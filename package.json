@@ -1,9 +1,9 @@
 {
-  "name": "virtual-nafree",
+  "name": "maiz-agents",
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Virtual Nafree: a store of AI employees for people who know nothing about AI.",
+  "description": "MAIZ agents: a store of AI employees for people who know nothing about AI.",
   "scripts": {
     "typecheck": "tsc --noEmit",
     "test": "vitest run",

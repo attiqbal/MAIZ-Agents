@@ -1,9 +1,9 @@
 {
-  "name": "virtual-nafree-web",
+  "name": "maiz-agents-web",
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Virtual Nafree website: marketing landing page, onboarding and control center.",
+  "description": "MAIZ agents website: marketing landing page, onboarding and control center.",
   "scripts": {
     "dev": "vite --host 0.0.0.0",
     "build": "tsc --noEmit && vite build",

@@ -213,9 +213,9 @@ describe("email sign-in", () => {
 
   it("the Resend sender posts the message and reports failures", async () => {
     let seen: any;
-    await new ResendEmailSender("key", "Nafree <hi@x.co>", (async (u: any, i: any) => { seen = { u, i }; return { ok: true }; }) as any).send({ to: "a@b.co", subject: "s", text: "t" });
+    await new ResendEmailSender("key", "MAIZ agents <hi@x.co>", (async (u: any, i: any) => { seen = { u, i }; return { ok: true }; }) as any).send({ to: "a@b.co", subject: "s", text: "t" });
     expect(seen.u).toBe("https://api.resend.com/emails");
-    expect(JSON.parse(seen.i.body)).toMatchObject({ from: "Nafree <hi@x.co>", to: ["a@b.co"] });
+    expect(JSON.parse(seen.i.body)).toMatchObject({ from: "MAIZ agents <hi@x.co>", to: ["a@b.co"] });
     await expect(new ResendEmailSender("k", "f", (async () => ({ ok: false, status: 422 })) as any).send({ to: "a", subject: "s", text: "t" })).rejects.toThrow(/422/);
   });
 });

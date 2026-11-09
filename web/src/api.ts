@@ -1,4 +1,4 @@
-// Thin client for the Virtual Nafree API. Every call fails soft: when the API is not running,
+// Thin client for the MAIZ agents API. Every call fails soft: when the API is not running,
 // the pages keep working as a demo.
 const TOKEN_KEY = "vn.token";
 export const getToken = (): string | null => { try { return localStorage.getItem(TOKEN_KEY); } catch { return null; } };
