@@ -161,6 +161,8 @@ function describe(task: TaskResult): string {
   switch (task.status) {
     case "ready_for_review":
       return task.deliverable ?? "";
+    case "queued":
+      return `Got it. This goes in your next batch, which runs at your closing time. I'll tell you when it's filed. Reply "urgent" with it if it can't wait.`;
     case "no_energy":
       return task.reason === "trial_ended"
         ? "Your free trial has ended. Choose a plan to keep your team working."

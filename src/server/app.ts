@@ -7,6 +7,8 @@ import { LedgerError } from "../modules/ledger/index.js";
 import { IntegrationError } from "../modules/integrations/index.js";
 import { ReviewError } from "../modules/review/index.js";
 import { PricingError } from "../modules/pricing/index.js";
+import { BatchError } from "../modules/batch/schedule.js";
+import { SettingsError } from "../modules/model-gateway/routing/settings.js";
 import { SignupError, type SignupChoices, type TeamSize } from "../modules/onboarding/index.js";
 import { getTemplate, TEMPLATES } from "../modules/workforce/templates.js";
 import { getJobDescription } from "../modules/workforce/job-descriptions.js";
@@ -250,9 +252,15 @@ export function createApp(p: Platform) {
     if (!userId) return json(401, { error: "sign in first" });
     // ---- MAIZ quality review: the platform owner's queue across every client. Clients get 403. ----
     if (path === "/api/owner/reviews" || path.startsWith("/api/owner/reviews/")) return ownerReviewRoutes(req, userId, body);
+    if (path === "/api/owner/ai" || path.startsWith("/api/owner/ai/")) return ownerAiRoutes(req, userId, body);
     if (path === "/api/owner/prices" || path.startsWith("/api/owner/prices/")) return ownerPriceRoutes(req, userId, body);
     if (path.startsWith("/api/owner/")) {
       if (!p.isPlatformOwner(userId)) return json(403, { error: "only the MAIZ platform owner can see this" });
+      if (method === "GET" && path === "/api/owner/batch") return json(200, p.batch.ownerView(userId));
+      if (method === "POST" && path === "/api/owner/batch/run-now") {
+        const run = await p.batch.runAllNow(userId);
+        return json(200, { started: !!run, run: run ?? null, ...p.batch.ownerView(userId) });
+      }
       if (method === "GET" && path === "/api/owner/clients") return json(200, { clients: p.clients(userId) });
       if (method === "GET" && path === "/api/owner/specialists") return json(200, { requests: p.specialists.queue(userId) });
       const d = /^\/api\/owner\/specialists\/([\w-]{1,64})\/decide$/.exec(path);
@@ -328,8 +336,25 @@ export function createApp(p: Platform) {
       if (text.length > 4000) throw new BadRequest("that is too long");
       const emp = p.workforce.team(userId, org.id).find((e) => e.id === b.employeeId);
       if (!emp) throw new BadRequest("pick one of your employees");
-      const task = await p.workforce.assign(userId, org.id, emp.id, text);
-      return json(200, { status: task.status, reason: task.reason, answer: task.deliverable, energyUsed: task.energyUsed });
+      const task = await p.workforce.assign(userId, org.id, emp.id, text, { urgent: b.urgent === true });
+      return json(200, { status: task.status, reason: task.reason, answer: task.deliverable, energyUsed: task.energyUsed, jobId: task.jobId, runsAt: task.runsAt, queueReason: task.queueReason });
+    }
+
+    // ---- batch queue: work that waits for the client's closing time ----
+    if (method === "GET" && path === "/api/queue") return json(200, p.batch.forClient(userId, org.id));
+    if (method === "POST" && path === "/api/queue/run-now") {
+      const run = await p.batch.runNow(userId, org.id);
+      return json(200, { started: !!run, ...p.batch.forClient(userId, org.id) });
+    }
+    const cancel = /^\/api\/queue\/([\w-]{1,64})\/cancel$/.exec(path);
+    if (method === "POST" && cancel) {
+      p.batch.cancel(userId, org.id, cancel[1]!);
+      return json(200, p.batch.forClient(userId, org.id));
+    }
+    if (method === "GET" && path === "/api/batch/schedule") return json(200, p.batch.forClient(userId, org.id));
+    if (method === "POST" && path === "/api/batch/schedule") {
+      p.batch.setSchedule(userId, org.id, body());
+      return json(200, p.batch.forClient(userId, org.id));
     }
 
     if (method === "GET" && path === "/api/finance/summary") {
@@ -384,6 +409,19 @@ export function createApp(p: Platform) {
         ? await p.reviews.approve(userId, m[1]!, { direction: str(b.direction), noteToClient: str(b.noteToClient), note: str(b.note), seenVersion: str(b.seenVersion) })
         : await p.reviews.requestInfo(userId, m[1]!, { question: str(b.question), note: str(b.note) });
       return json(200, { review: p.reviews.queue(userId).find((r) => r.id === item.id) });
+    }
+    return json(404, { error: "not found" });
+  }
+
+  /** AI spend and routing settings: the platform owner only (the service checks again). */
+  async function ownerAiRoutes(req: Req, userId: string, body: () => any): Promise<Res> {
+    if (!p.isPlatformOwner(userId)) return json(403, { error: "only the MAIZ platform owner can see AI spend" });
+    const { method, path } = req;
+    if (method === "GET" && path === "/api/owner/ai") return json(200, p.ai.overview(userId));
+    if (method === "GET" && path === "/api/owner/ai/health") return json(200, await p.ai.health(userId));
+    if (method === "POST" && path === "/api/owner/ai/settings") {
+      p.ai.update(userId, body());
+      return json(200, p.ai.overview(userId));
     }
     return json(404, { error: "not found" });
   }
@@ -455,7 +493,7 @@ export function createApp(p: Platform) {
     try {
       return await route(req);
     } catch (err) {
-      if (err instanceof BadRequest || err instanceof SetupError || err instanceof SignupError || err instanceof LedgerError || err instanceof ChannelError || err instanceof IntegrationError || err instanceof ReviewError || err instanceof PricingError) return json(400, { error: err.message });
+      if (err instanceof BadRequest || err instanceof SetupError || err instanceof SignupError || err instanceof LedgerError || err instanceof ChannelError || err instanceof IntegrationError || err instanceof ReviewError || err instanceof PricingError || err instanceof SettingsError || err instanceof BatchError) return json(400, { error: err.message });
       if (err instanceof PermissionError) return json(403, { error: "you don't have permission to do that" });
       console.error(`${req.method} ${req.path} failed:`, err);
       return json(500, { error: "something went wrong" });

@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+<head>
+<!--@include head title="AI spend and savings · MAIZ agents" description="The MAIZ platform owner sees what AI costs, what RunPod saves against Claude only, and edits models, thresholds and budget caps."-->
+<meta name="robots" content="noindex">
+</head>
+<body>
+<div class="page-top">
+  <!--@include header-->
+  <main id="main">
+    <section class="section">
+      <div class="container" style="max-width:1180px">
+        <!--@include owner-nav-->
+        <div class="rv-head">
+          <div><h1>AI spend and savings</h1>
+            <p class="sub">Open models on RunPod do the work and Claude checks it. This page shows what that cost this month against doing everything on Claude, and lets you change the models, quality bar and budget caps.</p></div>
+          <span class="badge badge-dark" id="ow-eg" hidden>Example data</span>
+        </div>
+        <div class="ob-panel" id="ow-gate" hidden aria-live="polite"><h2 id="ow-gate-h" style="font-size:1.25rem;margin:0 0 6px"></h2><p id="ow-gate-p" class="sub" style="margin:0 0 14px"></p><a class="btn btn-primary" id="ow-gate-a" href="/signin.html">Log in</a></div>
+        <div id="ow-body">
+          <div class="ow-stack">
+            <div class="kpis" id="ai-kpis"></div>
+            <section class="panel" aria-labelledby="ai-st-h"><div class="panel-h"><h2 id="ai-st-h">Providers and budgets</h2><button type="button" class="btn btn-quiet btn-sm r" id="ai-health">Check RunPod now</button></div>
+              <div class="ow-grid" id="ai-status"></div><p class="sub" id="ai-health-out" style="margin:12px 0 0" aria-live="polite"></p></section>
+            <section class="panel" aria-labelledby="ai-pol-h"><div class="panel-h"><h2 id="ai-pol-h">By kind of work, this month</h2></div>
+              <div class="tbl-wrap" tabindex="0" role="region" aria-label="Spend by kind of work, scrolls sideways on small screens"><table class="tbl" id="ai-policies"></table></div></section>
+            <section class="panel" aria-labelledby="ai-days-h"><div class="panel-h"><h2 id="ai-days-h">Last 30 days</h2></div>
+              <div class="tbl-wrap" tabindex="0" role="region" aria-label="Spend by day, scrolls sideways on small screens"><table class="tbl" id="ai-days"></table></div></section>
+            <section class="panel" aria-labelledby="ai-batch-h"><div class="panel-h"><h2 id="ai-batch-h">Batch queue</h2><button type="button" class="btn btn-quiet btn-sm r" id="ai-run-all">Run all now</button></div>
+              <p class="sub" style="margin:0 0 12px">Work that can wait is collected through the day and sent to RunPod together at each client's closing time, so the GPU starts once. Quick questions and urgent work are never queued.</p>
+              <div class="ow-stack" id="ai-batch" aria-live="polite"></div></section>
+            <form class="ow-stack" id="ai-form" novalidate>
+              <section class="panel" aria-labelledby="ai-set-h"><div class="panel-h"><h2 id="ai-set-h">Models, quality bar and budgets</h2><span class="r">Changes apply to the next task. Keys are never shown here: they live in the server's environment.</span></div>
+                <div class="ow-grid" id="ai-settings"></div></section>
+              <section class="panel" aria-labelledby="ai-rules-h"><div class="panel-h"><h2 id="ai-rules-h">Rules per kind of work</h2><span class="r">"Check rate" is the share of RunPod answers Claude reads. Suspicious answers are always checked.</span></div>
+                <div class="tbl-wrap" tabindex="0" role="region" aria-label="Routing rules, scrolls sideways on small screens"><table class="tbl" id="ai-rules"></table></div></section>
+              <div class="ow-save" aria-live="polite">
+                <span class="ow-changed" id="ai-changed">No changes yet</span>
+                <button type="submit" class="btn btn-primary" id="ai-save" disabled>Save changes</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+<!--@include footer-->
+<script type="module" src="/src/owner-ai.ts"></script>
+</body>
+</html>

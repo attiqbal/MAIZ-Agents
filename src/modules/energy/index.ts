@@ -127,8 +127,9 @@ export class EnergyMeter {
   }
 
   /** Record what a finished piece of work actually cost. */
-  record(workspaceId: string, employeeId: string, provider: string, inputTokens: number, outputTokens: number, overtime: boolean): UsageRecord {
-    const cost = costMicro(provider, inputTokens, outputTokens);
+  record(workspaceId: string, employeeId: string, provider: string, inputTokens: number, outputTokens: number, overtime: boolean, measuredCostMicro?: number): UsageRecord {
+    // The routing gateway measures the real cost of everything done for a task (answer, checks, redo); otherwise estimate from tokens.
+    const cost = measuredCostMicro ?? costMicro(provider, inputTokens, outputTokens);
     const rec: UsageRecord = {
       workspaceId,
       employeeId,

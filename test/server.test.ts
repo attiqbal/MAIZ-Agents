@@ -88,9 +88,12 @@ describe("ask and finance", () => {
   it("asks an employee and spends energy accounting", async () => {
     const { call, auth } = await signedUp();
     const org = (await call("GET", "/api/org", undefined, auth)).body as any;
-    const r = await call("POST", "/api/ask", { text: "Draft a post", employeeId: org.team[1].id }, auth);
+    const r = await call("POST", "/api/ask", { text: "Draft a post", employeeId: org.team[1].id, urgent: true }, auth);
     expect(r.status).toBe(200);
     expect((r.body as any).status).toBe("ready_for_review");
+    const q = await call("POST", "/api/ask", { text: "Draft a post", employeeId: org.team[1].id }, auth);
+    expect((q.body as any).status).toBe("queued");
+    expect((q.body as any).jobId).toBeTruthy();
     expect((await call("POST", "/api/ask", { text: "", employeeId: org.team[1].id }, auth)).status).toBe(400);
   });
   it("posts an entry and reports profit and loss", async () => {

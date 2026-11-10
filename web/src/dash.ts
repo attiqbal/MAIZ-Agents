@@ -3,6 +3,7 @@
 // so every screen tells the same story. Screens show an "Example data" tag when a real owner is signed in.
 import { toast } from "./common";
 import { initSignOff, proposalCount } from "./signoff-ui";
+import { initQueue } from "./queue-ui";
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
@@ -180,7 +181,7 @@ function renderCalendar(): void {
 }
 
 export function initDash(): void {
-  renderOverview(); renderTeam(); void initSignOff(); renderTasks(); renderUsage(); renderCalendar();
+  renderOverview(); renderTeam(); void initSignOff(); void initQueue(); renderTasks(); renderUsage(); renderCalendar();
   $("task-filter").addEventListener("click", (e) => {
     const b = (e.target as HTMLElement).closest<HTMLElement>("[data-who]");
     if (b) { taskFilter = b.dataset.who!; renderTasks(); $("task-filter").querySelector<HTMLElement>(`[data-who="${taskFilter}"]`)?.focus(); }

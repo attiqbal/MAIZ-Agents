@@ -872,3 +872,16 @@ body > main, body > .page-top { flex: none; }
 .ow-hist li:last-child { border-bottom: 0; }
 .ow-hist ul { margin: 0; padding-left: 18px; color: var(--color-ash); font-size: 13px; }
 .ow-hist { list-style: none; margin: 0; padding: 0; }
+
+/* AI spend page: provider status and budget meters */
+.field .lbl { font-size: 13px; color: var(--color-ash); }
+.field progress { width: 100%; height: 6px; border-radius: 6px; accent-color: var(--color-aurora-purple); }
+.field .hint.warn { color: var(--color-warn); }
+
+/* Batch queue (Tasks screen) and owner batch list */
+.q-list { display: flex; flex-direction: column; }
+.q-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--color-inkline); }
+.q-row > div { display: flex; flex-direction: column; gap: 2px; min-width: 0; overflow-wrap: anywhere; }
+.q-form { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 14px; }
+.q-form .field { min-width: 150px; }
+.ow-list { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 6px; color: var(--color-mist); font-size: 14px; }

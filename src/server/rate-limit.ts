@@ -31,6 +31,8 @@ export function limitFor(method: string, path: string): Limit | undefined {
   if (method !== "POST") return undefined;
   if (path === "/api/slack/events") return undefined; // signed by Slack, and Slack retries on 429
   if (path === "/api/signin/start" || path === "/api/signup") return { max: 10, windowMs: 10 * 60_000 };
+  // Run-now wakes the GPU pod, which is billed per second: keep it to a few presses an hour per address.
+  if (path === "/api/queue/run-now" || path === "/api/owner/batch/run-now") return { max: 6, windowMs: 60 * 60_000 };
   return { max: 60, windowMs: 60_000 };
 }
 
