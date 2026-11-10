@@ -16,6 +16,7 @@ const goodProd = {
   EMAIL_FROM: "MAIZ <hi@example.com>",
   APP_URL: "https://app.example.com",
   ANTHROPIC_API_KEY: "sk-x",
+  PLATFORM_OWNER_EMAILS: "owner@maiz.test",
 };
 
 describe("start-up checks", () => {
@@ -32,6 +33,11 @@ describe("start-up checks", () => {
     expect(p).toMatch(/ALLOW_DEV_AUTH/);
     expect(p).toMatch(/SESSION_SECRET/);
     expect(p).toMatch(/TOKEN_KEY/);
+  });
+  it("refuses production without a platform owner, and a bad owner email anywhere", () => {
+    expect(checkEnv({ ...goodProd, PLATFORM_OWNER_EMAILS: "" }).join("\n")).toMatch(/PLATFORM_OWNER_EMAILS is required/);
+    expect(checkEnv({ PLATFORM_OWNER_EMAILS: "atif@maiz.test, nope" }).join("\n")).toMatch(/comma-separated/);
+    expect(checkEnv({ PLATFORM_OWNER_EMAILS: "a@maiz.test, b@maiz.test" })).toEqual([]);
   });
   it("refuses half a Slack setup", () => expect(checkEnv({ SLACK_CLIENT_ID: "1" })[0]).toMatch(/Slack/));
 });

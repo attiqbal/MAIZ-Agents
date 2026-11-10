@@ -1,9 +1,11 @@
-import { createHash, createHmac, randomBytes, timingSafeEqual } from "node:crypto";
+import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
+import { userIdFor } from "./identity.js";
 import { SetupError } from "../modules/admin-manager/index.js";
 import { ChannelError, parseSlackEvent } from "../modules/channels/index.js";
 import { PermissionError } from "../modules/identity/index.js";
 import { LedgerError } from "../modules/ledger/index.js";
 import { IntegrationError } from "../modules/integrations/index.js";
+import { ReviewError } from "../modules/review/index.js";
 import { SignupError, type SignupChoices, type TeamSize } from "../modules/onboarding/index.js";
 import { getTemplate, TEMPLATES } from "../modules/workforce/templates.js";
 import { getJobDescription } from "../modules/workforce/job-descriptions.js";
@@ -67,7 +69,7 @@ export function readToken(secret: string, token: string | undefined, nowMs: numb
   }
 }
 
-export const userIdFor = (email: string) => `u_${createHash("sha256").update(email.trim().toLowerCase()).digest("hex").slice(0, 16)}`;
+export { userIdFor };
 const SIZES: Record<string, TeamSize> = { "just me": "solo", solo: "solo", "2–10": "2-10", "2-10": "2-10", "11–50": "11-50", "11-50": "11-50", "51+": "51+" };
 
 export function createApp(p: Platform) {
@@ -129,14 +131,15 @@ export function createApp(p: Platform) {
         text: `Click to sign in. The link works once and expires in 15 minutes.\n\n${base}/signin.html#token=${link}\n\nIf you didn't ask for this, ignore this email.`,
       }).catch(() => undefined);
       // Same answer whether or not the address has an account. In development the website skips the email step.
-      return json(200, p.cfg.allowDevAuth ? { ok: true, dev: true } : { ok: true });
+      // Development only: the link comes back in the reply, so an existing user (or the platform owner) can sign in without email.
+      return json(200, p.cfg.allowDevAuth ? { ok: true, dev: true, devLink: link } : { ok: true });
     }
     if (method === "POST" && path === "/api/signin/verify") {
       const c = readToken(secret, String(body().token ?? ""), p.now().getTime());
       if (!c || c.k !== "magic" || typeof c.e !== "string" || typeof c.n !== "string") return json(400, { error: "this sign-in link is invalid or has expired" });
       if (p.usedLinks.has(c.n)) return json(400, { error: "this sign-in link was already used" });
       p.usedLinks.add(c.n);
-      return json(200, { token: issueSession(c.e), email: c.e, hasOrganisation: !!orgOf(userIdFor(c.e)) });
+      return json(200, { token: issueSession(c.e), email: c.e, hasOrganisation: !!orgOf(userIdFor(c.e)), platformOwner: p.isPlatformOwner(userIdFor(c.e)) });
     }
 
     // ---- sign up: needs a verified email (or the development shortcut) ----
@@ -237,8 +240,26 @@ export function createApp(p: Platform) {
     // ---- everything below needs a signed-in user ----
     const userId = session(req);
     if (!userId) return json(401, { error: "sign in first" });
+    // ---- MAIZ quality review: the platform owner's queue across every client. Clients get 403. ----
+    if (path === "/api/owner/reviews" || path.startsWith("/api/owner/reviews/")) return ownerReviewRoutes(req, userId, body);
+    if (method === "GET" && path === "/api/me") return json(200, { platformOwner: p.isPlatformOwner(userId), hasOrganisation: !!orgOf(userId) });
+
     const org = orgOf(userId);
     if (!org) return json(404, { error: "no organisation yet" });
+
+    // ---- specialised tasks: the client follows them through quality review but never approves ----
+    if (method === "GET" && path === "/api/reviews") return json(200, { tasks: p.reviews.forClient(userId, org.id) });
+    if (method === "POST" && path === "/api/reviews") {
+      const item = await p.reviews.submit({ kind: "client", userId }, org.id, body());
+      return json(201, { task: p.reviews.forClient(userId, org.id).find((t) => t.id === item.id) });
+    }
+    const answer = /^\/api\/reviews\/([\w-]{1,64})\/answer$/.exec(path);
+    if (method === "POST" && answer) {
+      const b = body();
+      if (typeof b.label !== "string") throw new BadRequest("say which question you are answering");
+      await p.reviews.answer({ kind: "client", userId }, org.id, answer[1]!, b.label, b.value);
+      return json(200, { task: p.reviews.forClient(userId, org.id).find((t) => t.id === answer[1]) });
+    }
 
     if (method === "GET" && path === "/api/org") {
       const plan = p.energy.planOf(org.id);
@@ -322,6 +343,23 @@ export function createApp(p: Platform) {
     return json(404, { error: "not found" });
   }
 
+  /** Only the platform owner gets past the first line. The service checks again, so no route can skip it. */
+  async function ownerReviewRoutes(req: Req, userId: string, body: () => any): Promise<Res> {
+    if (!p.isPlatformOwner(userId)) return json(403, { error: "only the MAIZ platform owner can see quality review" });
+    const { method, path } = req;
+    if (method === "GET" && path === "/api/owner/reviews") return json(200, { reviews: p.reviews.queue(userId) });
+    const m = /^\/api\/owner\/reviews\/([\w-]{1,64})\/(approve|request-info)$/.exec(path);
+    if (method === "POST" && m) {
+      const b = body();
+      const str = (v: unknown) => (typeof v === "string" ? v : undefined);
+      const item = m[2] === "approve"
+        ? await p.reviews.approve(userId, m[1]!, { direction: str(b.direction), noteToClient: str(b.noteToClient), note: str(b.note) })
+        : await p.reviews.requestInfo(userId, m[1]!, { question: str(b.question), note: str(b.note) });
+      return json(200, { review: p.reviews.queue(userId).find((r) => r.id === item.id) });
+    }
+    return json(404, { error: "not found" });
+  }
+
   async function integrationRoutes(req: Req, userId: string, orgId: string, body: () => any): Promise<Res | undefined> {
     const { method, path } = req;
     const ig = p.integrations;
@@ -371,7 +409,7 @@ export function createApp(p: Platform) {
     try {
       return await route(req);
     } catch (err) {
-      if (err instanceof BadRequest || err instanceof SetupError || err instanceof SignupError || err instanceof LedgerError || err instanceof ChannelError || err instanceof IntegrationError) return json(400, { error: err.message });
+      if (err instanceof BadRequest || err instanceof SetupError || err instanceof SignupError || err instanceof LedgerError || err instanceof ChannelError || err instanceof IntegrationError || err instanceof ReviewError) return json(400, { error: err.message });
       if (err instanceof PermissionError) return json(403, { error: "you don't have permission to do that" });
       console.error(`${req.method} ${req.path} failed:`, err);
       return json(500, { error: "something went wrong" });

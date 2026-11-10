@@ -64,7 +64,7 @@ describe("sign-off gate for specialised tasks", () => {
     const ready = answerBrief(base, "Colours you like", "Deep green");
     const asked = requestMoreInfo(ready, "What do the two main competitors charge?");
     expect(proposalStage(asked)).toBe("needs_info");
-    expect(missingInfo(asked)).toEqual([{ label: "What do the two main competitors charge?", from: "employee" }]);
+    expect(missingInfo(asked)).toEqual([{ label: "What do the two main competitors charge?", from: "specialist" }]);
     expect(signOff(asked, new Date()).ok).toBe(false);
     expect(proposalStage(answerBrief(asked, "What do the two main competitors charge?", "£8 and £9.50 a bag"))).toBe("ready_for_sign_off");
     expect(requestMoreInfo(ready, "  ")).toBe(ready);

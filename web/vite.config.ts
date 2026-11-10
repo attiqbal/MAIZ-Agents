@@ -77,6 +77,7 @@ export default defineConfig({
         onboarding: resolve(__dirname, "onboarding.html"),
         app: resolve(__dirname, "app.html"),
         signin: resolve(__dirname, "signin.html"),
+        review: resolve(__dirname, "review.html"),
         employees: resolve(__dirname, "employees.html"),
         pricing: resolve(__dirname, "pricing.html"),
         security: resolve(__dirname, "security.html"),

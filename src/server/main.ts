@@ -2,7 +2,7 @@ import { randomBytes } from "node:crypto";
 import { createServer } from "node:http";
 import { join } from "node:path";
 import { createApp } from "./app.js";
-import { checkEnv, integrationAppsFromEnv } from "./config.js";
+import { checkEnv, integrationAppsFromEnv, platformOwnersFromEnv } from "./config.js";
 import { ResendEmailSender } from "./email.js";
 import { createPlatform } from "./platform.js";
 import { clientIp, limitFor, RateLimiter } from "./rate-limit.js";
@@ -28,6 +28,7 @@ const platform = createPlatform({
       ? { clientId: env.SLACK_CLIENT_ID, clientSecret: env.SLACK_CLIENT_SECRET, signingSecret: env.SLACK_SIGNING_SECRET, redirectUri: env.SLACK_REDIRECT_URI }
       : undefined,
   integrationApps: integrationAppsFromEnv(env, env.APP_URL ?? "http://localhost:5173"),
+  platformOwners: platformOwnersFromEnv(env),
 });
 
 let store: { close(): Promise<void> } | undefined;
@@ -42,6 +43,7 @@ if (env.DATABASE_URL) {
 } else {
   console.log("storage: memory (data resets on restart)");
 }
+if (!platformOwnersFromEnv(env).length) console.log("quality review: no PLATFORM_OWNER_EMAILS, so specialised tasks wait with no reviewer");
 if (!env.ANTHROPIC_API_KEY) console.log("ai: mock answers (ANTHROPIC_API_KEY is not set)");
 
 const handle = createApp(platform);

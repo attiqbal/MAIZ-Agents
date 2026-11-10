@@ -13,8 +13,10 @@ import { InMemoryModelProvisioner, InMemoryStorageProvisioner } from "../modules
 import { OnboardingService } from "../modules/onboarding/index.js";
 import { WorkforceService } from "../modules/workforce/index.js";
 import { IntegrationService, defaultRegistry, type OAuthApp } from "../modules/integrations/index.js";
+import { QualityReviewService } from "../modules/review/index.js";
 
 import { ConsoleEmailSender, type EmailSender } from "./email.js";
+import { userIdFor } from "./identity.js";
 
 export interface PlatformConfig {
   anthropicApiKey?: string;
@@ -29,6 +31,11 @@ export interface PlatformConfig {
   slack?: { clientId: string; clientSecret: string; signingSecret: string; redirectUri: string };
   /** Our OAuth app for each connector that has one (for example square), from environment variables. */
   integrationApps?: Record<string, OAuthApp>;
+  /**
+   * Emails of the MAIZ platform owner(s), from PLATFORM_OWNER_EMAILS. Only they see the quality review
+   * queue and sign off specialised tasks. Clients can never approve their own.
+   */
+  platformOwners?: readonly string[];
   now?: () => Date;
   http?: typeof fetch;
 }
@@ -52,6 +59,45 @@ export function createPlatform(cfg: PlatformConfig) {
   workforce.addContext((ws, templateKey) => integrations.contextFor(ws, templateKey));
   /** Welcomes new owners and runs setup. Storage and models are stand-ins until real RunPod/bucket provisioning is wired in. */
   const admin = new AdminManager(identity, workforce, audit, bus, new InMemoryStorageProvisioner(), new InMemoryModelProvisioner(), router, { now });
+  const email = cfg.email ?? new ConsoleEmailSender();
+  const base = (cfg.appUrl ?? "").replace(/\/$/, "");
+  /** Signed-in user ids of the platform owners (the same id the session carries). */
+  const ownerEmails = (cfg.platformOwners ?? []).map((e) => e.trim().toLowerCase()).filter(Boolean);
+  const ownerIds = new Set(ownerEmails.map(userIdFor));
+  const isPlatformOwner = (userId: string) => ownerIds.has(userId);
+  /** MAIZ quality review: every client's specialised tasks wait here for the platform owner's sign-off. */
+  const reviews = new QualityReviewService(identity, audit, isPlatformOwner, {
+    now,
+    notifyOwner: async (item, clientName) => {
+      for (const to of ownerEmails) {
+        await email.send({
+          to,
+          subject: `Quality review: ${item.proposal.title} for ${clientName}`,
+          text: `${clientName}'s ${item.proposal.employee} has compiled a brief for "${item.proposal.title}" and it is waiting for your sign-off.\n\nApprove a direction or ask for more information:\n${base}/review.html#${item.id}\n\nThe client sees "In quality review" until you decide.`,
+        });
+      }
+    },
+    notifyClient: async (item) => {
+      const chosen = item.proposal.directions?.find((d) => d.key === item.proposal.chosenDirection);
+      await admin.tell(item.workspaceId, `"${item.proposal.title}" passed quality review${chosen ? ` (direction: ${chosen.name})` : ""}. Your ${item.proposal.employee} has started the work.${item.noteToClient ? ` Note from MAIZ: ${item.noteToClient}` : ""}`, "/app.html#work");
+    },
+  });
+  /**
+   * A setup that could not undo itself needs a person. The Admin manager tells the client that MAIZ
+   * has been alerted, so this is where the platform owner actually is.
+   */
+  const alertOwners = async (subject: string, text: string) => {
+    for (const to of ownerEmails) await email.send({ to, subject, text }).catch((e) => console.error("owner alert failed:", e));
+    if (!ownerEmails.length) console.error(`platform alert (no PLATFORM_OWNER_EMAILS set): ${subject}`);
+  };
+  for (const type of ["setup.failed", "setup.rolled_back"]) {
+    bus.on(type, async (e) => {
+      const status = (e.payload as { status?: string }).status;
+      if (status !== "rollback_failed") return;
+      const client = identity.workspaceById(e.workspaceId)?.name ?? e.workspaceId;
+      await alertOwners(`Setup needs you: ${client}`, `${client}'s setup stopped and could not undo every step (${type}). The client was told MAIZ has been alerted and does not need to do anything.\n\nWorkspace: ${e.workspaceId}\nThe audit log has each step's result.`);
+    });
+  }
   /** Bot tokens by Slack team. Held in memory for now; encrypted storage comes with Postgres wiring. */
   const slackTokens = new Map<string, string>();
   router.register(new SlackChannel((team) => slackTokens.get(team) ?? "", cfg.http));
@@ -86,17 +132,17 @@ export function createPlatform(cfg: PlatformConfig) {
     for (const c of s.integrations ?? []) integrations.restoreConnection(c);
     for (const x of s.integrationSecrets ?? []) integrations.restoreSecret(x.connectionId, x.secret);
     for (const r of s.integrationRecords ?? []) integrations.restoreRecord(r);
+    for (const r of s.reviews ?? []) reviews.restore(r);
     sink = store;
-    for (const part of [audit, identity, energy, workforce, ledger, router, admin, integrations]) part.useSink(store);
+    for (const part of [audit, identity, energy, workforce, ledger, router, admin, integrations, reviews]) part.useSink(store);
   }
 
   const healthy = () => (sink as { healthy?: boolean } | undefined)?.healthy !== false;
 
-  const email = cfg.email ?? new ConsoleEmailSender();
   /** Sign-in links already used. In memory: a restart inside the 15-minute life of a link would allow one reuse. */
   const usedLinks = new Set<string>();
   /** Sign-in emails sent per address and hour, to stop the form being used to spam someone. */
   const sends = new Map<string, number[]>();
-  return { email, usedLinks, sends, admin, healthy, cfg, now, audit, bus, identity, energy, workforce, ledger, onboarding, router, integrations, slackTokens, saveSlackToken, attachStore };
+  return { email, usedLinks, sends, admin, reviews, isPlatformOwner, healthy, cfg, now, audit, bus, identity, energy, workforce, ledger, onboarding, router, integrations, slackTokens, saveSlackToken, attachStore };
 }
 export type Platform = ReturnType<typeof createPlatform>;

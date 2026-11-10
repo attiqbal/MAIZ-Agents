@@ -33,7 +33,7 @@ Creates your brand kit and writes the blogs, product copy, scripts and emails th
 ### How a pass works
 
 - You, or your Admin manager, give the consultant a brief. The consultant gathers everything it needs, compiles it into one summary with the directions it could take, and brings it to you with a plan that fits the days and the energy.
-- Nothing starts until you sign off. You either choose a direction and sign off, or ask for more information, and the consultant comes back with it. Sign-off stays locked while anything is missing.
+- Nothing starts until it passes MAIZ quality review. MAIZ checks the brief against what you asked for, then approves a direction or asks for more information, and the consultant comes back with it. Approval stays locked while anything is missing, and you see the approved direction before work starts.
 - You can also ask the consultant directly. The Admin manager stays informed and keeps the plan up to date.
 - The consultant stops at each approval point for your OK. Nothing is published, sent or paid for without you.
 - The Admin manager tracks days and energy and tells you at 80%. Work that will not fit is moved, trimmed or quoted as an extension.
@@ -76,6 +76,7 @@ Creates your brand kit and writes the blogs, product copy, scripts and emails th
 
 ### Working a pass
 
+- Compile every specialised task into one brief with the directions it could take, send it to MAIZ quality review, and start only after MAIZ approves
 - Work to the plan the Admin manager agrees with the owner, and fit it to the days and energy of the pass
 - Say before starting if a task will not fit, and offer a smaller version
 - Stop at every approval point and wait for the owner

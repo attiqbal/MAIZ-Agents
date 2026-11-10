@@ -35,8 +35,15 @@ PostgreSQL storage with row-level security by workspace, then Workforce (employe
 
 ## Sign-off gate and custom roles
 
-- `src/modules/workforce/signoff.ts`: specialised tasks (consultants, task-menu work) are proposals. The employee compiles a brief and the directions it could take; the owner asks for more information or signs off on one direction. `signOff` refuses while required information is missing or no direction is chosen, and `mayStart` is true only afterwards.
+- `src/modules/workforce/signoff.ts`: specialised tasks (consultants, task-menu work) are proposals. The specialist compiles a brief and the directions it could take. The rules: `signOff` refuses while required information is missing or no direction is chosen, and `mayStart` is true only afterwards.
+- `src/modules/review` (`QualityReviewService`): MAIZ quality review, the server-side gate. **The platform owner signs off, not the client.** Roles:
+  - *Client* (a business that hires MAIZ employees, workspace role `owner`/`admin`/`member`): asks for the work, answers the specialist's questions, follows status ("In quality review"). Cannot approve, pick a direction, or see review notes and unchosen directions.
+  - *Specialist*: compiles the brief and directions and submits it.
+  - *Platform owner* (MAIZ): signed-in emails listed in `PLATFORM_OWNER_EMAILS`. Sees one queue across every client (`GET /api/owner/reviews`, page `web/review.html`), approves a direction or asks for more information. Every other user gets 403.
+  - Status: `gathering_info` (client still answering) -> `in_review` (platform owner emailed) -> `more_info_requested` (back to the specialist) -> `in_review` ... -> `approved` (client told through the Admin manager; `mayStart` true). Every step is in the client's audit log with the actor (`user:`, `employee:`, `platform-owner:`). Items are stored as `state_records` kind `review` under the client's workspace.
+  - Client routes: `GET /api/reviews`, `POST /api/reviews` (submit a compiled brief, until the agent run loop does it itself), `POST /api/reviews/:id/answer`. Owner routes: `POST /api/owner/reviews/:id/approve` (`direction`, `noteToClient`, `note`), `POST /api/owner/reviews/:id/request-info` (`question`, `note`).
+- A setup that cannot undo itself (`rollback_failed`) emails the platform owner, since the client is told MAIZ has been alerted.
 - `src/modules/workforce/custom-roles.ts`: the Admin manager's role designer. `draftCustomRole` turns an owner's brief into a role blueprint and a full job description (same generator as blueprint specialists), flags regulated work and similar existing roles. The draft goes to the owner for sign-off.
-- Both are pure modules used by the website (`web/src/signoff-ui.ts`, `web/src/role-designer.ts`). Storing proposals and hiring a drafted specialist through the API are not built yet (see docs/AUDIT.md).
+- The rules are pure modules used by the website (`web/src/signoff-ui.ts` shows the client's tasks in review, `web/src/review.ts` is the platform owner's queue, `web/src/role-designer.ts`). Hiring a drafted specialist through the API is not built yet (see docs/AUDIT.md), and the agent run loop does not yet compile and submit briefs on its own.
 - `web/src/dash.ts` holds the control center dashboards' example data in one place.
 

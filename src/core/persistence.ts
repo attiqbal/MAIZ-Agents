@@ -6,6 +6,7 @@ import type { EnergyPlan, UsageRecord } from "../modules/energy/index.js";
 import type { Connection } from "../modules/channels/index.js";
 import type { AdminMessage, AdminOrgRecord } from "../modules/admin-manager/index.js";
 import type { IntegrationConnection, StoredRecord } from "../modules/integrations/service.js";
+import type { ReviewItem } from "../modules/review/index.js";
 
 /**
  * Where services report every change so it can be stored. Services stay fast and
@@ -32,6 +33,8 @@ export interface Sink {
   /** Credentials for a connected app as JSON. The store must encrypt it. Empty string means removed. */
   integrationSecret(workspaceId: string, connectionId: string, secret: string): void;
   integrationRecord(r: StoredRecord): void;
+  /** A specialised task in MAIZ quality review, replaced on every change. */
+  review(r: ReviewItem): void;
 }
 
 /** Everything stored, in the order it must be restored. */
@@ -54,4 +57,5 @@ export interface Snapshot {
   integrations?: IntegrationConnection[];
   integrationSecrets?: { connectionId: string; secret: string }[];
   integrationRecords?: StoredRecord[];
+  reviews?: ReviewItem[];
 }

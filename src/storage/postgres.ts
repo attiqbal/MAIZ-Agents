@@ -9,6 +9,7 @@ import type { AdminMessage, AdminOrgRecord } from "../modules/admin-manager/inde
 import type { Account, JournalEntry } from "../modules/ledger/index.js";
 import type { BusinessProfile, Employee } from "../modules/workforce/index.js";
 import type { IntegrationConnection, StoredRecord } from "../modules/integrations/service.js";
+import type { ReviewItem } from "../modules/review/index.js";
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
@@ -174,6 +175,10 @@ export class PgStore implements Sink {
   integrationRecord(r: StoredRecord): void {
     this.state(r.workspaceId, "int_record", r.id, r);
   }
+  review(r: ReviewItem): void {
+    // Stored under the client's workspace, so row-level security keeps one client's tasks from another.
+    this.state(r.workspaceId, "review", r.id, r);
+  }
   entry(e: JournalEntry): void {
     this.scoped(e.workspaceId, async (c) => {
       await c.query("INSERT INTO journal_entries(id, workspace_id, entry_date, memo, source, reverses) VALUES ($1,$2,$3,$4,$5,$6)", [e.id, e.workspaceId, e.date, e.memo, e.source ?? null, e.reverses ?? null]);
@@ -229,6 +234,7 @@ export class PgStore implements Sink {
       integrations: of("integration").map((s) => s.data),
       integrationSecrets: of("int_secret").filter((s) => s.data.enc).map((s) => ({ connectionId: s.id, secret: this.decrypt(s.data.enc) })),
       integrationRecords: of("int_record").map((s) => s.data),
+      reviews: of("review").map((s) => s.data),
     } as Snapshot;
   }
 

@@ -45,7 +45,7 @@ QA_URL=http://localhost:8787 npm run qa:flows  # 54 click-through checks
 ## Still open (not fixed here)
 
 - **The control center's figures are examples.** Signed-in owners see their real team, energy, apps and setup; tasks, finance, usage, compliance and approvals show example data with an "Example data" tag. Each needs an API endpoint.
-- **The sign-off gate and the role designer are not wired to the server.** The rules are tested (`src/modules/workforce/signoff.ts`, `custom-roles.ts`) and the screens work on example proposals, but proposals are not stored and a drafted specialist cannot be hired yet.
+- **Sign-off for specialised tasks goes to the platform owner, not the client** (corrected 2026-11-10). It is stored and enforced on the server (`src/modules/review`) with an owner-only queue (`web/review.html`). Not yet done: the agent run loop does not compile and submit briefs by itself (the API accepts them), and the role designer is not wired to the server, so a drafted specialist cannot be hired yet. Custom specialists are still approved only by the client.
 - **Payments.** Checkout is a placeholder. All prices are draft list prices.
 - **Docker image.** There is no Docker daemon in the session that did this audit, so the image was not built locally. The CI `docker` job builds and starts it.
 - **Screen readers.** Not tested with VoiceOver or NVDA.

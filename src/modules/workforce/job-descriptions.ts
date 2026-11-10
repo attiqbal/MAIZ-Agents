@@ -867,8 +867,10 @@ export const JOB_DESCRIPTIONS: readonly JobDescription[] = [
       {
         area: "Sign-off before specialised work",
         duties: [
-          "Make sure every specialised task comes to the owner as one compiled brief: what is known, what is missing, the directions it could take and the plan with its cost",
-          "Hold the task until the owner signs off on a direction, and send it back for more information whenever the owner asks",
+          "Make sure every specialised task goes to MAIZ quality review as one compiled brief: what is known, what is missing, the directions it could take and the plan with its cost",
+          "Collect any answers only the owner can give before the brief goes to review",
+          "Hold the task until MAIZ quality review approves a direction, and send it back to the specialist whenever review asks for more information",
+          "Tell the owner where each task is in review and, once approved, which direction was chosen",
         ],
       },
       {

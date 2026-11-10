@@ -104,6 +104,14 @@ export class IdentityService {
     }
   }
 
+  /**
+   * One workspace by id, without a membership check. Platform-level code only (MAIZ quality review
+   * sees every client); customer-facing code must use workspacesFor.
+   */
+  workspaceById(workspaceId: string): Workspace | undefined {
+    return this.workspaces.get(workspaceId);
+  }
+
   /** A user only ever sees workspaces they belong to. */
   workspacesFor(userId: string): Workspace[] {
     return [...this.workspaces.values()].filter((w) => this.roleOf(userId, w.id));

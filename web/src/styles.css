@@ -835,3 +835,18 @@ a.onode.add:hover { color: #fff; border-color: var(--color-sapphire-hairline); }
 body { min-height: 100vh; min-height: 100dvh; display: flex; flex-direction: column; }
 body > .footer { margin-top: auto; }
 body > main, body > .page-top { flex: none; }
+
+/* Quality review: the platform owner's queue (review.html) */
+.rv-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap; margin-bottom: 20px; }
+.rv-head h1 { font-size: 2rem; margin: 0 0 6px; }
+.rv-head .sub { max-width: 68ch; margin: 0; }
+.rv-list { margin-top: 16px; }
+.rv-meta { display: flex; gap: 6px 14px; flex-wrap: wrap; font-size: 12.5px; color: var(--color-ash); font-variant-numeric: tabular-nums; }
+.rv-meta b { color: var(--color-mist); font-weight: 500; }
+.rv-missing { color: var(--color-warn); }
+.rv-hist { margin: 0; padding-left: 18px; font-size: 12.5px; color: var(--color-ash); display: flex; flex-direction: column; gap: 2px; }
+.rv-acts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px 24px; border-top: 1px solid var(--color-inkline); padding-top: 14px; }
+.rv-acts form { display: flex; flex-direction: column; gap: 8px; }
+.rv-acts .acts { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.so-card:target { border-color: var(--color-frosted-lilac); }
+@media (max-width: 760px) { .rv-acts { grid-template-columns: 1fr; } }
