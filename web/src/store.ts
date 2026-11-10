@@ -2,6 +2,7 @@
 // pure cart module, so the page and /api/cart/quote always agree.
 import { BILLING_INFO, CATALOGUE, KIND_LABEL, MAX_QTY, getItem, quote, type Billing, type CartLine, type CatalogueItem } from "../../src/modules/store/cart";
 import { OVERAGE_RULE } from "../../src/modules/workforce/task-roles";
+import { HOW_A_PASS_WORKS } from "../../src/modules/workforce/consultants";
 import { getJobDescription, jdHtml } from "./jd";
 
 const KEY = "maiz.cart";
@@ -22,7 +23,7 @@ let cart: CartLine[] = [];
 function renderItem(): void {
   const item = getItem($<HTMLSelectElement>("store-pick").value);
   if (!item) { $("store-item").innerHTML = ""; return; }
-  const jd = getJobDescription(item.key);
+  const jd = getJobDescription(item.key.split(":")[0]!);
   const b = BILLING_INFO[item.billing];
   $("store-item").innerHTML = `<div class="store-head"><div><h3>${esc(item.title)}</h3><p class="jd-meta">${KIND_LABEL[item.kind]}</p></div><p class="store-price">${priceLabel(item)}</p></div>
     <p><span class="bill-tag bill-${item.billing}">${b.label}</span></p>
@@ -52,7 +53,7 @@ function renderCart(): void {
   $("cart-lines").innerHTML = q.lines.length
     ? section("monthly", q.lines.filter((l) => l.billing === "monthly"), q.monthlyGbp) + section("once", q.lines.filter((l) => l.billing === "once"), q.onceGbp)
     : `<p class="muted">Nothing here yet. Pick something on the left, or add a role from the org blueprint below.</p>`;
-  $("cart-totals").innerHTML = `<div><dt>Recurring, every month</dt><dd>${gbp(q.monthlyGbp)}</dd></div><div><dt>One-off, task based</dt><dd>${gbp(q.onceGbp)}</dd></div><div class="cart-due"><dt>Due today</dt><dd>${gbp(q.dueTodayGbp)}</dd></div>${q.monthlyGbp ? `<div><dt>From next month</dt><dd>${gbp(q.monthlyGbp)} / month</dd></div>` : ""}`;
+  $("cart-totals").innerHTML = `<div><dt>Recurring, every month</dt><dd>${gbp(q.monthlyGbp)}</dd></div><div><dt>One-off, consultant passes</dt><dd>${gbp(q.onceGbp)}</dd></div><div class="cart-due"><dt>Due today</dt><dd>${gbp(q.dueTodayGbp)}</dd></div>${q.monthlyGbp ? `<div><dt>From next month</dt><dd>${gbp(q.monthlyGbp)} / month</dd></div>` : ""}`;
   $<HTMLButtonElement>("cart-checkout").disabled = q.lines.length === 0;
 }
 
@@ -69,7 +70,7 @@ export function addToCart(key: string, qty = 1): string | undefined {
 
 export function initStore(): void {
   const groups = [...new Set(CATALOGUE.map((i) => i.group))];
-  $("store-pick").innerHTML = `<option value="">Choose an employee, specialist or task…</option>` +
+  $("store-pick").innerHTML = `<option value="">Choose an employee, specialist or consultant…</option>` +
     groups.map((g) => `<optgroup label="${esc(g)}">${CATALOGUE.filter((i) => i.group === g).map((i) => `<option value="${esc(i.key)}">${esc(i.title)} · ${priceLabel(i)}</option>`).join("")}</optgroup>`).join("");
   $("store-pick").addEventListener("change", renderItem);
   $("cart-lines").addEventListener("click", (e) => {
@@ -82,9 +83,9 @@ export function initStore(): void {
   });
   // Payments are not connected yet: say so plainly instead of pretending to charge.
   $("cart-checkout").addEventListener("click", () => {
-    $("cart-note").textContent = "Payments open soon. Your cart is saved on this device, and nothing has been charged. Monthly items will renew each month until you cancel; task items are paid once.";
+    $("cart-note").textContent = "Payments open soon. Your cart is saved on this device, and nothing has been charged. Monthly items will renew each month until you cancel; consultant passes are paid once.";
   });
-  $("task-rule").innerHTML = `<h3>How one-off tasks are billed</h3><ul>${OVERAGE_RULE.map((x) => `<li>${esc(x)}</li>`).join("")}</ul><p class="jd-note">Prices are list prices in GBP and may change before launch.</p>`;
+  $("task-rule").innerHTML = `<h3>How a consultant pass works</h3><ul>${HOW_A_PASS_WORKS.map((x) => `<li>${esc(x)}</li>`).join("")}</ul><h3>If a pass needs more energy</h3><ul>${OVERAGE_RULE.map((x) => `<li>${esc(x)}</li>`).join("")}</ul><p class="jd-note">Prices are list prices in GBP and may change before launch.</p>`;
   cart = load();
   renderCart();
 }

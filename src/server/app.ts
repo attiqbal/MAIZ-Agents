@@ -7,7 +7,8 @@ import { SignupError, type SignupChoices, type TeamSize } from "../modules/onboa
 import { getTemplate, TEMPLATES } from "../modules/workforce/templates.js";
 import { getJobDescription } from "../modules/workforce/job-descriptions.js";
 import { CUSTOM_SPECIALIST, DEPARTMENTS } from "../modules/workforce/blueprints.js";
-import { OVERAGE_RULE, TASK_ROLES } from "../modules/workforce/task-roles.js";
+import { OVERAGE_RULE } from "../modules/workforce/task-roles.js";
+import { CONSULTANTS, HOW_A_PASS_WORKS, menuOf } from "../modules/workforce/consultants.js";
 import { CATALOGUE, quote } from "../modules/store/cart.js";
 import type { Platform } from "./platform.js";
 
@@ -83,8 +84,9 @@ export function createApp(p: Platform) {
         // Every department and role of a typical business; roles without a ready-made employee are custom specialists.
         departments: DEPARTMENTS.map((d) => ({ key: d.key, name: d.name, mission: d.mission, roles: d.roles.map((r) => ({ key: r.key, title: r.title, purpose: r.purpose, readyMade: Boolean(r.jd) })) })),
         customSpecialist: CUSTOM_SPECIALIST,
-        // Task-based hires: one job, fixed price, included energy, one overage rule.
-        taskRoles: TASK_ROLES.map((r) => ({ key: r.key, title: r.title, category: r.category, purpose: r.purpose, fixedGbp: r.fixedGbp, includedEnergy: r.includedEnergy, turnaround: r.turnaround })),
+        // Consultants: one-off passes with an energy pool, and the task menu each can do.
+        consultants: CONSULTANTS.map((c) => ({ key: c.key, title: c.title, purpose: c.purpose, passes: c.passes, menu: menuOf(c.key).map((t) => ({ key: t.key, title: t.title, energy: t.includedEnergy })) })),
+        howAPassWorks: HOW_A_PASS_WORKS,
         overageRule: OVERAGE_RULE,
         // What can be added to a cart, and whether it is billed monthly or once.
         catalogue: CATALOGUE,

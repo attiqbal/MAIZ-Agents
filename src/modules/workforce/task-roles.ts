@@ -1,21 +1,22 @@
 /**
- * Task-based employees: hired for one job, like a freelancer, instead of joining
- * the team. Each has a fixed price for a defined scope, an included energy
- * allowance, and one overage rule. The Admin manager hires, briefs and sets
- * them up; the owner approves at the listed points.
+ * The task menu. Each entry is one job a consultant can be asked to do (consultants.ts
+ * groups them by skill). A consultant is hired for a time-boxed pass with a pool of
+ * energy, and the owner or the Admin manager picks tasks from the menu.
+ * `fixedGbp` is what the task would cost alone and is only used to size the pass
+ * prices; the pass is what is sold.
  *
  * Prices are draft list prices for the owner of MAIZ agents to confirm.
  * Pure data, no server imports: the website imports this file too.
  */
-import type { JobDescription } from "./job-descriptions.js";
-
 export interface TaskRole {
   key: string;
+  /** The consultant (consultants.ts) whose menu this task belongs to. */
+  consultant: string;
   title: string;
   category: string;
-  /** One sentence: the job this hire does. */
+  /** One sentence: the job this task does. */
   purpose: string;
-  /** What the fixed price covers. */
+  /** What this task covers. */
   scope: readonly string[];
   /** What it does not cover (quoted separately). */
   notIncluded: readonly string[];
@@ -28,22 +29,22 @@ export interface TaskRole {
   /** Typical time from approved brief to final delivery. */
   turnaround: string;
   tier: "standard" | "premium";
-  /** Fixed price in GBP for the scope above. */
+  /** What this task would cost on its own, in GBP. Only used to size pass prices. */
   fixedGbp: number;
-  /** Energy included in the fixed price. 1 energy = $0.001 of model cost. */
+  /** Typical energy for the task. 1 energy = $0.001 of model cost. */
   includedEnergy: number;
 }
 
-/** Price of extra energy once a task's included energy is used up, in GBP per 100 energy. */
+/** Price of extra energy once a pass's included energy is used up, in GBP per 100 energy. */
 export const OVERAGE_GBP_PER_100_ENERGY = 1;
-/** The Admin manager warns the owner when a task has used this share of its included energy. */
+/** The Admin manager warns the owner when a pass has used this share of its included energy. */
 export const OVERAGE_WARNING_SHARE = 0.8;
 
 export const OVERAGE_RULE = [
-  `Your Admin manager tells you when the task has used ${OVERAGE_WARNING_SHARE * 100}% of its included energy.`,
-  "When it is all used, work pauses. Nothing extra is charged until you choose: approve more energy up to a cap you set, cut the scope, or stop and keep what is done.",
+  `Your Admin manager tells you when the pass has used ${OVERAGE_WARNING_SHARE * 100}% of its included energy, and re-plans the remaining tasks to fit.`,
+  "When it is all used, work pauses. Nothing extra is charged until you choose: approve more energy up to a cap you set, drop a task, or stop and keep what is done.",
   `Approved extra energy costs £${OVERAGE_GBP_PER_100_ENERGY} per 100 energy, taken from your wallet.`,
-  "Redoing work because the employee got it wrong never counts against the allowance.",
+  "Redoing work because the consultant got it wrong never counts against the pass.",
 ] as const;
 
 export interface UsageCheck {
@@ -55,16 +56,16 @@ export interface UsageCheck {
 }
 
 /**
- * Where a task stands against its allowance. `approvedExtra` is the extra energy the
- * owner has approved so far; without it, work pauses at the limit.
+ * Where a pass stands against its energy. `approvedExtra` is the extra energy the owner
+ * has approved so far; without it, work pauses at the limit.
  */
-export function checkTaskUsage(role: TaskRole, energyUsed: number, approvedExtra = 0): UsageCheck {
+export function checkPassUsage(includedEnergy: number, energyUsed: number, approvedExtra = 0): UsageCheck {
   const used = Math.max(0, Math.floor(energyUsed));
-  const includedLeft = Math.max(0, role.includedEnergy - used);
-  const overageEnergy = Math.max(0, used - role.includedEnergy);
+  const includedLeft = Math.max(0, includedEnergy - used);
+  const overageEnergy = Math.max(0, used - includedEnergy);
   const overageGbp = Math.ceil(overageEnergy / 100) * OVERAGE_GBP_PER_100_ENERGY;
-  if (used < role.includedEnergy * OVERAGE_WARNING_SHARE) return { status: "within", includedLeft, overageEnergy, overageGbp };
-  if (used < role.includedEnergy) return { status: "warn", includedLeft, overageEnergy, overageGbp };
+  if (used < includedEnergy * OVERAGE_WARNING_SHARE) return { status: "within", includedLeft, overageEnergy, overageGbp };
+  if (used < includedEnergy) return { status: "warn", includedLeft, overageEnergy, overageGbp };
   if (overageEnergy < approvedExtra) return { status: "overage", includedLeft, overageEnergy, overageGbp };
   return { status: "paused", includedLeft, overageEnergy, overageGbp };
 }
@@ -74,7 +75,7 @@ const t = (x: TaskRole) => x;
 export const TASK_ROLES: readonly TaskRole[] = [
   // ---- Web and technology ----
   t({
-    key: "website-developer", title: "Website developer", category: "Web and technology", tier: "premium",
+    key: "website-developer", consultant: "web-developer", title: "Website developer", category: "Web and technology", tier: "premium",
     purpose: "Builds a small business website from your brief, ready to publish.",
     scope: ["Up to 5 pages (for example home, about, services, pricing, contact)", "Mobile-friendly design in your brand colours", "Contact form, basic SEO and analytics set-up", "Two rounds of changes"],
     notIncluded: ["Online shop or bookings system", "Logo design", "Domain and hosting fees", "Copywriting beyond the page text from your brief"],
@@ -86,7 +87,7 @@ export const TASK_ROLES: readonly TaskRole[] = [
     turnaround: "5 to 10 working days", fixedGbp: 249, includedEnergy: 6000,
   }),
   t({
-    key: "landing-page-builder", title: "Landing page builder", category: "Web and technology", tier: "standard",
+    key: "landing-page-builder", consultant: "web-developer", title: "Landing page builder", category: "Web and technology", tier: "standard",
     purpose: "Builds one high-converting landing page for a product, offer or campaign.",
     scope: ["One page with copy, layout and a clear call to action", "Sign-up or contact form", "One round of changes"],
     notIncluded: ["Paid ads set-up", "Payment checkout"],
@@ -98,7 +99,7 @@ export const TASK_ROLES: readonly TaskRole[] = [
     turnaround: "2 to 4 working days", fixedGbp: 79, includedEnergy: 1500,
   }),
   t({
-    key: "website-fixer", title: "Website fixer", category: "Web and technology", tier: "standard",
+    key: "website-fixer", consultant: "web-developer", title: "Website fixer", category: "Web and technology", tier: "standard",
     purpose: "Fixes a batch of problems or small changes on an existing website.",
     scope: ["Up to 10 small fixes or changes from one list", "Speed and broken-link check", "Before and after notes"],
     notIncluded: ["Redesigns or new pages", "Work on sites we cannot access safely"],
@@ -110,7 +111,7 @@ export const TASK_ROLES: readonly TaskRole[] = [
     turnaround: "1 to 3 working days", fixedGbp: 49, includedEnergy: 1000,
   }),
   t({
-    key: "automation-builder", title: "Automation builder", category: "Web and technology", tier: "premium",
+    key: "automation-builder", consultant: "web-developer", title: "Automation builder", category: "Web and technology", tier: "premium",
     purpose: "Automates one repetitive workflow between the tools you already use.",
     scope: ["One workflow (for example form to spreadsheet to email)", "Testing with sample data", "Simple guide to run and change it"],
     notIncluded: ["Paid automation-tool subscriptions", "Custom software beyond the workflow"],
@@ -122,7 +123,7 @@ export const TASK_ROLES: readonly TaskRole[] = [
     turnaround: "3 to 5 working days", fixedGbp: 99, includedEnergy: 2500,
   }),
   t({
-    key: "data-cleaner", title: "Data clean-up specialist", category: "Web and technology", tier: "standard",
+    key: "data-cleaner", consultant: "web-developer", title: "Data clean-up specialist", category: "Web and technology", tier: "standard",
     purpose: "Cleans, de-duplicates and restructures a messy spreadsheet or contact list.",
     scope: ["One file up to 5,000 rows", "Duplicates, formats and missing values fixed", "Summary of what changed"],
     notIncluded: ["Buying or enriching data from outside sources"],
@@ -135,7 +136,7 @@ export const TASK_ROLES: readonly TaskRole[] = [
   }),
   // ---- Design and content ----
   t({
-    key: "brand-designer", title: "Brand kit designer", category: "Design and content", tier: "standard",
+    key: "brand-designer", consultant: "content-creator", title: "Brand kit designer", category: "Design and content", tier: "standard",
     purpose: "Creates a simple brand kit: logo ideas, colours, fonts and how to use them.",
     scope: ["3 logo concepts, 1 refined", "Colour palette and font pairing", "One-page brand guide", "Two rounds of changes"],
     notIncluded: ["Trademark registration", "Printed materials"],
@@ -147,7 +148,7 @@ export const TASK_ROLES: readonly TaskRole[] = [
     turnaround: "3 to 5 working days", fixedGbp: 99, includedEnergy: 2000,
   }),
   t({
-    key: "pitch-deck-writer", title: "Pitch deck writer", category: "Design and content", tier: "premium",
+    key: "pitch-deck-writer", consultant: "finance-funding-consultant", title: "Pitch deck writer", category: "Design and content", tier: "premium",
     purpose: "Writes and lays out an investor or sales pitch deck.",
     scope: ["Up to 15 slides", "Story, copy and simple charts from your numbers", "Two rounds of changes"],
     notIncluded: ["Financial model (see Financial modeller)", "Custom illustrations"],
@@ -159,7 +160,7 @@ export const TASK_ROLES: readonly TaskRole[] = [
     turnaround: "3 to 5 working days", fixedGbp: 129, includedEnergy: 3000,
   }),
   t({
-    key: "blog-writer", title: "Blog writer", category: "Design and content", tier: "standard",
+    key: "blog-writer", consultant: "content-creator", title: "Blog writer", category: "Design and content", tier: "standard",
     purpose: "Writes a pack of search-friendly blog articles in your voice.",
     scope: ["4 articles of about 1,000 words", "Keyword brief for each", "One round of changes"],
     notIncluded: ["Publishing on your site", "Original photography"],
@@ -171,7 +172,7 @@ export const TASK_ROLES: readonly TaskRole[] = [
     turnaround: "4 to 6 working days", fixedGbp: 69, includedEnergy: 2000,
   }),
   t({
-    key: "product-copywriter", title: "Product description writer", category: "Design and content", tier: "standard",
+    key: "product-copywriter", consultant: "content-creator", title: "Product description writer", category: "Design and content", tier: "standard",
     purpose: "Writes clear, selling product descriptions for your shop.",
     scope: ["Up to 50 products", "Title, description and key features", "One round of changes"],
     notIncluded: ["Uploading to your shop", "Product photography"],
@@ -183,7 +184,7 @@ export const TASK_ROLES: readonly TaskRole[] = [
     turnaround: "2 to 4 working days", fixedGbp: 59, includedEnergy: 1500,
   }),
   t({
-    key: "video-scriptwriter", title: "Video scriptwriter", category: "Design and content", tier: "standard",
+    key: "video-scriptwriter", consultant: "content-creator", title: "Video scriptwriter", category: "Design and content", tier: "standard",
     purpose: "Writes scripts for short videos and explainer clips.",
     scope: ["Up to 5 scripts under 90 seconds", "Shot list for each", "One round of changes"],
     notIncluded: ["Filming and editing"],
@@ -195,7 +196,7 @@ export const TASK_ROLES: readonly TaskRole[] = [
     turnaround: "2 to 3 working days", fixedGbp: 49, includedEnergy: 1000,
   }),
   t({
-    key: "email-sequence-writer", title: "Email sequence writer", category: "Design and content", tier: "standard",
+    key: "email-sequence-writer", consultant: "content-creator", title: "Email sequence writer", category: "Design and content", tier: "standard",
     purpose: "Writes a welcome, nurture or win-back email sequence.",
     scope: ["Up to 6 emails", "Subject lines with test variants", "Timing plan"],
     notIncluded: ["Email platform set-up"],
@@ -208,7 +209,7 @@ export const TASK_ROLES: readonly TaskRole[] = [
   }),
   // ---- Marketing and research ----
   t({
-    key: "seo-auditor", title: "SEO auditor", category: "Marketing and research", tier: "standard",
+    key: "seo-auditor", consultant: "growth-consultant", title: "SEO auditor", category: "Marketing and research", tier: "standard",
     purpose: "Audits your website's search performance and gives a fix list in priority order.",
     scope: ["Technical, on-page and content audit of up to 50 pages", "Keyword gap list", "Prioritised fix plan"],
     notIncluded: ["Making the fixes (see Website fixer)", "Link building"],
@@ -220,7 +221,7 @@ export const TASK_ROLES: readonly TaskRole[] = [
     turnaround: "2 to 4 working days", fixedGbp: 79, includedEnergy: 2000,
   }),
   t({
-    key: "ads-campaign-builder", title: "Ad campaign builder", category: "Marketing and research", tier: "standard",
+    key: "ads-campaign-builder", consultant: "growth-consultant", title: "Ad campaign builder", category: "Marketing and research", tier: "standard",
     purpose: "Plans and writes one paid ad campaign ready to launch.",
     scope: ["One platform (for example Google or Meta)", "Audience, budget plan and 10 ad variants", "Launch checklist"],
     notIncluded: ["Ad spend", "Running the campaign after launch"],
@@ -232,7 +233,7 @@ export const TASK_ROLES: readonly TaskRole[] = [
     turnaround: "2 to 4 working days", fixedGbp: 89, includedEnergy: 1800,
   }),
   t({
-    key: "social-launch-planner", title: "Social media launch planner", category: "Marketing and research", tier: "standard",
+    key: "social-launch-planner", consultant: "growth-consultant", title: "Social media launch planner", category: "Marketing and research", tier: "standard",
     purpose: "Plans and writes 30 days of social posts for a launch or a fresh start.",
     scope: ["30 posts across up to 2 platforms", "Content calendar", "Hashtag and timing guide"],
     notIncluded: ["Posting and replying (see Social media manager)", "Paid promotion"],
@@ -244,7 +245,7 @@ export const TASK_ROLES: readonly TaskRole[] = [
     turnaround: "3 to 5 working days", fixedGbp: 79, includedEnergy: 2000,
   }),
   t({
-    key: "market-research-analyst", title: "Market research analyst", category: "Marketing and research", tier: "premium",
+    key: "market-research-analyst", consultant: "growth-consultant", title: "Market research analyst", category: "Marketing and research", tier: "premium",
     purpose: "Researches a market or idea and reports size, customers, competitors and risks.",
     scope: ["One market or product idea", "Market size estimate with method", "Up to 10 competitors compared", "Customer segments and risks"],
     notIncluded: ["Paid survey panels", "Interviews with real people"],
@@ -257,7 +258,7 @@ export const TASK_ROLES: readonly TaskRole[] = [
   }),
   // ---- Finance, legal and funding ----
   t({
-    key: "business-plan-writer", title: "Business plan writer", category: "Finance, legal and funding", tier: "premium",
+    key: "business-plan-writer", consultant: "finance-funding-consultant", title: "Business plan writer", category: "Finance, legal and funding", tier: "premium",
     purpose: "Writes a complete business plan for a bank, investor or your own direction.",
     scope: ["Full plan: summary, market, offer, operations, team, finances", "Uses your numbers or the Financial modeller's", "Two rounds of changes"],
     notIncluded: ["Financial model (separate task)", "Submitting the plan"],
@@ -269,7 +270,7 @@ export const TASK_ROLES: readonly TaskRole[] = [
     turnaround: "5 to 8 working days", fixedGbp: 199, includedEnergy: 5000,
   }),
   t({
-    key: "financial-modeller", title: "Financial modeller", category: "Finance, legal and funding", tier: "premium",
+    key: "financial-modeller", consultant: "finance-funding-consultant", title: "Financial modeller", category: "Finance, legal and funding", tier: "premium",
     purpose: "Builds a 3-year financial model with scenarios from your numbers.",
     scope: ["3-year profit and loss, cash flow and balance sheet", "Three scenarios", "Assumptions sheet"],
     notIncluded: ["Audit or accountant sign-off", "Tax advice"],
@@ -281,7 +282,7 @@ export const TASK_ROLES: readonly TaskRole[] = [
     turnaround: "4 to 6 working days", fixedGbp: 179, includedEnergy: 4500,
   }),
   t({
-    key: "bookkeeping-catch-up", title: "Bookkeeping catch-up", category: "Finance, legal and funding", tier: "premium",
+    key: "bookkeeping-catch-up", consultant: "finance-funding-consultant", title: "Bookkeeping catch-up", category: "Finance, legal and funding", tier: "premium",
     purpose: "Brings late books up to date and hands them to your Finance manager or accountant.",
     scope: ["Up to 3 months of transactions (about 300)", "Categorised, reconciled and checked", "List of missing documents"],
     notIncluded: ["Tax returns or filings", "More than 3 months (quoted per extra month)"],
@@ -293,7 +294,7 @@ export const TASK_ROLES: readonly TaskRole[] = [
     turnaround: "3 to 5 working days", fixedGbp: 149, includedEnergy: 4000,
   }),
   t({
-    key: "grant-writer", title: "Grant application writer", category: "Finance, legal and funding", tier: "premium",
+    key: "grant-writer", consultant: "finance-funding-consultant", title: "Grant application writer", category: "Finance, legal and funding", tier: "premium",
     purpose: "Finds a suitable grant and writes the application.",
     scope: ["Eligibility check for up to 3 grants", "One full application", "One round of changes"],
     notIncluded: ["Submitting the application", "Success fees"],
@@ -305,7 +306,7 @@ export const TASK_ROLES: readonly TaskRole[] = [
     turnaround: "5 to 10 working days", fixedGbp: 199, includedEnergy: 5000,
   }),
   t({
-    key: "tender-writer", title: "Tender response writer", category: "Finance, legal and funding", tier: "premium",
+    key: "tender-writer", consultant: "finance-funding-consultant", title: "Tender response writer", category: "Finance, legal and funding", tier: "premium",
     purpose: "Writes one tender or bid response to the buyer's questions.",
     scope: ["One tender up to 20 questions", "Compliance checklist against the buyer's rules"],
     notIncluded: ["Submitting the tender", "Pricing decisions"],
@@ -317,7 +318,7 @@ export const TASK_ROLES: readonly TaskRole[] = [
     turnaround: "5 to 10 working days", fixedGbp: 199, includedEnergy: 5000,
   }),
   t({
-    key: "policy-pack-writer", title: "Website legal pack writer", category: "Finance, legal and funding", tier: "premium",
+    key: "policy-pack-writer", consultant: "people-ops-consultant", title: "Website legal pack writer", category: "Finance, legal and funding", tier: "premium",
     purpose: "Drafts the standard legal pages a business website needs, for a lawyer to check.",
     scope: ["Privacy notice, cookie notice, terms of use or sale", "Tailored to your country and how you trade"],
     notIncluded: ["Legal advice or a lawyer's sign-off", "Contracts with named parties"],
@@ -330,7 +331,7 @@ export const TASK_ROLES: readonly TaskRole[] = [
   }),
   // ---- People and operations ----
   t({
-    key: "recruitment-campaign", title: "Recruitment campaign runner", category: "People and operations", tier: "standard",
+    key: "recruitment-campaign", consultant: "people-ops-consultant", title: "Recruitment campaign runner", category: "People and operations", tier: "standard",
     purpose: "Runs the paperwork side of hiring for one role, from job ad to shortlist.",
     scope: ["Job description and ad", "Screening questions and scorecard", "Shortlist from up to 50 applications you share"],
     notIncluded: ["Job board fees", "Interviewing candidates"],
@@ -342,7 +343,7 @@ export const TASK_ROLES: readonly TaskRole[] = [
     turnaround: "5 to 10 working days", fixedGbp: 129, includedEnergy: 3000,
   }),
   t({
-    key: "handbook-writer", title: "Staff handbook writer", category: "People and operations", tier: "premium",
+    key: "handbook-writer", consultant: "people-ops-consultant", title: "Staff handbook writer", category: "People and operations", tier: "premium",
     purpose: "Drafts a staff handbook and core HR policies for your country.",
     scope: ["Handbook with up to 12 policies", "Tailored to your country, size and way of working"],
     notIncluded: ["Employment-law advice or a lawyer's sign-off"],
@@ -354,7 +355,7 @@ export const TASK_ROLES: readonly TaskRole[] = [
     turnaround: "4 to 6 working days", fixedGbp: 149, includedEnergy: 3500,
   }),
   t({
-    key: "sop-writer", title: "Process (SOP) writer", category: "People and operations", tier: "standard",
+    key: "sop-writer", consultant: "people-ops-consultant", title: "Process (SOP) writer", category: "People and operations", tier: "standard",
     purpose: "Writes step-by-step procedures for work that is repeated.",
     scope: ["Up to 5 procedures from your notes or a walkthrough", "Checklists for each"],
     notIncluded: ["Software set-up"],
@@ -366,7 +367,7 @@ export const TASK_ROLES: readonly TaskRole[] = [
     turnaround: "2 to 4 working days", fixedGbp: 69, includedEnergy: 1500,
   }),
   t({
-    key: "event-planner", title: "Event planner", category: "People and operations", tier: "standard",
+    key: "event-planner", consultant: "people-ops-consultant", title: "Event planner", category: "People and operations", tier: "standard",
     purpose: "Plans a business event, launch or workshop from idea to run sheet.",
     scope: ["Plan, budget, timeline and supplier shortlist", "Invitations and run sheet"],
     notIncluded: ["Booking or paying suppliers", "Attending the event"],
@@ -381,53 +382,4 @@ export const TASK_ROLES: readonly TaskRole[] = [
 
 export function getTaskRole(key: string): TaskRole | undefined {
   return TASK_ROLES.find((r) => r.key === key);
-}
-
-export function priceText(role: TaskRole): string {
-  return `£${role.fixedGbp} fixed · ${role.includedEnergy.toLocaleString("en-GB")} energy included`;
-}
-
-/** A full job description for a task-based employee. */
-export function taskJobDescription(key: string): JobDescription | undefined {
-  const role = getTaskRole(key);
-  if (!role) return undefined;
-  return {
-    key: role.key,
-    jobTitle: role.title,
-    department: `Task hire · ${role.category}`,
-    reportsTo: "Owner",
-    worksWith: ["Admin manager (hires, briefs, tracks the allowance and collects approvals)", "Any team member whose work this task feeds"],
-    purpose: `${role.purpose} Hired for one task at a fixed price, not as a permanent team member.`,
-    responsibilities: [
-      { area: "Scope covered by the fixed price", duties: role.scope },
-      { area: "Approval points", duties: role.approvalPoints.map((a) => `Stop and get the owner's approval: ${a}`) },
-      { area: "Documentation and legal records", duties: ["Keep every record listed below complete and hand them over at the end", "Know the legal requirements of the job and say when a rule must be confirmed for the owner's country"] },
-    ],
-    legal: role.legal,
-    records: role.records,
-    competencies: role.skills.map((skill) => ({ skill, level: "Advanced" as const, detail: "Applied to this task and checked by the owner at each approval point." })),
-    knowledge: [`Good practice for ${role.title.toLowerCase()} work`, "The owner's brief and business profile"],
-    tools: [{ name: "Business profile and setup answers", status: "available" }],
-    deliverables: role.deliverables.map((d) => {
-      const share = Math.round(role.includedEnergy / role.deliverables.length);
-      return { name: d, cadence: "Once, for this task", energy: [Math.round(share / 2), share] as const };
-    }),
-    kpis: ["Delivered within the turnaround and the included energy", "Approved at each approval point without major rework", "Every required record handed over"],
-    authority: {
-      autonomous: ["Work through the agreed scope as drafts", "Keep this task's records"],
-      needsApproval: [...role.approvalPoints, "Any work outside the scope", "Using energy beyond the included allowance"],
-      never: ["Go beyond the included energy without the owner's approval", "Publish, submit, send or pay for anything", "Give legal, tax or financial advice", "Invent facts, figures or rules"],
-    },
-    escalate: ["Anything with legal, tax, safety or financial risk: tell the owner and recommend a qualified professional"],
-    handover: ["A brief of what you want", "Examples you like", "Access or files the task needs", ...role.notIncluded.map((n) => `Not included: ${n}`)],
-    engagement: {
-      fixedGbp: role.fixedGbp,
-      includedEnergy: role.includedEnergy,
-      turnaround: role.turnaround,
-      scope: role.scope,
-      notIncluded: role.notIncluded,
-      approvalPoints: role.approvalPoints,
-      overageRule: OVERAGE_RULE,
-    },
-  };
 }

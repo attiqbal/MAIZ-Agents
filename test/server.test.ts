@@ -62,8 +62,8 @@ describe("signup and org", () => {
   });
   it("prices a cart without sign-in, and refuses a malformed one", async () => {
     const s = setup();
-    const r = (await s.call("POST", "/api/cart/quote", { lines: [{ key: "website-developer", qty: 1 }] })).body as any;
-    expect(r.onceGbp).toBe(249);
+    const r = (await s.call("POST", "/api/cart/quote", { lines: [{ key: "web-developer:month", qty: 1 }] })).body as any;
+    expect(r.onceGbp).toBe(349);
     expect((await s.call("POST", "/api/cart/quote", { lines: "x" })).status).toBe(400);
   });
   it("requires a session for everything else", async () => {

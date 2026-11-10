@@ -79,6 +79,11 @@
       "viewport": "1440x900",
       "artifact": "store-billing-1440x900.png",
       "observation": "Cart groups items under 'Recurring \u00b7 monthly' and 'One-off \u00b7 task based' headings, each with its own billing note; totals show Recurring, One-off, Due today and From next month. Blueprint roles show a Core \u00b7 included, Recurring or One-off tag and an Add to cart button (core roles say 'Included in every package'). No console errors."
+    },
+    {
+      "viewport": "1440x900",
+      "artifact": "store-consultants-1440.png",
+      "observation": "Picker lists 5 consultants x 2 passes under 'One-off \u00b7 consultants'; opening one shows its passes, merged task menu, how a pass works, overage rule and merged job description; cart shows a 30-day pass (\u00a3349) and a 7-day sprint (\u00a3129) under the One-off heading, Due today \u00a3478. No console errors, no overflow."
     }
   ]
 }

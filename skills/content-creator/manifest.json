@@ -1,0 +1,119 @@
+{
+  "name": "content-creator",
+  "title": "Brand and content creator",
+  "department": "Consultant · one-off pass",
+  "lane": "standard",
+  "tools": [
+    {
+      "name": "Business profile and setup answers",
+      "status": "available"
+    }
+  ],
+  "authority": {
+    "autonomous": [
+      "Work through the agreed plan as drafts",
+      "Keep the records for each task"
+    ],
+    "needsApproval": [
+      "Concept choice",
+      "Final kit",
+      "Topics and keywords",
+      "Drafts",
+      "Style sample of 3 products",
+      "Full set",
+      "Ideas",
+      "Final scripts",
+      "Plan",
+      "Emails",
+      "Any work outside the menu or the agreed plan",
+      "Using energy beyond the pass"
+    ],
+    "never": [
+      "Go beyond the pass's energy without the owner's approval",
+      "Publish, submit, send or pay for anything",
+      "Give legal, tax or financial advice",
+      "Invent facts, figures or rules"
+    ]
+  },
+  "deliverables": [
+    {
+      "name": "Brand kit designer: Logo files, Brand guide",
+      "cadence": "3 to 5 working days",
+      "energy": [
+        1000,
+        2000
+      ]
+    },
+    {
+      "name": "Blog writer: Keyword briefs, 4 finished articles",
+      "cadence": "4 to 6 working days",
+      "energy": [
+        1000,
+        2000
+      ]
+    },
+    {
+      "name": "Product description writer: Spreadsheet of descriptions ready to import",
+      "cadence": "2 to 4 working days",
+      "energy": [
+        750,
+        1500
+      ]
+    },
+    {
+      "name": "Video scriptwriter: Scripts, Shot lists",
+      "cadence": "2 to 3 working days",
+      "energy": [
+        500,
+        1000
+      ]
+    },
+    {
+      "name": "Email sequence writer: Sequence plan, Finished emails",
+      "cadence": "2 to 3 working days",
+      "energy": [
+        600,
+        1200
+      ]
+    }
+  ],
+  "engagement": {
+    "type": "consultant-pass",
+    "passes": [
+      {
+        "label": "7-day sprint",
+        "days": 7,
+        "gbp": 79,
+        "energy": 2500
+      },
+      {
+        "label": "30-day pass",
+        "days": 30,
+        "gbp": 249,
+        "energy": 9000
+      }
+    ],
+    "menu": [
+      {
+        "task": "Brand kit designer",
+        "energy": 2000
+      },
+      {
+        "task": "Blog writer",
+        "energy": 2000
+      },
+      {
+        "task": "Product description writer",
+        "energy": 1500
+      },
+      {
+        "task": "Video scriptwriter",
+        "energy": 1000
+      },
+      {
+        "task": "Email sequence writer",
+        "energy": 1200
+      }
+    ]
+  }
+}

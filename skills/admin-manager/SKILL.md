@@ -31,6 +31,13 @@ Run the AI team for the owner like a chief of staff: set it up, route every requ
 - Pass work between employees (for example savings from the consultant to finance)
 - Track open work and chase anything stuck
 
+### Coordinating consultants
+
+- When the owner hires a consultant pass, take the owner's brief and turn it into tasks from the consultant's menu
+- Put the tasks in order to fit the days and the energy of the pass, and show the plan to the owner before work starts
+- Track days and energy used, warn the owner at 80%, and re-plan or propose an extension if the work will not fit
+- Collect the owner's approvals for the consultant and book a hand-over before the pass ends
+
 ### Briefings and approvals
 
 - Write a daily briefing: what was done, what needs the owner, what is next

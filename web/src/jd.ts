@@ -5,6 +5,7 @@ import { JOB_DESCRIPTIONS, energyText, getJobDescription, type JobDescription } 
 export { JOB_DESCRIPTIONS, getJobDescription };
 
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
+const gbp = (n: number) => `£${n.toLocaleString("en-GB")}`;
 const ul = (xs: readonly string[]) => `<ul>${xs.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>`;
 
 /** `level` is the heading level for section titles, so headings never skip a level on the page. */
@@ -13,7 +14,7 @@ export function jdHtml(jd: JobDescription, level: 3 | 4 | 5 = 4): string {
   return `<div class="jd-body">
   <p class="jd-meta">${esc(jd.department)} · reports to the ${esc(jd.reportsTo.toLowerCase())}</p>
   <${h}>Role summary</${h}><p>${esc(jd.purpose)}</p>
-  ${jd.engagement ? `<${h}>The deal</${h}><p class="jd-area">£${jd.engagement.fixedGbp} fixed · ${jd.engagement.includedEnergy.toLocaleString("en-GB")} energy included · ${esc(jd.engagement.turnaround)}</p><p class="jd-area">Covered</p>${ul(jd.engagement.scope)}<p class="jd-area">Not included</p>${ul(jd.engagement.notIncluded)}<p class="jd-area">You approve</p>${ul(jd.engagement.approvalPoints)}<p class="jd-area">If the included energy runs out</p>${ul(jd.engagement.overageRule)}` : ""}
+  ${jd.engagement ? engagementHtml(jd.engagement, h) : ""}
   <${h}>Key responsibilities</${h}>${jd.responsibilities.map((r) => `<p class="jd-area">${esc(r.area)}</p>${ul(r.duties)}`).join("")}
   <${h}>Skills and competencies</${h}>
   <table class="jd-table"><thead><tr><th>Skill</th><th>Level</th></tr></thead><tbody>${jd.competencies.map((c) => `<tr><td><b>${esc(c.skill)}</b><span>${esc(c.detail)}</span></td><td><span class="jd-lvl jd-${c.level.toLowerCase()}">${c.level}</span></td></tr>`).join("")}</tbody></table>
@@ -30,4 +31,13 @@ export function jdHtml(jd: JobDescription, level: 3 | 4 | 5 = 4): string {
   <${h}>When it brings in a qualified person</${h}>${ul(jd.escalate)}
   <${h}>What it needs from you to take over</${h}>${ul(jd.handover)}
 </div>`;
+}
+
+function engagementHtml(e: NonNullable<JobDescription["engagement"]>, h: string): string {
+  return `<${h}>Passes</${h}>
+  <table class="jd-table"><thead><tr><th>Pass</th><th>Price · energy</th></tr></thead><tbody>${e.passes.map((p) => `<tr><td><b>${esc(p.label)}</b><span>${p.days} days, paid once</span></td><td class="mono">${gbp(p.gbp)} · ${p.energy.toLocaleString("en-GB")}</td></tr>`).join("")}</tbody></table>
+  <${h}>Task menu</${h}>
+  <table class="jd-table"><thead><tr><th>Task</th><th>Typical energy</th></tr></thead><tbody>${e.menu.map((m) => `<tr><td><b>${esc(m.task)}</b><span>${esc(m.summary)}</span><span>${esc(m.deliverables.join(", "))} · ${esc(m.turnaround)}</span></td><td class="mono">${m.energy.toLocaleString("en-GB")}</td></tr>`).join("")}</tbody></table>
+  <${h}>How a pass works</${h}>${ul(e.howItWorks)}
+  <${h}>If the included energy runs out</${h}>${ul(e.overageRule)}`;
 }

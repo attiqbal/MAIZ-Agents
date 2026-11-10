@@ -1,5 +1,5 @@
 import { getBlueprint } from "./blueprints.js";
-import { getTaskRole, priceText } from "./task-roles.js";
+import { getConsultant, menuOf } from "./consultants.js";
 
 /**
  * Employee templates are the products in the future Agent Store. A store
@@ -23,7 +23,7 @@ export interface EmployeeTemplate {
    * "employee" is hired into a package. "manager" is the free Admin manager that every
    * organisation gets: it onboards the owner, sets up the team and runs it. It is never sold.
    */
-  kind: "employee" | "manager" | "specialist" | "task";
+  kind: "employee" | "manager" | "specialist" | "consultant";
 }
 
 export const TEMPLATES: readonly EmployeeTemplate[] = [
@@ -102,7 +102,7 @@ export const TEMPLATES: readonly EmployeeTemplate[] = [
     capabilities: ["Introduces your team and what each employee can do", "Collects your setup form and trains the team on it", "Creates your storage and prepares your AI models", "Routes work and writes your daily briefing"],
     firstJob: "Welcome and setup form",
     instructions:
-      "You are the Admin manager of a small business on MAIZ agents. You run the AI team for the owner: you welcome them, explain in plain words what each employee does, collect the information the team needs, set the team up, route requests to the right employee, and write a short daily briefing. You never do the specialists' work yourself, you never spend money, and you never change settings without the owner's approval. If you do not know which employee should handle something, ask one short question.",
+      "You are the Admin manager of a small business on MAIZ agents. You run the AI team for the owner: you welcome them, explain in plain words what each employee does, collect the information the team needs, set the team up, route requests to the right employee, write a short daily briefing, and coordinate any consultant the owner hires: turn the owner's brief into tasks from the consultant's menu, order them to fit the days and energy of the pass, track use, warn at 80%, and book a hand-over before the pass ends. You never do the specialists' work yourself, you never spend money, and you never change settings without the owner's approval. If you do not know which employee should handle something, ask one short question.",
   },
 ];
 
@@ -130,22 +130,22 @@ export function specialistTemplate(key: string): EmployeeTemplate | undefined {
   };
 }
 
-/** A task-based hire (task-roles.ts): one job, fixed price, included energy. */
-export function taskTemplate(key: string): EmployeeTemplate | undefined {
-  const role = getTaskRole(key);
-  if (!role) return undefined;
+/** A consultant (consultants.ts): hired for a 7 or 30 day pass with a pool of energy. */
+export function consultantTemplate(key: string): EmployeeTemplate | undefined {
+  const c = getConsultant(key);
+  if (!c) return undefined;
   return {
-    key: role.key,
-    title: role.title,
-    summary: `${role.purpose} ${priceText(role)}.`,
-    tier: role.tier,
-    kind: "task",
-    capabilities: role.scope,
-    firstJob: role.deliverables[0] ?? "Agreed brief",
-    instructions: `You are a ${role.title} hired by a small business for one task, like a freelancer. ${role.purpose} Work only from the owner's brief and what the team gives you, stay inside the agreed scope, and stop for the owner's approval at each approval point. Never invent facts, figures or rules. You draft and deliver files and documents; you never publish, submit, send or pay for anything yourself. You do not give legal, tax or financial advice: say when a qualified professional should check.`,
+    key: c.key,
+    title: c.title,
+    summary: `${c.purpose} Hired for a 7 or 30 day pass.`,
+    tier: c.tier,
+    kind: "consultant",
+    capabilities: menuOf(key).map((t) => t.title),
+    firstJob: "Plan for the pass, agreed with you and your Admin manager",
+    instructions: `You are a ${c.title}, hired by a small business as a consultant for a time-boxed pass, like a freelancer. ${c.purpose} Work only from the owner's brief and what the team gives you, stay inside your task menu, and stop for the owner's approval at each approval point. Never invent facts, figures or rules. You draft and deliver files and documents; you never publish, submit, send or pay for anything yourself. You do not give legal, tax or financial advice: say when a qualified professional should check.`,
   };
 }
 
 export function getTemplate(key: string): EmployeeTemplate | undefined {
-  return TEMPLATES.find((t) => t.key === key) ?? specialistTemplate(key) ?? taskTemplate(key);
+  return TEMPLATES.find((t) => t.key === key) ?? specialistTemplate(key) ?? consultantTemplate(key);
 }

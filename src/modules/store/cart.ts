@@ -2,19 +2,19 @@
  * The agent store's catalogue and cart. Everything a business can add on top
  * of its package, with how it is billed:
  *  - "monthly": ready-made add-on employees and custom specialists (recurring)
- *  - "once": task-based hires (fixed price per task, energy included)
+ *  - "once": consultant passes (7 or 30 days with an energy pool, paid once)
  *
  * Pure: no payments happen here. Prices are draft list prices in GBP for the
- * owner of MAIZ agents to confirm; tasks take their price from task-roles.ts.
+ * owner of MAIZ agents to confirm; consultant passes take their price from consultants.ts.
  * The website imports this file too, so the cart and the API always agree.
  */
 import { EMPLOYEE_TEMPLATES } from "../workforce/templates.js";
 import { DEPARTMENTS } from "../workforce/blueprints.js";
-import { TASK_ROLES } from "../workforce/task-roles.js";
+import { CONSULTANTS } from "../workforce/consultants.js";
 import { STANDARD_TEAM } from "../onboarding/index.js";
 
 export type Billing = "monthly" | "once";
-export type ItemKind = "employee" | "specialist" | "task";
+export type ItemKind = "employee" | "specialist" | "consultant";
 
 /**
  * How each kind of item is paid for, in the words shown next to the price and in the cart.
@@ -29,14 +29,14 @@ export const BILLING_INFO: Record<Billing, { label: string; short: string; note:
   once: {
     label: "One-off · task based",
     short: "once",
-    note: "Paid once for this task. No subscription. The employee leaves the team when the task is delivered.",
+    note: "Paid once for a time-boxed pass. No subscription. The consultant joins your team for the pass, then leaves; you can add another pass any time.",
   },
 };
 
 export const KIND_LABEL: Record<ItemKind, string> = {
   employee: "Ready-made employee",
   specialist: "Custom specialist",
-  task: "Task-based consultant",
+  consultant: "Consultant pass",
 };
 
 export interface CatalogueItem {
@@ -45,6 +45,10 @@ export interface CatalogueItem {
   kind: ItemKind;
   billing: Billing;
   priceGbp: number;
+  /** Pass length in days (consultants only). */
+  days?: number;
+  /** Energy included (consultants only). */
+  energy?: number;
   /** Group label for the picker, e.g. "Finance and accounting". */
   group: string;
   summary: string;
@@ -69,10 +73,12 @@ export const CATALOGUE: readonly CatalogueItem[] = [
       group: `Specialists · ${d.name}`, summary: r.purpose,
     })),
   ),
-  ...TASK_ROLES.map((r) => ({
-    key: r.key, title: r.title, kind: "task" as const, billing: "once" as const,
-    priceGbp: r.fixedGbp, group: `One-off tasks · ${r.category}`, summary: r.purpose,
-  })),
+  ...CONSULTANTS.flatMap((c) =>
+    c.passes.map((p) => ({
+      key: `${c.key}:${p.key}`, title: `${c.title} · ${p.label}`, kind: "consultant" as const, billing: "once" as const,
+      priceGbp: p.gbp, days: p.days, energy: p.energy, group: "One-off · consultants", summary: c.purpose,
+    })),
+  ),
 ];
 
 /** True for roles that come with every package: they cannot be added to a cart. */

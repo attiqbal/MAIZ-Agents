@@ -1,0 +1,132 @@
+{
+  "name": "finance-funding-consultant",
+  "title": "Finance and funding consultant",
+  "department": "Consultant · one-off pass",
+  "lane": "premium",
+  "tools": [
+    {
+      "name": "Business profile and setup answers",
+      "status": "available"
+    }
+  ],
+  "authority": {
+    "autonomous": [
+      "Work through the agreed plan as drafts",
+      "Keep the records for each task"
+    ],
+    "needsApproval": [
+      "Outline",
+      "Draft deck",
+      "Draft plan",
+      "Assumptions",
+      "Final model",
+      "Category rules",
+      "Final books",
+      "Grant choice",
+      "Application before you submit",
+      "Bid or no-bid",
+      "Answers before you submit",
+      "Any work outside the menu or the agreed plan",
+      "Using energy beyond the pass"
+    ],
+    "never": [
+      "Go beyond the pass's energy without the owner's approval",
+      "Publish, submit, send or pay for anything",
+      "Give legal, tax or financial advice",
+      "Invent facts, figures or rules"
+    ]
+  },
+  "deliverables": [
+    {
+      "name": "Pitch deck writer: Deck outline, Finished deck, Speaker notes",
+      "cadence": "3 to 5 working days",
+      "energy": [
+        1500,
+        3000
+      ]
+    },
+    {
+      "name": "Business plan writer: Business plan document, One-page summary",
+      "cadence": "5 to 8 working days",
+      "energy": [
+        2500,
+        5000
+      ]
+    },
+    {
+      "name": "Financial modeller: Spreadsheet model, Summary of key numbers",
+      "cadence": "4 to 6 working days",
+      "energy": [
+        2250,
+        4500
+      ]
+    },
+    {
+      "name": "Bookkeeping catch-up: Up-to-date ledger, Trial balance, Missing-documents list",
+      "cadence": "3 to 5 working days",
+      "energy": [
+        2000,
+        4000
+      ]
+    },
+    {
+      "name": "Grant application writer: Eligibility notes, Completed application",
+      "cadence": "5 to 10 working days",
+      "energy": [
+        2500,
+        5000
+      ]
+    },
+    {
+      "name": "Tender response writer: Answers, Compliance checklist",
+      "cadence": "5 to 10 working days",
+      "energy": [
+        2500,
+        5000
+      ]
+    }
+  ],
+  "engagement": {
+    "type": "consultant-pass",
+    "passes": [
+      {
+        "label": "7-day sprint",
+        "days": 7,
+        "gbp": 129,
+        "energy": 4000
+      },
+      {
+        "label": "30-day pass",
+        "days": 30,
+        "gbp": 399,
+        "energy": 14000
+      }
+    ],
+    "menu": [
+      {
+        "task": "Pitch deck writer",
+        "energy": 3000
+      },
+      {
+        "task": "Business plan writer",
+        "energy": 5000
+      },
+      {
+        "task": "Financial modeller",
+        "energy": 4500
+      },
+      {
+        "task": "Bookkeeping catch-up",
+        "energy": 4000
+      },
+      {
+        "task": "Grant application writer",
+        "energy": 5000
+      },
+      {
+        "task": "Tender response writer",
+        "energy": 5000
+      }
+    ]
+  }
+}

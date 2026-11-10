@@ -1,0 +1,119 @@
+{
+  "name": "web-developer",
+  "title": "Web and automation developer",
+  "department": "Consultant · one-off pass",
+  "lane": "premium",
+  "tools": [
+    {
+      "name": "Business profile and setup answers",
+      "status": "available"
+    }
+  ],
+  "authority": {
+    "autonomous": [
+      "Work through the agreed plan as drafts",
+      "Keep the records for each task"
+    ],
+    "needsApproval": [
+      "Sitemap and page plan",
+      "Home page design preview",
+      "Full site before publishing",
+      "Copy and layout",
+      "Page before publishing",
+      "Fix list and plan",
+      "Changes before they go live",
+      "Workflow map",
+      "Test run before switching on",
+      "Clean-up rules before they are applied",
+      "Any work outside the menu or the agreed plan",
+      "Using energy beyond the pass"
+    ],
+    "never": [
+      "Go beyond the pass's energy without the owner's approval",
+      "Publish, submit, send or pay for anything",
+      "Give legal, tax or financial advice",
+      "Invent facts, figures or rules"
+    ]
+  },
+  "deliverables": [
+    {
+      "name": "Website developer: Sitemap and page plan, Design preview of the home page, Finished website files and publishing guide, Handover notes: how to edit and what was built",
+      "cadence": "5 to 10 working days",
+      "energy": [
+        3000,
+        6000
+      ]
+    },
+    {
+      "name": "Landing page builder: Page copy, Finished page and publishing guide",
+      "cadence": "2 to 4 working days",
+      "energy": [
+        750,
+        1500
+      ]
+    },
+    {
+      "name": "Website fixer: Fix list with status, Changed files or step-by-step instructions",
+      "cadence": "1 to 3 working days",
+      "energy": [
+        500,
+        1000
+      ]
+    },
+    {
+      "name": "Automation builder: Workflow map, Working automation or exact set-up steps, Run guide",
+      "cadence": "3 to 5 working days",
+      "energy": [
+        1250,
+        2500
+      ]
+    },
+    {
+      "name": "Data clean-up specialist: Clean file, Change summary and list of rows needing your decision",
+      "cadence": "1 to 2 working days",
+      "energy": [
+        400,
+        800
+      ]
+    }
+  ],
+  "engagement": {
+    "type": "consultant-pass",
+    "passes": [
+      {
+        "label": "7-day sprint",
+        "days": 7,
+        "gbp": 99,
+        "energy": 3000
+      },
+      {
+        "label": "30-day pass",
+        "days": 30,
+        "gbp": 349,
+        "energy": 12000
+      }
+    ],
+    "menu": [
+      {
+        "task": "Website developer",
+        "energy": 6000
+      },
+      {
+        "task": "Landing page builder",
+        "energy": 1500
+      },
+      {
+        "task": "Website fixer",
+        "energy": 1000
+      },
+      {
+        "task": "Automation builder",
+        "energy": 2500
+      },
+      {
+        "task": "Data clean-up specialist",
+        "energy": 800
+      }
+    ]
+  }
+}

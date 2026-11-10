@@ -13,7 +13,7 @@
  * Mostly data, so it is allowed past the usual 800-line source-file ceiling.
  */
 import { specialistJobDescription } from "./blueprints.js";
-import { taskJobDescription } from "./task-roles.js";
+import { consultantJobDescription } from "./consultants.js";
 
 export type Level = "Expert" | "Advanced" | "Working";
 
@@ -75,16 +75,16 @@ export interface JobDescription {
   escalate: readonly string[];
   /** What the employee needs from the owner to take over the job. */
   handover: readonly string[];
-  /** Set for task-based hires: what the fixed price covers and how extra usage is handled. */
+  /** Set for consultants: the passes on sale, the task menu and how a pass runs. */
   engagement?: Engagement;
 }
 
 export interface Engagement {
-  fixedGbp: number;
-  includedEnergy: number;
-  turnaround: string;
-  scope: readonly string[];
-  notIncluded: readonly string[];
+  /** What can be bought: a short sprint or a longer pass, each with an energy pool. */
+  passes: readonly { label: string; days: number; gbp: number; energy: number }[];
+  /** The jobs a consultant can be asked to do during a pass. */
+  menu: readonly { task: string; summary: string; energy: number; turnaround: string; deliverables: readonly string[]; notIncluded: readonly string[] }[];
+  howItWorks: readonly string[];
   approvalPoints: readonly string[];
   overageRule: readonly string[];
 }
@@ -830,6 +830,15 @@ export const JOB_DESCRIPTIONS: readonly JobDescription[] = [
         ],
       },
       {
+        area: "Coordinating consultants",
+        duties: [
+          "When the owner hires a consultant pass, take the owner's brief and turn it into tasks from the consultant's menu",
+          "Put the tasks in order to fit the days and the energy of the pass, and show the plan to the owner before work starts",
+          "Track days and energy used, warn the owner at 80%, and re-plan or propose an extension if the work will not fit",
+          "Collect the owner's approvals for the consultant and book a hand-over before the pass ends",
+        ],
+      },
+      {
         area: "Briefings and approvals",
         duties: [
           "Write a daily briefing: what was done, what needs the owner, what is next",
@@ -897,9 +906,9 @@ export const JOB_DESCRIPTIONS: readonly JobDescription[] = [
   },
 ];
 
-/** A ready-made employee's JD, one built from the org blueprint for a custom specialist, or a task hire's. */
+/** A ready-made employee's JD, one built from the org blueprint for a custom specialist, or a consultant's. */
 export function getJobDescription(key: string): JobDescription | undefined {
-  return JOB_DESCRIPTIONS.find((j) => j.key === key) ?? specialistJobDescription(key) ?? taskJobDescription(key);
+  return JOB_DESCRIPTIONS.find((j) => j.key === key) ?? specialistJobDescription(key) ?? consultantJobDescription(key);
 }
 
 /** Typical energy for a deliverable, as text, e.g. "8–25 energy". */
@@ -934,12 +943,13 @@ export function renderJobDescription(jd: JobDescription): string {
 }
 
 function engagementPrompt(e: Engagement): string {
+  const passes = e.passes.map((p) => `${p.label} (${p.energy} energy)`).join(" or ");
   return [
-    `You are hired for one task at a fixed price of £${e.fixedGbp}, with ${e.includedEnergy} energy included.`,
-    `Covered: ${e.scope.join("; ")}.`,
-    `Not covered (say so and suggest a separate quote): ${e.notIncluded.join("; ")}.`,
+    `You are hired as a consultant for a time-boxed pass: ${passes}. The Admin manager tells you which pass you are on and when it ends.`,
+    `Your task menu:\n${e.menu.map((m) => `- ${m.task} (about ${m.energy} energy): ${m.summary} Not included: ${m.notIncluded.join("; ")}.`).join("\n")}`,
+    `How a pass works:\n${e.howItWorks.map((h) => `- ${h}`).join("\n")}`,
     `Stop for the owner's approval at: ${e.approvalPoints.join("; ")}.`,
-    "Plan the work to fit the included energy. If it will not fit, say so before starting.",
+    "Plan the work to fit the days and energy of the pass. If it will not fit, say so before starting and offer a smaller version.",
   ].join("\n");
 }
 
@@ -1033,23 +1043,27 @@ export function renderSkillMd(jd: JobDescription): string {
 function engagementMd(e: Engagement): string[] {
   const list = (xs: readonly string[]) => xs.map((x) => `- ${x}`).join("\n");
   return [
-    "## Engagement: task hire",
+    "## Engagement: consultant pass",
     "",
-    `**Fixed price:** £${e.fixedGbp} · **Included energy:** ${e.includedEnergy} · **Turnaround:** ${e.turnaround}`,
+    "| Pass | Days | Price | Energy included |",
+    "| --- | --- | --- | --- |",
+    ...e.passes.map((p) => `| ${p.label} | ${p.days} | £${p.gbp} | ${p.energy} |`),
     "",
-    "**Covered by the fixed price:**",
+    "### Task menu",
     "",
-    list(e.scope),
+    "| Task | Typical energy | Turnaround | Deliverables |",
+    "| --- | --- | --- | --- |",
+    ...e.menu.map((m) => `| ${m.task} | ${m.energy} | ${m.turnaround} | ${m.deliverables.join(", ")} |`),
     "",
-    "**Not included:**",
+    "### How a pass works",
     "",
-    list(e.notIncluded),
+    list(e.howItWorks),
     "",
-    "**Approval points:**",
+    "### Approval points",
     "",
     list(e.approvalPoints),
     "",
-    "**If the included energy runs out:**",
+    "### If the included energy runs out",
     "",
     list(e.overageRule),
     "",
@@ -1068,7 +1082,7 @@ export function renderManifest(jd: JobDescription, tier: string): string {
         tools: jd.tools,
         authority: jd.authority,
         deliverables: jd.deliverables.map((d) => ({ name: d.name, cadence: d.cadence, energy: d.energy })),
-        ...(jd.engagement ? { engagement: { type: "task", fixedGbp: jd.engagement.fixedGbp, includedEnergy: jd.engagement.includedEnergy, turnaround: jd.engagement.turnaround } } : {}),
+        ...(jd.engagement ? { engagement: { type: "consultant-pass", passes: jd.engagement.passes, menu: jd.engagement.menu.map((m) => ({ task: m.task, energy: m.energy })) } } : {}),
       },
       null,
       2,

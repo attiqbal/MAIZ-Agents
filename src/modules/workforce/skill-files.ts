@@ -1,11 +1,11 @@
 import { JOB_DESCRIPTIONS, getJobDescription, renderManifest, renderSkillMd } from "./job-descriptions.js";
 import { allRoles } from "./blueprints.js";
-import { TASK_ROLES } from "./task-roles.js";
+import { CONSULTANTS } from "./consultants.js";
 import { getTemplate } from "./templates.js";
 
-/** Every role the Admin manager can hire: ready-made employees, custom specialists and task hires. */
+/** Every role the Admin manager can hire: ready-made employees, custom specialists and consultants. */
 export function allHireableKeys(): string[] {
-  const keys = [...JOB_DESCRIPTIONS.map((j) => j.key), ...allRoles().map((r) => r.key), ...TASK_ROLES.map((r) => r.key)];
+  const keys = [...JOB_DESCRIPTIONS.map((j) => j.key), ...allRoles().map((r) => r.key), ...CONSULTANTS.map((c) => c.key)];
   return [...new Set(keys)];
 }
 
