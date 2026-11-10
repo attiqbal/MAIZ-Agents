@@ -84,7 +84,7 @@ export function getPass(consultantKey: string, passKey: string): Pass | undefine
 /** How a pass works. Shown in the store, in the job description and to the employee. */
 export const HOW_A_PASS_WORKS = [
   "You, or your Admin manager, give the consultant a brief. The consultant gathers everything it needs, compiles it into one summary with the directions it could take, and brings it to you with a plan that fits the days and the energy.",
-  "Nothing starts until you sign off. You either choose a direction and sign off, or ask for more information, and the consultant comes back with it. Sign-off stays locked while anything is missing.",
+  "Nothing starts until it passes MAIZ quality review. MAIZ checks the brief against what you asked for, then approves a direction or asks for more information, and the consultant comes back with it. Approval stays locked while anything is missing, and you see the approved direction before work starts.",
   "You can also ask the consultant directly. The Admin manager stays informed and keeps the plan up to date.",
   "The consultant stops at each approval point for your OK. Nothing is published, sent or paid for without you.",
   "The Admin manager tracks days and energy and tells you at 80%. Work that will not fit is moved, trimmed or quoted as an extension.",
@@ -107,7 +107,7 @@ export function consultantJobDescription(key: string): JobDescription | undefine
     purpose: `${c.purpose} Hired for a time-boxed pass, not as a permanent team member.`,
     responsibilities: [
       { area: "Task menu: what you can ask for", duties: menu.map((t) => `${t.title}: ${t.purpose}`) },
-      { area: "Working a pass", duties: ["Work to the plan the Admin manager agrees with the owner, and fit it to the days and energy of the pass", "Say before starting if a task will not fit, and offer a smaller version", "Stop at every approval point and wait for the owner"] },
+      { area: "Working a pass", duties: ["Compile every specialised task into one brief with the directions it could take, send it to MAIZ quality review, and start only after MAIZ approves", "Work to the plan the Admin manager agrees with the owner, and fit it to the days and energy of the pass", "Say before starting if a task will not fit, and offer a smaller version", "Stop at every approval point and wait for the owner"] },
       { area: "Documentation and legal records", duties: ["Keep every record listed below complete and hand them over at the end of the pass", "Know the legal requirements of each task and say when a rule must be confirmed for the owner's country"] },
     ],
     legal: dedupe(menu.flatMap((t) => t.legal)),

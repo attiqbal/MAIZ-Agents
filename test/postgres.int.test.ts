@@ -1,6 +1,6 @@
 import pg from "pg";
 import { describe, expect, it } from "vitest";
-import { createApp, userIdFor, type Req } from "../src/server/app.js";
+import { createApp, makeToken, userIdFor, type Req } from "../src/server/app.js";
 import { createPlatform } from "../src/server/platform.js";
 import { PgStore } from "../src/storage/postgres.js";
 
@@ -10,12 +10,12 @@ const APP = process.env.TEST_DATABASE_APP_URL;
 const KEY = "ab".repeat(32);
 const SLACK = { clientId: "c", clientSecret: "s", signingSecret: "sg", redirectUri: "https://x/cb" };
 
-async function boot() {
+async function boot(platformOwners: string[] = []) {
   const http = (async (url: any) =>
     String(url).includes("oauth.v2.access")
       ? { json: async () => ({ ok: true, access_token: "xoxb-secret-token", team: { id: "T7" }, authed_user: { id: "U7" } }) }
       : { json: async () => ({ ok: true }) }) as any;
-  const platform = createPlatform({ sessionSecret: "k", allowDevAuth: true, slack: SLACK, http, now: () => new Date("2026-06-10T10:00:00Z") });
+  const platform = createPlatform({ sessionSecret: "k", allowDevAuth: true, slack: SLACK, http, platformOwners, now: () => new Date("2026-06-10T10:00:00Z") });
   const store = new PgStore({ adminUrl: ADMIN!, appUrl: APP!, tokenKeyHex: KEY });
   await store.migrate();
   await platform.attachStore(store);
@@ -101,6 +101,34 @@ describe.skipIf(!ADMIN || !APP)("postgres persistence", () => {
     expect(b.platform.energy.monthSummary(user, org.id, "2026-06").byEmployee[org.team[1].id]).toBeDefined();
     await b.store.flush();
     expect(b.store.healthy).toBe(true);
+    await b.store.close();
+  }, 30000);
+
+  it("keeps price changes, custom specialist requests and the client's email across a restart", async () => {
+    const OWNER = "owner@maiz.test";
+    const ownerToken = makeToken("k", { k: "session", u: userIdFor(OWNER), e: OWNER }, 7 * 86400, new Date("2026-06-10T10:00:00Z").getTime());
+    const a = await boot([OWNER]);
+    const email = `bob${Date.now()}@bakery.co`;
+    const client = (await a.call("POST", "/api/signup", { email, businessName: "Bob's Bakery", sells: "Bread", size: "2-10", country: "GB" })).body as any;
+    const change = await a.call("POST", "/api/owner/prices/changes", { general: { addOnEmployeeMonthlyGbp: 14 }, agents: { "marketing-manager": 450 }, note: "Int test" }, ownerToken);
+    expect(change.status).toBe(201);
+    const madeSp = await a.call("POST", "/api/specialists", { title: "Wholesale account coordinator", purpose: "Look after cafes that buy in bulk", duties: ["Prepare price lists", "Chase repeat orders"] }, client.token);
+    expect(madeSp.body).toMatchObject({ request: { status: "in_review" } });
+    const req = (madeSp.body as any).request;
+    await a.call("POST", `/api/owner/specialists/${req.id}/decide`, { decision: "approved", priceGbp: 22 }, ownerToken);
+    await a.store.flush();
+    await a.store.close();
+
+    const b = await boot([OWNER]);
+    expect(((await b.call("GET", "/api/store")).body as any).prices.addOnEmployeeMonthlyGbp).toBe(14);
+    expect(((await b.call("GET", "/api/owner/prices", undefined, ownerToken)).body as any).history.some((h: any) => h.note === "Int test")).toBe(true);
+    expect(((await b.call("GET", "/api/specialists", undefined, client.token)).body as any).requests[0]).toMatchObject({ status: "approved", priceGbp: 22 });
+    const row = ((await b.call("GET", "/api/owner/clients", undefined, ownerToken)).body as any).clients.find((c: any) => c.ownerEmail === email);
+    expect(row).toMatchObject({ name: "Bob's Bakery", specialistsToReview: 0 });
+    const app = new pg.Client({ connectionString: APP });
+    await app.connect();
+    await expect(app.query("SELECT * FROM platform_records")).rejects.toThrow(/permission denied/);
+    await app.end();
     await b.store.close();
   }, 30000);
 });

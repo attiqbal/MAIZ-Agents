@@ -9,6 +9,9 @@ import type { AdminMessage, AdminOrgRecord } from "../modules/admin-manager/inde
 import type { Account, JournalEntry } from "../modules/ledger/index.js";
 import type { BusinessProfile, Employee } from "../modules/workforce/index.js";
 import type { IntegrationConnection, StoredRecord } from "../modules/integrations/service.js";
+import type { ReviewItem } from "../modules/review/index.js";
+import type { PriceChange } from "../modules/pricing/index.js";
+import type { SpecialistRequest } from "../modules/review/specialists.js";
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
@@ -119,8 +122,8 @@ export class PgStore implements Sink {
   workspace(w: Workspace): void {
     this.queue(async () => {
       await this.admin.query(
-        "INSERT INTO workspaces(id, name, type, language, base_currency, time_zone) VALUES ($1,$2,$3,$4,$5,$6) ON CONFLICT (id) DO NOTHING",
-        [w.id, w.name, w.type, w.language, w.baseCurrency, w.timeZone],
+        "INSERT INTO workspaces(id, name, type, language, base_currency, time_zone, owner_email) VALUES ($1,$2,$3,$4,$5,$6,$7) ON CONFLICT (id) DO NOTHING",
+        [w.id, w.name, w.type, w.language, w.baseCurrency, w.timeZone, w.ownerEmail ?? null],
       );
     });
   }
@@ -174,6 +177,25 @@ export class PgStore implements Sink {
   integrationRecord(r: StoredRecord): void {
     this.state(r.workspaceId, "int_record", r.id, r);
   }
+  review(r: ReviewItem): void {
+    // Stored under the client's workspace, so row-level security keeps one client's tasks from another.
+    this.state(r.workspaceId, "review", r.id, r);
+  }
+  specialistRequest(r: SpecialistRequest): void {
+    this.state(r.workspaceId, "specialist_req", r.id, r);
+  }
+  /** Platform records belong to no client: written with the platform role, never readable by app_user. */
+  priceChange(c: PriceChange, removed = false): void {
+    const json = JSON.stringify(c);
+    this.queue(async () => {
+      if (removed) await this.admin.query("DELETE FROM platform_records WHERE kind = 'price_change' AND id = $1", [c.id]);
+      else await this.admin.query(
+        `INSERT INTO platform_records(kind, id, data) VALUES ('price_change', $1, $2)
+         ON CONFLICT (kind, id) DO UPDATE SET data = EXCLUDED.data, updated_at = now()`,
+        [c.id, json],
+      );
+    });
+  }
   entry(e: JournalEntry): void {
     this.scoped(e.workspaceId, async (c) => {
       await c.query("INSERT INTO journal_entries(id, workspace_id, entry_date, memo, source, reverses) VALUES ($1,$2,$3,$4,$5,$6)", [e.id, e.workspaceId, e.date, e.memo, e.source ?? null, e.reverses ?? null]);
@@ -205,7 +227,7 @@ export class PgStore implements Sink {
     const byEntry = new Map<string, { account: string; debit: number; credit: number }[]>();
     for (const l of lines) (byEntry.get(l.entry_id) ?? byEntry.set(l.entry_id, []).get(l.entry_id)!).push({ account: l.account, debit: l.debit, credit: l.credit });
     return {
-      workspaces: (await q("SELECT * FROM workspaces ORDER BY created_at")).map((r) => ({ id: r.id, name: r.name, type: r.type, language: r.language, baseCurrency: r.base_currency, timeZone: r.time_zone })),
+      workspaces: (await q("SELECT * FROM workspaces ORDER BY created_at")).map((r) => ({ id: r.id, name: r.name, type: r.type, language: r.language, baseCurrency: r.base_currency, timeZone: r.time_zone, ...(r.owner_email ? { ownerEmail: r.owner_email } : {}), ...(r.created_at ? { createdAt: new Date(r.created_at).toISOString() } : {}) })),
       memberships: (await q("SELECT * FROM memberships")).map((r) => ({ workspaceId: r.workspace_id, userId: r.user_id, role: r.role })),
       employees: (await q("SELECT * FROM employees")).map((r) => ({ id: r.id, workspaceId: r.workspace_id, templateKey: r.template_key, name: r.name })),
       profiles: of("profile").map((s) => ({ workspaceId: s.workspace_id, profile: s.data })),
@@ -229,6 +251,9 @@ export class PgStore implements Sink {
       integrations: of("integration").map((s) => s.data),
       integrationSecrets: of("int_secret").filter((s) => s.data.enc).map((s) => ({ connectionId: s.id, secret: this.decrypt(s.data.enc) })),
       integrationRecords: of("int_record").map((s) => s.data),
+      reviews: of("review").map((s) => s.data),
+      specialistRequests: of("specialist_req").map((s) => s.data),
+      priceChanges: (await q("SELECT data FROM platform_records WHERE kind = 'price_change' ORDER BY updated_at, id")).map((r) => r.data),
     } as Snapshot;
   }
 

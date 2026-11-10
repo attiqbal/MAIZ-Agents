@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+<!--@include head title="Quality review · MAIZ agents" description="The MAIZ platform owner's queue: sign off every client's specialised tasks before work starts."-->
+<meta name="robots" content="noindex">
+</head>
+<body>
+<div class="page-top">
+  <!--@include header-->
+  <main id="main">
+    <section class="section">
+      <div class="container" style="max-width:1180px">
+        <!--@include owner-nav-->
+        <div class="rv-head">
+          <div><h1>Quality review</h1>
+            <p class="sub">Every client's specialised tasks, before any work starts. Check each brief against what the client asked for, then approve a direction or ask for more information. The client only sees "In quality review" until you decide.</p></div>
+          <span class="badge badge-dark" id="ow-eg" hidden>Example data</span>
+        </div>
+        <div class="ob-panel" id="ow-gate" hidden aria-live="polite"><h2 id="ow-gate-h" style="font-size:1.25rem;margin:0 0 6px"></h2><p id="ow-gate-p" class="sub" style="margin:0 0 14px"></p><a class="btn btn-primary" id="ow-gate-a" href="/signin.html">Log in</a></div>
+        <div id="ow-body">
+          <div class="chips" id="rv-filter" role="group" aria-label="Show tasks by stage"></div>
+          <div class="so-list rv-list" id="rv-list" aria-live="polite"></div>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+<!--@include footer-->
+<script type="module" src="/src/review.ts"></script>
+</body>
+</html>

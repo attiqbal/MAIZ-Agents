@@ -128,8 +128,8 @@
     <!-- WORK -->
     <div class="content" data-screen="work" hidden>
       <div class="page-h"><div><h1>Tasks and consultants</h1><p>Everything your team is working on. Each task shows its energy cost before it starts.</p></div><span class="badge badge-dark eg">Example data</span><button class="btn btn-primary btn-sm" id="new-task">New task</button></div>
-      <section class="panel" aria-labelledby="so-h"><div class="panel-h"><h2 id="so-h">Waiting for your sign-off</h2><span class="r" id="so-count"></span></div>
-        <p class="muted small">Specialised work never starts on its own. The specialist gathers everything it needs, compiles it with the directions it could take, and brings it to you. You either ask for more information or sign off on a direction. Sign-off stays locked until nothing is missing.</p>
+      <section class="panel" aria-labelledby="so-h"><div class="panel-h"><h2 id="so-h">Specialised work in quality review</h2><span class="r" id="so-count"></span></div>
+        <p class="muted small">Specialised work never starts on its own. The specialist gathers everything it needs from you and your apps, then MAIZ quality review checks it against what you asked for and approves the direction before any work starts. If something is missing, you will see the question here.</p>
         <div class="so-list" id="so-list"></div></section>
       <div class="chips" id="task-filter" role="group" aria-label="Show tasks by employee"></div>
       <div class="kan" id="kan" tabindex="0" role="region" aria-label="Task board, scrolls sideways on small screens"></div>
@@ -180,14 +180,15 @@
           <div class="kpi"><span class="l">Daily energy · price after trial</span><span class="v" id="skill-out">100 · £12.30/mo</span></div></section>
       </div>
       <section class="panel" aria-labelledby="rd-h"><div class="panel-h"><h2 id="rd-h">Need a role that isn't here?</h2><a class="r link" href="/employees.html#blueprint">See every ready role</a></div>
-        <p class="muted small">Describe the job. Your Admin manager designs a specialist for it, drafts the job description and brings it to you. Nothing is created or charged until you sign off.</p>
+        <p class="muted small">Describe the job. Your Admin manager designs a specialist and drafts the job description, then MAIZ checks it and confirms the price. You decide whether to hire it once it is approved. Nothing is trained or charged before that.</p>
         <form class="rd-form" id="rd-form" novalidate>
           <div class="field"><label for="rd-title">Job title</label><input class="input" id="rd-title" maxlength="60" placeholder="For example: Wholesale account coordinator"></div>
           <div class="field"><label for="rd-purpose">Why you need it</label><input class="input" id="rd-purpose" maxlength="240" placeholder="For example: look after the cafes that buy our coffee in bulk"></div>
           <div class="field"><label for="rd-duties">What it should do, one per line</label><textarea class="input" id="rd-duties" rows="3" placeholder="Prepare wholesale price lists&#10;Chase repeat orders each month"></textarea></div>
           <div class="acts"><button class="btn btn-primary btn-sm" type="submit">Draft the job description</button></div>
         </form>
-        <div id="rd-out" role="status" aria-live="polite"></div></section>
+        <div id="rd-out" role="status" aria-live="polite"></div>
+        <div id="rd-requests"></div></section>
       <section class="panel" id="jd-panel"><div class="panel-h"><h2>Job descriptions</h2><span class="r">What each employee is hired to do</span></div>
         <div class="chips" id="jd-pick" role="group" aria-label="Choose an employee"></div>
         <div id="jd-out"></div></section>

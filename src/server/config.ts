@@ -22,7 +22,11 @@ export function checkEnv(env: Record<string, string | undefined>): string[] {
     if (pair.filter((k) => env[k]).length === 1) problems.push(`${pair.join(" and ")} must be set together (or neither)`);
   }
 
+  const owners = (env.PLATFORM_OWNER_EMAILS ?? "").split(",").map((e) => e.trim()).filter(Boolean);
+  if (owners.some((e) => !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e))) problems.push("PLATFORM_OWNER_EMAILS must be a comma-separated list of email addresses");
+
   if (!production) return problems;
+  if (!owners.length) problems.push("PLATFORM_OWNER_EMAILS is required in production (without it no one can sign off specialised tasks)");
   if (env.ALLOW_DEV_AUTH === "1") problems.push("ALLOW_DEV_AUTH must not be on in production");
   need("SESSION_SECRET", "in production");
   if (env.SESSION_SECRET && env.SESSION_SECRET.length < 32) problems.push("SESSION_SECRET must be at least 32 characters");
@@ -41,6 +45,10 @@ const oauthPrefixes = (): string[] => defaultRegistry().list().flatMap((c) => (c
  * Our OAuth app per business app, from `<PREFIX>_CLIENT_ID` and `<PREFIX>_CLIENT_SECRET` (for example SQUARE_CLIENT_ID).
  * Apps without both stay on file upload. Every app returns to one callback on our API.
  */
+/** The MAIZ platform owner(s): only they review and sign off specialised tasks. */
+export const platformOwnersFromEnv = (env: Record<string, string | undefined>): string[] =>
+  (env.PLATFORM_OWNER_EMAILS ?? "").split(",").map((e) => e.trim().toLowerCase()).filter(Boolean);
+
 export function integrationAppsFromEnv(env: Record<string, string | undefined>, appUrl: string): Record<string, OAuthApp> {
   const apps: Record<string, OAuthApp> = {};
   const redirectUri = `${appUrl.replace(/\/$/, "")}/api/integrations/callback`;

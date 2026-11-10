@@ -77,7 +77,7 @@ function renderOverview(): void {
   const next = [...DEADLINES].sort((a, b) => a.inDays - b.inDays)[0]!;
   $("ov-kpis").innerHTML = [
     tile("Needs you", "3", "2 approvals, 1 question", "#approvals", "warn"),
-    tile("Plans to sign off", String(proposalCount()), "Specialised work waits for you", "#work", "warn"),
+    tile("In quality review", String(proposalCount()), "Specialised work MAIZ checks before it starts", "#work", "warn"),
     tile("Tasks in progress", String(count("In progress")), `${count("Planned")} planned, ${count("Done this week")} done this week`, "#work"),
     tile("Energy used today", `${usedToday} / ${allowanceToday}`, "Marketing is running low", "#usage"),
     tile("Spend this month", gbp(0), `Free trial. Then ${gbp(monthly)} a month`, "#usage"),
@@ -180,7 +180,7 @@ function renderCalendar(): void {
 }
 
 export function initDash(): void {
-  renderOverview(); renderTeam(); initSignOff(); renderTasks(); renderUsage(); renderCalendar();
+  renderOverview(); renderTeam(); void initSignOff(); renderTasks(); renderUsage(); renderCalendar();
   $("task-filter").addEventListener("click", (e) => {
     const b = (e.target as HTMLElement).closest<HTMLElement>("[data-who]");
     if (b) { taskFilter = b.dataset.who!; renderTasks(); $("task-filter").querySelector<HTMLElement>(`[data-who="${taskFilter}"]`)?.focus(); }

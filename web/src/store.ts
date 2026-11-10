@@ -1,6 +1,8 @@
-// The store picker and cart on the employees page. Prices come from the backend's
-// pure cart module, so the page and /api/cart/quote always agree.
-import { BILLING_INFO, CATALOGUE, KIND_LABEL, MAX_QTY, getItem, quote, type Billing, type CartLine, type CatalogueItem } from "../../src/modules/store/cart";
+// The store picker and cart on the employees page. Prices come from /api/store, which reflects the
+// platform owner's Prices page; with no API the launch defaults from the backend's cart module are used.
+// Either way the page prices with the same quote() function as /api/cart/quote.
+import { api } from "./api";
+import { BILLING_INFO, CATALOGUE, KIND_LABEL, MAX_QTY, quote as quoteWith, type Billing, type CartLine, type CatalogueItem } from "../../src/modules/store/cart";
 import { OVERAGE_RULE } from "../../src/modules/workforce/task-roles";
 import { HOW_A_PASS_WORKS } from "../../src/modules/workforce/consultants";
 import { getJobDescription, jdHtml } from "./jd";
@@ -19,6 +21,10 @@ function save(lines: CartLine[]): void {
 }
 
 let cart: CartLine[] = [];
+/** What can be bought, at today's prices. */
+let catalogue: readonly CatalogueItem[] = CATALOGUE;
+const getItem = (key: string) => catalogue.find((i) => i.key === key);
+const quote = (lines: readonly unknown[]) => quoteWith(lines, catalogue);
 
 function renderItem(): void {
   const item = getItem($<HTMLSelectElement>("store-pick").value);
@@ -68,10 +74,16 @@ export function addToCart(key: string, qty = 1): string | undefined {
   return item.title;
 }
 
-export function initStore(): void {
-  const groups = [...new Set(CATALOGUE.map((i) => i.group))];
+function renderPicker(): void {
+  const picked = $<HTMLSelectElement>("store-pick").value;
+  const groups = [...new Set(catalogue.map((i) => i.group))];
   $("store-pick").innerHTML = `<option value="">Choose an employee, specialist or consultant…</option>` +
-    groups.map((g) => `<optgroup label="${esc(g)}">${CATALOGUE.filter((i) => i.group === g).map((i) => `<option value="${esc(i.key)}">${esc(i.title)} · ${priceLabel(i)}</option>`).join("")}</optgroup>`).join("");
+    groups.map((g) => `<optgroup label="${esc(g)}">${catalogue.filter((i) => i.group === g).map((i) => `<option value="${esc(i.key)}">${esc(i.title)} · ${priceLabel(i)}</option>`).join("")}</optgroup>`).join("");
+  if (picked && getItem(picked)) $<HTMLSelectElement>("store-pick").value = picked;
+}
+
+export function initStore(): void {
+  renderPicker();
   $("store-pick").addEventListener("change", renderItem);
   $("cart-lines").addEventListener("click", (e) => {
     const key = (e.target as HTMLElement).closest<HTMLElement>("[data-remove]")?.dataset.remove;
@@ -88,4 +100,18 @@ export function initStore(): void {
   $("task-rule").innerHTML = `<h3>How a consultant pass works</h3><ul>${HOW_A_PASS_WORKS.map((x) => `<li>${esc(x)}</li>`).join("")}</ul><h3>If a pass needs more energy</h3><ul>${OVERAGE_RULE.map((x) => `<li>${esc(x)}</li>`).join("")}</ul><p class="jd-note">Prices are list prices in GBP and may change before launch.</p>`;
   cart = load();
   renderCart();
+  // Today's prices, as set by MAIZ. Kept on the defaults when the API is not reachable.
+  void api<{ catalogue?: CatalogueItem[] }>("/store").then((r) => {
+    if (!r.ok || !Array.isArray(r.data?.catalogue) || !r.data!.catalogue.length) return;
+    catalogue = r.data!.catalogue;
+    // Prices printed elsewhere on the page (the org blueprint) follow too.
+    document.querySelectorAll<HTMLElement>("[data-price-key]").forEach((el) => {
+      const item = getItem(el.dataset.priceKey!);
+      if (item) el.textContent = priceLabel(item);
+    });
+    renderPicker();
+    renderItem();
+    cart = load();
+    renderCart();
+  });
 }

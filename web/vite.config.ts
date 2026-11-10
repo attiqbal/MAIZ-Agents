@@ -12,7 +12,7 @@ function partials(): Plugin {
   const expand = (html: string, depth = 0): string =>
     depth > 3
       ? html
-      : html.replace(/<!--@include (\w+)((?:\s+\w+="[^"]*")*)\s*-->/g, (_m, name: string, attrs: string) => {
+      : html.replace(/<!--@include ([\w-]+)((?:\s+\w+="[^"]*")*)\s*-->/g, (_m, name: string, attrs: string) => {
           let out = read(name);
           for (const [, k, v] of attrs.matchAll(/(\w+)="([^"]*)"/g)) out = out.replaceAll(`{{${k}}}`, v!);
           return expand(out, depth + 1);
@@ -77,6 +77,10 @@ export default defineConfig({
         onboarding: resolve(__dirname, "onboarding.html"),
         app: resolve(__dirname, "app.html"),
         signin: resolve(__dirname, "signin.html"),
+        review: resolve(__dirname, "review.html"),
+        ownerSpecialists: resolve(__dirname, "owner-specialists.html"),
+        ownerClients: resolve(__dirname, "owner-clients.html"),
+        ownerPrices: resolve(__dirname, "owner-prices.html"),
         employees: resolve(__dirname, "employees.html"),
         pricing: resolve(__dirname, "pricing.html"),
         security: resolve(__dirname, "security.html"),

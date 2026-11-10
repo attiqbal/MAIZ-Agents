@@ -37,7 +37,7 @@ import {
 
 export type SetupState = "awaiting_form" | "setting_up" | "ready" | "needs_attention";
 
-export type AdminMessageKind = "welcome" | "form" | "progress" | "ready" | "failed" | "rolled_back";
+export type AdminMessageKind = "welcome" | "form" | "progress" | "ready" | "failed" | "rolled_back" | "review";
 
 export interface AdminMessage {
   id: string;
@@ -206,7 +206,7 @@ export class AdminManager {
         "failed",
         run.status === "rolled_back"
           ? `Setup stopped at "${failed?.title}". I undid every step, so nothing is left half done. Please send the form again; your answers are kept in this message thread.`
-          : `Setup stopped at "${failed?.title}" and I could not undo every step. Our support team has been alerted and will fix it; you don't need to do anything.`,
+          : `Setup stopped at "${failed?.title}" and I could not undo every step. The MAIZ team has been alerted and will fix it; you don't need to do anything.`,
         this.formUrl,
       );
       await this.bus.publish({ type: "setup.failed", workspaceId, payload: { runId: run.id, status: run.status }, at: this.now() });
@@ -229,7 +229,7 @@ export class AdminManager {
       "rolled_back",
       run.status === "rolled_back"
         ? "Done: I undid the setup. Your storage, models and training are removed and your profile is back as it was. Send the form again whenever you're ready."
-        : "I undid most of the setup but some steps need our support team. They have been alerted.",
+        : "I undid most of the setup but some steps need the MAIZ team. They have been alerted and will finish it.",
       this.formUrl,
     );
     await this.bus.publish({ type: "setup.rolled_back", workspaceId, payload: { runId: run.id, status: run.status }, at: this.now() });
@@ -329,6 +329,20 @@ export class AdminManager {
   }
 
   // ---------- messaging ----------
+
+  /** Platform-level (no user check): where a client's setup stands, for the platform owner's clients screen. */
+  setupStateOf(workspaceId: string): SetupState | undefined {
+    return this.orgs.get(workspaceId)?.state;
+  }
+
+  /**
+   * A note from the Admin manager to the client, for example that a specialised task passed quality
+   * review. Returns undefined for a workspace that was never welcomed (no inbox to post to).
+   */
+  async tell(workspaceId: string, text: string, link?: string): Promise<AdminMessage | undefined> {
+    if (!this.orgs.has(workspaceId)) return undefined;
+    return this.deliver(workspaceId, "review", text, link);
+  }
 
   private state(workspaceId: string): OrgState {
     const s = this.orgs.get(workspaceId);

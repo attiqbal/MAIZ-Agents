@@ -40,11 +40,12 @@ export interface Department {
 export const CUSTOM_SPECIALIST = {
   title: "Custom specialist",
   summary:
-    "Need a role that is not here? Describe the job. Your Admin manager designs a specialist for it and brings you the job description and the price. Nothing is created or charged until you sign off.",
+    "Need a role that is not here? Describe the job. Your Admin manager designs a specialist for it, MAIZ checks the job description and sets the price, and then you decide whether to hire it. Nothing is trained or charged before that.",
   steps: [
     "Pick a role from the blueprint, or describe the one you need",
     "Your Admin manager drafts its job description and asks what it should know about your business",
-    "You approve the job description and the price per agent",
+    "MAIZ reviews the job description and confirms the price per agent",
+    "You choose whether to hire it at that price",
     "The specialist is trained and joins your team, with the same approval rules as everyone else",
   ],
 } as const;

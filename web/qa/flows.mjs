@@ -1,15 +1,15 @@
 import { chromium, devices } from "playwright";
-// End-to-end flows against a running server: npm start with ALLOW_DEV_AUTH=1, then QA_URL=http://localhost:8787 npm run qa:flows
+// End-to-end flows against a running server: ALLOW_DEV_AUTH=1 PLATFORM_OWNER_EMAILS=owner@maiz.test npm start > api.log, then QA_URL=http://localhost:8787 QA_SERVER_LOG=api.log npm run qa:flows
 const B = process.env.QA_URL ?? "http://localhost:8787";
 const b = await chromium.launch();
 const res = []; const ok = (n, c, d = "") => { res.push([c ? "PASS" : "FAIL", n, d]); };
 const errs = [];
-const mk = async (opts = {}) => { const ctx = await b.newContext({ viewport: { width: 1280, height: 900 }, ...opts }); const p = await ctx.newPage(); p.on("pageerror", e => errs.push(String(e))); p.on("console", m => { if (m.type() === "error" && !(p.url().includes("/signin.html") && m.text().includes("400"))) errs.push(p.url() + " " + m.text()); }); return p; };
+const mk = async (opts = {}) => { const ctx = await b.newContext({ viewport: { width: 1280, height: 900 }, ...opts }); const p = await ctx.newPage(); p.on("pageerror", e => errs.push(String(e))); p.on("console", m => { if (m.type() === "error" && !(p.url().includes("/signin.html") && m.text().includes("400")) && !(/\/(review|owner-[a-z]+)\.html/.test(p.url()) && m.text().includes("403"))) errs.push(p.url() + " " + m.text()); }); return p; };
 
 // 1. Link check: every internal link and anchor on every page
 {
   const p = await mk(); const seen = new Map();
-  const pages = ["/", "/employees.html", "/pricing.html", "/security.html", "/signin.html", "/onboarding.html", "/app.html", "/404.html"];
+  const pages = ["/", "/employees.html", "/pricing.html", "/security.html", "/signin.html", "/onboarding.html", "/app.html", "/review.html", "/owner-specialists.html", "/owner-clients.html", "/owner-prices.html", "/404.html"];
   let broken = [];
   for (const pg of pages) {
     await p.goto(B + pg, { waitUntil: "networkidle" });
@@ -76,17 +76,12 @@ const mk = async (opts = {}) => { const ctx = await b.newContext({ viewport: { w
   await p.click('#cal-filter [data-kind="Tax"]'); ok("compliance filter: Tax shows 1", (await p.locator("#cal-list li").count()) === 1);
   await p.goto(B + "/app.html#work"); await p.waitForTimeout(200);
   const so = p.locator(".so-card").first();
-  ok("sign-off: locked while info missing", await so.locator("[data-so-ok]").isDisabled());
-  await so.locator('input[type=radio]').first().check();
-  ok("sign-off: still locked with direction but missing info", await p.locator(".so-card").first().locator("[data-so-ok]").isDisabled());
-  await p.locator(".so-card").first().locator(".so-brief input").fill("Green and cream, kestrel logo"); await p.locator(".so-card").first().locator("[data-so-save]").click();
-  ok("sign-off: unlocks once info and direction are in", await p.locator(".so-card").first().locator("[data-so-ok]").isEnabled());
-  await p.locator(".so-card").first().locator("[data-so-ok]").click();
-  ok("sign-off: signed off state", (await p.locator(".so-card").first().textContent()).includes("Signed off"));
-  const c2 = p.locator(".so-card").nth(1);
-  await c2.locator('input[type=radio]').nth(1).check();
-  await p.locator(".so-card").nth(1).locator(".so-ask input").fill("How long would the full handbook take to read?"); await p.locator(".so-card").nth(1).locator(".so-ask button").click();
-  ok("ask for more info: sign-off locks again", await p.locator(".so-card").nth(1).locator("[data-so-ok]").isDisabled() && (await p.locator(".so-card").nth(1).textContent()).includes("finding out"));
+  ok("client review: no approve or sign-off button for the client", (await p.locator(".so-card button", { hasText: /sign off|approve/i }).count()) === 0);
+  ok("client review: first task waits on the client", (await so.textContent()).includes("needs a few answers from you"));
+  await so.locator(".so-brief input").first().fill("Green and cream, kestrel logo"); await so.locator("[data-so-save]").first().click();
+  ok("client review: answering moves it to quality review", (await p.locator(".so-card").first().textContent()).includes("In quality review"));
+  ok("client review: MAIZ question shown on the second task", (await p.locator(".so-card").nth(1).textContent()).includes("MAIZ quality review asked this"));
+  ok("client review: approved task shows the direction MAIZ approved", (await p.locator(".so-card").nth(2).textContent()).includes("Approved, work has started"));
   await p.click('#task-filter [data-who="hr"]'); ok("task filter by employee", (await p.locator("#kan .kcard").count()) === 2);
   await p.goto(B + "/app.html#team"); await p.waitForTimeout(200);
   ok("team table has 6 rows", (await p.locator("#team-table tbody tr").count()) === 6);
@@ -117,8 +112,8 @@ const mk = async (opts = {}) => { const ctx = await b.newContext({ viewport: { w
 // 5. Sign-in page and mobile menu
 {
   const p = await mk();
-  await p.goto(B + "/signin.html"); await p.fill("#si-email", "someone@example.test"); await p.click("#si-go"); await p.waitForTimeout(600);
-  ok("sign in: confirmation shown", /Check your email/.test(await p.textContent("#si-h")), await p.textContent("#si-h"));
+  await p.goto(B + "/signin.html"); await p.fill("#si-email", "someone@example.test"); await p.click("#si-go"); await p.waitForURL(/onboarding|signin/, { timeout: 5000 }).catch(() => {}); await p.waitForTimeout(400);
+  ok("sign in (dev API): new email signs straight in and goes to onboarding", p.url().includes("/onboarding.html"), p.url());
   await p.goto("about:blank"); await p.goto(B + "/signin.html#token=bogus"); await p.waitForFunction(() => /didn't work/.test(document.getElementById("si-h")?.textContent ?? ""), null, { timeout: 5000 }).catch(() => {});
   ok("sign in: bad link explained, token removed from address bar", /didn't work/.test(await p.textContent("#si-h")) && !p.url().includes("token"));
   await p.context().close();
@@ -128,6 +123,57 @@ const mk = async (opts = {}) => { const ctx = await b.newContext({ viewport: { w
   await m.goto(B + "/app.html"); await m.click("#menu-btn"); ok("mobile app: rail opens", await m.isVisible('.rail a[data-nav="compliance"]'));
   await m.click('.rail a[data-nav="compliance"]'); await m.waitForTimeout(500); ok("mobile app: navigates and closes rail", await m.isVisible("#cal-list"));
   await m.context().close();
+}
+// 7. Quality review: a client's specialised task goes to the platform owner (server needs PLATFORM_OWNER_EMAILS=owner@maiz.test)
+{
+  const OWNER = process.env.QA_OWNER ?? "owner@maiz.test";
+  const p = await mk();
+  const post = (path, body, token) => p.request.post(B + "/api" + path, { data: body, headers: token ? { authorization: `Bearer ${token}` } : {} });
+  const client = await (await post("/signup", { email: `client${Date.now()}@example.test`, businessName: "Northside Bikes" })).json();
+  const brief = { title: "Investor pitch deck", employee: "Finance and funding consultant", days: 7, design: "A 12-slide deck checked against the books.", brief: [{ label: "How much to raise", value: "£150,000" }], directions: [{ key: "lean", name: "Lean deck", summary: "12 slides." }, { key: "full", name: "Full deck", summary: "20 slides with appendix." }], plan: [{ title: "Outline", energy: 120 }] };
+  const made = await (await post("/reviews", brief, client.token)).json();
+  ok("owner review: client task enters quality review", made.task?.status === "in_review", JSON.stringify(made).slice(0, 120));
+  ok("owner review: client cannot approve", (await post(`/owner/reviews/${made.task?.id}/approve`, { direction: "lean" }, client.token)).status() === 403);
+  // The owner never gets a dev shortcut: read the emailed link from the API log (ConsoleEmailSender prints it).
+  await p.goto(B + "/signin.html"); await p.fill("#si-email", OWNER); await p.click("#si-go"); await p.waitForTimeout(500);
+  const log = (await import("node:fs")).readFileSync(process.env.QA_SERVER_LOG ?? "", "utf8");
+  const esc = OWNER.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const link = [...log.matchAll(new RegExp(`--- email to ${esc} ---\\nYour MAIZ agents sign-in link[^#]*#token=(\\S+)`, "g"))].at(-1)?.[1];
+  ok("owner review: no dev shortcut for the owner, emailed link required", /Check your email/.test(await p.textContent("#si-h")) && !!link);
+  await p.goto("about:blank"); await p.goto(B + "/signin.html#token=" + link); await p.waitForURL(/review\.html/, { timeout: 5000 }).catch(() => {});
+  ok("owner review: platform owner lands on the review queue", p.url().includes("/review.html"), p.url());
+  const card = p.locator(`[id="${made.task?.id}"]`); await card.waitFor({ timeout: 5000 }).catch(() => {});
+  ok("owner review: queue shows the client and age", (await card.textContent() ?? "").includes("Northside Bikes"));
+  ok("owner review: approve locked until a direction is picked", await card.locator("[data-rv-approve] button").isDisabled());
+  await card.locator("input[type=radio]").nth(1).check();
+  await p.locator(`[id="${made.task?.id}"] textarea`).fill("Full deck suits your investors.");
+  await p.locator(`[id="${made.task?.id}"] [data-rv-approve] button`).click(); await p.waitForTimeout(400);
+  const after = await (await p.request.get(B + "/api/reviews", { headers: { authorization: `Bearer ${client.token}` } })).json();
+  ok("owner review: client sees approval and the chosen direction", after.tasks?.[0]?.status === "approved" && after.tasks[0].chosenDirection?.name === "Full deck", JSON.stringify(after.tasks?.[0]?.status));
+  // New specialists: the client's custom role waits for the owner, who approves at his own price.
+  const sp = await (await post("/specialists", { title: "Wholesale account coordinator", purpose: "Look after cafes that buy in bulk", duties: ["Prepare price lists", "Chase repeat orders"] }, client.token)).json();
+  ok("owner specialists: client's custom role goes to MAIZ, not straight to training", sp.request?.status === "in_review", JSON.stringify(sp).slice(0, 120));
+  await p.goto(B + "/owner-specialists.html"); const spc = p.locator(`[id="${sp.request?.id}"]`); await spc.waitFor({ timeout: 5000 }).catch(() => {});
+  ok("owner specialists: queue shows the client's role", (await spc.textContent() ?? "").includes("Northside Bikes") && await p.locator("#ow-eg").isHidden());
+  await spc.locator('input[type="number"]').fill("24"); await spc.locator('[data-decision="approved"]').click(); await p.waitForTimeout(400);
+  const mine = await (await p.request.get(B + "/api/specialists", { headers: { authorization: `Bearer ${client.token}` } })).json();
+  ok("owner specialists: approved at the owner's price", mine.requests?.[0]?.status === "approved" && mine.requests[0].priceGbp === 24, JSON.stringify(mine.requests?.[0]).slice(0, 120));
+  // Clients: every business, with what needs the owner.
+  await p.goto(B + "/owner-clients.html"); await p.locator("#cl-table tbody tr").first().waitFor({ timeout: 5000 }).catch(() => {});
+  ok("owner clients: table lists real clients", (await p.textContent("#cl-table") ?? "").includes("Northside Bikes") && await p.locator("#ow-eg").isHidden());
+  // Prices and packages: change the add-on price, the public store follows.
+  await p.goto(B + "/owner-prices.html"); await p.locator("#pr-g-addOnEmployeeMonthlyGbp").waitFor({ timeout: 5000 }).catch(() => {});
+  await p.fill("#pr-g-addOnEmployeeMonthlyGbp", "13"); await p.dispatchEvent("#pr-g-addOnEmployeeMonthlyGbp", "change");
+  await p.fill("#pr-note", "QA price check"); await p.click("#pr-save"); await p.waitForTimeout(400);
+  const store = await (await p.request.get(B + "/api/store")).json();
+  ok("owner prices: saved change shows in the store at once", store.prices?.addOnEmployeeMonthlyGbp === 13, JSON.stringify(store.prices));
+  ok("owner prices: history records the change", (await p.textContent("#pr-history") ?? "").includes("QA price check"));
+  await p.context().close();
+  const c = await mk();
+  await c.goto(B + "/signin.html"); await c.evaluate((t) => localStorage.setItem("vn.token", t), client.token);
+  await c.goto(B + "/review.html"); await c.waitForTimeout(500);
+  ok("owner review: a client opening the queue is turned away", /platform owner/.test(await c.textContent("#ow-gate-h")) && (await c.locator(".so-card").count()) === 0);
+  await c.context().close();
 }
 // 6. Keyboard
 {

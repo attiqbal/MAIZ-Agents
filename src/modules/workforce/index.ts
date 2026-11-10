@@ -137,6 +137,16 @@ export class WorkforceService {
     return employee;
   }
 
+  /** Platform-level (no user check): how many employees a client has. */
+  countIn(workspaceId: string): number {
+    return [...this.employees.values()].filter((e) => e.workspaceId === workspaceId).length;
+  }
+
+  /** Platform-level lookup (no user check): which template an employee was hired from. */
+  templateOf(employeeId: string): string | undefined {
+    return this.employees.get(employeeId)?.templateKey;
+  }
+
   team(userId: string, workspaceId: string): Employee[] {
     this.identity.require(userId, workspaceId, "task.read");
     return [...this.employees.values()].filter((e) => e.workspaceId === workspaceId);
