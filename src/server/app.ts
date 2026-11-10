@@ -8,6 +8,7 @@ import { getTemplate, TEMPLATES } from "../modules/workforce/templates.js";
 import { getJobDescription } from "../modules/workforce/job-descriptions.js";
 import { CUSTOM_SPECIALIST, DEPARTMENTS } from "../modules/workforce/blueprints.js";
 import { OVERAGE_RULE, TASK_ROLES } from "../modules/workforce/task-roles.js";
+import { CATALOGUE, quote } from "../modules/store/cart.js";
 import type { Platform } from "./platform.js";
 
 export interface Req {
@@ -85,7 +86,15 @@ export function createApp(p: Platform) {
         // Task-based hires: one job, fixed price, included energy, one overage rule.
         taskRoles: TASK_ROLES.map((r) => ({ key: r.key, title: r.title, category: r.category, purpose: r.purpose, fixedGbp: r.fixedGbp, includedEnergy: r.includedEnergy, turnaround: r.turnaround })),
         overageRule: OVERAGE_RULE,
+        // What can be added to a cart, and whether it is billed monthly or once.
+        catalogue: CATALOGUE,
       });
+    }
+    // Prices a cart. Public and pure: nothing is charged or stored (payments are not connected yet).
+    if (method === "POST" && path === "/api/cart/quote") {
+      const lines = body().lines;
+      if (!Array.isArray(lines) || lines.length > 100) throw new BadRequest("lines must be a list of up to 100 items");
+      return json(200, quote(lines));
     }
 
     // ---- sign in by email link ----

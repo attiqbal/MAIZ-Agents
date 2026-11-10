@@ -2,7 +2,6 @@ import "./styles.css";
 import { initNav } from "./common";
 import { getJobDescription, jdHtml } from "./jd";
 import { CUSTOM_SPECIALIST, DEPARTMENTS } from "../../src/modules/workforce/blueprints";
-import { OVERAGE_RULE, TASK_ROLES } from "../../src/modules/workforce/task-roles";
 
 initNav();
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
@@ -30,14 +29,5 @@ if (bp) {
     `<article class="card card-hi bp-dept bp-custom"><h3>${esc(CUSTOM_SPECIALIST.title)}</h3><p class="desc">${esc(CUSTOM_SPECIALIST.summary)}</p><ol>${CUSTOM_SPECIALIST.steps.map((s) => `<li>${esc(s)}</li>`).join("")}</ol></article>`;
 }
 
-// Task-based hires, grouped by category, each with its price, allowance and job description.
-const tasks = document.getElementById("task-roles");
-if (tasks) {
-  const categories = [...new Set(TASK_ROLES.map((r) => r.category))];
-  tasks.innerHTML =
-    categories.map((c) => `<h3 class="task-cat">${esc(c)}</h3><div class="task-grid">${TASK_ROLES.filter((r) => r.category === c).map((r) => {
-      const jd = getJobDescription(r.key);
-      return `<article class="card task-card"><h4>${esc(r.title)}</h4><p class="desc">${esc(r.purpose)}</p><p class="task-price"><b>£${r.fixedGbp}</b> fixed<span>${r.includedEnergy.toLocaleString("en-GB")} energy included · ${esc(r.turnaround)}</span></p>${jd ? `<details class="jd"><summary>Scope and job description</summary>${jdHtml(jd, 5)}</details>` : ""}</article>`;
-    }).join("")}</div>`).join("") +
-    `<div class="card card-flat task-rule"><h3>If a task needs more energy</h3><ul>${OVERAGE_RULE.map((x) => `<li>${esc(x)}</li>`).join("")}</ul><p class="jd-note">Prices are list prices in GBP and may change before launch.</p></div>`;
-}
+// Store: one picker for everything that can be added, and a cart that splits monthly from one-off.
+import("./store").then((m) => m.initStore());

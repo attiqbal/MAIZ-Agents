@@ -60,6 +60,12 @@ describe("signup and org", () => {
     expect(cm.jobDescription.competencies.length).toBeGreaterThan(5);
     expect(r.employees.every((e: any) => e.jobDescription)).toBe(true);
   });
+  it("prices a cart without sign-in, and refuses a malformed one", async () => {
+    const s = setup();
+    const r = (await s.call("POST", "/api/cart/quote", { lines: [{ key: "website-developer", qty: 1 }] })).body as any;
+    expect(r.onceGbp).toBe(249);
+    expect((await s.call("POST", "/api/cart/quote", { lines: "x" })).status).toBe(400);
+  });
   it("requires a session for everything else", async () => {
     const { call } = setup();
     expect((await call("GET", "/api/org")).status).toBe(401);

@@ -64,6 +64,16 @@
       "viewport": "375x812",
       "artifact": "employees-375x812.png",
       "observation": "Blueprint departments stack in one column; role rows keep the tag on the right with no horizontal overflow (scrollWidth 375)."
+    },
+    {
+      "viewport": "1440x900",
+      "artifact": "store-1440x900.png",
+      "observation": "Store picker (grouped dropdown) with the chosen item, quantity and Add to cart on the left; cart on the right splits Monthly (\u00a358) from One-off tasks (\u00a3249) with Due today \u00a3307 and a Checkout button that says payments open soon. No horizontal overflow, no console errors."
+    },
+    {
+      "viewport": "375x812",
+      "artifact": "store-375x812.png",
+      "observation": "Picker and cart stack in one column; quantity and Add to cart wrap onto their own rows; scrollWidth 375."
     }
   ]
 }
