@@ -277,6 +277,11 @@ export function createApp(p: Platform) {
         const run = await p.batch.runAllNow(userId);
         return json(200, { started: !!run, run: run ?? null, ...p.batch.ownerView(userId) });
       }
+      if (method === "GET" && path === "/api/owner/reconciliation") return json(200, { reports: p.reconciliation.all().map((r) => ({ ...r, clientName: p.identity.workspaceById(r.workspaceId)?.name ?? r.workspaceId })) });
+      if (method === "POST" && path === "/api/owner/reconciliation/run") {
+        for (const w of p.identity.allWorkspaces()) await p.reconciliation.runOne(w.id);
+        return json(200, { reports: p.reconciliation.all().map((r) => ({ ...r, clientName: p.identity.workspaceById(r.workspaceId)?.name ?? r.workspaceId })) });
+      }
       if (method === "GET" && path === "/api/owner/clients") return json(200, { clients: p.clients(userId) });
       if (method === "GET" && path === "/api/owner/specialists") return json(200, { requests: p.specialists.queue(userId) });
       const d = /^\/api\/owner\/specialists\/([\w-]{1,64})\/decide$/.exec(path);

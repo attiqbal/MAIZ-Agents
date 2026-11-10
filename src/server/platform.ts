@@ -25,6 +25,8 @@ import { SpecialistReviewService, type SpecialistRequest } from "../modules/revi
 import { templateFromRole } from "../modules/workforce/templates.js";
 import { MockPaymentProvider, PaymentService, type PaymentProvider } from "../modules/payments/index.js";
 import { quote } from "../modules/store/cart.js";
+import { ReconciliationService } from "../modules/reconciliation/index.js";
+import { localParts } from "../modules/batch/schedule.js";
 import { RotaService } from "../modules/rota/index.js";
 
 import { ConsoleEmailSender, type EmailSender } from "./email.js";
@@ -173,6 +175,24 @@ export function createPlatform(cfg: PlatformConfig) {
     },
   });
 
+  /** Nightly check of every client's books, run once after each client's own midnight (their batch time zone). */
+  const reconciliation = new ReconciliationService({
+    workspaceIds: () => identity.allWorkspaces().map((w) => w.id),
+    localDate: (ws) => {
+      const l = localParts(now(), batch.scheduleOf(ws).timezone);
+      return `${l.y}-${String(l.m).padStart(2, "0")}-${String(l.d).padStart(2, "0")}`;
+    },
+    books: (ws) => ledger.rawBooks(ws),
+    records: (ws) => integrations.recordsOf(ws),
+    orders: (ws) => payments.all().filter((o) => o.workspaceId === ws),
+    now,
+    alert: async (ws, report) => {
+      const name = identity.workspaceById(ws)?.name ?? ws;
+      const errors = report.findings.filter((f) => f.severity === "error");
+      await alertOwnersLate(`Books need a look: ${name}`, `Tonight's check of ${name}'s books found ${errors.length} problem(s):\n\n${errors.map((f) => `- ${f.message}`).join("\n")}\n\nNothing was changed. Details: ${base}/owner-clients.html`);
+    },
+  });
+
   /** The platform owner's AI spend and routing controls. Nothing here is visible to clients. */
   const ai = {
     overview: (userId: string) => {
@@ -213,6 +233,8 @@ export function createPlatform(cfg: PlatformConfig) {
         energyMonth: use.energyMonth,
         /** What MAIZ paid model providers this month, in US dollars. */
         aiCostUsdMonth: Math.round(use.costMicroMonth / 10_000) / 100,
+        /** Last nightly check of this client's books: ok, problems found, or not run yet. */
+        books: (() => { const r = reconciliation.latestFor(w.id); return r ? { ok: r.ok, date: r.date, problems: r.findings.filter((f) => f.severity === "error").length, warnings: r.findings.filter((f) => f.severity === "warn").length } : null; })(),
         openReviews: openReviews.get(w.id) ?? 0,
         specialistsToReview: openSpecialists.get(w.id) ?? 0,
       };
@@ -273,6 +295,7 @@ export function createPlatform(cfg: PlatformConfig) {
     for (const r of s.specialistRequests ?? []) specialists.restore(r);
     for (const x of s.records ?? []) {
       if (x.kind === "order") payments.restore(x.data);
+      else if (x.kind === "recon") reconciliation.restore(x.data);
       else if (x.kind === "rota_staff") rota.restoreStaff(x.data);
       else if (x.kind === "rota_shift" && !x.data.removed) rota.restoreShift(x.data);
     }
@@ -283,7 +306,7 @@ export function createPlatform(cfg: PlatformConfig) {
     for (const j of s.batchJobs ?? []) batch.restoreJob(j);
     for (const r of s.batchRuns ?? []) batch.restoreRun(r);
     sink = store;
-    for (const part of [audit, identity, energy, workforce, ledger, router, admin, integrations, reviews, prices, specialists, aiSettings, spend, batch, payments, rota]) part.useSink(store);
+    for (const part of [audit, identity, energy, workforce, ledger, router, admin, integrations, reviews, prices, specialists, aiSettings, spend, batch, payments, rota, reconciliation]) part.useSink(store);
   }
 
   const healthy = () => (sink as { healthy?: boolean } | undefined)?.healthy !== false;
@@ -292,6 +315,6 @@ export function createPlatform(cfg: PlatformConfig) {
   const usedLinks = new Set<string>();
   /** Sign-in emails sent per address and hour, to stop the form being used to spam someone. */
   const sends = new Map<string, number[]>();
-  return { rota, payments, batch, email, usedLinks, sends, admin, reviews, prices, specialists, ai, clients, isPlatformOwner, healthy, cfg, now, audit, bus, identity, energy, workforce, ledger, onboarding, router, integrations, slackTokens, saveSlackToken, attachStore };
+  return { reconciliation, rota, payments, batch, email, usedLinks, sends, admin, reviews, prices, specialists, ai, clients, isPlatformOwner, healthy, cfg, now, audit, bus, identity, energy, workforce, ledger, onboarding, router, integrations, slackTokens, saveSlackToken, attachStore };
 }
 export type Platform = ReturnType<typeof createPlatform>;

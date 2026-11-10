@@ -55,7 +55,7 @@ export function mergeSchedule(base: ClientSchedule, patch: unknown): ClientSched
 
 interface Local { y: number; m: number; d: number; hh: number; mm: number }
 
-function localParts(instant: Date, tz: string): Local {
+export function localParts(instant: Date, tz: string): Local {
   const parts = new Intl.DateTimeFormat("en-GB", { timeZone: tz, hourCycle: "h23", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" }).formatToParts(instant);
   const n = (t: string) => Number(parts.find((p) => p.type === t)!.value);
   return { y: n("year"), m: n("month"), d: n("day"), hh: n("hour"), mm: n("minute") };
