@@ -1,5 +1,5 @@
 // Apps screen: connect a till, payroll or any other app, upload exports, and choose which employees see the data.
-import { api } from "./api";
+import { api, getToken } from "./api";
 import { toast } from "./common";
 
 interface CatalogueItem {
@@ -45,21 +45,32 @@ let uploading: CatalogueItem | undefined;
 let keying: CatalogueItem | undefined;
 
 export async function loadApps(): Promise<void> {
-  const r = await api<AppsData>("/integrations");
+  // Logged-out visitors see the example catalogue; asking the API would only return "not signed in".
+  const r = getToken() ? await api<AppsData>("/integrations") : { ok: false, data: undefined };
   live = r.ok && !!r.data;
   data = live ? r.data! : DEMO;
   render();
 }
 
+const kpi = (label: string, value: string, note: string) => `<div class="tile-kpi"><span class="l">${label}</span><span class="v">${esc(value)}</span><span class="dl">${esc(note)}</span></div>`;
+
 function render(): void {
   const byKey = new Map(data.catalogue.map((c) => [c.key, c]));
+  const errors = data.connections.filter((c) => c.status === "error").length;
+  const direct = data.catalogue.filter((c) => c.availability === "live").length;
+  $("apps-kpis").innerHTML = [
+    kpi("Connected apps", String(data.connections.length), data.connections.length ? "Your team reads these, read-only" : "Connect your first app below"),
+    kpi("Waiting for your books", String(data.pending.length), data.pending.length ? "Check them, then add to books" : "Nothing waiting"),
+    kpi("Need attention", String(errors), errors ? "Reconnect below" : "All connections healthy"),
+    kpi("Apps available", String(data.catalogue.length), `${direct} connect directly, the rest by file or link`),
+  ].join("");
   // Waiting for the books
   $("apps-pending-panel").hidden = data.pending.length === 0;
   $("apps-pending-count").textContent = `${data.pending.length} item${data.pending.length === 1 ? "" : "s"}`;
   $("apps-pending").innerHTML = data.pending.map((p) => {
     const d = p.data;
     const what = p.kind === "sales" ? `Sales · ${d.transactions ?? 0} transactions` : `Payroll · ${d.headcount ?? 0} staff`;
-    return `<div class="app-row"><span>${esc(p.date)}</span><span>${esc(what)}</span><span class="mono">${esc(money(d.gross, d.currency))}</span></div>`;
+    return `<div class="app-line"><span>${esc(p.date)}</span><span>${esc(what)}</span><span class="mono">${esc(money(d.gross, d.currency))}</span></div>`;
   }).join("");
 
   // Connected
