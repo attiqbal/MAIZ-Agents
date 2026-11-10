@@ -53,6 +53,12 @@ export class WorkforceService {
     this.sink = sink;
   }
 
+  /** Extra facts per employee from other modules (for example connected apps). Kept out of this module's imports. */
+  private contextSources: ((workspaceId: string, templateKey: string) => string | undefined)[] = [];
+  addContext(source: (workspaceId: string, templateKey: string) => string | undefined): void {
+    this.contextSources.push(source);
+  }
+
   restoreEmployee(e: Employee): void {
     this.employees.set(e.id, e);
   }
@@ -153,6 +159,10 @@ export class WorkforceService {
     if (template.key === "finance-manager") parts.push(describePack(packFor(profile?.country)));
     const training = this.training.get(employeeId);
     if (training) parts.push(`What the owner told you during setup:\n${training}`);
+    for (const source of this.contextSources) {
+      const extra = source(workspaceId, template.key);
+      if (extra) parts.push(extra);
+    }
     const system = parts.join("\n\n");
 
     // The employee only starts work if there is energy left (or paid overtime).

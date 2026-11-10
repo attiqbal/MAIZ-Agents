@@ -11,7 +11,7 @@ import { chromium } from "playwright";
 const require = createRequire(import.meta.url);
 const axeSource = readFileSync(require.resolve("axe-core/axe.min.js"), "utf8");
 const OUT = join(import.meta.dirname, "out");
-const PAGES = ["/", "/onboarding.html", "/app.html", "/app.html#setup"];
+const PAGES = ["/", "/onboarding.html", "/app.html", "/app.html#setup", "/app.html#apps"];
 const VIEWPORTS = [[375, 812], [768, 1024], [1440, 900]];
 const AXE_TAGS = ["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa", "best-practice"];
 

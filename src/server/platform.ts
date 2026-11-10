@@ -12,6 +12,7 @@ import { AdminManager } from "../modules/admin-manager/index.js";
 import { InMemoryModelProvisioner, InMemoryStorageProvisioner } from "../modules/admin-manager/provisioning.js";
 import { OnboardingService } from "../modules/onboarding/index.js";
 import { WorkforceService } from "../modules/workforce/index.js";
+import { IntegrationService, defaultRegistry, type OAuthApp } from "../modules/integrations/index.js";
 
 import { ConsoleEmailSender, type EmailSender } from "./email.js";
 
@@ -26,6 +27,8 @@ export interface PlatformConfig {
   /** Dev-only sign-in by email, no verification. Must stay off in production. */
   allowDevAuth: boolean;
   slack?: { clientId: string; clientSecret: string; signingSecret: string; redirectUri: string };
+  /** Our OAuth app for each connector that has one (for example square), from environment variables. */
+  integrationApps?: Record<string, OAuthApp>;
   now?: () => Date;
   http?: typeof fetch;
 }
@@ -44,6 +47,9 @@ export function createPlatform(cfg: PlatformConfig) {
   const ledger = new Ledger(identity, audit);
   const onboarding = new OnboardingService(identity, workforce, ledger, energy, audit, now);
   const router = new ChannelRouter(identity, workforce, audit);
+  /** Business apps (tills, payroll). Employees get only the app data the owner granted them. */
+  const integrations = new IntegrationService(identity, audit, ledger, defaultRegistry(), { http: cfg.http, now, oauthApps: cfg.integrationApps });
+  workforce.addContext((ws, templateKey) => integrations.contextFor(ws, templateKey));
   /** Welcomes new owners and runs setup. Storage and models are stand-ins until real RunPod/bucket provisioning is wired in. */
   const admin = new AdminManager(identity, workforce, audit, bus, new InMemoryStorageProvisioner(), new InMemoryModelProvisioner(), router, { now });
   /** Bot tokens by Slack team. Held in memory for now; encrypted storage comes with Postgres wiring. */
@@ -77,8 +83,11 @@ export function createPlatform(cfg: PlatformConfig) {
     for (const c of s.connections) router.restoreConnection(c);
     for (const l of s.links) router.restoreLink(l.key, l.userId);
     for (const t of s.slackTokens) slackTokens.set(t.team, t.token);
+    for (const c of s.integrations ?? []) integrations.restoreConnection(c);
+    for (const x of s.integrationSecrets ?? []) integrations.restoreSecret(x.connectionId, x.secret);
+    for (const r of s.integrationRecords ?? []) integrations.restoreRecord(r);
     sink = store;
-    for (const part of [audit, identity, energy, workforce, ledger, router, admin]) part.useSink(store);
+    for (const part of [audit, identity, energy, workforce, ledger, router, admin, integrations]) part.useSink(store);
   }
 
   const healthy = () => (sink as { healthy?: boolean } | undefined)?.healthy !== false;
@@ -88,6 +97,6 @@ export function createPlatform(cfg: PlatformConfig) {
   const usedLinks = new Set<string>();
   /** Sign-in emails sent per address and hour, to stop the form being used to spam someone. */
   const sends = new Map<string, number[]>();
-  return { email, usedLinks, sends, admin, healthy, cfg, now, audit, bus, identity, energy, workforce, ledger, onboarding, router, slackTokens, saveSlackToken, attachStore };
+  return { email, usedLinks, sends, admin, healthy, cfg, now, audit, bus, identity, energy, workforce, ledger, onboarding, router, integrations, slackTokens, saveSlackToken, attachStore };
 }
 export type Platform = ReturnType<typeof createPlatform>;

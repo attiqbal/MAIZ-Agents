@@ -619,3 +619,24 @@ section[id] { scroll-margin-top: 72px; } /* clears the sticky nav when jumping t
 textarea.input { resize: vertical; min-height: 72px; font-family: inherit; }
 select.input { appearance: auto; }
 .prov li.undone { color: var(--color-ash); text-decoration: line-through; }
+
+/* ---------- Apps (business app connections) ---------- */
+.apps-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 14px; margin: 16px 0 12px; }
+.app-card { display: flex; flex-direction: column; gap: 10px; padding: 16px; }
+.app-card p { margin: 0; }
+.app-card .acts { margin-top: auto; }
+.app-card-h, .app-conn-h { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.app-conns { display: flex; flex-direction: column; gap: 16px; }
+.app-conn { display: flex; flex-direction: column; gap: 12px; padding-top: 14px; border-top: 1px solid var(--color-inkline); }
+.app-conn:first-child { border-top: 0; padding-top: 0; }
+.app-row { display: grid; grid-template-columns: 110px 1fr auto; gap: 10px; padding: 8px 0; font-size: 13px; color: var(--color-mist); border-bottom: 1px solid var(--color-inkline); }
+.app-row .mono { text-align: right; }
+.apps-dialog { max-width: min(520px, calc(100vw - 32px)); padding: 22px; color: var(--color-quartz); background: var(--color-abyss); border: 1px solid var(--color-sapphire-hairline); }
+.apps-dialog::backdrop { background: rgba(5, 6, 8, .72); }
+.apps-dialog form, .apps-dialog { display: flex; flex-direction: column; gap: 14px; }
+.apps-dialog:not([open]) { display: none; }
+.apps-dialog h2 { font-size: 18px; font-weight: 500; }
+.apps-steps { padding-left: 20px; color: var(--color-mist); display: flex; flex-direction: column; gap: 6px; }
+.apps-hook-url { word-break: break-all; padding: 10px 12px; background: var(--color-deep-sea); border: 1px solid var(--color-obsidian-edge); border-radius: 8px; }
+@media (max-width: 560px) { .app-row { grid-template-columns: 1fr auto; } .app-row span:nth-child(2) { grid-column: 1 / -1; order: 3; } }
+.app-card .acts, .app-conn .acts, .apps-dialog .acts, #apps-pending-panel .acts { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }

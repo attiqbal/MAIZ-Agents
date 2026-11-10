@@ -5,6 +5,7 @@ import type { Account, JournalEntry } from "../modules/ledger/index.js";
 import type { EnergyPlan, UsageRecord } from "../modules/energy/index.js";
 import type { Connection } from "../modules/channels/index.js";
 import type { AdminMessage, AdminOrgRecord } from "../modules/admin-manager/index.js";
+import type { IntegrationConnection, StoredRecord } from "../modules/integrations/service.js";
 
 /**
  * Where services report every change so it can be stored. Services stay fast and
@@ -27,6 +28,10 @@ export interface Sink {
   adminOrg(workspaceId: string, record: AdminOrgRecord): void;
   adminMessage(m: AdminMessage): void;
   slackToken(workspaceId: string, team: string, token: string): void;
+  integration(c: IntegrationConnection): void;
+  /** Credentials for a connected app as JSON. The store must encrypt it. Empty string means removed. */
+  integrationSecret(workspaceId: string, connectionId: string, secret: string): void;
+  integrationRecord(r: StoredRecord): void;
 }
 
 /** Everything stored, in the order it must be restored. */
@@ -46,4 +51,7 @@ export interface Snapshot {
   adminOrgs: AdminOrgRecord[];
   adminMessages: AdminMessage[];
   slackTokens: { team: string; token: string }[];
+  integrations?: IntegrationConnection[];
+  integrationSecrets?: { connectionId: string; secret: string }[];
+  integrationRecords?: StoredRecord[];
 }

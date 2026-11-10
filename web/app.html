@@ -27,6 +27,7 @@
     <div class="sep"></div>
     <div class="group">Connections</div>
     <a class="ni" href="#team" data-slack><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9.5" y="2" width="3" height="8" rx="1.5"/><rect x="14" y="9.5" width="8" height="3" rx="1.5"/><rect x="11.5" y="14" width="3" height="8" rx="1.5"/><rect x="2" y="11.5" width="8" height="3" rx="1.5"/></svg>Slack <span class="count" id="slack-state">Connect</span></a>
+    <a class="ni" href="#apps" data-nav="apps"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 7V3M15 7V3M7 7h10v4a5 5 0 01-10 0zM12 16v5"/></svg>Apps</a>
     <div class="trial"><b>Trial: 5 days left</b><span class="muted">No card needed until day 7</span><div class="energy"><i style="width:29%"></i></div></div>
   </aside>
   <div class="scrim" id="scrim"></div>
@@ -193,6 +194,47 @@
           <section class="panel"><div class="panel-h"><h2>For review</h2></div><div class="ubar" style="grid-template-columns:1fr auto"><span>Unusual £299 software charge</span><button class="btn btn-sm btn-ghost" data-toast="Opened in review: demo only">Check</button></div><div class="ubar" style="grid-template-columns:1fr auto"><span>Receipt without a match</span><button class="btn btn-sm btn-ghost" data-toast="Opened in review: demo only">Check</button></div></section>
         </div>
       </div>
+    </div>
+
+    <!-- APPS -->
+    <div class="content" data-screen="apps" hidden>
+      <div class="page-h"><div><h1>Apps</h1><p>Connect your till, payroll and other apps. Your team only reads them, and you choose who sees what.</p></div></div>
+      <section class="panel" id="apps-pending-panel" hidden><div class="panel-h"><h2>Waiting to go into your books</h2><span class="r" id="apps-pending-count"></span></div>
+        <div id="apps-pending"></div>
+        <p class="xs muted">Figures come straight from your apps. Nothing goes into your books until you add it.</p>
+        <div class="acts"><button class="btn btn-primary btn-sm" id="apps-post">Add to books</button></div></section>
+      <section class="panel" id="apps-connected-panel" hidden><div class="panel-h"><h2>Connected</h2></div><div id="apps-connected" class="app-conns"></div></section>
+      <section class="panel"><div class="panel-h"><h2>Add an app</h2></div>
+        <div class="chips" role="group" aria-label="Show apps by type" id="apps-filter">
+          <button type="button" class="chip" data-filter="all">All</button><button type="button" class="chip" data-filter="accounting">Accounting</button><button type="button" class="chip" data-filter="till">Tills</button><button type="button" class="chip" data-filter="payments">Payments and shops</button><button type="button" class="chip" data-filter="payroll">Payroll</button><button type="button" class="chip" data-filter="bridge">Any other app</button>
+        </div>
+        <div class="apps-grid" id="apps-grid"></div>
+        <p class="xs muted">Don't see your app? Zapier or Make can send data from thousands more apps through a private link, and any till that exports a CSV works with "Any till".</p></section>
+      <dialog class="apps-dialog card" id="apps-dialog" aria-labelledby="apps-dlg-h">
+        <form id="apps-dlg-form" novalidate>
+          <h2 id="apps-dlg-h">Upload a file</h2>
+          <ol class="small apps-steps" id="apps-dlg-steps"></ol>
+          <div class="field"><label for="apps-dlg-file">Exported file (CSV)</label><input class="input" type="file" id="apps-dlg-file" accept=".csv,text/csv" required></div>
+          <div class="field" id="apps-dlg-date-wrap" hidden><label for="apps-dlg-date">Pay date, if the file doesn't show one</label><input class="input" type="date" id="apps-dlg-date"></div>
+          <div id="apps-dlg-result" role="status" aria-live="polite"></div>
+          <div class="acts"><button class="btn btn-primary btn-sm" type="submit">Check file</button><button class="btn btn-ghost btn-sm" type="button" data-close-dialog>Close</button></div>
+        </form>
+      </dialog>
+      <dialog class="apps-dialog card" id="apps-key" aria-labelledby="apps-key-h">
+        <form id="apps-key-form" novalidate>
+          <h2 id="apps-key-h">Connect</h2>
+          <div id="apps-key-fields"></div>
+          <p class="xs muted">The key is stored encrypted and is never shown again, not even to you.</p>
+          <p class="small status crit" id="apps-key-result" role="status" aria-live="polite"></p>
+          <div class="acts"><button class="btn btn-primary btn-sm" type="submit">Connect</button><button class="btn btn-ghost btn-sm" type="button" data-close-dialog>Cancel</button></div>
+        </form>
+      </dialog>
+      <dialog class="apps-dialog card" id="apps-hook" aria-labelledby="apps-hook-h">
+        <h2 id="apps-hook-h">Your private link</h2>
+        <p class="small">Paste this into a Zapier or Make "Webhook: POST" step. We show it only once, so copy it now. Anyone with the link can send data, so keep it private.</p>
+        <p class="mono apps-hook-url" id="apps-hook-url"></p>
+        <div class="acts"><button class="btn btn-primary btn-sm" type="button" id="apps-hook-copy">Copy link</button><button class="btn btn-ghost btn-sm" type="button" data-close-dialog>Done</button></div>
+      </dialog>
     </div>
 
     <!-- SETTINGS -->

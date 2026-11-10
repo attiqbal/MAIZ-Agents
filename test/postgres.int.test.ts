@@ -52,6 +52,15 @@ describe.skipIf(!ADMIN || !APP)("postgres persistence", () => {
     const { url } = (await a.call("GET", "/api/slack/install", undefined, token)).body as any;
     expect((await a.call("GET", "/api/slack/callback", undefined, undefined, `code=1&state=${new URL(url).searchParams.get("state")}`)).status).toBe(302);
 
+    // business apps: a payroll file (pending), a till file (posted) and a webhook with a secret
+    const payroll = "Employee,Pay Date,Gross Pay,PAYE,Net Pay\nAnn,05/06/2026,1000,100,900";
+    expect((await a.call("POST", "/api/integrations/apps/brightpay/import", { csv: payroll }, token)).status).toBe(200);
+    await a.call("POST", "/api/integrations/post", {}, token);
+    await a.call("POST", "/api/integrations/apps/till-file/import", { csv: "Date,Total,VAT\n2026-06-06,60,10" }, token);
+    const hook = (await a.call("POST", "/api/integrations/apps/webhook/connect", {}, token)).body as any;
+    const hookPath = new URL(hook.url, "https://x").pathname;
+    const apps = (await a.call("GET", "/api/integrations", undefined, token)).body;
+
     const before = {
       summary: (await a.call("GET", "/api/finance/summary", undefined, token)).body,
       org: (await a.call("GET", "/api/org", undefined, token)).body,
@@ -65,6 +74,8 @@ describe.skipIf(!ADMIN || !APP)("postgres persistence", () => {
     const admin = new pg.Pool({ connectionString: ADMIN });
     const raw = await admin.query("SELECT data::text AS d FROM state_records WHERE kind='slack_token'");
     expect(raw.rows[0].d).not.toContain("xoxb-secret-token");
+    const hookRaw = await admin.query("SELECT data::text AS d FROM state_records WHERE kind='int_secret'");
+    expect(hookRaw.rows.map((r) => r.d).join()).not.toContain(hookPath.split("/").pop());
     // the database itself keeps the books balanced and append-only
     const bal = await admin.query("SELECT (sum(debit) - sum(credit))::bigint AS diff FROM journal_lines");
     expect(bal.rows[0].diff).toBe(0);
@@ -81,6 +92,9 @@ describe.skipIf(!ADMIN || !APP)("postgres persistence", () => {
     const undone = (await b.call("POST", "/api/setup/rollback", undefined, token)).body as any;
     expect(undone.run.status).toBe("rolled_back");
     expect(b.platform.slackTokens.get("T7")).toBe("xoxb-secret-token");
+    // apps, their pending records and the webhook secret all came back
+    expect((await b.call("GET", "/api/integrations", undefined, token)).body).toEqual(apps);
+    expect((await b.call("POST", hookPath, { sales: [{ date: "2026-06-07", gross: 100 }] })).status).toBe(200);
     expect((await b.call("POST", "/api/signup", { email: "ann@kestrel.co", businessName: "Again" })).status).toBe(409);
     // the Slack person is still linked and gets an answer, and usage records came back
     expect(await b.platform.router.handle({ channel: "slack", externalWorkspace: "T7", externalUser: "U7", conversation: "D1", text: "hello", eventId: "E-after-restart" })).toBe("replied");

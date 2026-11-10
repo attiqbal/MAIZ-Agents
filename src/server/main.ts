@@ -2,7 +2,7 @@ import { randomBytes } from "node:crypto";
 import { createServer } from "node:http";
 import { join } from "node:path";
 import { createApp } from "./app.js";
-import { checkEnv } from "./config.js";
+import { checkEnv, integrationAppsFromEnv } from "./config.js";
 import { ResendEmailSender } from "./email.js";
 import { createPlatform } from "./platform.js";
 import { clientIp, limitFor, RateLimiter } from "./rate-limit.js";
@@ -27,6 +27,7 @@ const platform = createPlatform({
     env.SLACK_CLIENT_ID && env.SLACK_CLIENT_SECRET && env.SLACK_SIGNING_SECRET && env.SLACK_REDIRECT_URI
       ? { clientId: env.SLACK_CLIENT_ID, clientSecret: env.SLACK_CLIENT_SECRET, signingSecret: env.SLACK_SIGNING_SECRET, redirectUri: env.SLACK_REDIRECT_URI }
       : undefined,
+  integrationApps: integrationAppsFromEnv(env, env.APP_URL ?? "http://localhost:5173"),
 });
 
 let store: { close(): Promise<void> } | undefined;

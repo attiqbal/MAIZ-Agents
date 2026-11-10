@@ -219,3 +219,33 @@ describe("email sign-in", () => {
     await expect(new ResendEmailSender("k", "f", (async () => ({ ok: false, status: 422 })) as any).send({ to: "a", subject: "s", text: "t" })).rejects.toThrow(/422/);
   });
 });
+
+describe("business apps API", () => {
+  it("imports a till file, posts it to the books, and runs a webhook end to end", async () => {
+    const { call, auth } = await signedUp();
+    const csv = "Date,Total,VAT\n2026-06-01,120.00,20.00\n2026-06-02,60.00,10.00";
+    const imp = await call("POST", "/api/integrations/apps/till-file/import", { csv }, auth);
+    expect(imp.status).toBe(200);
+    expect((imp.body as any).added).toBe(2);
+    const list = (await call("GET", "/api/integrations", undefined, auth)).body as any;
+    expect(list.pending).toHaveLength(2);
+    expect(list.catalogue.some((c: any) => c.key === "brightpay")).toBe(true);
+    expect((await call("POST", "/api/integrations/post", {}, auth)).body).toEqual({ posted: 2, skipped: [] });
+
+    const hook = (await call("POST", "/api/integrations/apps/webhook/connect", {}, auth)).body as any;
+    expect(hook.url).toMatch(/^https:\/\/app\.test\/api\/integrations\/hooks\//);
+    const path = new URL(hook.url).pathname;
+    expect((await call("POST", path, { sales: [{ date: "2026-06-03", gross: 500 }] })).status).toBe(200);
+    expect((await call("POST", path.replace(/[^/]+$/, "x".repeat(32)), { sales: [] })).status).toBe(404);
+  });
+  it("refuses app routes without a session and unknown apps", async () => {
+    const { call, auth } = await signedUp();
+    expect((await call("GET", "/api/integrations")).status).toBe(401);
+    expect((await call("POST", "/api/integrations/apps/nope/import", { csv: "a" }, auth)).status).toBe(400);
+    expect((await call("POST", "/api/integrations/apps/square/connect", {}, auth)).status).toBe(400); // no Square app keys in this setup
+  });
+  it("only accepts a signed connect state on the OAuth return", async () => {
+    const { call } = await signedUp();
+    expect((await call("GET", "/api/integrations/callback", undefined, {}, "code=x&state=forged")).status).toBe(400);
+  });
+});
