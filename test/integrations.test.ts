@@ -271,8 +271,9 @@ describe("Xero", () => {
       seen.push({ url: String(url), auth: h.authorization, tenant: h["xero-tenant-id"], body: init?.body ? String(init.body) : undefined });
       if (String(url).endsWith("/connect/token")) {
         issued++;
-        // first token is already expired, so the sync must refresh it
-        return new Response(JSON.stringify({ access_token: `xa-${issued}`, refresh_token: `xr-${issued}`, expires_in: issued === 1 ? 0 : 1800 }), { status: 200 });
+        // The first token expired long ago, so the sync must refresh it. (The expiry is computed from the real clock while the
+        // service runs on the test's fixed clock, so "expires now" would only work before the fixed time of day.)
+        return new Response(JSON.stringify({ access_token: `xa-${issued}`, refresh_token: `xr-${issued}`, expires_in: issued === 1 ? -86_400 * 3650 : 1800 }), { status: 200 });
       }
       if (String(url).endsWith("/connections")) return new Response(JSON.stringify([{ tenantId: "T-old", tenantName: "Old Co", updatedDateUtc: "2025-01-01" }, { tenantId: "T-new", tenantName: "Kestrel Ltd", updatedDateUtc: "2026-11-10" }]), { status: 200 });
       return new Response(JSON.stringify(XERO_PL), { status: 200 });
