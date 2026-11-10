@@ -23,6 +23,8 @@ import { QualityReviewService } from "../modules/review/index.js";
 import { PriceBook } from "../modules/pricing/index.js";
 import { SpecialistReviewService, type SpecialistRequest } from "../modules/review/specialists.js";
 import { templateFromRole } from "../modules/workforce/templates.js";
+import { MockPaymentProvider, PaymentService, type PaymentProvider } from "../modules/payments/index.js";
+import { quote } from "../modules/store/cart.js";
 
 import { ConsoleEmailSender, type EmailSender } from "./email.js";
 import { userIdFor } from "./identity.js";
@@ -47,6 +49,11 @@ export interface PlatformConfig {
    * queue and sign off specialised tasks. Clients can never approve their own.
    */
   platformOwners?: readonly string[];
+  /**
+   * Takes payments. Leave out for no charging: checkout is then refused. Development (allowDevAuth) defaults to a
+   * mock provider that charges nobody. A real provider (Stripe) is a class implementing PaymentProvider.
+   */
+  payments?: PaymentProvider;
   now?: () => Date;
   http?: typeof fetch;
 }
@@ -142,6 +149,26 @@ export function createPlatform(cfg: PlatformConfig) {
     },
   });
 
+  let alertOwnersLate: (subject: string, text: string) => Promise<void> = async () => undefined;
+  /** Checkout and orders. What a paid order buys is hired here, from the same templates the store sells. */
+  const payments = new PaymentService(identity, audit, {
+    provider: cfg.payments ?? (cfg.allowDevAuth ? new MockPaymentProvider() : undefined),
+    quote: (lines) => quote(lines, prices.catalogue()),
+    appUrl: base,
+    customerEmail: (userId) => identity.workspacesFor(userId).map((w) => w.ownerEmail).find(Boolean),
+    now,
+    alert: (subject, text) => alertOwnersLate(subject, text),
+    fulfil: async (order) => {
+      const ids: string[] = [];
+      for (const line of order.lines) {
+        // A consultant line is "consultant:pass"; the employee template is the part before the colon.
+        const templateKey = line.key.split(":")[0]!;
+        for (let i = 0; i < line.qty; i++) ids.push((await workforce.hire(order.userId, order.workspaceId, templateKey)).id);
+      }
+      return ids;
+    },
+  });
+
   /** The platform owner's AI spend and routing controls. Nothing here is visible to clients. */
   const ai = {
     overview: (userId: string) => {
@@ -191,7 +218,7 @@ export function createPlatform(cfg: PlatformConfig) {
    * A setup that could not undo itself needs a person. The Admin manager tells the client that MAIZ
    * has been alerted, so this is where the platform owner actually is.
    */
-  const alertOwners = async (subject: string, text: string) => {
+  const alertOwners = alertOwnersLate = async (subject: string, text: string) => {
     for (const to of ownerEmails) await email.send({ to, subject, text }).catch((e) => console.error("owner alert failed:", e));
     if (!ownerEmails.length) console.error(`platform alert (no PLATFORM_OWNER_EMAILS set): ${subject}`);
   };
@@ -240,6 +267,7 @@ export function createPlatform(cfg: PlatformConfig) {
     for (const r of s.reviews ?? []) reviews.restore(r);
     for (const c of s.priceChanges ?? []) prices.restore(c);
     for (const r of s.specialistRequests ?? []) specialists.restore(r);
+    for (const x of s.records ?? []) if (x.kind === "order") payments.restore(x.data);
     for (const r of specialists.approved()) workforce.registerCustomTemplate(r.workspaceId, customTemplateOf(r));
     if (s.aiSettings) aiSettings.restore(s.aiSettings);
     for (const d of s.aiDays ?? []) spend.restore(d);
@@ -247,7 +275,7 @@ export function createPlatform(cfg: PlatformConfig) {
     for (const j of s.batchJobs ?? []) batch.restoreJob(j);
     for (const r of s.batchRuns ?? []) batch.restoreRun(r);
     sink = store;
-    for (const part of [audit, identity, energy, workforce, ledger, router, admin, integrations, reviews, prices, specialists, aiSettings, spend, batch]) part.useSink(store);
+    for (const part of [audit, identity, energy, workforce, ledger, router, admin, integrations, reviews, prices, specialists, aiSettings, spend, batch, payments]) part.useSink(store);
   }
 
   const healthy = () => (sink as { healthy?: boolean } | undefined)?.healthy !== false;
@@ -256,6 +284,6 @@ export function createPlatform(cfg: PlatformConfig) {
   const usedLinks = new Set<string>();
   /** Sign-in emails sent per address and hour, to stop the form being used to spam someone. */
   const sends = new Map<string, number[]>();
-  return { batch, email, usedLinks, sends, admin, reviews, prices, specialists, ai, clients, isPlatformOwner, healthy, cfg, now, audit, bus, identity, energy, workforce, ledger, onboarding, router, integrations, slackTokens, saveSlackToken, attachStore };
+  return { payments, batch, email, usedLinks, sends, admin, reviews, prices, specialists, ai, clients, isPlatformOwner, healthy, cfg, now, audit, bus, identity, energy, workforce, ledger, onboarding, router, integrations, slackTokens, saveSlackToken, attachStore };
 }
 export type Platform = ReturnType<typeof createPlatform>;

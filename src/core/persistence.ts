@@ -55,7 +55,14 @@ export interface Sink {
   batchSchedule(workspaceId: string, s: ClientSchedule): void;
   /** Platform-level: one batch run summary, replaced on every call. */
   batchRun(r: BatchRunRecord): void;
+  /** A client's record of a newer kind (orders, rota, reconciliation reports), replaced on every change. */
+  record(workspaceId: string, kind: GenericKind, id: string, data: unknown): void;
 }
+
+/** Kinds stored through Sink.record. The database accepts any kind; this list is what load() hands back. */
+export const GENERIC_KINDS = ["order", "rota_staff", "rota_shift", "rota_settings", "recon"] as const;
+export type GenericKind = (typeof GENERIC_KINDS)[number];
+export interface GenericRecord { workspaceId: string; kind: GenericKind; id: string; data: any }
 
 /** Everything stored, in the order it must be restored. */
 export interface Snapshot {
@@ -85,4 +92,5 @@ export interface Snapshot {
   batchJobs?: BatchJob[];
   batchSchedules?: { workspaceId: string; schedule: ClientSchedule }[];
   batchRuns?: BatchRunRecord[];
+  records?: GenericRecord[];
 }

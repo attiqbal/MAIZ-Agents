@@ -16,6 +16,7 @@ import { CUSTOM_SPECIALIST, DEPARTMENTS } from "../modules/workforce/blueprints.
 import { OVERAGE_RULE } from "../modules/workforce/task-roles.js";
 import { CONSULTANTS, HOW_A_PASS_WORKS, menuOf } from "../modules/workforce/consultants.js";
 import { quote } from "../modules/store/cart.js";
+import { PaymentError, WebhookSignatureError, type Order } from "../modules/payments/index.js";
 import type { Platform } from "./platform.js";
 
 const OAUTH_STATE_SECONDS = 600;
@@ -45,6 +46,9 @@ export interface Res {
   /** Work to do after the reply is sent (Slack needs an answer within 3 seconds). */
   after?: () => Promise<void>;
 }
+
+/** What a client sees of an order: never the provider's reference. */
+const orderView = (o: Order) => ({ id: o.id, status: o.status, lines: o.lines, dueTodayMinor: o.dueTodayMinor, monthlyMinor: o.monthlyMinor, currency: o.currency, createdAt: o.createdAt, paidAt: o.paidAt, employeeIds: o.employeeIds, ...(o.problem && !o.fulfilledAt && o.status === "paid" ? { problem: "We took your payment but could not finish setting up. MAIZ has been alerted." } : {}) });
 
 const json = (status: number, body: unknown): Res => ({ status, body });
 
@@ -180,6 +184,17 @@ export function createApp(p: Platform) {
       return json(201, { token, workspaceId: org.workspaceId, blueprint: org.blueprint, trialEndsAt: org.trialEndsAt });
     }
 
+    // ---- payment provider webhooks: public, authenticated by the provider's signature over the exact bytes ----
+    if (method === "POST" && path === "/api/payments/webhook") {
+      if (!p.payments.enabled) return json(503, { error: "payments are not switched on" });
+      try {
+        return json(200, { result: await p.payments.handleWebhook(req.rawBody, req.headers) });
+      } catch (e) {
+        if (e instanceof WebhookSignatureError) return json(400, { error: "bad signature" });
+        throw e;
+      }
+    }
+
     // ---- Slack events: public, signed by Slack ----
     if (method === "POST" && path === "/api/slack/events") {
       if (!p.cfg.slack) return json(503, { error: "slack is not configured" });
@@ -275,6 +290,15 @@ export function createApp(p: Platform) {
 
     const org = orgOf(userId);
     if (!org) return json(404, { error: "no organisation yet" });
+
+    // ---- buying from the store ----
+    if (method === "POST" && path === "/api/checkout") {
+      const { order, url } = await p.payments.checkout(userId, org.id, body().lines);
+      return json(201, { order: orderView(order), ...(url ? { url } : {}) });
+    }
+    if (method === "GET" && path === "/api/orders") return json(200, { enabled: p.payments.enabled, orders: p.payments.mine(userId, org.id).map(orderView) });
+    const cancelOrder = /^\/api\/orders\/([\w-]{1,64})\/cancel$/.exec(path);
+    if (method === "POST" && cancelOrder) return json(200, { order: orderView(await p.payments.cancel(userId, org.id, cancelOrder[1]!)) });
 
     // ---- new custom specialists: the client asks, MAIZ reviews before anything is trained ----
     if (method === "GET" && path === "/api/specialists") return json(200, { requests: p.specialists.forClient(userId, org.id) });
@@ -499,7 +523,7 @@ export function createApp(p: Platform) {
     try {
       return await route(req);
     } catch (err) {
-      if (err instanceof BadRequest || err instanceof SetupError || err instanceof SignupError || err instanceof LedgerError || err instanceof ChannelError || err instanceof IntegrationError || err instanceof ReviewError || err instanceof PricingError || err instanceof SettingsError || err instanceof BatchError) return json(400, { error: err.message });
+      if (err instanceof BadRequest || err instanceof SetupError || err instanceof SignupError || err instanceof LedgerError || err instanceof ChannelError || err instanceof IntegrationError || err instanceof ReviewError || err instanceof PricingError || err instanceof SettingsError || err instanceof BatchError || err instanceof PaymentError) return json(400, { error: err.message });
       if (err instanceof PermissionError) return json(403, { error: "you don't have permission to do that" });
       console.error(`${req.method} ${req.path} failed:`, err);
       return json(500, { error: "something went wrong" });

@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { createApp } from "./app.js";
 import { checkEnv, integrationAppsFromEnv, platformOwnersFromEnv } from "./config.js";
 import { ResendEmailSender } from "./email.js";
+import { MockPaymentProvider } from "../modules/payments/index.js";
 import { createPlatform } from "./platform.js";
 import { clientIp, limitFor, RateLimiter } from "./rate-limit.js";
 import { createStatic } from "./static.js";
@@ -30,6 +31,8 @@ const platform = createPlatform({
       : undefined,
   integrationApps: integrationAppsFromEnv(env, env.APP_URL ?? "http://localhost:5173"),
   platformOwners: platformOwnersFromEnv(env),
+  // No real payment provider exists yet. "mock" (development only) charges nobody; unset means checkout is refused.
+  payments: env.PAYMENTS_PROVIDER === "mock" ? new MockPaymentProvider() : undefined,
 });
 
 let store: { close(): Promise<void> } | undefined;
@@ -44,6 +47,7 @@ if (env.DATABASE_URL) {
 } else {
   console.log("storage: memory (data resets on restart)");
 }
+if (!platform.payments.enabled) console.log("payments: not switched on (checkout is refused, nothing is charged)");
 if (!platformOwnersFromEnv(env).length) console.log("quality review: no PLATFORM_OWNER_EMAILS, so specialised tasks wait with no reviewer");
 if (!env.ANTHROPIC_API_KEY && !env.RUNPOD_API_KEY) console.log("ai: mock answers (neither ANTHROPIC_API_KEY nor RUNPOD_API_KEY is set)");
 else console.log(`ai: ${env.RUNPOD_API_KEY ? "RunPod does the work" : "Claude only (no RunPod)"}${env.ANTHROPIC_API_KEY ? ", Claude supervises" : ", no Claude supervision"}`);
