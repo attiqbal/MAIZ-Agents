@@ -31,7 +31,8 @@ Finds customers: SEO audits, ad campaigns, social launches and market research. 
 
 ### How a pass works
 
-- You, or your Admin manager, give the consultant a brief. The Admin manager turns it into tasks from the consultant's menu, puts them in order to fit the days and the energy, and shows you the plan before work starts.
+- You, or your Admin manager, give the consultant a brief. The consultant gathers everything it needs, compiles it into one summary with the directions it could take, and brings it to you with a plan that fits the days and the energy.
+- Nothing starts until you sign off. You either choose a direction and sign off, or ask for more information, and the consultant comes back with it. Sign-off stays locked while anything is missing.
 - You can also ask the consultant directly. The Admin manager stays informed and keeps the plan up to date.
 - The consultant stops at each approval point for your OK. Nothing is published, sent or paid for without you.
 - The Admin manager tracks days and energy and tells you at 80%. Work that will not fit is moved, trimmed or quoted as an extension.

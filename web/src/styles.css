@@ -779,3 +779,39 @@ a.onode.add:hover { color: #fff; border-color: var(--color-sapphire-hairline); }
 .cal-side { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
 .panel-h .chips.r { margin-left: auto; }
 @media (max-width: 640px) { .cal li { grid-template-columns: 48px minmax(0, 1fr); } .cal-side { grid-column: 2; flex-direction: row; align-items: center; gap: 10px; } .panel-h .chips.r { margin-left: 0; } }
+
+/* Sign-off gate for specialised tasks */
+.kpis:has(> :nth-child(6)) { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+@media (max-width: 1500px) { .kpis:has(> :nth-child(6)) { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 640px) { .kpis:has(> :nth-child(6)) { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.so-list { display: flex; flex-direction: column; gap: 12px; }
+.so-card { background: var(--color-abyss); border: 1px solid var(--color-inkline); border-radius: 10px; padding: 16px; display: flex; flex-direction: column; gap: 14px; }
+.so-h { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; }
+.so-h h3 { font-size: 15.5px; }
+.so-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; font-size: 13.5px; color: var(--color-mist); }
+.so-grid h4 { font-size: 12px; text-transform: uppercase; letter-spacing: 0.02em; color: var(--color-ash); margin: 0 0 8px; }
+.so-grid p + h4 { margin-top: 14px; }
+.so-brief, .so-plan { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; }
+.so-brief li, .so-plan li { display: flex; justify-content: space-between; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--color-inkline); }
+.so-brief li { flex-direction: column; gap: 4px; }
+.so-brief li:last-child, .so-plan li:last-child { border-bottom: 0; }
+.so-k { font-size: 12px; color: var(--color-ash); }
+.so-in { display: flex; gap: 8px; align-items: center; }
+.so-in .input { flex: 1; min-width: 0; }
+.so-plan { counter-reset: so; }
+.so-plan li > span:first-child::before { counter-increment: so; content: counter(so) ". "; color: var(--color-ash); }
+.so-plan .mono { font-size: 12px; color: var(--color-ash); white-space: nowrap; }
+.so-card .acts { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.btn[disabled] { opacity: .45; cursor: not-allowed; }
+@media (max-width: 900px) { .so-grid { grid-template-columns: 1fr; } }
+.so-dirs { border: 0; padding: 0; margin: 10px 0 14px; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.so-dir { display: grid; grid-template-columns: auto 1fr; gap: 10px; align-items: start; padding: 10px 12px; border: 1px solid var(--color-inkline); border-radius: 10px; cursor: pointer; }
+.so-dir.on { border-color: var(--color-frosted-lilac); background: var(--color-deep-sea); }
+.so-dir input { margin-top: 3px; accent-color: var(--color-aurora-purple); width: 16px; height: 16px; }
+.so-dir b { display: block; color: #fff; font-weight: 500; }
+.so-acts { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 16px 24px; align-items: end; border-top: 1px solid var(--color-inkline); padding-top: 14px; }
+.so-ask { display: flex; flex-direction: column; gap: 6px; }
+.so-wait { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.so-wait .status { white-space: normal; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+@media (max-width: 900px) { .so-acts { grid-template-columns: 1fr; } }

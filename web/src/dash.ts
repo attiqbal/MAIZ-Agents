@@ -2,6 +2,7 @@
 // and the compliance calendar. The figures are one example business (Kestrel Coffee) kept in this file,
 // so every screen tells the same story. Screens show an "Example data" tag when a real owner is signed in.
 import { toast } from "./common";
+import { initSignOff, proposalCount } from "./signoff-ui";
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
@@ -76,6 +77,7 @@ function renderOverview(): void {
   const next = [...DEADLINES].sort((a, b) => a.inDays - b.inDays)[0]!;
   $("ov-kpis").innerHTML = [
     tile("Needs you", "3", "2 approvals, 1 question", "#approvals", "warn"),
+    tile("Plans to sign off", String(proposalCount()), "Specialised work waits for you", "#work", "warn"),
     tile("Tasks in progress", String(count("In progress")), `${count("Planned")} planned, ${count("Done this week")} done this week`, "#work"),
     tile("Energy used today", `${usedToday} / ${allowanceToday}`, "Marketing is running low", "#usage"),
     tile("Spend this month", gbp(0), `Free trial. Then ${gbp(monthly)} a month`, "#usage"),
@@ -178,7 +180,7 @@ function renderCalendar(): void {
 }
 
 export function initDash(): void {
-  renderOverview(); renderTeam(); renderTasks(); renderUsage(); renderCalendar();
+  renderOverview(); renderTeam(); initSignOff(); renderTasks(); renderUsage(); renderCalendar();
   $("task-filter").addEventListener("click", (e) => {
     const b = (e.target as HTMLElement).closest<HTMLElement>("[data-who]");
     if (b) { taskFilter = b.dataset.who!; renderTasks(); $("task-filter").querySelector<HTMLElement>(`[data-who="${taskFilter}"]`)?.focus(); }
