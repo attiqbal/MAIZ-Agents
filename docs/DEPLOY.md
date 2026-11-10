@@ -24,7 +24,7 @@ Create an API key for the workspace that will pay for usage and set a monthly sp
 
 ## 4. Host: Render (render.com)
 1. Sign in with GitHub and choose **New > Blueprint**, then pick this repository. Render reads `render.yaml`: one always-on Docker web service (Starter plan) with a health check on `/api/health`.
-2. Fill in the values it asks for: `SITE_URL` and `APP_URL` (your address, for example `https://maizagents.com`; use the `onrender.com` address until the domain is ready), `DATABASE_URL`, `DATABASE_APP_URL`, `TOKEN_KEY`, `ANTHROPIC_API_KEY`, `RESEND_API_KEY`, `EMAIL_FROM`, `PLATFORM_OWNER_EMAILS` (your own sign-in email: you review and sign off every client's specialised tasks at `/review.html`), and the Slack values if you use Slack. `SESSION_SECRET` is generated for you.
+2. Fill in the values it asks for: `SITE_URL` and `APP_URL` (your address, for example `https://maizagents.com`; use the `onrender.com` address until the domain is ready), `DATABASE_URL`, `DATABASE_APP_URL`, `TOKEN_KEY`, `ANTHROPIC_API_KEY`, `RESEND_API_KEY`, `EMAIL_FROM`, `PLATFORM_OWNER_EMAILS` (your own sign-in email: you review and sign off every client's specialised tasks at `/review.html`, approve custom specialists, see every client and set prices from the owner menu), and the Slack values if you use Slack. `SESSION_SECRET` is generated for you.
 3. Pick the region nearest the Neon database (the blueprint says Frankfurt; change both together).
 4. Deploy. The first start applies the database migrations. Open `/api/health`: it should say `{"ok":true}`.
 5. Keep **one instance**. Sign-in links in use and rate limits are held in memory; see the runbook before scaling out.

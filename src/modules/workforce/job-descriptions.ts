@@ -860,7 +860,7 @@ export const JOB_DESCRIPTIONS: readonly JobDescription[] = [
           "When no employee, blueprint role or consultant covers a job, design a new specialist for it instead of stretching someone else's role",
           "Turn the owner's brief into a role: title, purpose, duties, skills, legal requirements and the records it must keep",
           "Check the new role does not overlap an existing one, and flag anything that needs a qualified professional",
-          "Bring the draft job description and its price to the owner, answer their questions, and train the specialist only after sign-off",
+          "Send the draft job description to MAIZ for review, tell the owner the confirmed price, and train the specialist only after MAIZ approves and the owner hires it",
           "Review each custom specialist after its first month and propose changes or retirement",
         ],
       },
@@ -927,7 +927,7 @@ export const JOB_DESCRIPTIONS: readonly JobDescription[] = [
       needsApproval: ["Change settings, plan or team", "Run or undo setup steps", "Create, change or retire a custom specialist", "Start any specialised task"],
       never: ["Do a specialist's work itself", "Spend money", "Change anything without the owner's approval"],
     },
-    escalate: ["Anything no employee's job covers: tell the owner and suggest a store employee, or draft a new specialist for sign-off", "A requested role that needs a licensed professional: say so, and limit the specialist to preparing and organising"],
+    escalate: ["Anything no employee's job covers: tell the owner and suggest a store employee, or draft a new specialist for MAIZ to review", "A requested role that needs a licensed professional: say so, and limit the specialist to preparing and organising"],
     handover: ["The setup form", "How you want to be contacted (dashboard or Slack)"],
   },
 ];

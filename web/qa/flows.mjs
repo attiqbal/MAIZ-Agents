@@ -4,12 +4,12 @@ const B = process.env.QA_URL ?? "http://localhost:8787";
 const b = await chromium.launch();
 const res = []; const ok = (n, c, d = "") => { res.push([c ? "PASS" : "FAIL", n, d]); };
 const errs = [];
-const mk = async (opts = {}) => { const ctx = await b.newContext({ viewport: { width: 1280, height: 900 }, ...opts }); const p = await ctx.newPage(); p.on("pageerror", e => errs.push(String(e))); p.on("console", m => { if (m.type() === "error" && !(p.url().includes("/signin.html") && m.text().includes("400")) && !(p.url().includes("/review.html") && m.text().includes("403"))) errs.push(p.url() + " " + m.text()); }); return p; };
+const mk = async (opts = {}) => { const ctx = await b.newContext({ viewport: { width: 1280, height: 900 }, ...opts }); const p = await ctx.newPage(); p.on("pageerror", e => errs.push(String(e))); p.on("console", m => { if (m.type() === "error" && !(p.url().includes("/signin.html") && m.text().includes("400")) && !(/\/(review|owner-[a-z]+)\.html/.test(p.url()) && m.text().includes("403"))) errs.push(p.url() + " " + m.text()); }); return p; };
 
 // 1. Link check: every internal link and anchor on every page
 {
   const p = await mk(); const seen = new Map();
-  const pages = ["/", "/employees.html", "/pricing.html", "/security.html", "/signin.html", "/onboarding.html", "/app.html", "/review.html", "/404.html"];
+  const pages = ["/", "/employees.html", "/pricing.html", "/security.html", "/signin.html", "/onboarding.html", "/app.html", "/review.html", "/owner-specialists.html", "/owner-clients.html", "/owner-prices.html", "/404.html"];
   let broken = [];
   for (const pg of pages) {
     await p.goto(B + pg, { waitUntil: "networkidle" });
@@ -150,11 +150,29 @@ const mk = async (opts = {}) => { const ctx = await b.newContext({ viewport: { w
   await p.locator(`[id="${made.task?.id}"] [data-rv-approve] button`).click(); await p.waitForTimeout(400);
   const after = await (await p.request.get(B + "/api/reviews", { headers: { authorization: `Bearer ${client.token}` } })).json();
   ok("owner review: client sees approval and the chosen direction", after.tasks?.[0]?.status === "approved" && after.tasks[0].chosenDirection?.name === "Full deck", JSON.stringify(after.tasks?.[0]?.status));
+  // New specialists: the client's custom role waits for the owner, who approves at his own price.
+  const sp = await (await post("/specialists", { title: "Wholesale account coordinator", purpose: "Look after cafes that buy in bulk", duties: ["Prepare price lists", "Chase repeat orders"] }, client.token)).json();
+  ok("owner specialists: client's custom role goes to MAIZ, not straight to training", sp.request?.status === "in_review", JSON.stringify(sp).slice(0, 120));
+  await p.goto(B + "/owner-specialists.html"); const spc = p.locator(`[id="${sp.request?.id}"]`); await spc.waitFor({ timeout: 5000 }).catch(() => {});
+  ok("owner specialists: queue shows the client's role", (await spc.textContent() ?? "").includes("Northside Bikes") && await p.locator("#ow-eg").isHidden());
+  await spc.locator('input[type="number"]').fill("24"); await spc.locator('[data-decision="approved"]').click(); await p.waitForTimeout(400);
+  const mine = await (await p.request.get(B + "/api/specialists", { headers: { authorization: `Bearer ${client.token}` } })).json();
+  ok("owner specialists: approved at the owner's price", mine.requests?.[0]?.status === "approved" && mine.requests[0].priceGbp === 24, JSON.stringify(mine.requests?.[0]).slice(0, 120));
+  // Clients: every business, with what needs the owner.
+  await p.goto(B + "/owner-clients.html"); await p.locator("#cl-table tbody tr").first().waitFor({ timeout: 5000 }).catch(() => {});
+  ok("owner clients: table lists real clients", (await p.textContent("#cl-table") ?? "").includes("Northside Bikes") && await p.locator("#ow-eg").isHidden());
+  // Prices and packages: change the add-on price, the public store follows.
+  await p.goto(B + "/owner-prices.html"); await p.locator("#pr-g-addOnEmployeeMonthlyGbp").waitFor({ timeout: 5000 }).catch(() => {});
+  await p.fill("#pr-g-addOnEmployeeMonthlyGbp", "13"); await p.dispatchEvent("#pr-g-addOnEmployeeMonthlyGbp", "change");
+  await p.fill("#pr-note", "QA price check"); await p.click("#pr-save"); await p.waitForTimeout(400);
+  const store = await (await p.request.get(B + "/api/store")).json();
+  ok("owner prices: saved change shows in the store at once", store.prices?.addOnEmployeeMonthlyGbp === 13, JSON.stringify(store.prices));
+  ok("owner prices: history records the change", (await p.textContent("#pr-history") ?? "").includes("QA price check"));
   await p.context().close();
   const c = await mk();
   await c.goto(B + "/signin.html"); await c.evaluate((t) => localStorage.setItem("vn.token", t), client.token);
   await c.goto(B + "/review.html"); await c.waitForTimeout(500);
-  ok("owner review: a client opening the queue is turned away", /platform owner/.test(await c.textContent("#rv-gate-h")) && (await c.locator(".so-card").count()) === 0);
+  ok("owner review: a client opening the queue is turned away", /platform owner/.test(await c.textContent("#ow-gate-h")) && (await c.locator(".so-card").count()) === 0);
   await c.context().close();
 }
 // 6. Keyboard

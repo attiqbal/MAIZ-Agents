@@ -45,8 +45,10 @@ QA_URL=http://localhost:8787 npm run qa:flows  # 54 click-through checks
 ## Still open (not fixed here)
 
 - **The control center's figures are examples.** Signed-in owners see their real team, energy, apps and setup; tasks, finance, usage, compliance and approvals show example data with an "Example data" tag. Each needs an API endpoint.
-- **Sign-off for specialised tasks goes to the platform owner, not the client** (corrected 2026-11-10). It is stored and enforced on the server (`src/modules/review`) with an owner-only queue (`web/review.html`). Not yet done: the agent run loop does not compile and submit briefs by itself (the API accepts them), and the role designer is not wired to the server, so a drafted specialist cannot be hired yet. Custom specialists are still approved only by the client.
-- **Payments.** Checkout is a placeholder. All prices are draft list prices.
+- **Sign-off for specialised tasks goes to the platform owner, not the client** (corrected 2026-11-10). It is stored and enforced on the server (`src/modules/review`) with an owner-only queue (`web/review.html`). Not yet done: the agent run loop does not compile and submit briefs by itself (the API accepts them).
+- **Custom specialists are approved by the platform owner** (2026-11-10) at `/owner-specialists.html`, who sets the price. Hiring an approved specialist is not wired yet.
+- **Prices are set by the platform owner** at `/owner-prices.html` (2026-11-10), with dated changes and history. The store, quotes, trials and energy follow them.
+- **Payments.** Checkout is a placeholder, so price changes affect quotes and new trials, not charges.
 - **Docker image.** There is no Docker daemon in the session that did this audit, so the image was not built locally. The CI `docker` job builds and starts it.
 - **Screen readers.** Not tested with VoiceOver or NVDA.
 - **Real services.** Not tested against real Slack, Resend, Neon, Anthropic, Stripe, Xero or Square. Xero and Square direct connections need `XERO_*` and `SQUARE_*` keys (docs/DEPLOY.md, 5b).

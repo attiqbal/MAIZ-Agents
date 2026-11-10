@@ -2,7 +2,8 @@
  * Roles nobody planned for. When the owner needs a specialist that is neither a ready-made
  * employee nor in the org blueprint, the Admin manager designs one: it turns the owner's brief
  * into a role blueprint, which becomes a full job description and a template like any other
- * specialist. The draft always goes to the owner for sign-off before the specialist is trained.
+ * specialist. The draft goes to the MAIZ platform owner for review (src/modules/review/specialists.ts)
+ * before anything is trained; the client then decides whether to hire it at the confirmed price.
  *
  * Pure data and functions, no server imports: the website imports this file too.
  */
@@ -53,7 +54,7 @@ export function similarRoles(title: string): string[] {
 
 /**
  * The Admin manager's role designer. Checks the brief, refuses what is unsafe or too thin,
- * and returns a draft role with its full job description for the owner to sign off.
+ * and returns a draft role with its full job description for MAIZ to review.
  */
 export function draftCustomRole(brief: RoleBrief): RoleDraft {
   const title = clean(brief.title);

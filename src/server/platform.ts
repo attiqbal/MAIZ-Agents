@@ -3,7 +3,7 @@ import { EventBus } from "../core/events.js";
 import { AuditLog } from "../modules/audit/index.js";
 import { ChannelRouter, SlackChannel } from "../modules/channels/index.js";
 import { EnergyMeter } from "../modules/energy/index.js";
-import { IdentityService } from "../modules/identity/index.js";
+import { IdentityService, PermissionError } from "../modules/identity/index.js";
 import { Ledger } from "../modules/ledger/index.js";
 import { AnthropicAdapter } from "../modules/model-gateway/adapters/anthropic.js";
 import { MockAdapter } from "../modules/model-gateway/adapters/mock.js";
@@ -14,6 +14,8 @@ import { OnboardingService } from "../modules/onboarding/index.js";
 import { WorkforceService } from "../modules/workforce/index.js";
 import { IntegrationService, defaultRegistry, type OAuthApp } from "../modules/integrations/index.js";
 import { QualityReviewService } from "../modules/review/index.js";
+import { PriceBook } from "../modules/pricing/index.js";
+import { SpecialistReviewService } from "../modules/review/specialists.js";
 
 import { ConsoleEmailSender, type EmailSender } from "./email.js";
 import { userIdFor } from "./identity.js";
@@ -52,7 +54,18 @@ export function createPlatform(cfg: PlatformConfig) {
   ]);
   const workforce = new WorkforceService(identity, audit, bus, gateway, energy);
   const ledger = new Ledger(identity, audit);
-  const onboarding = new OnboardingService(identity, workforce, ledger, energy, audit, now);
+  const ownerEmailsEarly = (cfg.platformOwners ?? []).map((e) => e.trim().toLowerCase()).filter(Boolean);
+  const ownerIdSet = new Set(ownerEmailsEarly.map(userIdFor));
+  /** Prices, trial terms and per-agent energy, set by the platform owner on the Prices page. */
+  const prices = new PriceBook((userId) => ownerIdSet.has(userId), now);
+  energy.setQuotaResolver((_ws, employeeId) => {
+    const key = workforce.templateOf(employeeId);
+    return key ? prices.agentAllowance(key) : undefined;
+  });
+  const onboarding = new OnboardingService(identity, workforce, ledger, energy, audit, now, () => {
+    const g = prices.general();
+    return { days: g.trialDays, dailyEnergy: g.defaultDailyEnergyPerEmployee };
+  });
   const router = new ChannelRouter(identity, workforce, audit);
   /** Business apps (tills, payroll). Employees get only the app data the owner granted them. */
   const integrations = new IntegrationService(identity, audit, ledger, defaultRegistry(), { http: cfg.http, now, oauthApps: cfg.integrationApps });
@@ -62,9 +75,8 @@ export function createPlatform(cfg: PlatformConfig) {
   const email = cfg.email ?? new ConsoleEmailSender();
   const base = (cfg.appUrl ?? "").replace(/\/$/, "");
   /** Signed-in user ids of the platform owners (the same id the session carries). */
-  const ownerEmails = (cfg.platformOwners ?? []).map((e) => e.trim().toLowerCase()).filter(Boolean);
-  const ownerIds = new Set(ownerEmails.map(userIdFor));
-  const isPlatformOwner = (userId: string) => ownerIds.has(userId);
+  const ownerEmails = ownerEmailsEarly;
+  const isPlatformOwner = (userId: string) => ownerIdSet.has(userId);
   /** MAIZ quality review: every client's specialised tasks wait here for the platform owner's sign-off. */
   const reviews = new QualityReviewService(identity, audit, isPlatformOwner, {
     now,
@@ -82,6 +94,56 @@ export function createPlatform(cfg: PlatformConfig) {
       await admin.tell(item.workspaceId, `"${item.proposal.title}" passed quality review${chosen ? ` (direction: ${chosen.name})` : ""}. Your ${item.proposal.employee} has started the work.${item.noteToClient ? ` Note from MAIZ: ${item.noteToClient}` : ""}`, "/app.html#work");
     },
   });
+  /** New custom specialists: drafted for the client, checked and priced by the platform owner before training. */
+  const specialists = new SpecialistReviewService(identity, audit, isPlatformOwner, (tier) => {
+    const g = prices.general();
+    return tier === "premium" ? g.specialistPremiumMonthlyGbp : g.specialistStandardMonthlyGbp;
+  }, {
+    now,
+    notifyOwner: async (r, clientName) => {
+      for (const to of ownerEmails) {
+        await email.send({ to, subject: `New specialist to review: ${r.role.title} for ${clientName}`, text: `${clientName} asked for a new custom specialist, "${r.role.title}". The Admin manager drafted the job description; nothing is trained until you approve it.\n\nReview it:\n${base}/owner-specialists.html#${r.id}` });
+      }
+    },
+    notifyClient: async (r) => {
+      const text = r.status === "approved"
+        ? `MAIZ approved your new specialist "${r.role.title}" at £${r.priceGbp} a month. It is ready to hire.`
+        : r.status === "changes_requested"
+          ? `MAIZ reviewed your new specialist "${r.role.title}" and asked for changes: ${r.messageToClient}`
+          : `MAIZ will not offer the specialist "${r.role.title}": ${r.messageToClient}`;
+      await admin.tell(r.workspaceId, text, "/app.html#team");
+    },
+  });
+
+  /** The platform owner's clients screen: every client at a glance. */
+  const clients = (userId: string) => {
+    if (!isPlatformOwner(userId)) throw new PermissionError("only the platform owner sees all clients");
+    const nowIso = now().toISOString();
+    const openReviews = new Map<string, number>();
+    for (const r of reviews.queue(userId)) if (r.status !== "approved") openReviews.set(r.workspaceId, (openReviews.get(r.workspaceId) ?? 0) + 1);
+    const openSpecialists = new Map<string, number>();
+    for (const r of specialists.queue(userId)) if (r.status === "in_review") openSpecialists.set(r.workspaceId, (openSpecialists.get(r.workspaceId) ?? 0) + 1);
+    return identity.allWorkspaces().map((w) => {
+      const plan = energy.planOf(w.id);
+      const use = energy.usageOf(w.id);
+      return {
+        id: w.id,
+        name: w.name,
+        ownerEmail: w.ownerEmail ?? null,
+        createdAt: w.createdAt ?? null,
+        trialEndsAt: plan.expiresAt ?? null,
+        status: plan.expiresAt && plan.expiresAt < nowIso ? "trial_ended" : plan.expiresAt ? "trial" : "active",
+        setup: admin.setupStateOf(w.id) ?? "not_started",
+        employees: workforce.countIn(w.id),
+        energyToday: use.energyToday,
+        energyMonth: use.energyMonth,
+        /** What MAIZ paid model providers this month, in US dollars. */
+        aiCostUsdMonth: Math.round(use.costMicroMonth / 10_000) / 100,
+        openReviews: openReviews.get(w.id) ?? 0,
+        specialistsToReview: openSpecialists.get(w.id) ?? 0,
+      };
+    }).sort((a, b) => Number(b.setup === "needs_attention") - Number(a.setup === "needs_attention") || (b.createdAt ?? "").localeCompare(a.createdAt ?? ""));
+  };
   /**
    * A setup that could not undo itself needs a person. The Admin manager tells the client that MAIZ
    * has been alerted, so this is where the platform owner actually is.
@@ -133,8 +195,10 @@ export function createPlatform(cfg: PlatformConfig) {
     for (const x of s.integrationSecrets ?? []) integrations.restoreSecret(x.connectionId, x.secret);
     for (const r of s.integrationRecords ?? []) integrations.restoreRecord(r);
     for (const r of s.reviews ?? []) reviews.restore(r);
+    for (const c of s.priceChanges ?? []) prices.restore(c);
+    for (const r of s.specialistRequests ?? []) specialists.restore(r);
     sink = store;
-    for (const part of [audit, identity, energy, workforce, ledger, router, admin, integrations, reviews]) part.useSink(store);
+    for (const part of [audit, identity, energy, workforce, ledger, router, admin, integrations, reviews, prices, specialists]) part.useSink(store);
   }
 
   const healthy = () => (sink as { healthy?: boolean } | undefined)?.healthy !== false;
@@ -143,6 +207,6 @@ export function createPlatform(cfg: PlatformConfig) {
   const usedLinks = new Set<string>();
   /** Sign-in emails sent per address and hour, to stop the form being used to spam someone. */
   const sends = new Map<string, number[]>();
-  return { email, usedLinks, sends, admin, reviews, isPlatformOwner, healthy, cfg, now, audit, bus, identity, energy, workforce, ledger, onboarding, router, integrations, slackTokens, saveSlackToken, attachStore };
+  return { email, usedLinks, sends, admin, reviews, prices, specialists, clients, isPlatformOwner, healthy, cfg, now, audit, bus, identity, energy, workforce, ledger, onboarding, router, integrations, slackTokens, saveSlackToken, attachStore };
 }
 export type Platform = ReturnType<typeof createPlatform>;

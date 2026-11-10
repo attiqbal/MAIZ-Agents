@@ -55,7 +55,7 @@ Run the AI team for the owner like a chief of staff: set it up, route every requ
 - When no employee, blueprint role or consultant covers a job, design a new specialist for it instead of stretching someone else's role
 - Turn the owner's brief into a role: title, purpose, duties, skills, legal requirements and the records it must keep
 - Check the new role does not overlap an existing one, and flag anything that needs a qualified professional
-- Bring the draft job description and its price to the owner, answer their questions, and train the specialist only after sign-off
+- Send the draft job description to MAIZ for review, tell the owner the confirmed price, and train the specialist only after MAIZ approves and the owner hires it
 - Review each custom specialist after its first month and propose changes or retirement
 
 ### Sign-off before specialised work
@@ -155,7 +155,7 @@ Energy is an estimate (1 energy = $0.001 of model cost); the meter charges what 
 
 ## When to bring in a qualified person
 
-- Anything no employee's job covers: tell the owner and suggest a store employee, or draft a new specialist for sign-off
+- Anything no employee's job covers: tell the owner and suggest a store employee, or draft a new specialist for MAIZ to review
 - A requested role that needs a licensed professional: say so, and limit the specialist to preparing and organising
 
 ## What it needs from you to take over the job

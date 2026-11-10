@@ -4,8 +4,8 @@
  *  - "monthly": ready-made add-on employees and custom specialists (recurring)
  *  - "once": consultant passes (7 or 30 days with an energy pool, paid once)
  *
- * Pure: no payments happen here. Prices are draft list prices in GBP for the
- * owner of MAIZ agents to confirm; consultant passes take their price from consultants.ts.
+ * Pure: no payments happen here. These are the launch defaults; the platform owner changes prices,
+ * energy and availability on the Prices page (src/modules/pricing), and the API quotes from that.
  * The website imports this file too, so the cart and the API always agree.
  */
 import { EMPLOYEE_TEMPLATES } from "../workforce/templates.js";
@@ -49,6 +49,8 @@ export interface CatalogueItem {
   days?: number;
   /** Energy included (consultants only). */
   energy?: number;
+  /** Custom specialists only: which monthly price band applies. */
+  tier?: "standard" | "premium";
   /** Group label for the picker, e.g. "Finance and accounting". */
   group: string;
   summary: string;
@@ -70,6 +72,7 @@ export const CATALOGUE: readonly CatalogueItem[] = [
     d.roles.filter((r) => !r.jd).map((r) => ({
       key: r.key, title: r.title, kind: "specialist" as const, billing: "monthly" as const,
       priceGbp: r.tier === "premium" ? MONTHLY_PRICE_GBP.specialistPremium : MONTHLY_PRICE_GBP.specialistStandard,
+      tier: r.tier === "premium" ? ("premium" as const) : ("standard" as const),
       group: `Specialists · ${d.name}`, summary: r.purpose,
     })),
   ),
@@ -115,7 +118,8 @@ export interface Quote {
 }
 
 /** Prices a cart. Same key twice is merged; quantities are whole numbers from 1 to MAX_QTY. */
-export function quote(lines: readonly unknown[]): Quote {
+export function quote(lines: readonly unknown[], catalogue: readonly CatalogueItem[] = CATALOGUE): Quote {
+  const getItem = (key: string) => catalogue.find((i) => i.key === key);
   const qty = new Map<string, number>();
   const rejected: Quote["rejected"] = [];
   for (const raw of lines) {

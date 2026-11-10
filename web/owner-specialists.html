@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+<!--@include head title="New specialists · MAIZ agents" description="The MAIZ platform owner checks and prices every new custom specialist before it is trained."-->
+<meta name="robots" content="noindex">
+</head>
+<body>
+<div class="page-top">
+  <!--@include header-->
+  <main id="main">
+    <section class="section">
+      <div class="container" style="max-width:1180px">
+        <!--@include owner-nav-->
+        <div class="rv-head">
+          <div><h1>New specialists</h1>
+            <p class="sub">When a client needs a role nobody offers, their Admin manager drafts a custom specialist. Check the job description, set the price, then approve it, ask the client for changes, or decline. Nothing is trained until you approve.</p></div>
+          <span class="badge badge-dark" id="ow-eg" hidden>Example data</span>
+        </div>
+        <div class="ob-panel" id="ow-gate" hidden aria-live="polite"><h2 id="ow-gate-h" style="font-size:1.25rem;margin:0 0 6px"></h2><p id="ow-gate-p" class="sub" style="margin:0 0 14px"></p><a class="btn btn-primary" id="ow-gate-a" href="/signin.html">Log in</a></div>
+        <div id="ow-body">
+          <div class="chips" id="sp-filter" role="group" aria-label="Show requests by stage"></div>
+          <div class="so-list rv-list" id="sp-list" aria-live="polite"></div>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+<!--@include footer-->
+<script type="module" src="/src/owner-specialists.ts"></script>
+</body>
+</html>

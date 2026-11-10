@@ -1,5 +1,5 @@
 {
-  "contract": "Surface: every MAIZ agents page: landing (/), employees and store, pricing, security, log in, 404, onboarding and all ten control center screens (/app.html). Audience: founders and small-business owners with no AI background. Job: understand what the AI employees do and start a free trial. Primary action: 'Start free trial'. Direction: dark 'aurora over a midnight terminal' chosen by the owner, tokens in web/src/styles.css. Hierarchy: hero headline + live product mockup first, then how it works, employees, control center, Slack, pricing, FAQ. Constraints: WCAG 2.2 AA, no framework, landing JS < 150 kB gz and CSS < 30 kB gz, max two web font families, target viewports 375x812, 768x1024, 1440x900. References: the existing site and the project's AgentQL-style dark reference. Quality review (2026-11-10): /review.html is the MAIZ platform owner's queue (noindex); specialised-task sign-off moved from the client to the platform owner.",
+  "contract": "Surface: every MAIZ agents page: landing (/), employees and store, pricing, security, log in, 404, onboarding and all ten control center screens (/app.html). Audience: founders and small-business owners with no AI background. Job: understand what the AI employees do and start a free trial. Primary action: 'Start free trial'. Direction: dark 'aurora over a midnight terminal' chosen by the owner, tokens in web/src/styles.css. Hierarchy: hero headline + live product mockup first, then how it works, employees, control center, Slack, pricing, FAQ. Constraints: WCAG 2.2 AA, no framework, landing JS < 150 kB gz and CSS < 30 kB gz, max two web font families, target viewports 375x812, 768x1024, 1440x900. References: the existing site and the project's AgentQL-style dark reference. Quality review (2026-11-10): /review.html is the MAIZ platform owner's queue (noindex); specialised-task sign-off moved from the client to the platform owner. Owner admin (2026-11-10): /owner-specialists.html, /owner-clients.html and /owner-prices.html join /review.html behind a shared platform-owner menu (all noindex): custom specialists wait for the owner's approval and price, a clients table shows trial, setup, energy, AI cost and what is waiting, and a prices and packages page edits package prices, trial length, store prices and each agent's daily energy now or from a date, with history.",
   "targetViewports": [
     "375x812",
     "768x1024",
@@ -7,11 +7,11 @@
   ],
   "accessibility": {
     "status": "pass",
-    "evidence": "axe-core 4.10 (wcag2a, wcag2aa, wcag21aa, wcag22aa, best-practice) reports 0 violations on /, /onboarding.html, /app.html, /app.html#setup, /app.html#team and /employees.html at 375, 768 and 1440 (npm run qa). Before this change it reported footer text contrast 3.97:1, skipped heading level in the footer, 79 nodes outside landmarks on the landing page and no main landmark in the app. Keyboard: first Tab focuses a visible 'Skip to content' link that moves focus to main; the mobile menu opens with the button, closes on Escape and returns focus to the button. All links, buttons, inputs and summaries are at least 24x24 px at 375 wide. Form errors use role=alert, aria-invalid and aria-describedby, and move focus to the field. Not covered: a screen-reader pass with VoiceOver or NVDA. Job descriptions (2026-11-10): the employees page had no h1 and the app's Team screen skipped from h2 to h4 and had a scrollable org chart that could not be focused; all three are fixed (h1 eyebrow, heading level passed to the job-description renderer, focusable labelled org-chart region). Job descriptions and blueprint roles are native details/summary elements, so they open with the keyboard. Combined release (2026-11-10): npm run qa now scans 17 pages and screens (every public page plus all ten control center screens) at 375, 768 and 1440: 51 checks, 0 axe violations, 0 overflow, 0 console errors, run against the real server with production headers. Fixed on the way: heading order on the employees and pricing pages (h1 was a small eyebrow), dashboard tables and the task board are focusable scroll regions with labels, direction choices are native radio buttons in a fieldset, locked sign-off buttons say why via aria-describedby. Not covered: a screen-reader pass with VoiceOver or NVDA. Quality review (2026-11-10): npm run qa now also scans /review.html at 375, 768 and 1440 (54 checks, 0 axe violations, 0 overflow, 0 console errors). Direction choices are native radios inside a fieldset with a hidden legend; disabled Approve buttons point to their reason with aria-describedby; every input has a label."
+    "evidence": "axe-core 4.10 (wcag2a, wcag2aa, wcag21aa, wcag22aa, best-practice) reports 0 violations on /, /onboarding.html, /app.html, /app.html#setup, /app.html#team and /employees.html at 375, 768 and 1440 (npm run qa). Before this change it reported footer text contrast 3.97:1, skipped heading level in the footer, 79 nodes outside landmarks on the landing page and no main landmark in the app. Keyboard: first Tab focuses a visible 'Skip to content' link that moves focus to main; the mobile menu opens with the button, closes on Escape and returns focus to the button. All links, buttons, inputs and summaries are at least 24x24 px at 375 wide. Form errors use role=alert, aria-invalid and aria-describedby, and move focus to the field. Not covered: a screen-reader pass with VoiceOver or NVDA. Job descriptions (2026-11-10): the employees page had no h1 and the app's Team screen skipped from h2 to h4 and had a scrollable org chart that could not be focused; all three are fixed (h1 eyebrow, heading level passed to the job-description renderer, focusable labelled org-chart region). Job descriptions and blueprint roles are native details/summary elements, so they open with the keyboard. Combined release (2026-11-10): npm run qa now scans 17 pages and screens (every public page plus all ten control center screens) at 375, 768 and 1440: 51 checks, 0 axe violations, 0 overflow, 0 console errors, run against the real server with production headers. Fixed on the way: heading order on the employees and pricing pages (h1 was a small eyebrow), dashboard tables and the task board are focusable scroll regions with labels, direction choices are native radio buttons in a fieldset, locked sign-off buttons say why via aria-describedby. Not covered: a screen-reader pass with VoiceOver or NVDA. Quality review (2026-11-10): npm run qa now also scans /review.html at 375, 768 and 1440 (54 checks, 0 axe violations, 0 overflow, 0 console errors). Direction choices are native radios inside a fieldset with a hidden legend; disabled Approve buttons point to their reason with aria-describedby; every input has a label. Owner admin (2026-11-10): npm run qa scans 21 pages at 375, 768 and 1440 (63 checks, 0 axe violations, 0 overflow, 0 console errors). The three owner pages were also scanned signed in as the owner with live data at 375 and 1440: 0 axe violations, 0 overflow. Prices inputs have visible labels or aria-labels, wide tables sit in focusable labelled scroll regions, filter chips use aria-pressed, the current menu item has aria-current=page."
   },
   "responsive": {
     "status": "pass",
-    "evidence": "Full-page screenshots of all four pages at 375, 768 and 1440 show no horizontal overflow (scrollWidth equals viewport width in every run). The hero mockup's code window previously split each token onto its own line and covered the consultant message and energy values; it now renders as five code lines and the three windows no longer hide each other's text at 1440, and stack cleanly at 375. Apps screen: no horizontal overflow at 375/768/1440; app cards reflow from four columns to one; the pending list moves the description to its own line under 560 px. Combined release (2026-11-10): the new dashboards (overview tiles, employee status table, task board, sign-off cards, energy chart and table, compliance calendar) have no horizontal overflow at 375, 768 or 1440; wide tables scroll inside their own panel."
+    "evidence": "Full-page screenshots of all four pages at 375, 768 and 1440 show no horizontal overflow (scrollWidth equals viewport width in every run). The hero mockup's code window previously split each token onto its own line and covered the consultant message and energy values; it now renders as five code lines and the three windows no longer hide each other's text at 1440, and stack cleanly at 375. Apps screen: no horizontal overflow at 375/768/1440; app cards reflow from four columns to one; the pending list moves the description to its own line under 560 px. Combined release (2026-11-10): the new dashboards (overview tiles, employee status table, task board, sign-off cards, energy chart and table, compliance calendar) have no horizontal overflow at 375, 768 or 1440; wide tables scroll inside their own panel. Owner pages (2026-11-10): the price save bar sticks to the bottom on tablet and desktop and sits in the flow on phones so it does not cover the form; the owner menu wraps to two rows at 375."
   },
   "contentStates": {
     "loading": {
@@ -129,6 +129,36 @@
       "viewport": "1440x900",
       "artifact": "tasks-signoff-1440x900.png",
       "observation": "Client Tasks screen now shows 'Specialised work in quality review' with three states (needs your answers, in quality review with MAIZ's question, approved with the direction MAIZ chose) and no sign-off button."
+    },
+    {
+      "viewport": "1440x900",
+      "artifact": "owner-specialists-1440x900.png",
+      "observation": "Owner menu with New specialists current; each request card shows client, lane, quoted price, the client's brief, overlap and regulated-work checks, the drafted job description, a price field, a message box and Approve / Ask for changes / Decline."
+    },
+    {
+      "viewport": "375x812",
+      "artifact": "owner-specialists-375x812.png",
+      "observation": "Menu wraps to two rows; cards stack to one column with full-width price and message fields; buttons at least 40px tall; no overflow."
+    },
+    {
+      "viewport": "1440x900",
+      "artifact": "owner-clients-1440x900.png",
+      "observation": "Five KPI tiles (clients, needs you, tasks to review, energy today, AI cost) above filter chips and a table of every client with email, sign-up date, trial end, setup state, team size, energy and links to waiting reviews and specialists."
+    },
+    {
+      "viewport": "375x812",
+      "artifact": "owner-clients-375x812.png",
+      "observation": "KPI tiles stack two per row; the client table scrolls inside a focusable labelled region; no page overflow."
+    },
+    {
+      "viewport": "1440x900",
+      "artifact": "owner-prices-1440x900.png",
+      "observation": "Packages and trial fields with hints, daily energy per agent table (blank means default), store prices filtered by kind with price, energy, days and shown-in-store, sticky save bar with start now or on a date and a reason, and history."
+    },
+    {
+      "viewport": "375x812",
+      "artifact": "owner-prices-375x812.png",
+      "observation": "Fields stack one per row; save bar sits in the flow rather than covering the form; wide tables scroll inside labelled regions; no page overflow."
     }
   ]
 }

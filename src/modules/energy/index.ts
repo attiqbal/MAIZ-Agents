@@ -86,6 +86,17 @@ export class EnergyMeter {
     private now: () => Date = () => new Date(),
   ) {}
 
+  private quotaFor?: (workspaceId: string, employeeId: string) => number | undefined;
+
+  /** Per-agent daily energy set by the platform owner. Undefined falls back to the workspace plan. */
+  setQuotaResolver(fn: (workspaceId: string, employeeId: string) => number | undefined): void {
+    this.quotaFor = fn;
+  }
+
+  private dailyQuota(workspaceId: string, employeeId: string): number {
+    return this.quotaFor?.(workspaceId, employeeId) ?? this.planOf(workspaceId).dailyQuotaPerEmployee;
+  }
+
   setPlan(userId: string, workspaceId: string, plan: EnergyPlan): void {
     this.identity.require(userId, workspaceId, "workspace.manage");
     this.plans.set(workspaceId, plan);
@@ -108,7 +119,7 @@ export class EnergyMeter {
     if (monthRows.reduce((s, u) => s + u.costMicro, 0) >= plan.monthlyCostCapMicro)
       return { allowed: false, reason: "monthly_cost_cap_reached" };
     const usedToday = mine.filter((u) => u.employeeId === employeeId && u.day === day).reduce((s, u) => s + u.energy, 0);
-    if (usedToday < plan.dailyQuotaPerEmployee) return { allowed: true, overtime: false };
+    if (usedToday < this.dailyQuota(workspaceId, employeeId)) return { allowed: true, overtime: false };
     const overtimeUsed = monthRows.filter((u) => u.overtime).reduce((s, u) => s + u.energy, 0);
     if (plan.monthlyOvertimeCap === 0) return { allowed: false, reason: "daily_quota_used" };
     if (overtimeUsed >= plan.monthlyOvertimeCap) return { allowed: false, reason: "overtime_cap_reached" };
@@ -139,7 +150,7 @@ export class EnergyMeter {
     this.identity.require(userId, workspaceId, "task.read");
     const day = this.today();
     const used = this.usage.filter((u) => u.workspaceId === workspaceId && u.employeeId === employeeId && u.day === day && !u.overtime).reduce((s, u) => s + u.energy, 0);
-    return Math.max(0, this.planOf(workspaceId).dailyQuotaPerEmployee - used);
+    return Math.max(0, this.dailyQuota(workspaceId, employeeId) - used);
   }
 
   /** What we see: real cost and energy for the month. Admin/owner view. */
@@ -157,6 +168,17 @@ export class EnergyMeter {
       costMicro: rows.reduce((s, r) => s + r.costMicro, 0),
       overtimeEnergy: rows.filter((r) => r.overtime).reduce((s, r) => s + r.energy, 0),
       byEmployee,
+    };
+  }
+
+  /** Platform-level usage for one client (no user check): the platform owner's clients screen. */
+  usageOf(workspaceId: string): { energyToday: number; energyMonth: number; costMicroMonth: number } {
+    const day = this.today();
+    const rows = this.usage.filter((u) => u.workspaceId === workspaceId && u.day.startsWith(day.slice(0, 7)));
+    return {
+      energyToday: rows.filter((u) => u.day === day).reduce((s, u) => s + u.energy, 0),
+      energyMonth: rows.reduce((s, u) => s + u.energy, 0),
+      costMicroMonth: rows.reduce((s, u) => s + u.costMicro, 0),
     };
   }
 

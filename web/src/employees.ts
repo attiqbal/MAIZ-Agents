@@ -26,7 +26,7 @@ if (bp) {
     const item = getItem(key);
     const tag = isCoreRole(key) ? `<span class="bp-tag bp-ready">Core · included</span>` : item ? `<span class="bill-tag bill-${item.billing}">${BILLING_INFO[item.billing].label}</span>` : "";
     const buy = item
-      ? `<div class="bp-buy"><span class="store-price">${item.billing === "monthly" ? `£${item.priceGbp} / month` : `£${item.priceGbp} once`}</span><button class="btn btn-primary btn-sm" type="button" data-add="${esc(key)}">Add to cart</button><span class="jd-note">${esc(BILLING_INFO[item.billing].note)}</span></div>`
+      ? `<div class="bp-buy"><span class="store-price" data-price-key="${esc(key)}">${item.billing === "monthly" ? `£${item.priceGbp} / month` : `£${item.priceGbp} once`}</span><button class="btn btn-primary btn-sm" type="button" data-add="${esc(key)}">Add to cart</button><span class="jd-note">${esc(BILLING_INFO[item.billing].note)}</span></div>`
       : `<p class="jd-note">Included in every package. Nothing to add.</p>`;
     return `<details class="jd bp-role"><summary><span>${esc(title)}</span>${tag}</summary>${buy}${jd ? jdHtml(jd) : ""}</details>`;
   };

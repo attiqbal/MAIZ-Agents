@@ -330,6 +330,11 @@ export class AdminManager {
 
   // ---------- messaging ----------
 
+  /** Platform-level (no user check): where a client's setup stands, for the platform owner's clients screen. */
+  setupStateOf(workspaceId: string): SetupState | undefined {
+    return this.orgs.get(workspaceId)?.state;
+  }
+
   /**
    * A note from the Admin manager to the client, for example that a specialised task passed quality
    * review. Returns undefined for a workspace that was never welcomed (no inbox to post to).

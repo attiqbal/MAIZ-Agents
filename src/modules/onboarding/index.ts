@@ -20,6 +20,8 @@ export type Privacy = "shared" | "own-database" | "own-server" | "own-environmen
 
 /** What the customer picks in the signup menu. */
 export interface SignupChoices {
+  /** The verified sign-in email, kept so the platform owner can reach the client. */
+  ownerEmail?: string;
   businessName: string;
   businessType: string;
   description: string;
@@ -109,24 +111,28 @@ export class OnboardingService {
     private energy: EnergyMeter,
     private audit: AuditLog,
     private now: () => Date = () => new Date(),
+    /** Trial length and daily energy set by the platform owner on the Prices page. */
+    private trialTerms?: () => { days: number; dailyEnergy: number },
   ) {}
 
   async signUp(userId: string, choices: SignupChoices): Promise<Organisation> {
     const blueprint = buildBlueprint(choices);
-    const ws = await this.identity.createWorkspace(userId, { name: blueprint.businessName });
+    const ws = await this.identity.createWorkspace(userId, { name: blueprint.businessName, ...(choices.ownerEmail ? { ownerEmail: choices.ownerEmail } : {}) });
     this.workforce.setProfile(userId, ws.id, blueprint.profile);
     this.ledger.open(userId, ws.id);
     const adminManagerId = (await this.workforce.hire(userId, ws.id, ADMIN_MANAGER)).id;
     const employeeIds: string[] = [];
     for (const key of blueprint.employees) employeeIds.push((await this.workforce.hire(userId, ws.id, key)).id);
-    const trialEndsAt = new Date(this.now().getTime() + blueprint.trialDays * 86_400_000).toISOString();
-    this.energy.setPlan(userId, ws.id, { ...PLANS.trial!, expiresAt: trialEndsAt });
+    const terms = this.trialTerms?.();
+    const trialDays = choices.trialDays ?? terms?.days ?? blueprint.trialDays;
+    const trialEndsAt = new Date(this.now().getTime() + trialDays * 86_400_000).toISOString();
+    this.energy.setPlan(userId, ws.id, { ...PLANS.trial!, ...(terms ? { dailyQuotaPerEmployee: terms.dailyEnergy } : {}), expiresAt: trialEndsAt });
     this.audit.record({
       workspaceId: ws.id,
       actor: `user:${userId}`,
       action: "organisation.provisioned",
       data: { privacy: blueprint.privacy, employees: blueprint.employees, waitlist: blueprint.waitlist, trialEndsAt, contact: blueprint.contact },
     });
-    return { workspaceId: ws.id, blueprint, trialEndsAt, employeeIds, adminManagerId };
+    return { workspaceId: ws.id, blueprint: { ...blueprint, trialDays }, trialEndsAt, employeeIds, adminManagerId };
   }
 }

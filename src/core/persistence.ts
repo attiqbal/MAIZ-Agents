@@ -7,6 +7,8 @@ import type { Connection } from "../modules/channels/index.js";
 import type { AdminMessage, AdminOrgRecord } from "../modules/admin-manager/index.js";
 import type { IntegrationConnection, StoredRecord } from "../modules/integrations/service.js";
 import type { ReviewItem } from "../modules/review/index.js";
+import type { PriceChange } from "../modules/pricing/index.js";
+import type { SpecialistRequest } from "../modules/review/specialists.js";
 
 /**
  * Where services report every change so it can be stored. Services stay fast and
@@ -35,6 +37,10 @@ export interface Sink {
   integrationRecord(r: StoredRecord): void;
   /** A specialised task in MAIZ quality review, replaced on every change. */
   review(r: ReviewItem): void;
+  /** A custom specialist waiting for (or past) the platform owner's review. */
+  specialistRequest(r: SpecialistRequest): void;
+  /** Platform-level (no workspace): a price change by the platform owner. removed = a scheduled change was cancelled. */
+  priceChange(c: PriceChange, removed?: boolean): void;
 }
 
 /** Everything stored, in the order it must be restored. */
@@ -58,4 +64,6 @@ export interface Snapshot {
   integrationSecrets?: { connectionId: string; secret: string }[];
   integrationRecords?: StoredRecord[];
   reviews?: ReviewItem[];
+  priceChanges?: PriceChange[];
+  specialistRequests?: SpecialistRequest[];
 }

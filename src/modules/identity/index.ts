@@ -27,6 +27,10 @@ export interface Workspace {
   language: string;
   baseCurrency: string;
   timeZone: string;
+  /** The client's sign-in email, so the platform owner can reach them. */
+  ownerEmail?: string;
+  /** When the client signed up (ISO). */
+  createdAt?: string;
 }
 
 export class PermissionError extends Error {}
@@ -56,7 +60,7 @@ export class IdentityService {
 
   async createWorkspace(
     ownerUserId: string,
-    input: { name: string; baseCurrency?: string; timeZone?: string; language?: string },
+    input: { name: string; baseCurrency?: string; timeZone?: string; language?: string; ownerEmail?: string },
   ): Promise<Workspace> {
     const ws: Workspace = {
       id: newId("workspace"),
@@ -65,6 +69,8 @@ export class IdentityService {
       language: input.language ?? "en",
       baseCurrency: input.baseCurrency ?? "USD",
       timeZone: input.timeZone ?? "UTC",
+      ...(input.ownerEmail ? { ownerEmail: input.ownerEmail } : {}),
+      createdAt: new Date().toISOString(),
     };
     this.workspaces.set(ws.id, ws);
     this.memberships.set(`${ws.id}|${ownerUserId}`, "owner");
@@ -110,6 +116,11 @@ export class IdentityService {
    */
   workspaceById(workspaceId: string): Workspace | undefined {
     return this.workspaces.get(workspaceId);
+  }
+
+  /** Every client workspace. Platform-level code only (the platform owner's clients screen). */
+  allWorkspaces(): Workspace[] {
+    return [...this.workspaces.values()];
   }
 
   /** A user only ever sees workspaces they belong to. */

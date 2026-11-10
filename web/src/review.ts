@@ -2,13 +2,15 @@
 // The server only answers this page for emails in PLATFORM_OWNER_EMAILS; clients get a 403 and a link
 // back to their control center. With no API running, the page shows example tasks that work locally.
 import "./styles.css";
-import { api, getToken } from "./api";
+import { api } from "./api";
 import { initNav, toast } from "./common";
+import { initOwnerNav, markDemo, ownerLoad } from "./owner-common";
 import { EXAMPLE_TASKS } from "./review-examples";
 import { missingInfo, planEnergy, requestMoreInfo, reviewStatus, signOff, type ReviewStatus } from "../../src/modules/workforce/signoff";
 import type { OwnerReviewView } from "../../src/modules/review/index";
 
 initNav();
+initOwnerNav();
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
 
@@ -76,27 +78,11 @@ function render(): void {
   $("rv-list").innerHTML = shown.map(card).join("") || `<p class="all-clear">${filter === "waiting" ? "Nothing is waiting for you. New tasks are emailed to you as they arrive." : "Nothing here."}</p>`;
 }
 
-function gate(h: string, p: string, link?: [string, string]): void {
-  $("rv-body").hidden = true;
-  $("rv-gate").hidden = false;
-  $("rv-gate-h").textContent = h;
-  $("rv-gate-p").textContent = p;
-  const a = $<HTMLAnchorElement>("rv-gate-a");
-  if (link) { a.href = link[0]; a.textContent = link[1]; } else a.hidden = true;
-}
-
 async function load(): Promise<void> {
-  // Not logged in: ask to log in when the API is up, or show the examples when it is not.
-  if (!getToken()) {
-    const health = await api("/health");
-    if (health.status !== 0) { gate("Log in to review tasks", "Quality review is for the MAIZ platform owner. Log in with your owner email.", ["/signin.html", "Log in"]); return; }
-  }
-  const r = await api<{ reviews: OwnerReviewView[] }>("/owner/reviews");
-  if (r.status === 401) { gate("Log in to review tasks", "Quality review is for the MAIZ platform owner. Log in with your owner email.", ["/signin.html", "Log in"]); return; }
-  if (r.status === 403) { gate("This page is for the MAIZ platform owner", "Your own specialised tasks, and where each one is in review, are on the Tasks screen of your control center.", ["/app.html#work", "Open your control center"]); return; }
-  if (r.ok && r.data) { reviews = r.data.reviews; live = true; }
-  else if (r.status === 0) { reviews = demo(); $("rv-eg").hidden = false; } // no API at all: examples, clearly labelled
-  else { gate("The review queue did not load", "Nothing was changed. Reload the page to try again.", [location.pathname, "Reload"]); return; }
+  const r = await ownerLoad<{ reviews: OwnerReviewView[] }>("/owner/reviews");
+  if (!r) return;
+  if (r === "demo") { reviews = demo(); markDemo(); }
+  else { reviews = r.reviews; live = true; }
   const target = location.hash.slice(1);
   const hit = reviews.find((x) => x.id === target);
   if (hit) filter = inFilter(hit.status, "waiting") ? "waiting" : inFilter(hit.status, "approved") ? "approved" : "elsewhere";

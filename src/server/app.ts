@@ -6,13 +6,14 @@ import { PermissionError } from "../modules/identity/index.js";
 import { LedgerError } from "../modules/ledger/index.js";
 import { IntegrationError } from "../modules/integrations/index.js";
 import { ReviewError } from "../modules/review/index.js";
+import { PricingError } from "../modules/pricing/index.js";
 import { SignupError, type SignupChoices, type TeamSize } from "../modules/onboarding/index.js";
 import { getTemplate, TEMPLATES } from "../modules/workforce/templates.js";
 import { getJobDescription } from "../modules/workforce/job-descriptions.js";
 import { CUSTOM_SPECIALIST, DEPARTMENTS } from "../modules/workforce/blueprints.js";
 import { OVERAGE_RULE } from "../modules/workforce/task-roles.js";
 import { CONSULTANTS, HOW_A_PASS_WORKS, menuOf } from "../modules/workforce/consultants.js";
-import { CATALOGUE, quote } from "../modules/store/cart.js";
+import { quote } from "../modules/store/cart.js";
 import type { Platform } from "./platform.js";
 
 const OAUTH_STATE_SECONDS = 600;
@@ -104,14 +105,16 @@ export function createApp(p: Platform) {
         howAPassWorks: HOW_A_PASS_WORKS,
         overageRule: OVERAGE_RULE,
         // What can be added to a cart, and whether it is billed monthly or once.
-        catalogue: CATALOGUE,
+        catalogue: p.prices.catalogue(),
+        // Package prices and trial terms in force today, set by the platform owner.
+        prices: p.prices.general(),
       });
     }
     // Prices a cart. Public and pure: nothing is charged or stored (payments are not connected yet).
     if (method === "POST" && path === "/api/cart/quote") {
       const lines = body().lines;
       if (!Array.isArray(lines) || lines.length > 100) throw new BadRequest("lines must be a list of up to 100 items");
-      return json(200, quote(lines));
+      return json(200, quote(lines, p.prices.catalogue()));
     }
 
     // ---- sign in by email link ----
@@ -158,6 +161,7 @@ export function createApp(p: Platform) {
       const userId = userIdFor(email);
       if (orgOf(userId)) return json(409, { error: "this email already has an organisation" });
       const choices: SignupChoices = {
+        ownerEmail: email,
         businessName: String(b.businessName ?? ""),
         businessType: String(b.sells ?? "") || "small business",
         description: [b.sells, b.goal ? `Main goal: ${b.goal}` : "", b.website ? `Website: ${b.website}` : ""].filter(Boolean).join(". ") || String(b.businessName ?? ""),
@@ -246,10 +250,30 @@ export function createApp(p: Platform) {
     if (!userId) return json(401, { error: "sign in first" });
     // ---- MAIZ quality review: the platform owner's queue across every client. Clients get 403. ----
     if (path === "/api/owner/reviews" || path.startsWith("/api/owner/reviews/")) return ownerReviewRoutes(req, userId, body);
+    if (path === "/api/owner/prices" || path.startsWith("/api/owner/prices/")) return ownerPriceRoutes(req, userId, body);
+    if (path.startsWith("/api/owner/")) {
+      if (!p.isPlatformOwner(userId)) return json(403, { error: "only the MAIZ platform owner can see this" });
+      if (method === "GET" && path === "/api/owner/clients") return json(200, { clients: p.clients(userId) });
+      if (method === "GET" && path === "/api/owner/specialists") return json(200, { requests: p.specialists.queue(userId) });
+      const d = /^\/api\/owner\/specialists\/([\w-]{1,64})\/decide$/.exec(path);
+      if (method === "POST" && d) {
+        const b = body();
+        await p.specialists.decide(userId, d[1]!, { decision: b.decision, message: b.message, priceGbp: b.priceGbp });
+        return json(200, { requests: p.specialists.queue(userId) });
+      }
+      return json(404, { error: "not found" });
+    }
     if (method === "GET" && path === "/api/me") return json(200, { platformOwner: p.isPlatformOwner(userId), hasOrganisation: !!orgOf(userId) });
 
     const org = orgOf(userId);
     if (!org) return json(404, { error: "no organisation yet" });
+
+    // ---- new custom specialists: the client asks, MAIZ reviews before anything is trained ----
+    if (method === "GET" && path === "/api/specialists") return json(200, { requests: p.specialists.forClient(userId, org.id) });
+    if (method === "POST" && path === "/api/specialists") {
+      const r = await p.specialists.request(userId, org.id, body());
+      return json(201, { request: p.specialists.forClient(userId, org.id).find((x) => x.id === r.id), jobDescription: r.jobDescription, notes: r.notes });
+    }
 
     // ---- specialised tasks: the client follows them through quality review but never approves ----
     if (method === "GET" && path === "/api/reviews") return json(200, { tasks: p.reviews.forClient(userId, org.id) });
@@ -364,6 +388,24 @@ export function createApp(p: Platform) {
     return json(404, { error: "not found" });
   }
 
+  /** Prices and packages: the platform owner only. */
+  async function ownerPriceRoutes(req: Req, userId: string, body: () => any): Promise<Res> {
+    if (!p.isPlatformOwner(userId)) return json(403, { error: "only the MAIZ platform owner can change prices" });
+    const { method, path } = req;
+    if (method === "GET" && path === "/api/owner/prices") return json(200, p.prices.view(userId));
+    if (method === "POST" && path === "/api/owner/prices/changes") {
+      const c = p.prices.change(userId, body());
+      // The price book keeps its own history (who, when, from, to); client audit logs are per workspace.
+      return json(201, { change: c, ...p.prices.view(userId) });
+    }
+    const m = /^\/api\/owner\/prices\/changes\/([\w-]{1,64})$/.exec(path);
+    if (method === "DELETE" && m) {
+      p.prices.cancel(userId, m[1]!);
+      return json(200, p.prices.view(userId));
+    }
+    return json(404, { error: "not found" });
+  }
+
   async function integrationRoutes(req: Req, userId: string, orgId: string, body: () => any): Promise<Res | undefined> {
     const { method, path } = req;
     const ig = p.integrations;
@@ -413,7 +455,7 @@ export function createApp(p: Platform) {
     try {
       return await route(req);
     } catch (err) {
-      if (err instanceof BadRequest || err instanceof SetupError || err instanceof SignupError || err instanceof LedgerError || err instanceof ChannelError || err instanceof IntegrationError || err instanceof ReviewError) return json(400, { error: err.message });
+      if (err instanceof BadRequest || err instanceof SetupError || err instanceof SignupError || err instanceof LedgerError || err instanceof ChannelError || err instanceof IntegrationError || err instanceof ReviewError || err instanceof PricingError) return json(400, { error: err.message });
       if (err instanceof PermissionError) return json(403, { error: "you don't have permission to do that" });
       console.error(`${req.method} ${req.path} failed:`, err);
       return json(500, { error: "something went wrong" });
