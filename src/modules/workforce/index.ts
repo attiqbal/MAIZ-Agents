@@ -3,7 +3,7 @@ import type { Sink } from "../../core/persistence.js";
 import type { AuditLog } from "../audit/index.js";
 import type { EventBus } from "../../core/events.js";
 import type { IdentityService } from "../identity/index.js";
-import type { ModelGateway } from "../model-gateway/gateway.js";
+import type { Completer } from "../model-gateway/types.js";
 import { getTemplate } from "./templates.js";
 import { getJobDescription, renderJobDescription } from "./job-descriptions.js";
 import type { EnergyMeter } from "../energy/index.js";
@@ -79,7 +79,7 @@ export class WorkforceService {
     private identity: IdentityService,
     private audit: AuditLog,
     private bus: EventBus,
-    private gateway: ModelGateway,
+    private gateway: Completer,
     private energy?: EnergyMeter,
   ) {}
 
@@ -193,6 +193,8 @@ export class WorkforceService {
     try {
       const result = await this.gateway.complete({
         tier: template.tier,
+        workspaceId,
+        taskType: template.key,
         // Long deliverables (reports, journals) must not be cut off mid-sentence.
         maxTokens: 4096,
         messages: [
@@ -204,7 +206,7 @@ export class WorkforceService {
       task.provider = result.provider;
       task.inputTokens = result.inputTokens;
       task.outputTokens = result.outputTokens;
-      task.energyUsed = this.energy?.record(workspaceId, employeeId, result.provider, result.inputTokens, result.outputTokens, verdict.overtime).energy;
+      task.energyUsed = this.energy?.record(workspaceId, employeeId, result.provider, result.inputTokens, result.outputTokens, verdict.overtime, result.costMicro).energy;
     } catch {
       task.status = "failed";
     }

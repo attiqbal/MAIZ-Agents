@@ -12,6 +12,8 @@ import type { IntegrationConnection, StoredRecord } from "../modules/integration
 import type { ReviewItem } from "../modules/review/index.js";
 import type { PriceChange } from "../modules/pricing/index.js";
 import type { SpecialistRequest } from "../modules/review/specialists.js";
+import type { AiRoutingSettings } from "../modules/model-gateway/routing/settings.js";
+import type { AiDay } from "../modules/model-gateway/routing/ledger.js";
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
@@ -196,6 +198,26 @@ export class PgStore implements Sink {
       );
     });
   }
+  aiSettings(s: AiRoutingSettings): void {
+    const json = JSON.stringify(s);
+    this.queue(async () => {
+      await this.admin.query(
+        `INSERT INTO platform_records(kind, id, data) VALUES ('ai_settings', 'current', $1)
+         ON CONFLICT (kind, id) DO UPDATE SET data = EXCLUDED.data, updated_at = now()`,
+        [json],
+      );
+    });
+  }
+  aiDay(d: AiDay): void {
+    const json = JSON.stringify(d);
+    this.queue(async () => {
+      await this.admin.query(
+        `INSERT INTO platform_records(kind, id, data) VALUES ('ai_day', $1, $2)
+         ON CONFLICT (kind, id) DO UPDATE SET data = EXCLUDED.data, updated_at = now()`,
+        [d.day, json],
+      );
+    });
+  }
   entry(e: JournalEntry): void {
     this.scoped(e.workspaceId, async (c) => {
       await c.query("INSERT INTO journal_entries(id, workspace_id, entry_date, memo, source, reverses) VALUES ($1,$2,$3,$4,$5,$6)", [e.id, e.workspaceId, e.date, e.memo, e.source ?? null, e.reverses ?? null]);
@@ -254,6 +276,8 @@ export class PgStore implements Sink {
       reviews: of("review").map((s) => s.data),
       specialistRequests: of("specialist_req").map((s) => s.data),
       priceChanges: (await q("SELECT data FROM platform_records WHERE kind = 'price_change' ORDER BY updated_at, id")).map((r) => r.data),
+      aiSettings: (await q("SELECT data FROM platform_records WHERE kind = 'ai_settings' AND id = 'current'"))[0]?.data,
+      aiDays: (await q("SELECT data FROM platform_records WHERE kind = 'ai_day' ORDER BY id")).map((r) => r.data),
     } as Snapshot;
   }
 

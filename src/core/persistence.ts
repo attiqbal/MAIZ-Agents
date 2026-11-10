@@ -9,6 +9,8 @@ import type { IntegrationConnection, StoredRecord } from "../modules/integration
 import type { ReviewItem } from "../modules/review/index.js";
 import type { PriceChange } from "../modules/pricing/index.js";
 import type { SpecialistRequest } from "../modules/review/specialists.js";
+import type { AiRoutingSettings } from "../modules/model-gateway/routing/settings.js";
+import type { AiDay } from "../modules/model-gateway/routing/ledger.js";
 
 /**
  * Where services report every change so it can be stored. Services stay fast and
@@ -41,6 +43,10 @@ export interface Sink {
   specialistRequest(r: SpecialistRequest): void;
   /** Platform-level (no workspace): a price change by the platform owner. removed = a scheduled change was cancelled. */
   priceChange(c: PriceChange, removed?: boolean): void;
+  /** Platform-level: the owner's AI routing settings (models, thresholds, caps). Replaced on every change. */
+  aiSettings(s: AiRoutingSettings): void;
+  /** Platform-level: one day of AI routing spend and savings, replaced on every call. */
+  aiDay(d: AiDay): void;
 }
 
 /** Everything stored, in the order it must be restored. */
@@ -66,4 +72,6 @@ export interface Snapshot {
   reviews?: ReviewItem[];
   priceChanges?: PriceChange[];
   specialistRequests?: SpecialistRequest[];
+  aiSettings?: unknown;
+  aiDays?: AiDay[];
 }

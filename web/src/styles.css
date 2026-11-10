@@ -872,3 +872,8 @@ body > main, body > .page-top { flex: none; }
 .ow-hist li:last-child { border-bottom: 0; }
 .ow-hist ul { margin: 0; padding-left: 18px; color: var(--color-ash); font-size: 13px; }
 .ow-hist { list-style: none; margin: 0; padding: 0; }
+
+/* AI spend page: provider status and budget meters */
+.field .lbl { font-size: 13px; color: var(--color-ash); }
+.field progress { width: 100%; height: 6px; border-radius: 6px; accent-color: var(--color-aurora-purple); }
+.field .hint.warn { color: var(--color-warn); }

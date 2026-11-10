@@ -8,6 +8,11 @@ import { Ledger } from "../modules/ledger/index.js";
 import { AnthropicAdapter } from "../modules/model-gateway/adapters/anthropic.js";
 import { MockAdapter } from "../modules/model-gateway/adapters/mock.js";
 import { ModelGateway } from "../modules/model-gateway/gateway.js";
+import { RunPodAdapter } from "../modules/model-gateway/adapters/runpod.js";
+import { RoutingGateway } from "../modules/model-gateway/routing/router.js";
+import { SpendLedger } from "../modules/model-gateway/routing/ledger.js";
+import { RoutingSettingsStore, defaultSettings } from "../modules/model-gateway/routing/settings.js";
+import type { Completer } from "../modules/model-gateway/types.js";
 import { AdminManager } from "../modules/admin-manager/index.js";
 import { InMemoryModelProvisioner, InMemoryStorageProvisioner } from "../modules/admin-manager/provisioning.js";
 import { OnboardingService } from "../modules/onboarding/index.js";
@@ -23,6 +28,8 @@ import { userIdFor } from "./identity.js";
 export interface PlatformConfig {
   anthropicApiKey?: string;
   anthropicModel?: string;
+  /** RunPod Serverless endpoint (vLLM worker) that does the heavy lifting. Both come from environment variables. */
+  runpod?: { apiKey: string; endpointId: string };
   sessionSecret: string;
   /** Where sign-in emails come from. Defaults to printing them (development). */
   email?: EmailSender;
@@ -49,9 +56,16 @@ export function createPlatform(cfg: PlatformConfig) {
   const bus = new EventBus();
   const identity = new IdentityService(audit, bus);
   const energy = new EnergyMeter(identity, audit, now);
-  const gateway = new ModelGateway([
-    cfg.anthropicApiKey ? new AnthropicAdapter(cfg.anthropicApiKey, cfg.anthropicModel ?? "claude-haiku-5-5") : new MockAdapter(),
-  ]);
+  /**
+   * Open models on RunPod do the work and Claude supervises (see model-gateway/routing). Everything about it,
+   * models, thresholds and caps included, is editable by the platform owner. Without any key the answers are mocks.
+   */
+  const aiSettings = new RoutingSettingsStore(defaultSettings(cfg.anthropicModel ?? "claude-haiku-5-5"));
+  const spend = new SpendLedger(now);
+  const runpod = cfg.runpod ? new RunPodAdapter(cfg.runpod.apiKey, cfg.runpod.endpointId, aiSettings.get().runpod.model, cfg.http) : undefined;
+  const claude = cfg.anthropicApiKey ? new AnthropicAdapter(cfg.anthropicApiKey, cfg.anthropicModel ?? "claude-haiku-5-5", cfg.http) : undefined;
+  const routing = runpod || claude ? new RoutingGateway({ settings: aiSettings, ledger: spend, runpod, claude, now: () => now().getTime() }) : undefined;
+  const gateway: Completer = routing ?? new ModelGateway([new MockAdapter()]);
   const workforce = new WorkforceService(identity, audit, bus, gateway, energy);
   const ledger = new Ledger(identity, audit);
   const ownerEmailsEarly = (cfg.platformOwners ?? []).map((e) => e.trim().toLowerCase()).filter(Boolean);
@@ -114,6 +128,22 @@ export function createPlatform(cfg: PlatformConfig) {
       await admin.tell(r.workspaceId, text, "/app.html#team");
     },
   });
+
+  /** The platform owner's AI spend and routing controls. Nothing here is visible to clients. */
+  const ai = {
+    overview: (userId: string) => {
+      if (!ownerIdSet.has(userId)) throw new PermissionError("only the platform owner sees AI spend");
+      return { configured: { runpod: !!runpod, claude: !!claude }, status: routing?.status() ?? null, settings: aiSettings.get(), ...spend.summary(30), cacheable: aiSettings.get().cache.enabled };
+    },
+    health: async (userId: string) => {
+      if (!ownerIdSet.has(userId)) throw new PermissionError("only the platform owner sees AI spend");
+      return runpod ? runpod.health() : { reachable: false, error: "RunPod is not configured (RUNPOD_API_KEY and RUNPOD_ENDPOINT_ID)" };
+    },
+    update: (userId: string, patch: unknown) => {
+      if (!ownerIdSet.has(userId)) throw new PermissionError("only the platform owner changes AI settings");
+      return aiSettings.update(patch);
+    },
+  };
 
   /** The platform owner's clients screen: every client at a glance. */
   const clients = (userId: string) => {
@@ -197,8 +227,10 @@ export function createPlatform(cfg: PlatformConfig) {
     for (const r of s.reviews ?? []) reviews.restore(r);
     for (const c of s.priceChanges ?? []) prices.restore(c);
     for (const r of s.specialistRequests ?? []) specialists.restore(r);
+    if (s.aiSettings) aiSettings.restore(s.aiSettings);
+    for (const d of s.aiDays ?? []) spend.restore(d);
     sink = store;
-    for (const part of [audit, identity, energy, workforce, ledger, router, admin, integrations, reviews, prices, specialists]) part.useSink(store);
+    for (const part of [audit, identity, energy, workforce, ledger, router, admin, integrations, reviews, prices, specialists, aiSettings, spend]) part.useSink(store);
   }
 
   const healthy = () => (sink as { healthy?: boolean } | undefined)?.healthy !== false;
@@ -207,6 +239,6 @@ export function createPlatform(cfg: PlatformConfig) {
   const usedLinks = new Set<string>();
   /** Sign-in emails sent per address and hour, to stop the form being used to spam someone. */
   const sends = new Map<string, number[]>();
-  return { email, usedLinks, sends, admin, reviews, prices, specialists, clients, isPlatformOwner, healthy, cfg, now, audit, bus, identity, energy, workforce, ledger, onboarding, router, integrations, slackTokens, saveSlackToken, attachStore };
+  return { email, usedLinks, sends, admin, reviews, prices, specialists, ai, clients, isPlatformOwner, healthy, cfg, now, audit, bus, identity, energy, workforce, ledger, onboarding, router, integrations, slackTokens, saveSlackToken, attachStore };
 }
 export type Platform = ReturnType<typeof createPlatform>;

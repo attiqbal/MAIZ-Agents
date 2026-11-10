@@ -21,6 +21,7 @@ const platform = createPlatform({
   email: env.RESEND_API_KEY && env.EMAIL_FROM ? new ResendEmailSender(env.RESEND_API_KEY, env.EMAIL_FROM) : undefined,
   anthropicApiKey: env.ANTHROPIC_API_KEY,
   anthropicModel: env.ANTHROPIC_MODEL,
+  runpod: env.RUNPOD_API_KEY && env.RUNPOD_ENDPOINT_ID ? { apiKey: env.RUNPOD_API_KEY, endpointId: env.RUNPOD_ENDPOINT_ID } : undefined,
   sessionSecret: env.SESSION_SECRET ?? randomBytes(32).toString("hex"),
   allowDevAuth: env.ALLOW_DEV_AUTH === "1",
   slack:
@@ -44,7 +45,8 @@ if (env.DATABASE_URL) {
   console.log("storage: memory (data resets on restart)");
 }
 if (!platformOwnersFromEnv(env).length) console.log("quality review: no PLATFORM_OWNER_EMAILS, so specialised tasks wait with no reviewer");
-if (!env.ANTHROPIC_API_KEY) console.log("ai: mock answers (ANTHROPIC_API_KEY is not set)");
+if (!env.ANTHROPIC_API_KEY && !env.RUNPOD_API_KEY) console.log("ai: mock answers (neither ANTHROPIC_API_KEY nor RUNPOD_API_KEY is set)");
+else console.log(`ai: ${env.RUNPOD_API_KEY ? "RunPod does the work" : "Claude only (no RunPod)"}${env.ANTHROPIC_API_KEY ? ", Claude supervises" : ", no Claude supervision"}`);
 
 const handle = createApp(platform);
 // One service serves the website and the API on the same address, so sign-in links, cookies-free

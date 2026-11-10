@@ -7,6 +7,7 @@ import { LedgerError } from "../modules/ledger/index.js";
 import { IntegrationError } from "../modules/integrations/index.js";
 import { ReviewError } from "../modules/review/index.js";
 import { PricingError } from "../modules/pricing/index.js";
+import { SettingsError } from "../modules/model-gateway/routing/settings.js";
 import { SignupError, type SignupChoices, type TeamSize } from "../modules/onboarding/index.js";
 import { getTemplate, TEMPLATES } from "../modules/workforce/templates.js";
 import { getJobDescription } from "../modules/workforce/job-descriptions.js";
@@ -250,6 +251,7 @@ export function createApp(p: Platform) {
     if (!userId) return json(401, { error: "sign in first" });
     // ---- MAIZ quality review: the platform owner's queue across every client. Clients get 403. ----
     if (path === "/api/owner/reviews" || path.startsWith("/api/owner/reviews/")) return ownerReviewRoutes(req, userId, body);
+    if (path === "/api/owner/ai" || path.startsWith("/api/owner/ai/")) return ownerAiRoutes(req, userId, body);
     if (path === "/api/owner/prices" || path.startsWith("/api/owner/prices/")) return ownerPriceRoutes(req, userId, body);
     if (path.startsWith("/api/owner/")) {
       if (!p.isPlatformOwner(userId)) return json(403, { error: "only the MAIZ platform owner can see this" });
@@ -388,6 +390,19 @@ export function createApp(p: Platform) {
     return json(404, { error: "not found" });
   }
 
+  /** AI spend and routing settings: the platform owner only (the service checks again). */
+  async function ownerAiRoutes(req: Req, userId: string, body: () => any): Promise<Res> {
+    if (!p.isPlatformOwner(userId)) return json(403, { error: "only the MAIZ platform owner can see AI spend" });
+    const { method, path } = req;
+    if (method === "GET" && path === "/api/owner/ai") return json(200, p.ai.overview(userId));
+    if (method === "GET" && path === "/api/owner/ai/health") return json(200, await p.ai.health(userId));
+    if (method === "POST" && path === "/api/owner/ai/settings") {
+      p.ai.update(userId, body());
+      return json(200, p.ai.overview(userId));
+    }
+    return json(404, { error: "not found" });
+  }
+
   /** Prices and packages: the platform owner only. */
   async function ownerPriceRoutes(req: Req, userId: string, body: () => any): Promise<Res> {
     if (!p.isPlatformOwner(userId)) return json(403, { error: "only the MAIZ platform owner can change prices" });
@@ -455,7 +470,7 @@ export function createApp(p: Platform) {
     try {
       return await route(req);
     } catch (err) {
-      if (err instanceof BadRequest || err instanceof SetupError || err instanceof SignupError || err instanceof LedgerError || err instanceof ChannelError || err instanceof IntegrationError || err instanceof ReviewError || err instanceof PricingError) return json(400, { error: err.message });
+      if (err instanceof BadRequest || err instanceof SetupError || err instanceof SignupError || err instanceof LedgerError || err instanceof ChannelError || err instanceof IntegrationError || err instanceof ReviewError || err instanceof PricingError || err instanceof SettingsError) return json(400, { error: err.message });
       if (err instanceof PermissionError) return json(403, { error: "you don't have permission to do that" });
       console.error(`${req.method} ${req.path} failed:`, err);
       return json(500, { error: "something went wrong" });

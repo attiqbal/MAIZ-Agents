@@ -81,6 +81,7 @@ export default defineConfig({
         ownerSpecialists: resolve(__dirname, "owner-specialists.html"),
         ownerClients: resolve(__dirname, "owner-clients.html"),
         ownerPrices: resolve(__dirname, "owner-prices.html"),
+        ownerAi: resolve(__dirname, "owner-ai.html"),
         employees: resolve(__dirname, "employees.html"),
         pricing: resolve(__dirname, "pricing.html"),
         security: resolve(__dirname, "security.html"),
