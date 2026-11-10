@@ -41,7 +41,7 @@ describe.skipIf(!ADMIN || !APP)("postgres persistence", () => {
     a.platform.ledger.reverse(user, org.id, oops.id, "2026-06-04");
 
     // work: spends energy
-    const ask = await a.call("POST", "/api/ask", { text: "Draft a post", employeeId: org.team[1].id }, token);
+    const ask = await a.call("POST", "/api/ask", { text: "Draft a post", employeeId: org.team[1].id, urgent: true }, token);
     expect((ask.body as any).status).toBe("ready_for_review");
 
     // the Admin manager: welcome is stored, setup runs from the form
