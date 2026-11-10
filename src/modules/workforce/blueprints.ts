@@ -40,7 +40,7 @@ export interface Department {
 export const CUSTOM_SPECIALIST = {
   title: "Custom specialist",
   summary:
-    "Need a role we don't have ready-made? Your Admin manager trains a specialist for it from the role blueprint and your own brief. Each specialist is an extra cost per agent, shown before you confirm.",
+    "Need a role that is not here? Describe the job. Your Admin manager designs a specialist for it and brings you the job description and the price. Nothing is created or charged until you sign off.",
   steps: [
     "Pick a role from the blueprint, or describe the one you need",
     "Your Admin manager drafts its job description and asks what it should know about your business",

@@ -63,6 +63,9 @@ export const DEFAULT_CHART: readonly Account[] = [
   { code: "6900", name: "Other expenses", type: "expense" },
 ];
 
+/** Largest amount one line may carry, in minor units (ten trillion). Keeps totals exact in JavaScript and inside the database's bigint. */
+export const MAX_AMOUNT_MINOR = 1e15;
+
 export class LedgerError extends Error {}
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -142,6 +145,7 @@ export class Ledger {
       if (!accts.has(l.account)) throw new LedgerError(`unknown account ${l.account}`);
       if (!Number.isInteger(l.debit) || !Number.isInteger(l.credit) || l.debit < 0 || l.credit < 0)
         throw new LedgerError("amounts must be whole minor units and not negative");
+      if (l.debit > MAX_AMOUNT_MINOR || l.credit > MAX_AMOUNT_MINOR) throw new LedgerError("amount is too large");
       if ((l.debit > 0) === (l.credit > 0)) throw new LedgerError("each line is either a debit or a credit");
       debit += l.debit;
       credit += l.credit;

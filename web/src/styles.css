@@ -823,3 +823,15 @@ a.onode.add:hover { color: #fff; border-color: var(--color-sapphire-hairline); }
 .rd-draft { background: var(--color-abyss); border: 1px solid var(--color-inkline); border-radius: 10px; padding: 16px; display: flex; flex-direction: column; gap: 14px; }
 .rd-draft .acts { display: flex; gap: 8px; flex-wrap: wrap; }
 @media (max-width: 760px) { .rd-form { grid-template-columns: 1fr; } }
+
+/* Marketing pages: in-page navigation and small layout fixes */
+.subnav { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; margin: -24px 0 40px; }
+.subnav a { padding: 8px 16px; min-height: 40px; display: inline-flex; align-items: center; border: 1px solid var(--color-obsidian-edge); border-radius: var(--radius-full); font-size: 14px; color: var(--color-mist); transition: color .15s, border-color .15s; }
+.subnav a:hover { color: #fff; border-color: var(--color-sapphire-hairline); }
+.sec-more { display: flex; justify-content: center; margin-top: 32px; }
+.sec-head h1 { font-size: 48px; line-height: 1.1; letter-spacing: -0.96px; }
+@media (max-width: 640px) { .sec-head h1 { font-size: 34px; letter-spacing: -0.68px; } }
+[id] { scroll-margin-top: 84px; }
+body { min-height: 100vh; min-height: 100dvh; display: flex; flex-direction: column; }
+body > .footer { margin-top: auto; }
+body > main, body > .page-top { flex: none; }

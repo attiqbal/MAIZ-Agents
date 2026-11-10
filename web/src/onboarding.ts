@@ -26,15 +26,10 @@ function show(n: number): void {
 document.addEventListener("click", (e) => {
   const t = (e.target as HTMLElement).closest<HTMLElement>("[data-next],[data-back]");
   if (!t || t.id === "email-go" || t.id === "biz-go") return;
-  if (current === 1 && t.classList.contains("btn-provider")) { void providerClick(); return; }
   if (t.hasAttribute("data-back")) show(current - 1); else show(current + 1);
 });
 
 // Step 1: a real sign-in link by email. Without the API (demo) or with dev sign-in on, this step just moves on.
-async function providerClick(): Promise<void> {
-  const up = await api("/health");
-  if (up.ok) toast("Google and Microsoft sign-in are coming soon. Please use the email link."); else show(2);
-}
 $("email-go").addEventListener("click", async () => {
   const v = $<HTMLInputElement>("email").value.trim();
   const ok = /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v);
@@ -116,7 +111,11 @@ async function createOrganisation(): Promise<void> {
     body: { email: profile.email, businessName: profile.biz, website: profile.site, sells: profile.sells, size: profile.size, goal: profile.goal, contact: profile.contact },
   });
   if (r.ok && r.data?.token) setToken(r.data.token);
-  else if (r.status === 409) $("prov-h").textContent = "You already have an organisation. Opening it";
+  else if (r.status === 409) {
+    // This email already has a team. Without a login on this device, the owner has to log in to reach it.
+    $("prov-h").textContent = getToken() ? "You already have a team. Open your control center." : "You already have a team. Log in to open it.";
+    if (!getToken()) { const open = $<HTMLAnchorElement>("open-app"); open.href = "/signin.html"; open.textContent = "Log in"; }
+  }
 }
 
 function provision(): void {

@@ -13,6 +13,18 @@ import { CONSULTANTS, HOW_A_PASS_WORKS, menuOf } from "../modules/workforce/cons
 import { CATALOGUE, quote } from "../modules/store/cart.js";
 import type { Platform } from "./platform.js";
 
+const OAUTH_STATE_SECONDS = 600;
+const OAUTH_COOKIE = "maiz_oauth";
+const oauthCookie = (nonce: string, maxAge: number, appUrl?: string): string =>
+  `${OAUTH_COOKIE}=${nonce}; Path=/api/integrations; HttpOnly; SameSite=Lax; Max-Age=${maxAge}${appUrl?.startsWith("https://") ? "; Secure" : ""}`;
+function readCookie(header: string | undefined, name: string): string | undefined {
+  for (const part of (header ?? "").split(";")) {
+    const [k, ...v] = part.trim().split("=");
+    if (k === name) return v.join("=");
+  }
+  return undefined;
+}
+
 export interface Req {
   method: string;
   path: string;
@@ -173,7 +185,10 @@ export function createApp(p: Platform) {
       if (!cfg) return json(503, { error: "slack is not configured" });
       const state = readToken(secret, req.query.get("state") ?? undefined, p.now().getTime());
       const code = req.query.get("code");
-      if (!state?.u || state.k !== "slack-install" || !code) return json(400, { error: "invalid or expired install link" });
+      if (!state?.u || state.k !== "slack-install" || typeof state.n !== "string" || !code) return json(400, { error: "invalid or expired install link" });
+      // Usable once. The QR flow finishes on a phone, so this link cannot be tied to the browser that started it.
+      if (p.usedLinks.has(state.n)) return json(400, { error: "invalid or expired install link" });
+      p.usedLinks.add(state.n);
       const res = await (p.cfg.http ?? fetch)("https://slack.com/api/oauth.v2.access", {
         method: "POST",
         headers: { "content-type": "application/x-www-form-urlencoded" },
@@ -197,7 +212,10 @@ export function createApp(p: Platform) {
     if (method === "GET" && path === "/api/integrations/callback") {
       const state = readToken(secret, req.query.get("state") ?? undefined, p.now().getTime());
       const code = req.query.get("code");
-      if (!state?.u || state.k !== "int-oauth" || typeof state.a !== "string") return json(400, { error: "invalid or expired connect link" });
+      if (!state?.u || state.k !== "int-oauth" || typeof state.a !== "string" || typeof state.n !== "string") return json(400, { error: "invalid or expired connect link" });
+      // Bound to the browser that started it (cookie) and usable once, so a link sent to someone else cannot attach their account.
+      if (readCookie(req.headers["cookie"], OAUTH_COOKIE) !== state.n || p.usedLinks.has(state.n)) return json(400, { error: "invalid or expired connect link" });
+      p.usedLinks.add(state.n);
       const org = orgOf(state.u);
       if (!code || !org) return { status: 302, headers: { location: "/app.html#apps" } }; // owner pressed Cancel in the app
       try {
@@ -292,7 +310,7 @@ export function createApp(p: Platform) {
     if (method === "GET" && path === "/api/slack/install") {
       const cfg = p.cfg.slack;
       if (!cfg) return json(503, { error: "slack is not configured" });
-      const state = makeToken(secret, { u: userId, k: "slack-install" }, 600, p.now().getTime());
+      const state = makeToken(secret, { u: userId, k: "slack-install", n: randomBytes(16).toString("hex") }, OAUTH_STATE_SECONDS, p.now().getTime());
       const url = new URL("https://slack.com/oauth/v2/authorize");
       url.searchParams.set("client_id", cfg.clientId);
       url.searchParams.set("scope", "app_mentions:read,chat:write,im:history,im:read,im:write");
@@ -321,8 +339,10 @@ export function createApp(p: Platform) {
         return json(200, ig.importFile(userId, orgId, key, b.csv, { date: typeof b.date === "string" ? b.date : undefined }));
       }
       if (c.auth.kind === "oauth2") {
-        const state = makeToken(secret, { k: "int-oauth", u: userId, a: key }, 600, p.now().getTime());
-        return json(200, { url: ig.authorizeUrl(userId, orgId, key, state) });
+        // The nonce is also set as a cookie, so only the browser that started the connection can finish it.
+        const nonce = randomBytes(16).toString("hex");
+        const state = makeToken(secret, { k: "int-oauth", u: userId, a: key, n: nonce }, OAUTH_STATE_SECONDS, p.now().getTime());
+        return { status: 200, body: { url: ig.authorizeUrl(userId, orgId, key, state) }, headers: { "set-cookie": oauthCookie(nonce, OAUTH_STATE_SECONDS, p.cfg.appUrl) } };
       }
       if (c.auth.kind === "api_key") return json(201, { connection: ig.connectWithKey(userId, orgId, key, body().values ?? {}) });
       if (c.auth.kind === "webhook") {

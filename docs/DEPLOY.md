@@ -12,7 +12,7 @@ Order: 1 Neon, 2 Resend, 3 Anthropic key, 4 Render, 5 Slack (optional), 6 domain
 2. In the project, open **Connection details** and copy the connection string for the default owner role. That is `DATABASE_URL`. Keep it secret: it can read every customer's data.
 3. Start the API once with `DATABASE_URL` set (plus a placeholder `DATABASE_APP_URL` and `TOKEN_KEY`). It applies `db/*.sql` and creates the `app_user` role.
 4. In Neon's SQL editor run `ALTER ROLE app_user PASSWORD '<a long random password>';`. Build `DATABASE_APP_URL` from the same connection string with `app_user` and that password. The API uses this role for every customer write, so row-level security applies.
-5. Generate `TOKEN_KEY` with `openssl rand -hex 32`. It encrypts Slack bot tokens. **Losing it means customers have to reconnect Slack**, so back it up.
+5. Generate `TOKEN_KEY` with `openssl rand -hex 32`. It encrypts Slack bot tokens and business app connections. **Losing it means customers have to reconnect Slack and their apps**, so back it up.
 6. Turn on Neon's point-in-time restore (history retention) before real customers arrive.
 
 ## 2. Sign-in emails: Resend (resend.com)
@@ -36,6 +36,9 @@ Create an API key for the workspace that will pay for usage and set a monthly sp
 4. Copy **Client ID**, **Client Secret** and **Signing Secret** into `SLACK_CLIENT_ID`, `SLACK_CLIENT_SECRET`, `SLACK_SIGNING_SECRET`. Set `SLACK_REDIRECT_URI` to the redirect URL from step 1.
 
 Use your live address (`APP_URL`) as `<API address>`: the website and the API share it.
+
+## 5b. Business apps (optional)
+Stripe (restricted key), till and payroll file uploads and the Zapier or Make link work with no extra setup. For direct Xero and Square connections, create an app in each developer console, register `<APP_URL>/api/integrations/callback` as the redirect address, and set `XERO_CLIENT_ID`, `XERO_CLIENT_SECRET`, `SQUARE_CLIENT_ID` and `SQUARE_CLIENT_SECRET` in Render. Each pair must be set together or left empty. Details: [INTEGRATIONS.md](INTEGRATIONS.md).
 
 ## 6. Domain
 In Render, open the service, **Settings > Custom domains**, add your domain and create the DNS records it shows. Then set `SITE_URL`, `APP_URL` and `SLACK_REDIRECT_URI` to the new address, update the Slack app URLs, and redeploy.

@@ -9,7 +9,8 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
-    "qa": "node qa/run.mjs"
+    "qa": "node qa/run.mjs",
+    "qa:flows": "node qa/flows.mjs"
   },
   "devDependencies": {
     "@types/node": "^22.20.5",

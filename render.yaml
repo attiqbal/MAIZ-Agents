@@ -39,3 +39,12 @@ services:
         sync: false
       - key: SLACK_REDIRECT_URI
         sync: false
+      # Optional: direct connections to business apps (docs/INTEGRATIONS.md). Leave empty to keep them on file upload.
+      - key: XERO_CLIENT_ID
+        sync: false
+      - key: XERO_CLIENT_SECRET
+        sync: false
+      - key: SQUARE_CLIENT_ID
+        sync: false
+      - key: SQUARE_CLIENT_SECRET
+        sync: false

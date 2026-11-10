@@ -116,6 +116,8 @@ describe("slack", () => {
     expect(cb.status).toBe(302);
     expect(platform.slackTokens.get("T9")).toBe("xoxb-9");
     expect((await call("GET", "/api/slack/callback", undefined, {}, "code=abc&state=forged")).status).toBe(400);
+    // An install link works once: replaying it cannot connect another Slack workspace to this organisation.
+    expect((await call("GET", "/api/slack/callback", undefined, {}, `code=abc&state=${state}`)).status).toBe(400);
   });
   it("answers Slack events only when signed, and replies in the chat afterwards", async () => {
     const { call, auth, calls, clock } = await signedUp();
@@ -256,6 +258,19 @@ describe("business apps API", () => {
     expect((await call("GET", "/api/integrations")).status).toBe(401);
     expect((await call("POST", "/api/integrations/apps/nope/import", { csv: "a" }, auth)).status).toBe(400);
     expect((await call("POST", "/api/integrations/apps/square/connect", {}, auth)).status).toBe(400); // no Square app keys in this setup
+  });
+  it("finishes an app connection only in the browser that started it, and only once", async () => {
+    const s = setup({ integrationApps: { square: { clientId: "sq", clientSecret: "sec", redirectUri: "https://app.test/api/integrations/callback" } } });
+    const { token } = (await s.call("POST", "/api/signup", { email: "ann@kestrel.co", businessName: "Kestrel Coffee", sells: "Coffee", size: "2–10", country: "GB", goal: "More customers" })).body as any;
+    const start = await s.call("POST", "/api/integrations/apps/square/connect", {}, { authorization: `Bearer ${token}` });
+    const state = new URL((start.body as any).url).searchParams.get("state")!;
+    const cookie = start.headers!["set-cookie"]!.split(";")[0]!;
+    expect(start.headers!["set-cookie"]).toMatch(/HttpOnly; SameSite=Lax; Max-Age=600; Secure$/);
+    // Someone else's browser (no cookie, or a different one) cannot complete the link they were sent.
+    expect((await s.call("GET", "/api/integrations/callback", undefined, {}, `code=x&state=${state}`)).status).toBe(400);
+    expect((await s.call("GET", "/api/integrations/callback", undefined, { cookie: "maiz_oauth=other" }, `code=x&state=${state}`)).status).toBe(400);
+    expect((await s.call("GET", "/api/integrations/callback", undefined, { cookie: `a=b; ${cookie}` }, `code=x&state=${state}`)).status).toBe(302);
+    expect((await s.call("GET", "/api/integrations/callback", undefined, { cookie }, `code=x&state=${state}`)).status).toBe(400);
   });
   it("only accepts a signed connect state on the OAuth return", async () => {
     const { call } = await signedUp();

@@ -11,7 +11,7 @@ import { chromium } from "playwright";
 const require = createRequire(import.meta.url);
 const axeSource = readFileSync(require.resolve("axe-core/axe.min.js"), "utf8");
 const OUT = join(import.meta.dirname, "out");
-const PAGES = ["/", "/onboarding.html", "/app.html", "/app.html#setup", "/app.html#team", "/app.html#apps", "/employees.html"];
+const PAGES = ["/", "/employees.html", "/pricing.html", "/security.html", "/signin.html", "/404.html", "/onboarding.html", "/app.html", "/app.html#approvals", "/app.html#work", "/app.html#team", "/app.html#usage", "/app.html#finance", "/app.html#compliance", "/app.html#apps", "/app.html#setup", "/app.html#settings"];
 const VIEWPORTS = [[375, 812], [768, 1024], [1440, 900]];
 const AXE_TAGS = ["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa", "best-practice"];
 
@@ -33,7 +33,7 @@ let failures = 0;
 try {
   for (const path of PAGES) {
     for (const [width, height] of VIEWPORTS) {
-      const ctx = await browser.newContext({ viewport: { width, height } });
+      const ctx = await browser.newContext({ viewport: { width, height }, bypassCSP: true }) // axe is injected inline, which the production CSP rightly blocks;
       const page = await ctx.newPage();
       const consoleErrors = [];
       const failedRequests = [];

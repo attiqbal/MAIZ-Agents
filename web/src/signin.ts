@@ -17,7 +17,8 @@ async function verify(t: string): Promise<void> {
   say("Signing you in…", "");
   const r = await api<{ token: string; email: string; hasOrganisation: boolean; error?: string }>("/signin/verify", { body: { token: t } });
   if (!r.ok || !r.data?.token) {
-    say("This link didn't work", r.data?.error ?? "It may have expired or been used already. Request a new one below.");
+    const why = r.data?.error ? `${r.data.error[0]!.toUpperCase()}${r.data.error.slice(1)}. Request a new link below.` : "It may have expired or been used already. Request a new one below.";
+    say("This link didn't work", why);
     $("si-form").hidden = false;
     return;
   }
