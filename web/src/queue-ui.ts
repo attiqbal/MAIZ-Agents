@@ -9,12 +9,12 @@ const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&
 
 interface Job { id: string; brief: string; status: string; runsAtLabel?: string; problem?: string; deliverable?: string }
 interface QueueView {
-  schedule: { enabled: boolean; timezone: string; closingTime: string; skipWeekends: boolean };
+  schedule: { enabled: boolean; timezone: string; closingTime: string; skipWeekends: boolean; midnightSweep: boolean };
   nextRunLabel: string; queued: number; jobs: Job[]; realTime: { what: string; why: string }[];
 }
 
 const EXAMPLE: QueueView = {
-  schedule: { enabled: true, timezone: "Europe/London", closingTime: "18:00", skipWeekends: false },
+  schedule: { enabled: true, timezone: "Europe/London", closingTime: "18:00", skipWeekends: false, midnightSweep: true },
   nextRunLabel: "Today, 6:00 pm", queued: 2, realTime: [],
   jobs: [
     { id: "x1", brief: "Plan next month's social posts", status: "queued", runsAtLabel: "Today, 6:00 pm" },
@@ -35,6 +35,7 @@ function render(): void {
   $<HTMLInputElement>("q-time").value = s.closingTime;
   $<HTMLInputElement>("q-tz").value = s.timezone;
   $<HTMLInputElement>("q-weekends").checked = s.skipWeekends;
+  $<HTMLInputElement>("q-sweep").checked = s.midnightSweep !== false;
 }
 
 async function act(path: string, ok: string): Promise<void> {
@@ -54,7 +55,7 @@ export async function initQueue(): Promise<void> {
   $<HTMLFormElement>("q-form").addEventListener("submit", async (e) => {
     e.preventDefault();
     if (!live) { toast("Example data: sign in to change your schedule."); return; }
-    const r = await api<QueueView & { error?: string }>("/batch/schedule", { body: { closingTime: $<HTMLInputElement>("q-time").value, timezone: $<HTMLInputElement>("q-tz").value.trim(), skipWeekends: $<HTMLInputElement>("q-weekends").checked } });
+    const r = await api<QueueView & { error?: string }>("/batch/schedule", { body: { closingTime: $<HTMLInputElement>("q-time").value, timezone: $<HTMLInputElement>("q-tz").value.trim(), skipWeekends: $<HTMLInputElement>("q-weekends").checked, midnightSweep: $<HTMLInputElement>("q-sweep").checked } });
     if (!r.ok || !r.data) { toast(r.data?.error ? `${r.data.error[0]!.toUpperCase()}${r.data.error.slice(1)}` : "Could not save. Try again."); return; }
     view = r.data; render(); toast("Saved. Waiting tasks moved to the new time.");
   });

@@ -49,6 +49,8 @@ export interface BatchSettings {
   /** Used only for the savings estimate: seconds a worker takes to start. */
   coldStartSeconds: number;
   /** Employee templates whose work is never queued (always answered at once). */
+  /** After urgent work runs, send everything waiting to the pod too. */
+  flushAfterUrgent: boolean;
   liveTemplates: string[];
 }
 
@@ -109,7 +111,7 @@ export const UNKNOWN_MODEL_PRICE: ModelPrice = { inputPer1k: 4_000, outputPer1k:
 
 export const DEFAULT_BATCH: BatchSettings = {
   enabled: true, sizeTrigger: 20, tokenTrigger: 200_000, maxQueueAgeHours: 24, concurrency: 6, maxAttempts: 3, retryBackoffMinutes: 15,
-  qaRateMin: 0.3, claudeAfterFailures: true, coldStartSeconds: 40, liveTemplates: ["admin-manager"],
+  qaRateMin: 0.3, claudeAfterFailures: true, coldStartSeconds: 40, flushAfterUrgent: true, liveTemplates: ["admin-manager"],
 };
 
 export function defaultSettings(claudeDirectModel: string = HAIKU): AiRoutingSettings {
@@ -251,6 +253,7 @@ function validBatch(b: Record<string, unknown>): BatchSettings {
     qaRateMin: num(b.qaRateMin, "batch check rate", 0, 1),
     claudeAfterFailures: bool(b.claudeAfterFailures, "Claude after failures"),
     coldStartSeconds: num(b.coldStartSeconds, "cold start seconds", 0, 600),
+    flushAfterUrgent: b.flushAfterUrgent === undefined ? true : bool(b.flushAfterUrgent, "flush after urgent"),
     liveTemplates: [...list] as string[],
   };
 }

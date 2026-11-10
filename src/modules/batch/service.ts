@@ -1,3 +1,4 @@
+import { zoneForCountry } from "./zones.js";
 import type { Sink } from "../../core/persistence.js";
 import { newId } from "../../core/ids.js";
 import type { AuditLog } from "../audit/index.js";
@@ -9,7 +10,7 @@ import { classifyWork, REAL_TIME_RULES } from "./classify.js";
 import { BatchError, DEFAULT_SCHEDULE, formatLocal, mergeSchedule, nextRunAt, type ClientSchedule } from "./schedule.js";
 
 export type JobStatus = "queued" | "running" | "done" | "failed" | "cancelled";
-export type Trigger = "schedule" | "size" | "age" | "run_now" | "owner";
+export type Trigger = "schedule" | "size" | "age" | "run_now" | "owner" | "urgent";
 
 /** One piece of queued work and, once it has run, its result. This is the client's filed record of the task. */
 export interface BatchJob {
@@ -100,8 +101,16 @@ export class BatchService implements Intake {
     const s = this.d.settings.get().batch;
     const c = classifyWork({ brief, templateKey, urgent: opts.urgent, liveTemplates: s.liveTemplates });
     if (c.mode === "batch" && (!s.enabled || !this.scheduleOf(workspaceId).enabled)) return { mode: "urgent" as const, reason: "batching is switched off" };
-    return c;
+    return { ...c, flushAfter: c.mode === "urgent" && s.flushAfterUrgent && !s.liveTemplates.includes(templateKey) };
   }
+
+  /** Urgent work just ran on the pod, so send everything that is waiting now, whatever the time. Runs in the background. */
+  flush(): void {
+    this.current = this.dispatch("urgent").catch((err) => { console.error("batch flush failed:", err instanceof Error ? err.message : err); return undefined; });
+  }
+  /** Resolves when the batch now running (if any) has finished. */
+  async idle(): Promise<void> { await this.current; }
+  private current?: Promise<unknown>;
 
   enqueue(a: { userId: string; workspaceId: string; employeeId: string; brief: string; reason: string; estTokens: number }): { jobId: string; runsAt: string } {
     const runAfter = nextRunAt(this.scheduleOf(a.workspaceId), this.now()).toISOString();
@@ -113,7 +122,7 @@ export class BatchService implements Intake {
   // ---------- client views and controls ----------
 
   scheduleOf(workspaceId: string): ClientSchedule {
-    return this.schedules.get(workspaceId) ?? DEFAULT_SCHEDULE;
+    return this.schedules.get(workspaceId) ?? { ...DEFAULT_SCHEDULE, timezone: zoneForCountry(this.d.workforce.countryOf(workspaceId)) };
   }
 
   /** Changes when this client's batch runs. Queued tasks move to the new time. */

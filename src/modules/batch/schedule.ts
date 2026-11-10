@@ -13,9 +13,11 @@ export interface ClientSchedule {
   /** Extra local run times, for example ["12:00"] for a midday run. */
   extraRuns: string[];
   skipWeekends: boolean;
+  /** A catch-all run at local midnight, so nothing waits for the next closing time. */
+  midnightSweep: boolean;
 }
 
-export const DEFAULT_SCHEDULE: ClientSchedule = { enabled: true, timezone: "UTC", closingTime: "18:00", extraRuns: [], skipWeekends: false };
+export const DEFAULT_SCHEDULE: ClientSchedule = { enabled: true, timezone: "UTC", closingTime: "18:00", extraRuns: [], skipWeekends: false, midnightSweep: true };
 
 export class BatchError extends Error {}
 
@@ -38,6 +40,7 @@ export function mergeSchedule(base: ClientSchedule, patch: unknown): ClientSched
   const next = { ...base, extraRuns: [...base.extraRuns] };
   if (p.enabled !== undefined) { if (typeof p.enabled !== "boolean") throw new BatchError("enabled must be true or false"); next.enabled = p.enabled; }
   if (p.skipWeekends !== undefined) { if (typeof p.skipWeekends !== "boolean") throw new BatchError("skipWeekends must be true or false"); next.skipWeekends = p.skipWeekends; }
+  if (p.midnightSweep !== undefined) { if (typeof p.midnightSweep !== "boolean") throw new BatchError("midnightSweep must be true or false"); next.midnightSweep = p.midnightSweep; }
   if (p.timezone !== undefined) next.timezone = validateTimezone(p.timezone);
   if (p.closingTime !== undefined) {
     if (typeof p.closingTime !== "string" || !HHMM.test(p.closingTime)) throw new BatchError("closing time must look like 18:00");
@@ -72,7 +75,7 @@ export function localToInstant(tz: string, y: number, m: number, d: number, hh: 
 
 /** The next time a batch is due for this client, strictly after `from`. */
 export function nextRunAt(s: ClientSchedule, from: Date): Date {
-  const times = [s.closingTime, ...s.extraRuns].map((t) => t.split(":").map(Number) as [number, number]);
+  const times = [s.closingTime, ...s.extraRuns, ...(s.midnightSweep === false ? [] : ["00:00"])].map((t) => t.split(":").map(Number) as [number, number]);
   const today = localParts(from, s.timezone);
   let best: Date | undefined;
   for (let add = 0; add <= 8 && !best; add++) {

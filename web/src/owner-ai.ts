@@ -50,7 +50,7 @@ function demoSettings(): AiRoutingSettings {
     reviewer: { enabled: true, model: "claude-haiku-5-5", maxInputChars: 12000, adaptive: true }, cache: { enabled: true, ttlSeconds: 3600, maxEntries: 500 },
     budgets: { claudeDailyUsd: 15, claudeMonthlyUsd: 200, claudePerWorkspaceMonthlyUsd: 20, runpodMonthlyUsd: 300, whenClaudeCapped: "degrade" }, prices: {},
     policies: { live: p({ primary: "claude", reviewRate: 0, escalate: false, fallbackToClaude: false, allowOpenModel: false }), standard: p(), premium: p({ claudeModel: "claude-sonnet-5-5", baselineModel: "claude-sonnet-5-5", reviewRate: 0.5, minScore: 8 }), "compliance-manager": p({ primary: "claude", reviewRate: 0, escalate: false, fallbackToClaude: false, allowOpenModel: false }) },
-    batch: { enabled: true, sizeTrigger: 20, tokenTrigger: 200_000, maxQueueAgeHours: 24, concurrency: 6, maxAttempts: 3, retryBackoffMinutes: 15, qaRateMin: 0.3, claudeAfterFailures: true, coldStartSeconds: 40, liveTemplates: ["admin-manager"] },
+    batch: { enabled: true, sizeTrigger: 20, tokenTrigger: 200_000, maxQueueAgeHours: 24, concurrency: 6, maxAttempts: 3, retryBackoffMinutes: 15, qaRateMin: 0.3, claudeAfterFailures: true, coldStartSeconds: 40, flushAfterUrgent: true, liveTemplates: ["admin-manager"] },
   };
 }
 
@@ -61,7 +61,7 @@ interface BatchView {
   realTime: { what: string; why: string }[];
 }
 let batchView: BatchView | null = null;
-const TRIGGER_LABEL: Record<string, string> = { schedule: "Closing time", size: "Enough work gathered", age: "Waited too long", run_now: "Client pressed Run now", owner: "You pressed Run all now" };
+const TRIGGER_LABEL: Record<string, string> = { schedule: "Closing time", size: "Enough work gathered", age: "Waited too long", run_now: "Client pressed Run now", owner: "You pressed Run all now", urgent: "After an urgent task" };
 const when = (iso: string): string => new Date(iso).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
 
 let view: Overview;
@@ -161,6 +161,7 @@ const FIELDS: Field[] = [
   { path: "batch.retryBackoffMinutes", label: "Wait between tries (minutes)", kind: "number", step: "1", hint: "Multiplied by the try number" },
   { path: "batch.qaRateMin", label: "Claude reads at least this share of batch answers", kind: "number", step: "0.05", hint: "0 to 1. Nobody waits on the answer, so this can be generous" },
   { path: "batch.claudeAfterFailures", label: "Claude finishes a task after the last failed try", kind: "bool", hint: "Off means a pod outage leaves tasks failed, never on Claude" },
+  { path: "batch.flushAfterUrgent", label: "Urgent work also clears the queue", kind: "bool", hint: "The pod is warm, so everything waiting runs right after an urgent task, at any time" },
   { path: "batch.coldStartSeconds", label: "Cold start length (seconds)", kind: "number", step: "1", hint: "Only used to estimate the saving" },
   { path: "budgets.whenClaudeCapped", label: "When Claude is capped", kind: "select", options: [["degrade", "Keep working, unchecked"], ["fail", "Stop Claude-only work"]] },
 ];

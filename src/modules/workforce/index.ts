@@ -60,7 +60,9 @@ export interface AssignOptions {
 
 /** How a request is handled. The batch module implements this; the workforce only asks. */
 export interface Intake {
-  route(workspaceId: string, templateKey: string, brief: string, opts: AssignOptions): { mode: "lookup" | "urgent" | "batch"; reason: string };
+  route(workspaceId: string, templateKey: string, brief: string, opts: AssignOptions): { mode: "lookup" | "urgent" | "batch"; reason: string; flushAfter?: boolean };
+  /** Called after urgent work finished: the pod is warm, so waiting work may as well go now. Must not throw. */
+  flush?(): void;
   enqueue(job: { userId: string; workspaceId: string; employeeId: string; brief: string; reason: string; estTokens: number }): { jobId: string; runsAt: string };
 }
 
@@ -206,7 +208,14 @@ export class WorkforceService {
         return queued;
       }
     }
-    return this.execute(userId, workspaceId, employee, brief, { taskType: route?.mode === "lookup" ? "live" : template.key });
+    const done = await this.execute(userId, workspaceId, employee, brief, { taskType: route?.mode === "lookup" ? "live" : template.key });
+    if (route?.flushAfter && done.status === "ready_for_review") this.intake?.flush?.();
+    return done;
+  }
+
+  /** The business's country, for its local clock. Internal use, no permission check. */
+  countryOf(workspaceId: string): string | undefined {
+    return this.profiles.get(workspaceId)?.country;
   }
 
   /** Runs a queued job. Called by the batch dispatcher, which already checked the person's right to ask when it was queued; it is checked again here. */

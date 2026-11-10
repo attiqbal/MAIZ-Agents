@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { BatchError, formatLocal, mergeSchedule, nextRunAt, DEFAULT_SCHEDULE } from "../src/modules/batch/schedule.js";
+import { zoneForCountry } from "../src/modules/batch/zones.js";
 import { classifyWork } from "../src/modules/batch/classify.js";
 import { createApp, makeToken, type Req } from "../src/server/app.js";
 import { userIdFor } from "../src/server/identity.js";
@@ -14,14 +15,23 @@ describe("batch schedule", () => {
     expect(nextRunAt(london, at("2026-07-01T09:00:00Z")).toISOString()).toBe("2026-07-01T17:00:00.000Z"); // BST
     expect(nextRunAt(london, at("2026-12-01T09:00:00Z")).toISOString()).toBe("2026-12-01T18:00:00.000Z"); // GMT
   });
-  it("moves to the next day once closing has passed, and can skip weekends", () => {
-    expect(nextRunAt(DEFAULT_SCHEDULE, at("2026-11-10T19:00:00Z")).toISOString()).toBe("2026-11-11T18:00:00.000Z");
-    const wk = mergeSchedule(DEFAULT_SCHEDULE, { skipWeekends: true });
+  it("sweeps up at the business's own midnight once closing has passed, and can skip weekends", () => {
+    expect(nextRunAt(DEFAULT_SCHEDULE, at("2026-11-10T19:00:00Z")).toISOString()).toBe("2026-11-11T00:00:00.000Z");
+    const karachi = mergeSchedule(DEFAULT_SCHEDULE, { timezone: "Asia/Karachi" });
+    expect(nextRunAt(karachi, at("2026-11-10T14:00:00Z")).toISOString()).toBe("2026-11-10T19:00:00.000Z"); // 19:00 PKT has passed; midnight PKT is 19:00Z
+    const noSweep = mergeSchedule(DEFAULT_SCHEDULE, { midnightSweep: false });
+    expect(nextRunAt(noSweep, at("2026-11-10T19:00:00Z")).toISOString()).toBe("2026-11-11T18:00:00.000Z");
+    const wk = mergeSchedule(noSweep, { skipWeekends: true });
     expect(nextRunAt(wk, at("2026-11-13T19:00:00Z")).toISOString()).toBe("2026-11-16T18:00:00.000Z"); // Friday evening -> Monday
   });
   it("picks the earliest of the closing time and any extra runs", () => {
     const s = mergeSchedule(DEFAULT_SCHEDULE, { extraRuns: ["12:00"] });
     expect(nextRunAt(s, at("2026-11-10T09:00:00Z")).toISOString()).toBe("2026-11-10T12:00:00.000Z");
+  });
+  it("starts from the business's country clock", () => {
+    expect(zoneForCountry("PK")).toBe("Asia/Karachi");
+    expect(zoneForCountry("United Kingdom")).toBe("Europe/London");
+    expect(zoneForCountry("Atlantis")).toBe("UTC");
   });
   it("rejects a bad timezone or time and labels times for the client", () => {
     expect(() => mergeSchedule(DEFAULT_SCHEDULE, { timezone: "Mars/Base" })).toThrow(BatchError);
@@ -118,6 +128,30 @@ describe("batch queue end to end", () => {
     expect(run?.jobs).toBe(3);
     expect(run?.clients).toBe(2);
     expect(s.state.runpod).toBe(3);
+  });
+
+  it("clears the whole queue after urgent work completes, at any time of day", async () => {
+    const s = setup();
+    const a = await s.client("ann@kestrel.co", "Kestrel Coffee");
+    const b = await s.client("bo@loaf.co", "Loaf Bakery");
+    await s.call("POST", "/api/ask", { employeeId: a.empId, text: "Plan next month's posts" }, a.auth);
+    await s.call("POST", "/api/ask", { employeeId: b.empId, text: "Write a launch plan" }, b.auth);
+    expect(s.state.runpod).toBe(0);
+    const urgent = await s.call("POST", "/api/ask", { employeeId: a.empId, text: "Draft the supplier reply", urgent: true }, a.auth);
+    expect((urgent.body as any).status).toBe("ready_for_review");
+    await s.platform.batch.idle();
+    expect(s.state.runpod).toBe(3); // the urgent task plus both queued ones, at 09:00
+    expect(((await s.call("GET", "/api/queue", undefined, b.auth)).body as any).queued).toBe(0);
+    expect(s.platform.batch.ownerView(userIdFor(OWNER)).runs[0]!.trigger).toBe("urgent");
+  });
+
+  it("does not flush the queue for lookups or the Admin manager", async () => {
+    const s = setup();
+    const a = await s.client();
+    await s.call("POST", "/api/ask", { employeeId: a.empId, text: "Plan next month's posts" }, a.auth);
+    await s.call("POST", "/api/ask", { employeeId: a.empId, text: "What's the status of my tasks?" }, a.auth);
+    await s.platform.batch.idle();
+    expect(s.state.runpod).toBe(0);
   });
 
   it("lets a client run their queue now, and cancel a task, but not see the owner's queue", async () => {
