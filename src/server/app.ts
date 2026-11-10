@@ -283,6 +283,12 @@ export function createApp(p: Platform) {
       return json(201, { request: p.specialists.forClient(userId, org.id).find((x) => x.id === r.id), jobDescription: r.jobDescription, notes: r.notes });
     }
 
+    const hireSpecialist = /^\/api\/specialists\/([\w-]{1,64})\/hire$/.exec(path);
+    if (method === "POST" && hireSpecialist) {
+      const r = await p.specialists.hire(userId, org.id, hireSpecialist[1]!);
+      return json(201, { request: p.specialists.forClient(userId, org.id).find((x) => x.id === r.id), employeeId: r.hiredEmployeeId });
+    }
+
     // ---- specialised tasks: the client follows them through quality review but never approves ----
     if (method === "GET" && path === "/api/reviews") return json(200, { tasks: p.reviews.forClient(userId, org.id) });
     if (method === "POST" && path === "/api/reviews") {
@@ -308,7 +314,7 @@ export function createApp(p: Platform) {
           id: e.id,
           templateKey: e.templateKey,
           name: e.name,
-          blurb: getTemplate(e.templateKey)?.title,
+          blurb: p.workforce.templateFor(e.templateKey, org.id)?.title,
           energyLeft: p.energy.remainingToday(userId, org.id, e.id),
         })),
       });

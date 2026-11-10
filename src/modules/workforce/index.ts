@@ -4,7 +4,7 @@ import type { AuditLog } from "../audit/index.js";
 import type { EventBus } from "../../core/events.js";
 import type { IdentityService } from "../identity/index.js";
 import type { Completer } from "../model-gateway/types.js";
-import { getTemplate } from "./templates.js";
+import { getTemplate, type EmployeeTemplate } from "./templates.js";
 import { getJobDescription, renderJobDescription } from "./job-descriptions.js";
 import type { EnergyMeter } from "../energy/index.js";
 import { describePack, packFor } from "./finance/rules-pack.js";
@@ -94,6 +94,20 @@ export class WorkforceService {
     this.contextSources.push(source);
   }
 
+  /** Templates made for one client (approved custom specialists). Only that client's workspace can use them. */
+  private customTemplates = new Map<string, { workspaceId: string; template: EmployeeTemplate }>();
+
+  registerCustomTemplate(workspaceId: string, template: EmployeeTemplate): void {
+    this.customTemplates.set(template.key, { workspaceId, template });
+  }
+
+  /** The template for a key, as seen from one workspace: shared templates, plus that workspace's own custom ones. */
+  templateFor(key: string, workspaceId?: string): EmployeeTemplate | undefined {
+    const custom = this.customTemplates.get(key);
+    if (custom) return custom.workspaceId === workspaceId ? custom.template : undefined;
+    return getTemplate(key);
+  }
+
   restoreEmployee(e: Employee): void {
     this.employees.set(e.id, e);
   }
@@ -150,7 +164,7 @@ export class WorkforceService {
 
   async hire(userId: string, workspaceId: string, templateKey: string, name?: string): Promise<Employee> {
     this.identity.require(userId, workspaceId, "employee.hire");
-    const template = getTemplate(templateKey);
+    const template = this.templateFor(templateKey, workspaceId);
     if (!template) throw new Error(`unknown employee template: ${templateKey}`);
     const employee: Employee = {
       id: newId("employee"),
@@ -195,7 +209,7 @@ export class WorkforceService {
     const employee = this.employees.get(employeeId);
     // An employee from another workspace looks exactly like one that does not exist.
     if (!employee || employee.workspaceId !== workspaceId) throw new Error("employee not found");
-    const template = getTemplate(employee.templateKey);
+    const template = this.templateFor(employee.templateKey, workspaceId);
     if (!template) throw new Error("employee template missing");
     const route = this.intake?.route(workspaceId, template.key, brief, opts);
     if (route?.mode === "batch") {
@@ -228,10 +242,10 @@ export class WorkforceService {
 
   private async execute(userId: string, workspaceId: string, employee: Employee, brief: string, run: RunContext): Promise<TaskResult> {
     const employeeId = employee.id;
-    const template = getTemplate(employee.templateKey)!;
+    const template = this.templateFor(employee.templateKey, workspaceId)!;
 
     const profile = this.profiles.get(workspaceId);
-    const jd = getJobDescription(template.key);
+    const jd = template.jobDescription ?? getJobDescription(template.key);
     const parts = [
       template.instructions,
       // The full job description: responsibilities, skills, deliverables and authority limits.

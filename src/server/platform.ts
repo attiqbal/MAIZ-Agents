@@ -21,7 +21,8 @@ import { WorkforceService } from "../modules/workforce/index.js";
 import { IntegrationService, defaultRegistry, type OAuthApp } from "../modules/integrations/index.js";
 import { QualityReviewService } from "../modules/review/index.js";
 import { PriceBook } from "../modules/pricing/index.js";
-import { SpecialistReviewService } from "../modules/review/specialists.js";
+import { SpecialistReviewService, type SpecialistRequest } from "../modules/review/specialists.js";
+import { templateFromRole } from "../modules/workforce/templates.js";
 
 import { ConsoleEmailSender, type EmailSender } from "./email.js";
 import { userIdFor } from "./identity.js";
@@ -114,11 +115,18 @@ export function createPlatform(cfg: PlatformConfig) {
     },
   });
   /** New custom specialists: drafted for the client, checked and priced by the platform owner before training. */
+  /** A custom specialist's template: its approved role and job description, usable only by the client that asked for it. */
+  const customTemplateOf = (r: SpecialistRequest) => ({ ...templateFromRole(r.role, `custom-${r.id}`), jobDescription: r.jobDescription });
   const specialists = new SpecialistReviewService(identity, audit, isPlatformOwner, (tier) => {
     const g = prices.general();
     return tier === "premium" ? g.specialistPremiumMonthlyGbp : g.specialistStandardMonthlyGbp;
   }, {
     now,
+    hire: async (userId, r) => {
+      const t = customTemplateOf(r);
+      workforce.registerCustomTemplate(r.workspaceId, t);
+      return workforce.hire(userId, r.workspaceId, t.key);
+    },
     notifyOwner: async (r, clientName) => {
       for (const to of ownerEmails) {
         await email.send({ to, subject: `New specialist to review: ${r.role.title} for ${clientName}`, text: `${clientName} asked for a new custom specialist, "${r.role.title}". The Admin manager drafted the job description; nothing is trained until you approve it.\n\nReview it:\n${base}/owner-specialists.html#${r.id}` });
@@ -232,6 +240,7 @@ export function createPlatform(cfg: PlatformConfig) {
     for (const r of s.reviews ?? []) reviews.restore(r);
     for (const c of s.priceChanges ?? []) prices.restore(c);
     for (const r of s.specialistRequests ?? []) specialists.restore(r);
+    for (const r of specialists.approved()) workforce.registerCustomTemplate(r.workspaceId, customTemplateOf(r));
     if (s.aiSettings) aiSettings.restore(s.aiSettings);
     for (const d of s.aiDays ?? []) spend.restore(d);
     for (const x of s.batchSchedules ?? []) batch.restoreSchedule(x.workspaceId, x.schedule);
