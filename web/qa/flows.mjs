@@ -52,7 +52,8 @@ const mk = async (opts = {}) => { const ctx = await b.newContext({ viewport: { w
   ok("onboarding: account created (login stored)", !!token);
   await p.click("#open-app"); await p.waitForURL(/app\.html/); await p.waitForTimeout(800);
   ok("app (signed in): shows the real business name", (await p.textContent("#org-name")) === "Example Bakery", await p.textContent("#org-name"));
-  ok("app (signed in): demo bar hidden, example tags shown", !(await p.isVisible("#demo-banner")) && await p.isVisible('[data-screen="home"] .eg'));
+  // The overview, team, tasks and energy screens show the client's own records; screens still on example data keep their tag.
+  ok("app (signed in): demo bar hidden, real screens untagged, example screens tagged", !(await p.isVisible("#demo-banner")) && (await p.locator('[data-screen="home"] .eg').count()) === 0 && (await p.locator('[data-screen="team"] .eg').count()) === 0 && await p.locator('[data-screen="finance"] .eg').count() === 1);
   await p.fill("#ask-in", "finance: what is my runway?"); await p.press("#ask-in", "Enter");
   await p.waitForSelector("#answer", { timeout: 8000 }).catch(() => {});
   ok("app (signed in): ask bar returns an answer", await p.isVisible("#answer"));
