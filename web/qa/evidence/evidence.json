@@ -1,25 +1,69 @@
 {
   "contract": "Surface: MAIZ agents marketing landing (/), onboarding (/onboarding.html) and control center demo (/app.html). Audience: founders and small-business owners with no AI background. Job: understand what the AI employees do and start a free trial. Primary action: 'Start free trial'. Direction: dark 'aurora over a midnight terminal' chosen by the owner, tokens in web/src/styles.css. Hierarchy: hero headline + live product mockup first, then how it works, employees, control center, Slack, pricing, FAQ. Constraints: WCAG 2.2 AA, no framework, landing JS < 150 kB gz and CSS < 30 kB gz, max two web font families, target viewports 375x812, 768x1024, 1440x900. References: the existing site and the project's AgentQL-style dark reference.",
-  "targetViewports": ["375x812", "768x1024", "1440x900"],
+  "targetViewports": [
+    "375x812",
+    "768x1024",
+    "1440x900"
+  ],
   "accessibility": {
     "status": "pass",
-    "evidence": "axe-core 4.10 (wcag2a, wcag2aa, wcag21aa, wcag22aa, best-practice) reports 0 violations on /, /onboarding.html, /app.html and /app.html#setup at 375, 768 and 1440 (npm run qa). Before this change it reported footer text contrast 3.97:1, skipped heading level in the footer, 79 nodes outside landmarks on the landing page and no main landmark in the app. Keyboard: first Tab focuses a visible 'Skip to content' link that moves focus to main; the mobile menu opens with the button, closes on Escape and returns focus to the button. All links, buttons, inputs and summaries are at least 24x24 px at 375 wide. Form errors use role=alert, aria-invalid and aria-describedby, and move focus to the field. Not covered: a screen-reader pass with VoiceOver or NVDA."
+    "evidence": "axe-core 4.10 (wcag2a, wcag2aa, wcag21aa, wcag22aa, best-practice) reports 0 violations on /, /onboarding.html, /app.html, /app.html#setup, /app.html#team and /employees.html at 375, 768 and 1440 (npm run qa). Before this change it reported footer text contrast 3.97:1, skipped heading level in the footer, 79 nodes outside landmarks on the landing page and no main landmark in the app. Keyboard: first Tab focuses a visible 'Skip to content' link that moves focus to main; the mobile menu opens with the button, closes on Escape and returns focus to the button. All links, buttons, inputs and summaries are at least 24x24 px at 375 wide. Form errors use role=alert, aria-invalid and aria-describedby, and move focus to the field. Not covered: a screen-reader pass with VoiceOver or NVDA. Job descriptions (2026-11-10): the employees page had no h1 and the app's Team screen skipped from h2 to h4 and had a scrollable org chart that could not be focused; all three are fixed (h1 eyebrow, heading level passed to the job-description renderer, focusable labelled org-chart region). Job descriptions and blueprint roles are native details/summary elements, so they open with the keyboard."
   },
   "responsive": {
     "status": "pass",
     "evidence": "Full-page screenshots of all four pages at 375, 768 and 1440 show no horizontal overflow (scrollWidth equals viewport width in every run). The hero mockup's code window previously split each token onto its own line and covered the consultant message and energy values; it now renders as five code lines and the three windows no longer hide each other's text at 1440, and stack cleanly at 375."
   },
   "contentStates": {
-    "loading": { "status": "pass", "evidence": "Onboarding step 6 shows setup steps completing one by one with a spinner on the active step (state-loading-onboarding-375x812.png)." },
-    "empty": { "status": "pass", "evidence": "After approving all three items in /app.html#approvals the list is replaced by 'Nothing needs you right now.' (state-empty-approvals-1440x900.png)." },
-    "error": { "status": "pass", "evidence": "Submitting 'not-an-email' on onboarding step 1 shows 'Enter a valid email address.', marks the input invalid with a red border and moves focus to it (state-error-onboarding-375x812.png)." },
-    "partial": { "status": "pass", "evidence": "With no API running, /app.html keeps working on labelled example data ('example data', 'Demo figures are illustrative') instead of failing (state-partial-app-1440x900.png)." },
-    "success": { "status": "pass", "evidence": "Onboarding step 6 ends with every step ticked and an 'Open my control center' button as the next action (state-success-onboarding-375x812.png)." },
-    "permission": { "status": "not-applicable", "reason": "These pages have no permission-gated surface yet: sign-in is simulated in the demo build and the API's real email-link sign-in is not built. Revisit when real auth and roles land." }
+    "loading": {
+      "status": "pass",
+      "evidence": "Onboarding step 6 shows setup steps completing one by one with a spinner on the active step (state-loading-onboarding-375x812.png)."
+    },
+    "empty": {
+      "status": "pass",
+      "evidence": "After approving all three items in /app.html#approvals the list is replaced by 'Nothing needs you right now.' (state-empty-approvals-1440x900.png)."
+    },
+    "error": {
+      "status": "pass",
+      "evidence": "Submitting 'not-an-email' on onboarding step 1 shows 'Enter a valid email address.', marks the input invalid with a red border and moves focus to it (state-error-onboarding-375x812.png)."
+    },
+    "partial": {
+      "status": "pass",
+      "evidence": "With no API running, /app.html keeps working on labelled example data ('example data', 'Demo figures are illustrative') instead of failing (state-partial-app-1440x900.png)."
+    },
+    "success": {
+      "status": "pass",
+      "evidence": "Onboarding step 6 ends with every step ticked and an 'Open my control center' button as the next action (state-success-onboarding-375x812.png)."
+    },
+    "permission": {
+      "status": "not-applicable",
+      "reason": "These pages have no permission-gated surface yet: sign-in is simulated in the demo build and the API's real email-link sign-in is not built. Revisit when real auth and roles land."
+    }
   },
   "renderedEvidence": [
-    { "viewport": "375x812", "artifact": "home-375x812.png", "observation": "Hero headline, lede, both CTAs and the menu button fit with 16px gutters; no clipped text." },
-    { "viewport": "768x1024", "artifact": "home-768x1024.png", "observation": "Single-column hero with the product windows stacked below; nav collapses to the menu button." },
-    { "viewport": "1440x900", "artifact": "home-1440x900.png", "observation": "Two-column hero; Slack, task plan and energy windows are layered without hiding message text, code or energy values." }
+    {
+      "viewport": "375x812",
+      "artifact": "home-375x812.png",
+      "observation": "Hero headline, lede, both CTAs and the menu button fit with 16px gutters; no clipped text."
+    },
+    {
+      "viewport": "768x1024",
+      "artifact": "home-768x1024.png",
+      "observation": "Single-column hero with the product windows stacked below; nav collapses to the menu button."
+    },
+    {
+      "viewport": "1440x900",
+      "artifact": "home-1440x900.png",
+      "observation": "Two-column hero; Slack, task plan and energy windows are layered without hiding message text, code or energy values."
+    },
+    {
+      "viewport": "1440x900",
+      "artifact": "employees-1440x900.png",
+      "observation": "Employee cards each expand to a full job description; the org blueprint shows 11 departments in a 3-column grid with 'In the store' and 'Custom specialist' tags, and an opened Payroll specialist role shows its full job description without breaking the grid."
+    },
+    {
+      "viewport": "375x812",
+      "artifact": "employees-375x812.png",
+      "observation": "Blueprint departments stack in one column; role rows keep the tag on the right with no horizontal overflow (scrollWidth 375)."
+    }
   ]
 }

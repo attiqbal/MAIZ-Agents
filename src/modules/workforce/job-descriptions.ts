@@ -11,6 +11,7 @@
  *
  * Pure data, no imports from the server: the website imports this file too.
  */
+import { specialistJobDescription } from "./blueprints.js";
 
 export type Level = "Expert" | "Advanced" | "Working";
 
@@ -882,8 +883,9 @@ export const JOB_DESCRIPTIONS: readonly JobDescription[] = [
   },
 ];
 
+/** A ready-made employee's JD, or one built from the org blueprint for a custom specialist. */
 export function getJobDescription(key: string): JobDescription | undefined {
-  return JOB_DESCRIPTIONS.find((j) => j.key === key);
+  return JOB_DESCRIPTIONS.find((j) => j.key === key) ?? specialistJobDescription(key);
 }
 
 /** Typical energy for a deliverable, as text, e.g. "8–25 energy". */

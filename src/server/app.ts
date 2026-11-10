@@ -6,6 +6,7 @@ import { LedgerError } from "../modules/ledger/index.js";
 import { SignupError, type SignupChoices, type TeamSize } from "../modules/onboarding/index.js";
 import { getTemplate, TEMPLATES } from "../modules/workforce/templates.js";
 import { getJobDescription } from "../modules/workforce/job-descriptions.js";
+import { CUSTOM_SPECIALIST, DEPARTMENTS } from "../modules/workforce/blueprints.js";
 import type { Platform } from "./platform.js";
 
 export interface Req {
@@ -77,6 +78,9 @@ export function createApp(p: Platform) {
     if (method === "GET" && path === "/api/store") {
       return json(200, {
         employees: TEMPLATES.map((t) => ({ key: t.key, title: t.title, summary: t.summary, kind: t.kind, tier: t.tier, firstJob: t.firstJob, jobDescription: getJobDescription(t.key) })),
+        // Every department and role of a typical business; roles without a ready-made employee are custom specialists.
+        departments: DEPARTMENTS.map((d) => ({ key: d.key, name: d.name, mission: d.mission, roles: d.roles.map((r) => ({ key: r.key, title: r.title, purpose: r.purpose, readyMade: Boolean(r.jd) })) })),
+        customSpecialist: CUSTOM_SPECIALIST,
       });
     }
 

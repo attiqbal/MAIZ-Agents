@@ -630,7 +630,7 @@ select.input { appearance: auto; }
 .jd summary::after { content: " +"; color: var(--color-ash); }
 .jd[open] summary::after { content: " –"; }
 .jd-body { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; font-size: 14px; color: var(--color-mist); font-weight: 300; overflow-wrap: anywhere; }
-.jd-body h4 { margin: 12px 0 0; font-size: 12px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.02em; color: var(--color-ash); }
+.jd-body h3, .jd-body h4 { margin: 12px 0 0; font-size: 12px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.02em; color: var(--color-ash); }
 .jd-body ul { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 4px; }
 .jd-body p { margin: 0; }
 .jd-meta { color: var(--color-ash); font-size: 13px; }
@@ -648,3 +648,19 @@ select.input { appearance: auto; }
 @media (max-width: 960px) { .jd-auth { grid-template-columns: 1fr; } }
 .emp-card .jd-auth { grid-template-columns: 1fr; }
 #jd-pick { margin-bottom: 12px; flex-wrap: wrap; }
+
+/* Org blueprint (employees page) */
+.org-bp { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; align-items: start; }
+@media (max-width: 1200px) { .org-bp { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 760px) { .org-bp { grid-template-columns: 1fr; } }
+.bp-dept { display: flex; flex-direction: column; gap: 12px; }
+.bp-dept h3 { margin: 0; }
+.bp-roles { display: flex; flex-direction: column; }
+.bp-role { padding: 10px 0; }
+.bp-role summary { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 40px; }
+.bp-role summary::after { content: none; }
+.bp-role[open] summary::after { content: none; }
+.bp-tag { flex: none; font-size: 12px; font-weight: 400; color: var(--color-ash); border: 1px solid var(--color-inkline); border-radius: 999px; padding: 2px 10px; }
+.bp-ready { color: #fff; border-color: var(--color-sapphire-hairline); }
+.bp-custom ol { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 6px; color: var(--color-mist); font-weight: 300; }
+.emp-card .jd-auth, .bp-role .jd-auth { grid-template-columns: 1fr; }

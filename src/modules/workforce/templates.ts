@@ -1,3 +1,5 @@
+import { getBlueprint } from "./blueprints.js";
+
 /**
  * Employee templates are the products in the future Agent Store. A store
  * listing points to a template; hiring creates an Employee from it. Adding a
@@ -20,7 +22,7 @@ export interface EmployeeTemplate {
    * "employee" is hired into a package. "manager" is the free Admin manager that every
    * organisation gets: it onboards the owner, sets up the team and runs it. It is never sold.
    */
-  kind: "employee" | "manager";
+  kind: "employee" | "manager" | "specialist";
 }
 
 export const TEMPLATES: readonly EmployeeTemplate[] = [
@@ -106,6 +108,27 @@ export const TEMPLATES: readonly EmployeeTemplate[] = [
 /** Employees that can be sold in a package (everything except the free Admin manager). */
 export const EMPLOYEE_TEMPLATES: readonly EmployeeTemplate[] = TEMPLATES.filter((t) => t.kind === "employee");
 
+/**
+ * A custom specialist, trained from an org blueprint role (blueprints.ts). Not in the
+ * basic package: each one is an extra cost per agent. The owner's brief is added
+ * later through training, like any other employee.
+ */
+export function specialistTemplate(key: string): EmployeeTemplate | undefined {
+  const b = getBlueprint(key);
+  if (!b || b.role.jd) return undefined;
+  const { role } = b;
+  return {
+    key: role.key,
+    title: role.title,
+    summary: role.purpose,
+    tier: role.tier ?? "standard",
+    kind: "specialist",
+    capabilities: role.duties,
+    firstJob: role.duties[0] ?? "First task agreed with the owner",
+    instructions: `You are the ${role.title} of a small business, a custom specialist trained for this business. ${role.purpose} Work only from what the owner and the team give you, keep the records your job requires up to date, and never invent facts, figures or rules. You draft and advise; you never spend money, sign, submit or send anything outside the workspace without the owner's approval. You do not give legal, tax or medical advice: say when a qualified professional should check.`,
+  };
+}
+
 export function getTemplate(key: string): EmployeeTemplate | undefined {
-  return TEMPLATES.find((t) => t.key === key);
+  return TEMPLATES.find((t) => t.key === key) ?? specialistTemplate(key);
 }

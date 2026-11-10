@@ -53,3 +53,37 @@ describe("job descriptions", () => {
     for (const f of skillFiles()) expect(readFileSync(new URL(`../${f.path}`, import.meta.url), "utf8"), f.path).toBe(f.content);
   });
 });
+
+describe("org blueprints", () => {
+  it("cover the big departments, and every ready-made role points at a real employee", async () => {
+    const { DEPARTMENTS, allRoles } = await import("../src/modules/workforce/blueprints.js");
+    expect(DEPARTMENTS.length).toBeGreaterThanOrEqual(10);
+    const keys = allRoles().map((r) => r.key);
+    expect(new Set(keys).size).toBe(keys.length);
+    for (const t of TEMPLATES) expect(keys).toContain(t.key);
+    for (const r of allRoles()) {
+      if (r.jd) expect(TEMPLATES.some((t) => t.key === r.jd)).toBe(true);
+      else {
+        expect(r.duties.length).toBeGreaterThanOrEqual(3);
+        expect(r.legal.length).toBeGreaterThan(0);
+        expect(r.records.length).toBeGreaterThan(0);
+      }
+    }
+  });
+
+  it("let the owner hire a custom specialist trained from its blueprint, with a full JD", async () => {
+    const audit = new AuditLog();
+    const bus = new EventBus();
+    const identity = new IdentityService(audit, bus);
+    const seen: string[] = [];
+    const gateway = new ModelGateway([{ name: "spy", tiers: ["standard", "premium"], complete: async (r: any) => { seen.push(r.messages[0].content); return { text: "ok", provider: "spy", inputTokens: 1, outputTokens: 1 }; } } as any]);
+    const workforce = new WorkforceService(identity, audit, bus, gateway);
+    const ws = await identity.createWorkspace("owner", { name: "Acme" });
+    const e = await workforce.hire("owner", ws.id, "payroll-specialist");
+    expect(e.name).toBe("Payroll specialist");
+    await workforce.assign("owner", ws.id, e.id, "Prepare this month's payroll");
+    expect(seen[0]).toContain("Your job description: Payroll specialist (Finance and accounting");
+    expect(seen[0]).toContain("Payroll registers and pay slips");
+    expect(getJobDescription("not-a-role")).toBeUndefined();
+  });
+});

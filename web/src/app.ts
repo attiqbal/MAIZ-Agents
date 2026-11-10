@@ -163,7 +163,7 @@ document.addEventListener("keydown", (e) => {
   pick.innerHTML = JOB_DESCRIPTIONS.map((j, i) => `<button class="chip" aria-pressed="${i === 0}" data-key="${j.key}">${esc(j.jobTitle)}</button>`).join("");
   const show = (key: string) => {
     const jd = getJobDescription(key);
-    if (jd) $("jd-out").innerHTML = jdHtml(jd);
+    if (jd) $("jd-out").innerHTML = jdHtml(jd, 3);
     pick.querySelectorAll<HTMLElement>(".chip").forEach((c) => c.setAttribute("aria-pressed", String(c.dataset.key === key)));
   };
   pick.addEventListener("click", (e) => {
