@@ -1,6 +1,6 @@
 // The store picker and cart on the employees page. Prices come from the backend's
 // pure cart module, so the page and /api/cart/quote always agree.
-import { CATALOGUE, MAX_QTY, getItem, quote, type CartLine, type CatalogueItem } from "../../src/modules/store/cart";
+import { BILLING_INFO, CATALOGUE, KIND_LABEL, MAX_QTY, getItem, quote, type Billing, type CartLine, type CatalogueItem } from "../../src/modules/store/cart";
 import { OVERAGE_RULE } from "../../src/modules/workforce/task-roles";
 import { getJobDescription, jdHtml } from "./jd";
 
@@ -23,27 +23,48 @@ function renderItem(): void {
   const item = getItem($<HTMLSelectElement>("store-pick").value);
   if (!item) { $("store-item").innerHTML = ""; return; }
   const jd = getJobDescription(item.key);
-  const kind = item.kind === "task" ? "One-off task" : item.kind === "specialist" ? "Custom specialist, trained for you" : "Ready-made employee";
-  $("store-item").innerHTML = `<div class="store-head"><div><h3>${esc(item.title)}</h3><p class="jd-meta">${kind}</p></div><p class="store-price">${priceLabel(item)}</p></div>
+  const b = BILLING_INFO[item.billing];
+  $("store-item").innerHTML = `<div class="store-head"><div><h3>${esc(item.title)}</h3><p class="jd-meta">${KIND_LABEL[item.kind]}</p></div><p class="store-price">${priceLabel(item)}</p></div>
+    <p><span class="bill-tag bill-${item.billing}">${b.label}</span></p>
     <p class="desc">${esc(item.summary)}</p>
+    <p class="jd-note">${esc(b.note)}</p>
     <div class="store-add"><label class="label" for="store-qty">Quantity</label><input class="input" id="store-qty" type="number" min="1" max="${MAX_QTY}" value="1" inputmode="numeric"><button class="btn btn-primary" id="store-add" type="button">Add to cart</button></div>
     ${jd ? `<details class="jd"><summary>Full job description</summary>${jdHtml(jd)}</details>` : ""}`;
   $("store-add").addEventListener("click", () => {
     const qty = Math.max(1, Math.min(MAX_QTY, Math.floor(Number($<HTMLInputElement>("store-qty").value) || 1)));
-    cart = quote([...cart, { key: item.key, qty }]).lines.map(({ key, qty: q }) => ({ key, qty: q }));
-    save(cart);
-    renderCart();
-    $("cart-note").textContent = `${item.title} added to your cart.`;
+    addToCart(item.key, qty);
   });
+}
+
+function lineHtml(l: ReturnType<typeof quote>["lines"][number]): string {
+  return `<li><div><b>${esc(l.title)}</b><span>${l.qty} × ${gbp(l.unitGbp)} ${BILLING_INFO[l.billing].short}</span></div><div class="cart-act"><span class="mono">${gbp(l.totalGbp)}</span><button class="btn btn-sm btn-ghost" type="button" data-remove="${esc(l.key)}" aria-label="Remove ${esc(l.title)}">Remove</button></div></li>`;
+}
+
+function section(billing: Billing, lines: ReturnType<typeof quote>["lines"], total: number): string {
+  if (!lines.length) return "";
+  const b = BILLING_INFO[billing];
+  const sum = billing === "monthly" ? `${gbp(total)} every month` : `${gbp(total)} once`;
+  return `<section class="cart-sec"><h4><span class="bill-tag bill-${billing}">${b.label}</span><span class="mono">${sum}</span></h4><ul class="cart-list">${lines.map(lineHtml).join("")}</ul><p class="jd-note">${esc(b.note)}</p></section>`;
 }
 
 function renderCart(): void {
   const q = quote(cart);
   $("cart-lines").innerHTML = q.lines.length
-    ? `<ul class="cart-list">${q.lines.map((l) => `<li><div><b>${esc(l.title)}</b><span>${l.qty} × ${gbp(l.unitGbp)} ${l.billing === "monthly" ? "a month" : "once"}</span></div><div class="cart-act"><span class="mono">${gbp(l.totalGbp)}</span><button class="btn btn-sm btn-ghost" type="button" data-remove="${esc(l.key)}" aria-label="Remove ${esc(l.title)}">Remove</button></div></li>`).join("")}</ul>`
-    : `<p class="muted">Nothing here yet. Pick something on the left.</p>`;
-  $("cart-totals").innerHTML = `<div><dt>Monthly</dt><dd>${gbp(q.monthlyGbp)} / month</dd></div><div><dt>One-off tasks</dt><dd>${gbp(q.onceGbp)}</dd></div><div class="cart-due"><dt>Due today</dt><dd>${gbp(q.dueTodayGbp)}</dd></div>`;
+    ? section("monthly", q.lines.filter((l) => l.billing === "monthly"), q.monthlyGbp) + section("once", q.lines.filter((l) => l.billing === "once"), q.onceGbp)
+    : `<p class="muted">Nothing here yet. Pick something on the left, or add a role from the org blueprint below.</p>`;
+  $("cart-totals").innerHTML = `<div><dt>Recurring, every month</dt><dd>${gbp(q.monthlyGbp)}</dd></div><div><dt>One-off, task based</dt><dd>${gbp(q.onceGbp)}</dd></div><div class="cart-due"><dt>Due today</dt><dd>${gbp(q.dueTodayGbp)}</dd></div>${q.monthlyGbp ? `<div><dt>From next month</dt><dd>${gbp(q.monthlyGbp)} / month</dd></div>` : ""}`;
   $<HTMLButtonElement>("cart-checkout").disabled = q.lines.length === 0;
+}
+
+/** Adds one of an item to the cart. Used by the picker and by the org blueprint buttons. */
+export function addToCart(key: string, qty = 1): string | undefined {
+  const item = getItem(key);
+  if (!item) return undefined;
+  cart = quote([...cart, { key, qty }]).lines.map(({ key: k, qty: n }) => ({ key: k, qty: n }));
+  save(cart);
+  renderCart();
+  $("cart-note").textContent = `${item.title} added to your cart (${BILLING_INFO[item.billing].label.toLowerCase()}).`;
+  return item.title;
 }
 
 export function initStore(): void {
@@ -61,7 +82,7 @@ export function initStore(): void {
   });
   // Payments are not connected yet: say so plainly instead of pretending to charge.
   $("cart-checkout").addEventListener("click", () => {
-    $("cart-note").textContent = "Payments open soon. Your cart is saved on this device, and nothing has been charged.";
+    $("cart-note").textContent = "Payments open soon. Your cart is saved on this device, and nothing has been charged. Monthly items will renew each month until you cancel; task items are paid once.";
   });
   $("task-rule").innerHTML = `<h3>How one-off tasks are billed</h3><ul>${OVERAGE_RULE.map((x) => `<li>${esc(x)}</li>`).join("")}</ul><p class="jd-note">Prices are list prices in GBP and may change before launch.</p>`;
   cart = load();

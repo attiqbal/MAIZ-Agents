@@ -25,3 +25,15 @@ describe("store cart", () => {
     expect(q.lines).toEqual([expect.objectContaining({ key: "blog-writer", qty: MAX_QTY })]);
   });
 });
+
+describe("billing labels", () => {
+  it("say plainly which items recur and which are one-off, and which roles are core", async () => {
+    const { BILLING_INFO, KIND_LABEL, isCoreRole } = await import("../src/modules/store/cart.js");
+    expect(BILLING_INFO.monthly.label).toContain("Recurring");
+    expect(BILLING_INFO.once.label).toContain("One-off");
+    expect(KIND_LABEL.task).toBe("Task-based consultant");
+    expect(isCoreRole("finance-manager") && isCoreRole("admin-manager")).toBe(true);
+    expect(isCoreRole("supply-chain-manager") || isCoreRole("website-developer")).toBe(false);
+    for (const i of CATALOGUE) expect(isCoreRole(i.key), i.key).toBe(false);
+  });
+});

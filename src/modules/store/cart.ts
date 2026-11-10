@@ -16,6 +16,29 @@ import { STANDARD_TEAM } from "../onboarding/index.js";
 export type Billing = "monthly" | "once";
 export type ItemKind = "employee" | "specialist" | "task";
 
+/**
+ * How each kind of item is paid for, in the words shown next to the price and in the cart.
+ * Core roles (the basic package and the free Admin manager) are included and never sold here.
+ */
+export const BILLING_INFO: Record<Billing, { label: string; short: string; note: string }> = {
+  monthly: {
+    label: "Recurring · monthly",
+    short: "a month",
+    note: "Charged every month until you cancel. Cancel in one click; you keep access to the end of the month you paid for.",
+  },
+  once: {
+    label: "One-off · task based",
+    short: "once",
+    note: "Paid once for this task. No subscription. The employee leaves the team when the task is delivered.",
+  },
+};
+
+export const KIND_LABEL: Record<ItemKind, string> = {
+  employee: "Ready-made employee",
+  specialist: "Custom specialist",
+  task: "Task-based consultant",
+};
+
 export interface CatalogueItem {
   key: string;
   title: string;
@@ -51,6 +74,11 @@ export const CATALOGUE: readonly CatalogueItem[] = [
     priceGbp: r.fixedGbp, group: `One-off tasks · ${r.category}`, summary: r.purpose,
   })),
 ];
+
+/** True for roles that come with every package: they cannot be added to a cart. */
+export function isCoreRole(key: string): boolean {
+  return IN_PACKAGE.has(key) || key === "admin-manager";
+}
 
 export function getItem(key: string): CatalogueItem | undefined {
   return CATALOGUE.find((i) => i.key === key);

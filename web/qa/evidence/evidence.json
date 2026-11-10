@@ -74,6 +74,11 @@
       "viewport": "375x812",
       "artifact": "store-375x812.png",
       "observation": "Picker and cart stack in one column; quantity and Add to cart wrap onto their own rows; scrollWidth 375."
+    },
+    {
+      "viewport": "1440x900",
+      "artifact": "store-billing-1440x900.png",
+      "observation": "Cart groups items under 'Recurring \u00b7 monthly' and 'One-off \u00b7 task based' headings, each with its own billing note; totals show Recurring, One-off, Due today and From next month. Blueprint roles show a Core \u00b7 included, Recurring or One-off tag and an Add to cart button (core roles say 'Included in every package'). No console errors."
     }
   ]
 }

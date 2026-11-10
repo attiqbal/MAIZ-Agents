@@ -687,3 +687,12 @@ select.input { appearance: auto; }
 .cart-totals div { display: flex; justify-content: space-between; color: var(--color-mist); }
 .cart-totals dd { margin: 0; }
 .cart-due { color: #fff !important; font-weight: 500; border-top: 1px solid var(--color-inkline); padding-top: 8px; }
+
+/* Billing labels: recurring versus one-off */
+.bill-tag { display: inline-block; flex: none; font-size: 12px; font-weight: 500; border-radius: 999px; padding: 3px 10px; border: 1px solid var(--color-obsidian-edge); }
+.bill-monthly { color: #fff; border-color: var(--color-pulse-violet); }
+.bill-once { color: var(--color-mist); border-color: var(--color-ash); }
+.cart-sec { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
+.cart-sec h4 { margin: 0; display: flex; justify-content: space-between; align-items: center; gap: 8px; font-weight: 500; color: #fff; font-size: 14px; }
+.bp-buy { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; padding: 10px 0 4px; }
+.bp-buy .jd-note { flex-basis: 100%; }
