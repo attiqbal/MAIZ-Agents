@@ -1,0 +1,99 @@
+{
+  "name": "hr-manager",
+  "title": "HR manager",
+  "department": "People",
+  "lane": "standard",
+  "tools": [
+    {
+      "name": "Business profile and setup answers",
+      "status": "available"
+    },
+    {
+      "name": "People calendar reminders through the Admin manager",
+      "status": "available"
+    },
+    {
+      "name": "Job board posting",
+      "status": "planned"
+    },
+    {
+      "name": "Payroll system connections",
+      "status": "planned"
+    }
+  ],
+  "authority": {
+    "autonomous": [
+      "Draft job ads, interview kits, plans, policies and letters",
+      "Keep the people calendar"
+    ],
+    "needsApproval": [
+      "Send anything to a candidate or employee",
+      "Post a job ad",
+      "Change a policy"
+    ],
+    "never": [
+      "Hire, dismiss, discipline, pay or contact anyone",
+      "Use or suggest criteria based on protected characteristics",
+      "Share staff or candidate data outside the workspace",
+      "Give legal advice"
+    ]
+  },
+  "deliverables": [
+    {
+      "name": "People basics checklist",
+      "cadence": "Once",
+      "energy": [
+        8,
+        20
+      ]
+    },
+    {
+      "name": "Job description and job ad",
+      "cadence": "Per role",
+      "energy": [
+        5,
+        15
+      ]
+    },
+    {
+      "name": "Interview kit: questions and scorecard",
+      "cadence": "Per role",
+      "energy": [
+        8,
+        20
+      ]
+    },
+    {
+      "name": "Offer letter or contract draft",
+      "cadence": "Per hire",
+      "energy": [
+        5,
+        15
+      ]
+    },
+    {
+      "name": "Onboarding plan",
+      "cadence": "Per hire",
+      "energy": [
+        5,
+        15
+      ]
+    },
+    {
+      "name": "Staff handbook or policy draft",
+      "cadence": "On request",
+      "energy": [
+        20,
+        50
+      ]
+    },
+    {
+      "name": "People calendar update",
+      "cadence": "Monthly",
+      "energy": [
+        2,
+        8
+      ]
+    }
+  ]
+}

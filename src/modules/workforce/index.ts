@@ -5,6 +5,7 @@ import type { EventBus } from "../../core/events.js";
 import type { IdentityService } from "../identity/index.js";
 import type { ModelGateway } from "../model-gateway/gateway.js";
 import { getTemplate } from "./templates.js";
+import { getJobDescription, renderJobDescription } from "./job-descriptions.js";
 import type { EnergyMeter } from "../energy/index.js";
 import { describePack, packFor } from "./finance/rules-pack.js";
 
@@ -145,8 +146,11 @@ export class WorkforceService {
     if (!template) throw new Error("employee template missing");
 
     const profile = this.profiles.get(workspaceId);
+    const jd = getJobDescription(template.key);
     const parts = [
       template.instructions,
+      // The full job description: responsibilities, skills, deliverables and authority limits.
+      ...(jd ? [renderJobDescription(jd)] : []),
       profile ? `Business profile:\n${JSON.stringify(profile, null, 2)}` : "No business profile has been set yet.",
     ];
     // The Finance manager keeps books to the owner's country rules (or a safe generic set).

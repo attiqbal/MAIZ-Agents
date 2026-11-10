@@ -12,7 +12,8 @@
     "dev:api": "ALLOW_DEV_AUTH=1 tsx src/server/main.ts",
     "db:int": "bash db/with-postgres.sh npx vitest run test/postgres.int.test.ts",
     "build": "npm run typecheck && cd web && npm run build",
-    "start": "node --import tsx src/server/main.ts"
+    "start": "node --import tsx src/server/main.ts",
+    "skills": "tsx scripts/build-skills.ts"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

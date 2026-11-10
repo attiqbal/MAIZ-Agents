@@ -14,9 +14,9 @@ function setup(clock = { d: new Date("2026-05-01T12:00:00Z") }) {
 }
 
 describe("blueprint", () => {
-  it("always includes the four basic-package employees and waitlists unbuilt add-ons", () => {
+  it("always includes the five basic-package employees and waitlists unbuilt add-ons", () => {
     const b = buildBlueprint({ ...base, addOns: ["video-editor", "finance-manager", "admin-manager"] });
-    expect(b.employees).toEqual(["finance-manager", "marketing-manager", "business-consultant", "hr-manager"]);
+    expect(b.employees).toEqual(["finance-manager", "marketing-manager", "business-consultant", "hr-manager", "compliance-manager"]);
     expect(b.waitlist).toEqual(["video-editor"]);
     expect(b.trialDays).toBe(7);
   });
@@ -48,8 +48,8 @@ describe("signUp", () => {
   it("provisions workspace, team, books and a 7-day trial in one step", async () => {
     const { onboarding, wf, ledger, energy, clock } = setup();
     const org = await onboarding.signUp("founder", base);
-    expect(wf.team("founder", org.workspaceId)).toHaveLength(5); // 4 employees + free Admin manager
-    expect(org.employeeIds).toHaveLength(4);
+    expect(wf.team("founder", org.workspaceId)).toHaveLength(6); // 5 employees + free Admin manager
+    expect(org.employeeIds).toHaveLength(5);
     expect(wf.team("founder", org.workspaceId).find((e) => e.id === org.adminManagerId)?.templateKey).toBe("admin-manager");
     expect(ledger.chart("founder", org.workspaceId).length).toBeGreaterThan(5);
     expect(org.trialEndsAt).toBe("2026-05-08T12:00:00.000Z");

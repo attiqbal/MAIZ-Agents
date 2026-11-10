@@ -2,6 +2,7 @@ import "./styles.css";
 import { toast } from "./common";
 import { initSetup } from "./setup";
 import { api, getToken, clearSession, type Org } from "./api";
+import { JOB_DESCRIPTIONS, getJobDescription, jdHtml } from "./jd";
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const app = $("app");
@@ -92,7 +93,7 @@ $("a-edit").addEventListener("click", () => toast("Editing opens in the web edit
 
 // Real data: when signed in and the API is running, replace the demo team with the real one.
 let realOrg: Org | undefined;
-const ROLE: Record<string, [string, string]> = { "finance-manager": ["FM", "av-fm"], "marketing-manager": ["MM", "av-mm"], "business-consultant": ["BC", "av-bc"], "hr-manager": ["HR", "av-hr"], "admin-manager": ["AM", "av-tl"] };
+const ROLE: Record<string, [string, string]> = { "finance-manager": ["FM", "av-fm"], "marketing-manager": ["MM", "av-mm"], "business-consultant": ["BC", "av-bc"], "hr-manager": ["HR", "av-hr"], "compliance-manager": ["CM", "av-cm"], "admin-manager": ["AM", "av-tl"] };
 const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]!);
 async function loadOrg(): Promise<void> {
   const r = await api<Org>("/org");
@@ -122,15 +123,15 @@ $("me-av").addEventListener("click", () => { location.hash = "#settings"; });
 $("set-biz").textContent = biz;
 $("set-email").textContent = profile.email || "Not set";
 
-// Ask bar: "finance: ..." / "marketing: ..." / "consultant: ..." / "hr: ..." picks the employee; otherwise the consultant answers.
+// Ask bar: "finance: ..." / "marketing: ..." / "consultant: ..." / "hr: ..." / "compliance: ..." picks the employee; otherwise the consultant answers.
 $<HTMLFormElement>("ask").addEventListener("submit", async (e) => {
   e.preventDefault();
   const input = $<HTMLInputElement>("ask-in");
   const text = input.value.trim();
   if (!text) return;
   if (!realOrg) { toast("Admin manager got it and will route it (demo)"); input.value = ""; return; }
-  const m = /^(finance|marketing|consultant|hr)\s*[:,-]\s*(.+)$/is.exec(text);
-  const key = m ? { finance: "finance-manager", marketing: "marketing-manager", consultant: "business-consultant", hr: "hr-manager" }[m[1]!.toLowerCase() as "finance"] : "business-consultant";
+  const m = /^(finance|marketing|consultant|hr|compliance)\s*[:,-]\s*(.+)$/is.exec(text);
+  const key = m ? { finance: "finance-manager", marketing: "marketing-manager", consultant: "business-consultant", hr: "hr-manager", compliance: "compliance-manager" }[m[1]!.toLowerCase() as "finance"] : "business-consultant";
   const emp = realOrg.team.find((x) => x.templateKey === key) ?? realOrg.team[0]!;
   toast(`${emp.name} is on it…`);
   const r = await api<{ status: string; reason?: string; answer?: string }>("/ask", { body: { text: m ? m[2] : text, employeeId: emp.id } });
@@ -155,6 +156,22 @@ document.addEventListener("keydown", (e) => {
   const tag = (e.target as HTMLElement).tagName;
   if (e.key === "/" && tag !== "INPUT" && tag !== "TEXTAREA") { e.preventDefault(); $("ask-in").focus(); }
 });
+
+// Job descriptions in the team builder, from the same data the employees work to.
+{
+  const pick = $("jd-pick");
+  pick.innerHTML = JOB_DESCRIPTIONS.map((j, i) => `<button class="chip" aria-pressed="${i === 0}" data-key="${j.key}">${esc(j.jobTitle)}</button>`).join("");
+  const show = (key: string) => {
+    const jd = getJobDescription(key);
+    if (jd) $("jd-out").innerHTML = jdHtml(jd);
+    pick.querySelectorAll<HTMLElement>(".chip").forEach((c) => c.setAttribute("aria-pressed", String(c.dataset.key === key)));
+  };
+  pick.addEventListener("click", (e) => {
+    const b = (e.target as HTMLElement).closest<HTMLButtonElement>(".chip");
+    if (b?.dataset.key) show(b.dataset.key);
+  });
+  show(JOB_DESCRIPTIONS[0]!.key);
+}
 
 // Skill tuning
 const skills: Record<string, string> = { Standard: "100 · £12.30/mo", Pro: "200 · £21.40/mo", Expert: "400 · £38.00/mo" };

@@ -44,7 +44,7 @@ describe("signup and org", () => {
     expect((r.body as any).trialEndsAt).toBe("2026-06-17T10:00:00.000Z");
     const org = (await call("GET", "/api/org", undefined, auth)).body as any;
     expect(org.name).toBe("Kestrel Coffee");
-    expect(org.team.map((e: any) => e.templateKey)).toEqual(["admin-manager", "finance-manager", "marketing-manager", "business-consultant", "hr-manager"]);
+    expect(org.team.map((e: any) => e.templateKey)).toEqual(["admin-manager", "finance-manager", "marketing-manager", "business-consultant", "hr-manager", "compliance-manager"]);
     expect(org.team[0].energyLeft).toBe(300);
   });
   it("refuses a second signup for the same email, bad emails, and unconfigured dev auth", async () => {
@@ -52,6 +52,13 @@ describe("signup and org", () => {
     expect((await call("POST", "/api/signup", { email: "ann@kestrel.co", businessName: "X" })).status).toBe(409);
     expect((await call("POST", "/api/signup", { email: "nope", businessName: "X" })).status).toBe(400);
     expect((await setup({ allowDevAuth: false }).call("POST", "/api/signup", { email: "a@b.co", businessName: "X" })).status).toBe(401);
+  });
+  it("lists the agent store with every employee's job description, without sign-in", async () => {
+    const r = (await setup().call("GET", "/api/store")).body as any;
+    const cm = r.employees.find((e: any) => e.key === "compliance-manager");
+    expect(cm.title).toBe("Compliance manager");
+    expect(cm.jobDescription.competencies.length).toBeGreaterThan(5);
+    expect(r.employees.every((e: any) => e.jobDescription)).toBe(true);
   });
   it("requires a session for everything else", async () => {
     const { call } = setup();

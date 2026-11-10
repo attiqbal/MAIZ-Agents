@@ -172,6 +172,7 @@ main:focus { outline: none; }
 .av-bc { background: linear-gradient(135deg, #a8327f, #e05aa8); }
 .av-tl { background: #1b2742; }
 .av-hr { background: linear-gradient(135deg, #0f7a6c, #2bb59a); }
+.av-cm { background: linear-gradient(135deg, #8a5a12, #d9a23a); }
 .av-me { background: var(--color-slate); }
 
 /* ---------- Energy bar ---------- */
@@ -338,6 +339,7 @@ section[id] { scroll-margin-top: 72px; } /* clears the sticky nav when jumping t
 .first-day .v { font-size: 15px; color: #fff; }
 .emp-card .btn { align-self: flex-start; margin-top: auto; }
 @media (max-width: 960px) { .emps { grid-template-columns: 1fr; } }
+@media (min-width: 1201px) { .emps-5 { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 
 /* Feature grid */
 .features { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
@@ -619,3 +621,29 @@ section[id] { scroll-margin-top: 72px; } /* clears the sticky nav when jumping t
 textarea.input { resize: vertical; min-height: 72px; font-family: inherit; }
 select.input { appearance: auto; }
 .prov li.undone { color: var(--color-ash); text-decoration: line-through; }
+
+/* Job descriptions (agent store cards and the team builder) */
+.jd { border-top: 1px solid var(--color-inkline); padding-top: 14px; }
+.jd summary { cursor: pointer; color: #fff; font-weight: 500; font-size: 15px; list-style: none; }
+.jd summary::-webkit-details-marker { display: none; }
+.jd summary::after { content: " +"; color: var(--color-ash); }
+.jd[open] summary::after { content: " –"; }
+.jd-body { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; font-size: 14px; color: var(--color-mist); font-weight: 300; overflow-wrap: anywhere; }
+.jd-body h4 { margin: 12px 0 0; font-size: 12px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.02em; color: var(--color-ash); }
+.jd-body ul { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 4px; }
+.jd-body p { margin: 0; }
+.jd-meta { color: var(--color-ash); font-size: 13px; }
+.jd-area { color: #fff; font-weight: 500; margin-top: 4px !important; }
+.jd-note { font-size: 12px; color: var(--color-ash); }
+.jd-table { width: 100%; border-collapse: collapse; }
+.jd-table th { text-align: left; font-size: 12px; font-weight: 500; color: var(--color-ash); padding: 6px 8px 6px 0; border-bottom: 1px solid var(--color-inkline); }
+.jd-table td { padding: 8px 8px 8px 0; border-bottom: 1px solid var(--color-inkline); vertical-align: top; }
+.jd-table td:last-child { white-space: nowrap; text-align: right; padding-right: 0; }
+.jd-table td b { display: block; color: #fff; font-weight: 500; }
+.jd-table td span { display: block; font-size: 13px; }
+.jd-lvl { display: inline-block !important; font-size: 12px !important; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--color-inkline); }
+.jd-expert { color: #fff; border-color: var(--color-sapphire-hairline) !important; }
+.jd-auth { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+@media (max-width: 960px) { .jd-auth { grid-template-columns: 1fr; } }
+.emp-card .jd-auth { grid-template-columns: 1fr; }
+#jd-pick { margin-bottom: 12px; flex-wrap: wrap; }

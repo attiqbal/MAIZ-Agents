@@ -8,7 +8,7 @@ import { getTemplate } from "../../src/modules/workforce/templates";
 import { toast } from "./common";
 import { api, getToken } from "./api";
 
-const TEAM = ["finance-manager", "marketing-manager", "business-consultant", "hr-manager"];
+const TEAM = ["finance-manager", "marketing-manager", "business-consultant", "hr-manager", "compliance-manager"];
 const KEY = "vn.setup";
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);

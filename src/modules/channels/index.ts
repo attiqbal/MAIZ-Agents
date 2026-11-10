@@ -147,9 +147,9 @@ export class ChannelRouter {
 
   /** "finance: how much runway do we have?" goes to the Finance manager; otherwise the default employee. */
   private pickEmployee(userId: string, conn: Connection, text: string) {
-    const m = /^\s*(finance|marketing|consultant|hr|admin)\s*[:,-]\s*(.+)$/is.exec(text);
+    const m = /^\s*(finance|marketing|consultant|hr|compliance|admin)\s*[:,-]\s*(.+)$/is.exec(text);
     if (m) {
-      const key = { finance: "finance-manager", marketing: "marketing-manager", consultant: "business-consultant", hr: "hr-manager", admin: "admin-manager" }[m[1]!.toLowerCase() as "finance"];
+      const key = { finance: "finance-manager", marketing: "marketing-manager", consultant: "business-consultant", hr: "hr-manager", compliance: "compliance-manager", admin: "admin-manager" }[m[1]!.toLowerCase() as "finance"];
       const emp = this.workforce.team(userId, conn.workspaceId).find((e) => e.templateKey === key);
       if (emp) return { employeeId: emp.id as string, brief: m[2]!.trim() };
     }

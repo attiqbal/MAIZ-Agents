@@ -7,7 +7,7 @@ import { EMPLOYEE_TEMPLATES } from "../workforce/templates.js";
 import type { ChannelKind } from "../channels/index.js";
 
 /** The basic package every customer gets. Everything else is an add-on. */
-export const STANDARD_TEAM = ["finance-manager", "marketing-manager", "business-consultant", "hr-manager"] as const;
+export const STANDARD_TEAM = ["finance-manager", "marketing-manager", "business-consultant", "hr-manager", "compliance-manager"] as const;
 
 /** Free for every organisation and never counted as a package employee. */
 export const ADMIN_MANAGER = "admin-manager";

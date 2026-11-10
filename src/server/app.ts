@@ -4,7 +4,8 @@ import { ChannelError, parseSlackEvent } from "../modules/channels/index.js";
 import { PermissionError } from "../modules/identity/index.js";
 import { LedgerError } from "../modules/ledger/index.js";
 import { SignupError, type SignupChoices, type TeamSize } from "../modules/onboarding/index.js";
-import { getTemplate } from "../modules/workforce/templates.js";
+import { getTemplate, TEMPLATES } from "../modules/workforce/templates.js";
+import { getJobDescription } from "../modules/workforce/job-descriptions.js";
 import type { Platform } from "./platform.js";
 
 export interface Req {
@@ -72,6 +73,12 @@ export function createApp(p: Platform) {
     };
 
     if (method === "GET" && path === "/api/health") return p.healthy() ? json(200, { ok: true }) : json(503, { ok: false, error: "storage is failing" });
+    // Agent store: every employee with its full job description. Public, no sign-in needed.
+    if (method === "GET" && path === "/api/store") {
+      return json(200, {
+        employees: TEMPLATES.map((t) => ({ key: t.key, title: t.title, summary: t.summary, kind: t.kind, tier: t.tier, firstJob: t.firstJob, jobDescription: getJobDescription(t.key) })),
+      });
+    }
 
     // ---- sign in by email link ----
     if (method === "POST" && path === "/api/signin/start") {

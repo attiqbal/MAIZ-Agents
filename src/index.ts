@@ -6,6 +6,7 @@ export { AnthropicAdapter } from "./modules/model-gateway/adapters/anthropic.js"
 export { OpenAICompatibleAdapter } from "./modules/model-gateway/adapters/openai-compatible.js";
 export { MockAdapter } from "./modules/model-gateway/adapters/mock.js";
 export { WorkforceService, type BusinessProfile, type Employee, type TaskResult } from "./modules/workforce/index.js";
+export { JOB_DESCRIPTIONS, getJobDescription, renderJobDescription, type JobDescription } from "./modules/workforce/job-descriptions.js";
 export { TEMPLATES, EMPLOYEE_TEMPLATES, getTemplate, type EmployeeTemplate } from "./modules/workforce/templates.js";
 export { GENERIC_PACK, registerPack, packFor, describePack, type RulesPack } from "./modules/workforce/finance/rules-pack.js";
 export { Ledger, LedgerError, DEFAULT_CHART, type Account, type AccountType, type JournalEntry, type JournalLine } from "./modules/ledger/index.js";
