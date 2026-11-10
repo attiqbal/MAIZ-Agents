@@ -35,6 +35,13 @@ export interface AiDay {
   /** Cost the cache avoided (at the baseline model's price). Shown separately: a Claude-only setup could cache too. */
   cacheSavedMicro: number;
   runpodSeconds: number;
+  /** Batch system: tasks run in batches, batches run, and the same tasks priced both ways. */
+  batchJobs: number;
+  batchRuns: number;
+  batchActualMicro: number;
+  batchBaselineMicro: number;
+  /** Estimate: tasks that shared a worker start instead of waking one each, priced at the GPU rate. */
+  coldStartSavedMicro: number;
   byPolicy: Record<string, PolicyDay>;
   claudeByWorkspace: Record<string, number>;
 }
@@ -42,7 +49,7 @@ export interface AiDay {
 export const emptyDay = (day: string): AiDay => ({
   day, calls: 0, cacheHits: 0, runpodCalls: 0, claudeDirect: 0, fallbacks: 0, reviews: 0, reviewFails: 0, reviewErrors: 0,
   escalations: 0, lowConfidence: 0, budgetRefused: 0, failures: 0, runpodMicro: 0, claudeMicro: 0, baselineMicro: 0,
-  cacheSavedMicro: 0, runpodSeconds: 0, byPolicy: {}, claudeByWorkspace: {},
+  cacheSavedMicro: 0, runpodSeconds: 0, batchJobs: 0, batchRuns: 0, batchActualMicro: 0, batchBaselineMicro: 0, coldStartSavedMicro: 0, byPolicy: {}, claudeByWorkspace: {},
 });
 
 /** What one request did, added to the day's totals. */
@@ -65,15 +72,17 @@ export interface CallRecord {
   baselineMicro: number;
   cacheSavedMicro?: number;
   runpodSeconds?: number;
+  batch?: boolean;
 }
 
 export interface Totals {
   calls: number; cacheHits: number; runpodCalls: number; claudeDirect: number; fallbacks: number; reviews: number; reviewFails: number;
   reviewErrors: number; escalations: number; lowConfidence: number; budgetRefused: number; failures: number;
   runpodMicro: number; claudeMicro: number; baselineMicro: number; cacheSavedMicro: number; runpodSeconds: number;
+  batchJobs: number; batchRuns: number; batchActualMicro: number; batchBaselineMicro: number; coldStartSavedMicro: number;
 }
 
-const COUNTERS = ["calls", "cacheHits", "runpodCalls", "claudeDirect", "fallbacks", "reviews", "reviewFails", "reviewErrors", "escalations", "lowConfidence", "budgetRefused", "failures", "runpodMicro", "claudeMicro", "baselineMicro", "cacheSavedMicro", "runpodSeconds"] as const;
+const COUNTERS = ["calls", "cacheHits", "runpodCalls", "claudeDirect", "fallbacks", "reviews", "reviewFails", "reviewErrors", "escalations", "lowConfidence", "budgetRefused", "failures", "runpodMicro", "claudeMicro", "baselineMicro", "cacheSavedMicro", "runpodSeconds", "batchJobs", "batchRuns", "batchActualMicro", "batchBaselineMicro", "coldStartSavedMicro"] as const;
 
 /** Spend and savings, by day. The routing gateway asks it about caps and writes every call into it. */
 export class SpendLedger {
@@ -106,6 +115,7 @@ export class SpendLedger {
     d.claudeMicro += r.claudeMicro;
     d.baselineMicro += r.baselineMicro;
     d.runpodSeconds += r.runpodSeconds ?? 0;
+    if (r.batch) { d.batchJobs++; d.batchActualMicro += r.runpodMicro + r.claudeMicro; d.batchBaselineMicro += r.baselineMicro; }
     const p = (d.byPolicy[r.policy] ??= { calls: 0, runpodMicro: 0, claudeMicro: 0, baselineMicro: 0, escalations: 0, reviewFails: 0 });
     p.calls++;
     p.runpodMicro += r.runpodMicro;
@@ -114,6 +124,16 @@ export class SpendLedger {
     if (r.escalated) p.escalations++;
     if (r.reviewFailed) p.reviewFails++;
     if (r.claudeMicro > 0) d.claudeByWorkspace[r.workspaceId] = (d.claudeByWorkspace[r.workspaceId] ?? 0) + r.claudeMicro;
+    this.sink?.aiDay(structuredClone(d));
+  }
+
+  /** One batch finished: counts the run and the estimated cold starts the batch saved. */
+  recordBatchRun(coldStartSavedMicro: number): void {
+    const day = this.today();
+    const d = this.days.get(day) ?? emptyDay(day);
+    this.days.set(day, d);
+    d.batchRuns++;
+    d.coldStartSavedMicro += coldStartSavedMicro;
     this.sink?.aiDay(structuredClone(d));
   }
 

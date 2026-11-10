@@ -19,6 +19,10 @@ export interface CompletionRequest {
   taskType?: string;
   /** Overrides the adapter's own model. Set by the router from editable settings. */
   model?: string;
+  /** "batch": unattended, non-urgent work. The router waits out RunPod cold starts and never spends Claude to cover an outage (the batch retries later). */
+  mode?: "batch";
+  /** Batch only: last attempt, so Claude may cover a RunPod failure instead of the job failing. */
+  allowClaudeFallback?: boolean;
   /** Gives up on the provider after this many milliseconds (throws a `timeout` ProviderError). */
   timeoutMs?: number;
 }

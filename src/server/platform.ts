@@ -16,6 +16,7 @@ import type { Completer } from "../modules/model-gateway/types.js";
 import { AdminManager } from "../modules/admin-manager/index.js";
 import { InMemoryModelProvisioner, InMemoryStorageProvisioner } from "../modules/admin-manager/provisioning.js";
 import { OnboardingService } from "../modules/onboarding/index.js";
+import { BatchService } from "../modules/batch/service.js";
 import { WorkforceService } from "../modules/workforce/index.js";
 import { IntegrationService, defaultRegistry, type OAuthApp } from "../modules/integrations/index.js";
 import { QualityReviewService } from "../modules/review/index.js";
@@ -86,6 +87,10 @@ export function createPlatform(cfg: PlatformConfig) {
   workforce.addContext((ws, templateKey) => integrations.contextFor(ws, templateKey));
   /** Welcomes new owners and runs setup. Storage and models are stand-ins until real RunPod/bucket provisioning is wired in. */
   const admin = new AdminManager(identity, workforce, audit, bus, new InMemoryStorageProvisioner(), new InMemoryModelProvisioner(), router, { now });
+  /** Batch work: compiled during the day, sent to the pod at each client's closing time or when enough has gathered. */
+  const batch = new BatchService({ identity, audit, workforce, settings: aiSettings, ledger: spend, isPlatformOwner: (id) => ownerIdSet.has(id), notify: (ws, text, link) => admin.tell(ws, text, link), now });
+  workforce.setIntake(batch);
+  workforce.addContext((ws, templateKey, taskType) => batch.contextFor(ws, templateKey, taskType));
   const email = cfg.email ?? new ConsoleEmailSender();
   const base = (cfg.appUrl ?? "").replace(/\/$/, "");
   /** Signed-in user ids of the platform owners (the same id the session carries). */
@@ -229,8 +234,11 @@ export function createPlatform(cfg: PlatformConfig) {
     for (const r of s.specialistRequests ?? []) specialists.restore(r);
     if (s.aiSettings) aiSettings.restore(s.aiSettings);
     for (const d of s.aiDays ?? []) spend.restore(d);
+    for (const x of s.batchSchedules ?? []) batch.restoreSchedule(x.workspaceId, x.schedule);
+    for (const j of s.batchJobs ?? []) batch.restoreJob(j);
+    for (const r of s.batchRuns ?? []) batch.restoreRun(r);
     sink = store;
-    for (const part of [audit, identity, energy, workforce, ledger, router, admin, integrations, reviews, prices, specialists, aiSettings, spend]) part.useSink(store);
+    for (const part of [audit, identity, energy, workforce, ledger, router, admin, integrations, reviews, prices, specialists, aiSettings, spend, batch]) part.useSink(store);
   }
 
   const healthy = () => (sink as { healthy?: boolean } | undefined)?.healthy !== false;
@@ -239,6 +247,6 @@ export function createPlatform(cfg: PlatformConfig) {
   const usedLinks = new Set<string>();
   /** Sign-in emails sent per address and hour, to stop the form being used to spam someone. */
   const sends = new Map<string, number[]>();
-  return { email, usedLinks, sends, admin, reviews, prices, specialists, ai, clients, isPlatformOwner, healthy, cfg, now, audit, bus, identity, energy, workforce, ledger, onboarding, router, integrations, slackTokens, saveSlackToken, attachStore };
+  return { batch, email, usedLinks, sends, admin, reviews, prices, specialists, ai, clients, isPlatformOwner, healthy, cfg, now, audit, bus, identity, energy, workforce, ledger, onboarding, router, integrations, slackTokens, saveSlackToken, attachStore };
 }
 export type Platform = ReturnType<typeof createPlatform>;

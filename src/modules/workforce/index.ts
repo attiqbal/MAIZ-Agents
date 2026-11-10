@@ -26,7 +26,7 @@ export interface Employee {
   name: string;
 }
 
-export type TaskStatus = "ready_for_review" | "failed" | "no_energy";
+export type TaskStatus = "ready_for_review" | "failed" | "no_energy" | "queued";
 
 export interface TaskResult {
   id: Id<"task">;
@@ -42,6 +42,32 @@ export interface TaskResult {
   provider?: string;
   inputTokens?: number;
   outputTokens?: number;
+  /** Real provider cost and its Claude-only baseline, in micro-dollars. Platform use only: never sent to clients. */
+  costMicro?: number;
+  baselineMicro?: number;
+  /** Queued tasks only: the batch job, when it is due, and why it was not run at once. */
+  /** Why a failed task failed (platform use only). */
+  failure?: string;
+  jobId?: string;
+  runsAt?: string;
+  queueReason?: string;
+}
+
+export interface AssignOptions {
+  /** The person wants it now: skip the batch queue. */
+  urgent?: boolean;
+}
+
+/** How a request is handled. The batch module implements this; the workforce only asks. */
+export interface Intake {
+  route(workspaceId: string, templateKey: string, brief: string, opts: AssignOptions): { mode: "lookup" | "urgent" | "batch"; reason: string };
+  enqueue(job: { userId: string; workspaceId: string; employeeId: string; brief: string; reason: string; estTokens: number }): { jobId: string; runsAt: string };
+}
+
+interface RunContext {
+  /** Routing policy. "live" for quick lookups, else the employee template. */
+  taskType: string;
+  batch?: { allowClaudeFallback: boolean };
 }
 
 export class WorkforceService {
@@ -49,14 +75,20 @@ export class WorkforceService {
   private profiles = new Map<string, BusinessProfile>();
   private tasks = new Map<string, TaskResult>();
   private sink?: Sink;
+  private intake?: Intake;
+
+  /** Turns on the batch queue: non-urgent work is queued instead of answered at once. */
+  setIntake(intake: Intake): void {
+    this.intake = intake;
+  }
 
   useSink(sink: Sink): void {
     this.sink = sink;
   }
 
   /** Extra facts per employee from other modules (for example connected apps). Kept out of this module's imports. */
-  private contextSources: ((workspaceId: string, templateKey: string) => string | undefined)[] = [];
-  addContext(source: (workspaceId: string, templateKey: string) => string | undefined): void {
+  private contextSources: ((workspaceId: string, templateKey: string, taskType?: string) => string | undefined)[] = [];
+  addContext(source: (workspaceId: string, templateKey: string, taskType?: string) => string | undefined): void {
     this.contextSources.push(source);
   }
 
@@ -152,14 +184,42 @@ export class WorkforceService {
     return [...this.employees.values()].filter((e) => e.workspaceId === workspaceId);
   }
 
-  /** Give an employee a piece of work. Returns a draft for the owner to review. */
-  async assign(userId: string, workspaceId: string, employeeId: string, brief: string): Promise<TaskResult> {
+  /**
+   * Give an employee a piece of work. Quick questions and urgent work are answered now (a draft for the owner to
+   * review). Everything else is queued for the next batch and comes back as status "queued" with the time it will run.
+   */
+  async assign(userId: string, workspaceId: string, employeeId: string, brief: string, opts: AssignOptions = {}): Promise<TaskResult> {
     this.identity.require(userId, workspaceId, "task.create");
     const employee = this.employees.get(employeeId);
     // An employee from another workspace looks exactly like one that does not exist.
     if (!employee || employee.workspaceId !== workspaceId) throw new Error("employee not found");
     const template = getTemplate(employee.templateKey);
     if (!template) throw new Error("employee template missing");
+    const route = this.intake?.route(workspaceId, template.key, brief, opts);
+    if (route?.mode === "batch") {
+      // Only queue work that could start: a client with no energy left learns that now, not tonight.
+      const verdict = this.energy?.check(workspaceId, employeeId) ?? { allowed: true as const, overtime: false };
+      if (verdict.allowed) {
+        const q = this.intake!.enqueue({ userId, workspaceId, employeeId, brief, reason: route.reason, estTokens: Math.ceil((brief.length + 6000) / 4) + 1500 });
+        const queued: TaskResult = { id: newId("task"), workspaceId, employeeId, brief, status: "queued", jobId: q.jobId, runsAt: q.runsAt, queueReason: route.reason };
+        this.audit.record({ workspaceId, actor: `user:${userId}`, action: "task.queued", target: queued.id, data: { jobId: q.jobId, runsAt: q.runsAt } });
+        return queued;
+      }
+    }
+    return this.execute(userId, workspaceId, employee, brief, { taskType: route?.mode === "lookup" ? "live" : template.key });
+  }
+
+  /** Runs a queued job. Called by the batch dispatcher, which already checked the person's right to ask when it was queued; it is checked again here. */
+  async runQueued(job: { userId: string; workspaceId: string; employeeId: string; brief: string }, batch: { allowClaudeFallback: boolean }): Promise<TaskResult> {
+    this.identity.require(job.userId, job.workspaceId, "task.create");
+    const employee = this.employees.get(job.employeeId);
+    if (!employee || employee.workspaceId !== job.workspaceId) throw new Error("employee not found");
+    return this.execute(job.userId, job.workspaceId, employee, job.brief, { taskType: employee.templateKey, batch });
+  }
+
+  private async execute(userId: string, workspaceId: string, employee: Employee, brief: string, run: RunContext): Promise<TaskResult> {
+    const employeeId = employee.id;
+    const template = getTemplate(employee.templateKey)!;
 
     const profile = this.profiles.get(workspaceId);
     const jd = getJobDescription(template.key);
@@ -174,7 +234,7 @@ export class WorkforceService {
     const training = this.training.get(employeeId);
     if (training) parts.push(`What the owner told you during setup:\n${training}`);
     for (const source of this.contextSources) {
-      const extra = source(workspaceId, template.key);
+      const extra = source(workspaceId, template.key, run.taskType);
       if (extra) parts.push(extra);
     }
     const system = parts.join("\n\n");
@@ -194,7 +254,8 @@ export class WorkforceService {
       const result = await this.gateway.complete({
         tier: template.tier,
         workspaceId,
-        taskType: template.key,
+        taskType: run.taskType,
+        ...(run.batch ? { mode: "batch" as const, allowClaudeFallback: run.batch.allowClaudeFallback } : {}),
         // Long deliverables (reports, journals) must not be cut off mid-sentence.
         maxTokens: 4096,
         messages: [
@@ -206,9 +267,12 @@ export class WorkforceService {
       task.provider = result.provider;
       task.inputTokens = result.inputTokens;
       task.outputTokens = result.outputTokens;
+      task.costMicro = result.costMicro;
+      task.baselineMicro = result.routing?.baselineMicro;
       task.energyUsed = this.energy?.record(workspaceId, employeeId, result.provider, result.inputTokens, result.outputTokens, verdict.overtime, result.costMicro).energy;
-    } catch {
+    } catch (err) {
       task.status = "failed";
+      task.failure = err instanceof Error ? err.message : String(err);
     }
     this.tasks.set(task.id, task);
     this.audit.record({

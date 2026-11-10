@@ -368,7 +368,7 @@ describe("platform wiring", () => {
     const client = { authorization: `Bearer ${(su.body as any).token}` };
     const org = (await s.call("GET", "/api/org", undefined, client)).body as any;
     const emp = org.team.find((e: any) => e.templateKey === "marketing-manager");
-    const task = await s.call("POST", "/api/ask", { employeeId: emp.id, text: "Plan next month's posts" }, client);
+    const task = await s.call("POST", "/api/ask", { employeeId: emp.id, text: "Plan next month's posts", urgent: true }, client);
     expect((task.body as any).status).toBe("ready_for_review");
     expect((task.body as any).answer).toContain("Open model draft");
 

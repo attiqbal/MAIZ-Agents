@@ -11,6 +11,8 @@ import type { PriceChange } from "../modules/pricing/index.js";
 import type { SpecialistRequest } from "../modules/review/specialists.js";
 import type { AiRoutingSettings } from "../modules/model-gateway/routing/settings.js";
 import type { AiDay } from "../modules/model-gateway/routing/ledger.js";
+import type { BatchJob, BatchRunRecord } from "../modules/batch/service.js";
+import type { ClientSchedule } from "../modules/batch/schedule.js";
 
 /**
  * Where services report every change so it can be stored. Services stay fast and
@@ -47,6 +49,12 @@ export interface Sink {
   aiSettings(s: AiRoutingSettings): void;
   /** Platform-level: one day of AI routing spend and savings, replaced on every call. */
   aiDay(d: AiDay): void;
+  /** One queued or finished batch job, replaced on every change. */
+  batchJob(j: BatchJob): void;
+  /** A client's batch schedule (closing time, timezone). */
+  batchSchedule(workspaceId: string, s: ClientSchedule): void;
+  /** Platform-level: one batch run summary, replaced on every call. */
+  batchRun(r: BatchRunRecord): void;
 }
 
 /** Everything stored, in the order it must be restored. */
@@ -74,4 +82,7 @@ export interface Snapshot {
   specialistRequests?: SpecialistRequest[];
   aiSettings?: unknown;
   aiDays?: AiDay[];
+  batchJobs?: BatchJob[];
+  batchSchedules?: { workspaceId: string; schedule: ClientSchedule }[];
+  batchRuns?: BatchRunRecord[];
 }

@@ -29,6 +29,29 @@ export interface PolicySettings {
   cache: boolean;
 }
 
+export interface BatchSettings {
+  enabled: boolean;
+  /** Run a batch as soon as this many tasks are waiting (all clients together). */
+  sizeTrigger: number;
+  /** ...or when their estimated tokens reach this. */
+  tokenTrigger: number;
+  /** A task never waits longer than this many hours, whatever the schedule says. */
+  maxQueueAgeHours: number;
+  /** Tasks sent to the pod at the same time. The pod's continuous batching serves them from one warm worker. */
+  concurrency: number;
+  /** After this many failed tries the task is marked failed and the client is told. */
+  maxAttempts: number;
+  retryBackoffMinutes: number;
+  /** Claude reads at least this share of batch answers: nobody is watching them run. */
+  qaRateMin: number;
+  /** On the last try, let Claude do the task if RunPod keeps failing, so it is not lost. */
+  claudeAfterFailures: boolean;
+  /** Used only for the savings estimate: seconds a worker takes to start. */
+  coldStartSeconds: number;
+  /** Employee templates whose work is never queued (always answered at once). */
+  liveTemplates: string[];
+}
+
 export interface AiRoutingSettings {
   runpod: {
     enabled: boolean;
@@ -65,6 +88,8 @@ export interface AiRoutingSettings {
     /** When a Claude cap is reached: "degrade" keeps serving from RunPod unchecked, "fail" stops claude-only work. */
     whenClaudeCapped: "degrade" | "fail";
   };
+  /** Batch system: non-urgent work is queued and sent to the pod together. */
+  batch: BatchSettings;
   /** Claude (and any other) model prices, by model name. */
   prices: Record<string, ModelPrice>;
   /** Keyed by "standard", "premium" or an employee template key. */
@@ -81,6 +106,11 @@ export const DEFAULT_PRICES_BY_MODEL: Record<string, ModelPrice> = {
 };
 /** Used for a model with no price entry, so unknown models are never counted as free. */
 export const UNKNOWN_MODEL_PRICE: ModelPrice = { inputPer1k: 4_000, outputPer1k: 20_000 };
+
+export const DEFAULT_BATCH: BatchSettings = {
+  enabled: true, sizeTrigger: 20, tokenTrigger: 200_000, maxQueueAgeHours: 24, concurrency: 6, maxAttempts: 3, retryBackoffMinutes: 15,
+  qaRateMin: 0.3, claudeAfterFailures: true, coldStartSeconds: 40, liveTemplates: ["admin-manager"],
+};
 
 export function defaultSettings(claudeDirectModel: string = HAIKU): AiRoutingSettings {
   const standard: PolicySettings = {
@@ -103,10 +133,13 @@ export function defaultSettings(claudeDirectModel: string = HAIKU): AiRoutingSet
     reviewer: { enabled: true, model: HAIKU, maxInputChars: 12_000, adaptive: true },
     cache: { enabled: true, ttlSeconds: 3_600, maxEntries: 500 },
     budgets: { claudeDailyUsd: 15, claudeMonthlyUsd: 200, claudePerWorkspaceMonthlyUsd: 20, runpodMonthlyUsd: 300, whenClaudeCapped: "degrade" },
+    batch: structuredClone(DEFAULT_BATCH),
     prices: structuredClone(DEFAULT_PRICES_BY_MODEL),
     policies: {
       standard,
       premium: { ...standard, claudeModel: SONNET, baselineModel: SONNET, reviewRate: 0.5, minScore: 8 },
+      // Quick lookups through the day ("what's the status", "who is on the rota"): a cheap Claude model reading the records.
+      live: { ...standard, primary: "claude", reviewRate: 0, escalate: false, fallbackToClaude: false, allowOpenModel: false },
       // Regulated work stays on Claude by default. Change it here if the open model proves good enough.
       "compliance-manager": { ...standard, primary: "claude", claudeModel: SONNET, baselineModel: SONNET, reviewRate: 0, escalate: false, fallbackToClaude: false, allowOpenModel: false },
     },
@@ -162,12 +195,15 @@ export function validateSettings(v: unknown): AiRoutingSettings {
   const c = obj(o.cache, "cache");
   const b = obj(o.budgets, "budgets");
   const pr = obj(o.prices, "prices");
+  const bt = (o.batch === undefined ? DEFAULT_BATCH : obj(o.batch, "batch")) as unknown as Record<string, unknown>;
   const po = obj(o.policies, "policies");
   const policies: Record<string, PolicySettings> = {};
   for (const [k, p] of Object.entries(po)) {
     if (!POLICY_KEY.test(k)) throw new SettingsError(`policy name "${k}" is not valid`);
     policies[k] = validPolicy(p, `policy ${k}`);
   }
+  // Settings saved before the batch system existed have no live policy: add the default one.
+  if (!policies.live && policies.standard) policies.live = defaultSettings(policies.standard.baselineModel).policies.live!;
   if (!policies.standard || !policies.premium) throw new SettingsError("the standard and premium policies are required");
   if (Object.keys(policies).length > 40) throw new SettingsError("too many policies");
   const prices: Record<string, ModelPrice> = {};
@@ -195,8 +231,27 @@ export function validateSettings(v: unknown): AiRoutingSettings {
       runpodMonthlyUsd: cap(b.runpodMonthlyUsd, "monthly RunPod cap"),
       whenClaudeCapped: oneOf(b.whenClaudeCapped, "when Claude is capped", ["degrade", "fail"]),
     },
+    batch: validBatch(bt),
     prices,
     policies,
+  };
+}
+
+function validBatch(b: Record<string, unknown>): BatchSettings {
+  const list = b.liveTemplates;
+  if (!Array.isArray(list) || list.length > 40 || list.some((t) => typeof t !== "string" || !POLICY_KEY.test(t))) throw new SettingsError("live templates must be a list of employee template keys");
+  return {
+    enabled: bool(b.enabled, "batch enabled"),
+    sizeTrigger: Math.round(num(b.sizeTrigger, "batch size trigger", 1, 10_000)),
+    tokenTrigger: Math.round(num(b.tokenTrigger, "batch token trigger", 1_000, 100_000_000)),
+    maxQueueAgeHours: num(b.maxQueueAgeHours, "longest wait", 1, 168),
+    concurrency: Math.round(num(b.concurrency, "batch concurrency", 1, 64)),
+    maxAttempts: Math.round(num(b.maxAttempts, "batch attempts", 1, 10)),
+    retryBackoffMinutes: num(b.retryBackoffMinutes, "retry wait", 1, 1_440),
+    qaRateMin: num(b.qaRateMin, "batch check rate", 0, 1),
+    claudeAfterFailures: bool(b.claudeAfterFailures, "Claude after failures"),
+    coldStartSeconds: num(b.coldStartSeconds, "cold start seconds", 0, 600),
+    liveTemplates: [...list] as string[],
   };
 }
 

@@ -102,6 +102,11 @@ server.headersTimeout = 15_000;
 const port = Number(env.PORT ?? 8787);
 server.listen(port, () => console.log(`listening on :${port}`));
 
+// The batch dispatcher: once a minute, runs any client whose closing time has passed or whose queue is big enough.
+const BATCH_TICK_MS = 60_000;
+const batchTimer = setInterval(() => { void platform.batch.tick(); }, BATCH_TICK_MS);
+batchTimer.unref();
+
 // Hosts send SIGTERM before replacing the instance: stop taking requests and write pending changes to Postgres.
 let stopping = false;
 async function shutdown(signal: string) {
@@ -110,6 +115,7 @@ async function shutdown(signal: string) {
   console.log(`${signal}: shutting down`);
   const force = setTimeout(() => process.exit(1), 10_000);
   force.unref();
+  clearInterval(batchTimer);
   server.close();
   try { await store?.close(); } catch (err) { console.error("flush on shutdown failed:", err); }
   process.exit(0);

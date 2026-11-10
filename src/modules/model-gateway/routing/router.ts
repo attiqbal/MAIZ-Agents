@@ -110,8 +110,11 @@ export class RoutingGateway implements Completer {
     const { policy } = c;
     const blocked = this.claudeBlocked(c);
     if (policy.primary === "runpod") {
-      const r = await this.tryRunpod(c, !blocked && policy.fallbackToClaude);
+      // A batch waits out cold starts and retries later instead of paying Claude to cover an outage (except on its last try).
+      const hold = c.req.mode === "batch" && !c.req.allowClaudeFallback && !!this.d.runpod && c.s.runpod.enabled;
+      const r = await this.tryRunpod(c, !hold && !blocked && policy.fallbackToClaude);
       if (r) return { result: r, fromRunpod: true };
+      if (hold) throw c.lastError ?? new ProviderError("runpod", "unavailable", `RunPod is not taking work (${c.notes.join(", ") || "unknown"})`);
       if (!policy.fallbackToClaude) throw c.lastError ?? new ProviderError("runpod", "unavailable", "RunPod is not available");
       c.rec.fallback = true;
     } else if (blocked && policy.allowOpenModel && c.s.budgets.whenClaudeCapped === "degrade") {
@@ -223,7 +226,7 @@ export class RoutingGateway implements Completer {
   }
 
   private effectiveRate(c: Call): number {
-    const base = c.policy.reviewRate;
+    const base = c.req.mode === "batch" ? Math.max(c.policy.reviewRate, c.s.batch.qaRateMin) : c.policy.reviewRate;
     const w = this.windows.get(c.policyKey) ?? [];
     if (!c.s.reviewer.adaptive || w.length < MIN_WINDOW_FOR_ADAPTIVE) return base;
     const failRate = w.filter(Boolean).length / w.length;
@@ -277,7 +280,7 @@ export class RoutingGateway implements Completer {
   }
 
   private book(c: Call, extra: { baselineMicro: number; failed?: boolean; budgetRefused?: boolean }): void {
-    this.d.ledger.record({ workspaceId: c.ws, policy: c.policyKey, ...c.rec, ...extra, runpodMicro: c.runpodMicro, claudeMicro: c.claudeMicro, runpodSeconds: c.runpodSeconds });
+    this.d.ledger.record({ workspaceId: c.ws, policy: c.policyKey, batch: c.req.mode === "batch", ...c.rec, ...extra, runpodMicro: c.runpodMicro, claudeMicro: c.claudeMicro, runpodSeconds: c.runpodSeconds });
   }
 
   private cached(c: Call, result: CompletionResult, savedMicro: number): CompletionResult {
