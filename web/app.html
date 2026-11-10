@@ -4,11 +4,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Control center · MAIZ agents</title>
+<meta name="robots" content="noindex">
 <meta name="theme-color" content="#0b0c0e">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@500;600&family=IBM+Plex+Mono:wght@400&family=Inter:wght@300;400;500;600&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@500;600&family=Inter:wght@300;400;500;600&display=swap">
 </head>
 <body>
 <div class="app" id="app">
@@ -30,7 +31,7 @@
   </aside>
   <div class="scrim" id="scrim"></div>
 
-  <div class="main">
+  <div class="main" role="main" id="main">
     <div class="topbar">
       <button class="menu-btn" id="menu-btn" aria-label="Open menu"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
       <form class="ask" id="ask"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4-4"/></svg><input id="ask-in" placeholder="Ask your team anything…" aria-label="Ask your team"><span class="kbd hide-sm">/</span></form>

@@ -174,7 +174,7 @@ function drawBars(): void {
   const colors = ["#305fbd", "#625fff", "#ff7dda"];
   const x0 = 44, w = 646, top = 16, bottom = 150, max = 300, slot = w / days.length, bw = 44;
   const y = (v: number) => bottom - ((bottom - top) * v) / max;
-  let s = `<g font-family="IBM Plex Mono, monospace" font-size="11" fill="#abaebb">`;
+  let s = `<g font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" fill="#abaebb">`;
   for (const v of [0, 150, 300]) s += `<line x1="${x0}" x2="690" y1="${y(v)}" y2="${y(v)}" stroke="#151e32" ${v === 300 ? 'stroke-dasharray="4 4"' : ""}/><text x="38" y="${y(v) + 4}" text-anchor="end">${v}</text>`;
   data.forEach((row, i) => {
     let acc = 0; const cx = x0 + slot * i + (slot - bw) / 2;

@@ -20,12 +20,17 @@ export function initNav(): void {
   const toggle = document.querySelector<HTMLButtonElement>(".nav-toggle");
   const menu = document.getElementById("mobile-menu");
   if (toggle && menu) {
-    toggle.addEventListener("click", () => {
-      const open = menu.hasAttribute("hidden");
+    const setOpen = (open: boolean) => {
       menu.toggleAttribute("hidden", !open);
       toggle.setAttribute("aria-expanded", String(open));
+      toggle.setAttribute("aria-label", open ? "Close menu" : "Menu");
+    };
+    toggle.addEventListener("click", () => setOpen(menu.hasAttribute("hidden")));
+    menu.querySelectorAll("a").forEach((a) => a.addEventListener("click", () => setOpen(false)));
+    // Escape closes the menu and returns focus to the button (WCAG 2.1.2, ECC accessibility skill).
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape" && !menu.hasAttribute("hidden")) { setOpen(false); toggle.focus(); }
     });
-    menu.querySelectorAll("a").forEach((a) => a.addEventListener("click", () => menu.setAttribute("hidden", "")));
   }
 }
 

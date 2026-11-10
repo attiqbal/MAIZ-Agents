@@ -39,7 +39,8 @@ $("email-go").addEventListener("click", async () => {
   const v = $<HTMLInputElement>("email").value.trim();
   const ok = /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v);
   $("email-err").toggleAttribute("hidden", ok);
-  if (!ok) return;
+  $("email").setAttribute("aria-invalid", String(!ok));
+  if (!ok) { $("email").focus(); return; }
   profile.email = v; save();
   const r = await api<{ dev?: boolean }>("/signin/start", { body: { email: v } });
   if (r.status === 429) { $("email-sent").textContent = "Too many emails for this address. Please try again in an hour."; $("email-sent").removeAttribute("hidden"); return; }
@@ -72,7 +73,8 @@ $("size").addEventListener("click", (e) => {
 $("biz-go").addEventListener("click", () => {
   const biz = $<HTMLInputElement>("biz").value.trim();
   $("biz-err").toggleAttribute("hidden", !!biz);
-  if (!biz) return;
+  $("biz").setAttribute("aria-invalid", String(!biz));
+  if (!biz) { $("biz").focus(); return; }
   profile.biz = biz;
   profile.site = $<HTMLInputElement>("site").value.trim();
   profile.sells = $<HTMLInputElement>("sells").value.trim();
