@@ -1,4 +1,5 @@
 import { newId } from "../../core/ids.js";
+import type { Sink } from "../../core/persistence.js";
 import type { EventBus } from "../../core/events.js";
 import type { AuditLog } from "../audit/index.js";
 import type { IdentityService } from "../identity/index.js";
@@ -69,6 +70,15 @@ interface OrgState {
   steps: Map<string, SetupStep[]>;
 }
 
+/** What is stored for each organisation. Step definitions are rebuilt from code, not stored. */
+export interface AdminOrgRecord {
+  org: Organisation;
+  ownerUserId: string;
+  contact: ContactChannel;
+  state: SetupState;
+  runs: SetupRun[];
+}
+
 export class SetupError extends Error {}
 
 export interface AdminManagerOptions {
@@ -80,6 +90,28 @@ export interface AdminManagerOptions {
 export class AdminManager {
   private orgs = new Map<string, OrgState>();
   private inbox: AdminMessage[] = [];
+  private sink?: Sink;
+
+  useSink(sink: Sink): void {
+    this.sink = sink;
+  }
+
+  /** Put back an organisation read from storage. A setup that was running when the server stopped needs a person to look at it. */
+  restoreOrg(r: AdminOrgRecord): void {
+    const s: OrgState = { org: r.org, ownerUserId: r.ownerUserId, contact: r.contact, state: r.state === "setting_up" ? "needs_attention" : r.state, runs: r.runs, steps: new Map() };
+    // Undo only needs what each step returned (kept in the run), so steps are rebuilt from code.
+    for (const run of r.runs) s.steps.set(run.id, this.buildSteps(s, formFor(r.org.blueprint.employees), {}));
+    this.orgs.set(r.org.workspaceId, s);
+  }
+
+  restoreMessage(m: AdminMessage): void {
+    this.inbox.push(m);
+  }
+
+  private save(workspaceId: string): void {
+    const s = this.orgs.get(workspaceId);
+    if (s) this.sink?.adminOrg(workspaceId, { org: s.org, ownerUserId: s.ownerUserId, contact: s.contact, state: s.state, runs: s.runs });
+  }
   private runner: StepRunner;
   private formUrl: string;
   private now: () => Date;
@@ -105,6 +137,7 @@ export class AdminManager {
     if (this.orgs.has(org.workspaceId)) throw new SetupError("already welcomed");
     const contact = org.blueprint.contact;
     this.orgs.set(org.workspaceId, { org, ownerUserId, contact, state: "awaiting_form", runs: [], steps: new Map() });
+    this.save(org.workspaceId);
     const { businessName, employees, trialDays, privacy, plan } = org.blueprint;
     const out = [await this.deliver(org.workspaceId, "welcome", welcomeText(businessName, employees, trialDays))];
     out.push(await this.deliver(org.workspaceId, "form", formInviteText(employees, drivePlan(privacy, plan).kind), this.formUrl));
@@ -135,6 +168,7 @@ export class AdminManager {
       if (!(await this.sendChat(workspaceId, m.pendingOn, s.ownerUserId, m))) break;
       m.delivered.push(m.pendingOn);
       delete m.pendingOn;
+      this.sink?.adminMessage(m);
       sent++;
     }
     return sent;
@@ -152,11 +186,13 @@ export class AdminManager {
     this.audit.record({ workspaceId, actor: `user:${userId}`, action: "setup.form_submitted", data: { fields: Object.keys(v.clean) } });
 
     s.state = "setting_up";
+    this.save(workspaceId);
     await this.deliver(workspaceId, "progress", "Thanks, got your answers. Setting up your team now.");
     const steps = this.buildSteps(s, fields, v.clean);
     const run = await this.runner.run(userId, workspaceId, steps);
     s.runs.push(run);
     s.steps.set(run.id, steps);
+    this.save(workspaceId);
 
     if (run.status === "completed") {
       s.state = "ready";
@@ -175,6 +211,7 @@ export class AdminManager {
       );
       await this.bus.publish({ type: "setup.failed", workspaceId, payload: { runId: run.id, status: run.status }, at: this.now() });
     }
+    this.save(workspaceId);
     return run;
   }
 
@@ -186,6 +223,7 @@ export class AdminManager {
     if (!run || s.state !== "ready") throw new SetupError("nothing to roll back");
     await this.runner.rollback(userId, run, s.steps.get(run.id) ?? [], "owner_request");
     s.state = run.status === "rolled_back" ? "awaiting_form" : "needs_attention";
+    this.save(workspaceId);
     await this.deliver(
       workspaceId,
       "rolled_back",
@@ -308,6 +346,7 @@ export class AdminManager {
       if (!behind && (await this.sendChat(workspaceId, s.contact, s.ownerUserId, msg))) msg.delivered.push(s.contact);
       else msg.pendingOn = s.contact;
     }
+    this.sink?.adminMessage(msg);
     return msg;
   }
 

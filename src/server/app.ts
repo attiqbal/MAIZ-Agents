@@ -1,10 +1,29 @@
-import { createHash, createHmac, timingSafeEqual } from "node:crypto";
+import { createHash, createHmac, randomBytes, timingSafeEqual } from "node:crypto";
+import { SetupError } from "../modules/admin-manager/index.js";
 import { ChannelError, parseSlackEvent } from "../modules/channels/index.js";
 import { PermissionError } from "../modules/identity/index.js";
 import { LedgerError } from "../modules/ledger/index.js";
+import { IntegrationError } from "../modules/integrations/index.js";
 import { SignupError, type SignupChoices, type TeamSize } from "../modules/onboarding/index.js";
-import { getTemplate } from "../modules/workforce/templates.js";
+import { getTemplate, TEMPLATES } from "../modules/workforce/templates.js";
+import { getJobDescription } from "../modules/workforce/job-descriptions.js";
+import { CUSTOM_SPECIALIST, DEPARTMENTS } from "../modules/workforce/blueprints.js";
+import { OVERAGE_RULE } from "../modules/workforce/task-roles.js";
+import { CONSULTANTS, HOW_A_PASS_WORKS, menuOf } from "../modules/workforce/consultants.js";
+import { CATALOGUE, quote } from "../modules/store/cart.js";
 import type { Platform } from "./platform.js";
+
+const OAUTH_STATE_SECONDS = 600;
+const OAUTH_COOKIE = "maiz_oauth";
+const oauthCookie = (nonce: string, maxAge: number, appUrl?: string): string =>
+  `${OAUTH_COOKIE}=${nonce}; Path=/api/integrations; HttpOnly; SameSite=Lax; Max-Age=${maxAge}${appUrl?.startsWith("https://") ? "; Secure" : ""}`;
+function readCookie(header: string | undefined, name: string): string | undefined {
+  for (const part of (header ?? "").split(";")) {
+    const [k, ...v] = part.trim().split("=");
+    if (k === name) return v.join("=");
+  }
+  return undefined;
+}
 
 export interface Req {
   method: string;
@@ -53,11 +72,15 @@ const SIZES: Record<string, TeamSize> = { "just me": "solo", solo: "solo", "2–
 
 export function createApp(p: Platform) {
   const secret = p.cfg.sessionSecret;
-  const session = (req: Req): string | undefined => {
+  /** Only tokens issued as sessions count. Other signed tokens (sign-in links, Slack install state) never do. */
+  const sessionClaims = (req: Req) => {
     const h = req.headers["authorization"];
     const t = h?.startsWith("Bearer ") ? h.slice(7) : undefined;
-    return readToken(secret, t, p.now().getTime())?.u;
+    const c = readToken(secret, t, p.now().getTime());
+    return c?.k === "session" ? c : undefined;
   };
+  const session = (req: Req): string | undefined => sessionClaims(req)?.u;
+  const issueSession = (email: string) => makeToken(secret, { k: "session", u: userIdFor(email), e: email }, 7 * 86400, p.now().getTime());
   const orgOf = (userId: string) => p.identity.workspacesFor(userId)[0];
 
   async function route(req: Req): Promise<Res> {
@@ -66,13 +89,64 @@ export function createApp(p: Platform) {
       try { return req.rawBody ? JSON.parse(req.rawBody) : {}; } catch { throw new BadRequest("invalid JSON"); }
     };
 
-    if (method === "GET" && path === "/api/health") return json(200, { ok: true });
+    if (method === "GET" && path === "/api/health") return p.healthy() ? json(200, { ok: true }) : json(503, { ok: false, error: "storage is failing" });
+    // Agent store: every employee with its full job description. Public, no sign-in needed.
+    if (method === "GET" && path === "/api/store") {
+      return json(200, {
+        employees: TEMPLATES.map((t) => ({ key: t.key, title: t.title, summary: t.summary, kind: t.kind, tier: t.tier, firstJob: t.firstJob, jobDescription: getJobDescription(t.key) })),
+        // Every department and role of a typical business; roles without a ready-made employee are custom specialists.
+        departments: DEPARTMENTS.map((d) => ({ key: d.key, name: d.name, mission: d.mission, roles: d.roles.map((r) => ({ key: r.key, title: r.title, purpose: r.purpose, readyMade: Boolean(r.jd) })) })),
+        customSpecialist: CUSTOM_SPECIALIST,
+        // Consultants: one-off passes with an energy pool, and the task menu each can do.
+        consultants: CONSULTANTS.map((c) => ({ key: c.key, title: c.title, purpose: c.purpose, passes: c.passes, menu: menuOf(c.key).map((t) => ({ key: t.key, title: t.title, energy: t.includedEnergy })) })),
+        howAPassWorks: HOW_A_PASS_WORKS,
+        overageRule: OVERAGE_RULE,
+        // What can be added to a cart, and whether it is billed monthly or once.
+        catalogue: CATALOGUE,
+      });
+    }
+    // Prices a cart. Public and pure: nothing is charged or stored (payments are not connected yet).
+    if (method === "POST" && path === "/api/cart/quote") {
+      const lines = body().lines;
+      if (!Array.isArray(lines) || lines.length > 100) throw new BadRequest("lines must be a list of up to 100 items");
+      return json(200, quote(lines));
+    }
 
-    // ---- sign up (dev sign-in: no email verification yet) ----
+    // ---- sign in by email link ----
+    if (method === "POST" && path === "/api/signin/start") {
+      const email = String(body().email ?? "").trim().toLowerCase();
+      if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email) || email.length > 200) throw new BadRequest("a valid email is required");
+      const nowMs = p.now().getTime();
+      const recent = (p.sends.get(email) ?? []).filter((t) => nowMs - t < 3_600_000);
+      if (recent.length >= 5) return json(429, { error: "too many sign-in emails, try again later" });
+      p.sends.set(email, [...recent, nowMs]);
+      const link = makeToken(secret, { k: "magic", e: email, n: randomBytes(12).toString("hex") }, 900, nowMs);
+      const base = (p.cfg.appUrl ?? "").replace(/\/$/, "");
+      // The link opens a page that posts the token back, so mail scanners that pre-open links cannot use it up.
+      await p.email.send({
+        to: email,
+        subject: "Your MAIZ agents sign-in link",
+        text: `Click to sign in. The link works once and expires in 15 minutes.\n\n${base}/signin.html#token=${link}\n\nIf you didn't ask for this, ignore this email.`,
+      }).catch(() => undefined);
+      // Same answer whether or not the address has an account. In development the website skips the email step.
+      return json(200, p.cfg.allowDevAuth ? { ok: true, dev: true } : { ok: true });
+    }
+    if (method === "POST" && path === "/api/signin/verify") {
+      const c = readToken(secret, String(body().token ?? ""), p.now().getTime());
+      if (!c || c.k !== "magic" || typeof c.e !== "string" || typeof c.n !== "string") return json(400, { error: "this sign-in link is invalid or has expired" });
+      if (p.usedLinks.has(c.n)) return json(400, { error: "this sign-in link was already used" });
+      p.usedLinks.add(c.n);
+      return json(200, { token: issueSession(c.e), email: c.e, hasOrganisation: !!orgOf(userIdFor(c.e)) });
+    }
+
+    // ---- sign up: needs a verified email (or the development shortcut) ----
     if (method === "POST" && path === "/api/signup") {
-      if (!p.cfg.allowDevAuth) return json(503, { error: "sign-in is not configured" });
       const b = body();
-      const email = String(b.email ?? "").trim().toLowerCase();
+      const claims = sessionClaims(req);
+      let email: string;
+      if (claims && typeof claims.e === "string") email = claims.e; // verified by a sign-in link
+      else if (p.cfg.allowDevAuth) email = String(b.email ?? "").trim().toLowerCase(); // development only: no check
+      else return json(401, { error: "verify your email first" });
       if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) throw new BadRequest("a valid email is required");
       const userId = userIdFor(email);
       if (orgOf(userId)) return json(409, { error: "this email already has an organisation" });
@@ -85,9 +159,11 @@ export function createApp(p: Platform) {
         monthlyVolume: typeof b.monthlyVolume === "number" ? b.monthlyVolume : undefined,
         addOns: Array.isArray(b.addOns) ? b.addOns.map(String) : [],
         prepaidMonths: typeof b.prepaidMonths === "number" ? b.prepaidMonths : undefined,
+        contact: b.contact === "slack" ? "slack" : "dashboard",
       };
       const org = await p.onboarding.signUp(userId, choices);
-      const token = makeToken(secret, { u: userId }, 7 * 86400, p.now().getTime());
+      await p.admin.welcome(userId, org);
+      const token = issueSession(email);
       return json(201, { token, workspaceId: org.workspaceId, blueprint: org.blueprint, trialEndsAt: org.trialEndsAt });
     }
 
@@ -109,7 +185,10 @@ export function createApp(p: Platform) {
       if (!cfg) return json(503, { error: "slack is not configured" });
       const state = readToken(secret, req.query.get("state") ?? undefined, p.now().getTime());
       const code = req.query.get("code");
-      if (!state?.u || state.k !== "slack-install" || !code) return json(400, { error: "invalid or expired install link" });
+      if (!state?.u || state.k !== "slack-install" || typeof state.n !== "string" || !code) return json(400, { error: "invalid or expired install link" });
+      // Usable once. The QR flow finishes on a phone, so this link cannot be tied to the browser that started it.
+      if (p.usedLinks.has(state.n)) return json(400, { error: "invalid or expired install link" });
+      p.usedLinks.add(state.n);
       const res = await (p.cfg.http ?? fetch)("https://slack.com/api/oauth.v2.access", {
         method: "POST",
         headers: { "content-type": "application/x-www-form-urlencoded" },
@@ -122,9 +201,37 @@ export function createApp(p: Platform) {
       const team = p.workforce.team(state.u, org.id);
       const lead = team.find((e) => e.templateKey === "business-consultant") ?? team[0]!;
       p.router.connect(state.u, { workspaceId: org.id, channel: "slack", externalWorkspace: o.team.id, defaultEmployeeId: lead.id }, []);
-      p.slackTokens.set(o.team.id, o.access_token);
+      p.saveSlackToken(org.id, o.team.id, o.access_token);
       if (o.authed_user?.id) p.router.linkUser(state.u, org.id, "slack", o.team.id, o.authed_user.id);
+      // Anything the Admin manager was holding for Slack goes out now.
+      await p.admin.deliverPending(state.u, org.id).catch(() => 0);
       return { status: 302, headers: { location: "/app.html#team" } };
+    }
+
+    // ---- business apps: OAuth return and webhooks are public; state or the secret link proves who they are for ----
+    if (method === "GET" && path === "/api/integrations/callback") {
+      const state = readToken(secret, req.query.get("state") ?? undefined, p.now().getTime());
+      const code = req.query.get("code");
+      if (!state?.u || state.k !== "int-oauth" || typeof state.a !== "string" || typeof state.n !== "string") return json(400, { error: "invalid or expired connect link" });
+      // Bound to the browser that started it (cookie) and usable once, so a link sent to someone else cannot attach their account.
+      if (readCookie(req.headers["cookie"], OAUTH_COOKIE) !== state.n || p.usedLinks.has(state.n)) return json(400, { error: "invalid or expired connect link" });
+      p.usedLinks.add(state.n);
+      const org = orgOf(state.u);
+      if (!code || !org) return { status: 302, headers: { location: "/app.html#apps" } }; // owner pressed Cancel in the app
+      try {
+        await p.integrations.completeOAuth(state.u, org.id, state.a, code);
+      } catch (e) {
+        if (!(e instanceof IntegrationError)) throw e;
+        return { status: 302, headers: { location: "/app.html?connect=failed#apps" } };
+      }
+      return { status: 302, headers: { location: "/app.html#apps" } };
+    }
+    const hook = /^\/api\/integrations\/hooks\/([\w-]{1,64})\/([\w-]{16,128})$/.exec(path);
+    if (method === "POST" && hook) {
+      let payload: unknown;
+      try { payload = JSON.parse(req.rawBody || "{}"); } catch { return json(400, { error: "invalid JSON" }); }
+      const result = p.integrations.receiveWebhook(hook[1]!, hook[2]!, payload);
+      return result ? json(200, { ok: true, added: result.added, updated: result.updated, warnings: result.warnings }) : json(404, { error: "not found" });
     }
 
     // ---- everything below needs a signed-in user ----
@@ -148,6 +255,21 @@ export function createApp(p: Platform) {
           energyLeft: p.energy.remainingToday(userId, org.id, e.id),
         })),
       });
+    }
+
+    // ---- Admin manager: messages, setup form, setup run ----
+    if (method === "GET" && path === "/api/setup") {
+      return json(200, { ...p.admin.status(userId, org.id), messages: p.admin.messages(userId, org.id) });
+    }
+    if (method === "POST" && path === "/api/setup") {
+      const b = body();
+      if (!b.answers || typeof b.answers !== "object" || Array.isArray(b.answers)) throw new BadRequest("answers are required");
+      const run = await p.admin.submitForm(userId, org.id, b.answers);
+      return json(200, { run, ...p.admin.status(userId, org.id), messages: p.admin.messages(userId, org.id) });
+    }
+    if (method === "POST" && path === "/api/setup/rollback") {
+      const run = await p.admin.rollback(userId, org.id);
+      return json(200, { run, ...p.admin.status(userId, org.id), messages: p.admin.messages(userId, org.id) });
     }
 
     if (method === "POST" && path === "/api/ask") {
@@ -178,11 +300,17 @@ export function createApp(p: Platform) {
       return json(201, { id: entry.id });
     }
 
+    // ---- business apps ----
+    if (path.startsWith("/api/integrations")) {
+      const r = await integrationRoutes(req, userId, org.id, body);
+      if (r) return r;
+    }
+
     // ---- start the Slack install; the QR code on the website encodes this URL ----
     if (method === "GET" && path === "/api/slack/install") {
       const cfg = p.cfg.slack;
       if (!cfg) return json(503, { error: "slack is not configured" });
-      const state = makeToken(secret, { u: userId, k: "slack-install" }, 600, p.now().getTime());
+      const state = makeToken(secret, { u: userId, k: "slack-install", n: randomBytes(16).toString("hex") }, OAUTH_STATE_SECONDS, p.now().getTime());
       const url = new URL("https://slack.com/oauth/v2/authorize");
       url.searchParams.set("client_id", cfg.clientId);
       url.searchParams.set("scope", "app_mentions:read,chat:write,im:history,im:read,im:write");
@@ -194,12 +322,58 @@ export function createApp(p: Platform) {
     return json(404, { error: "not found" });
   }
 
+  async function integrationRoutes(req: Req, userId: string, orgId: string, body: () => any): Promise<Res | undefined> {
+    const { method, path } = req;
+    const ig = p.integrations;
+    if (method === "GET" && path === "/api/integrations") {
+      return json(200, { catalogue: ig.catalogue(), connections: ig.list(userId, orgId), pending: ig.pending(userId, orgId) });
+    }
+    if (method === "POST" && path === "/api/integrations/post") return json(200, ig.post(userId, orgId));
+    const app = /^\/api\/integrations\/apps\/([a-z0-9-]{2,40})\/(connect|import)$/.exec(path);
+    if (method === "POST" && app) {
+      const [, key, action] = app as unknown as [string, string, string];
+      const c = ig.registry.require(key);
+      if (action === "import") {
+        const b = body();
+        if (typeof b.csv !== "string") throw new BadRequest("attach the exported file");
+        return json(200, ig.importFile(userId, orgId, key, b.csv, { date: typeof b.date === "string" ? b.date : undefined }));
+      }
+      if (c.auth.kind === "oauth2") {
+        // The nonce is also set as a cookie, so only the browser that started the connection can finish it.
+        const nonce = randomBytes(16).toString("hex");
+        const state = makeToken(secret, { k: "int-oauth", u: userId, a: key, n: nonce }, OAUTH_STATE_SECONDS, p.now().getTime());
+        return { status: 200, body: { url: ig.authorizeUrl(userId, orgId, key, state) }, headers: { "set-cookie": oauthCookie(nonce, OAUTH_STATE_SECONDS, p.cfg.appUrl) } };
+      }
+      if (c.auth.kind === "api_key") return json(201, { connection: ig.connectWithKey(userId, orgId, key, body().values ?? {}) });
+      if (c.auth.kind === "webhook") {
+        const { connection, secret: hookSecret } = ig.createWebhook(userId, orgId);
+        const base = (p.cfg.appUrl ?? "").replace(/\/$/, "");
+        // Shown once. Only a hash is stored, so a lost link is replaced, not recovered.
+        return json(201, { connection, url: `${base}/api/integrations/hooks/${connection.id}/${hookSecret}` });
+      }
+      throw new BadRequest(`${c.name} works by file upload`);
+    }
+    const conn = /^\/api\/integrations\/connections\/([\w-]{1,64})(?:\/(sync|access))?$/.exec(path);
+    if (conn) {
+      const [, id, action] = conn as unknown as [string, string, string | undefined];
+      if (method === "DELETE" && !action) { ig.disconnect(userId, orgId, id); return json(200, { ok: true }); }
+      if (method === "POST" && action === "sync") return json(200, await ig.sync(userId, orgId, id));
+      if (method === "POST" && action === "access") {
+        const b = body();
+        if (!Array.isArray(b.employees)) throw new BadRequest("employees must be a list");
+        return json(200, { connection: ig.setAccess(userId, orgId, id, b.employees) });
+      }
+    }
+    return undefined;
+  }
+
   return async function handle(req: Req): Promise<Res> {
     try {
       return await route(req);
     } catch (err) {
-      if (err instanceof BadRequest || err instanceof SignupError || err instanceof LedgerError || err instanceof ChannelError) return json(400, { error: err.message });
+      if (err instanceof BadRequest || err instanceof SetupError || err instanceof SignupError || err instanceof LedgerError || err instanceof ChannelError || err instanceof IntegrationError) return json(400, { error: err.message });
       if (err instanceof PermissionError) return json(403, { error: "you don't have permission to do that" });
+      console.error(`${req.method} ${req.path} failed:`, err);
       return json(500, { error: "something went wrong" });
     }
   };

@@ -33,8 +33,8 @@ class Recorder implements ModelAdapter {
 }
 
 describe("templates", () => {
-  it("has the four basic-package employees plus the free Admin manager", () => {
-    expect(EMPLOYEE_TEMPLATES.map((t) => t.key).sort()).toEqual(["business-consultant", "finance-manager", "hr-manager", "marketing-manager"]);
+  it("has the basic-package employees, store add-ons and the free Admin manager", () => {
+    expect(EMPLOYEE_TEMPLATES.map((t) => t.key).sort()).toEqual(["business-consultant", "compliance-manager", "finance-manager", "hr-manager", "marketing-manager", "supply-chain-manager"]);
     expect(TEMPLATES.filter((t) => t.kind === "manager").map((t) => t.key)).toEqual(["admin-manager"]);
   });
   it("every template lists plain-language capabilities and a first job", () => {

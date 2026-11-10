@@ -35,6 +35,12 @@ export const SETUP_FORM: readonly FormField[] = [
   { key: "staffCount", label: "How many people work for you, not counting you?", type: "number", for: "hr-manager" },
   { key: "hiringSoon", label: "Are you planning to hire in the next 3 months?", type: "yesno", for: "hr-manager" },
   { key: "peopleHelp", label: "What would help most with your people?", type: "multi", options: ["Hiring", "Onboarding new staff", "Staff handbook and policies", "Holiday and leave", "Performance reviews"], for: "hr-manager" },
+  { key: "industry", label: "Which industry are you in, and do you sell anything regulated?", type: "text", for: "compliance-manager", help: "For example: food, alcohol, health, finance, childcare, construction. \"Nothing regulated\" is fine." },
+  { key: "regions", label: "Where do you sell or have customers?", type: "multi", options: ["Only my country", "European Union", "United Kingdom", "United States", "Middle East", "Asia", "Worldwide online"], for: "compliance-manager" },
+  { key: "personalData", label: "What personal data do you keep?", type: "multi", options: ["Customer contact details", "Payment details", "Staff records", "Health or other sensitive data", "None"], for: "compliance-manager" },
+  { key: "stockItems", label: "Roughly how many products or stock items do you keep?", type: "number", for: "supply-chain-manager" },
+  { key: "tradeCountries", label: "Which countries do you buy from or ship to?", type: "text", for: "supply-chain-manager", help: "So your team knows which customs and product rules apply." },
+  { key: "licences", label: "Which licences, registrations or certificates do you hold?", type: "longtext", for: "compliance-manager", help: "With renewal dates if you know them." },
 ];
 
 export type Answers = Record<string, string | number | boolean | string[]>;

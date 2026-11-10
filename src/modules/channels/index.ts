@@ -1,4 +1,5 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
+import type { Sink } from "../../core/persistence.js";
 import type { AuditLog } from "../audit/index.js";
 import type { IdentityService } from "../identity/index.js";
 import type { WorkforceService, TaskResult } from "../workforce/index.js";
@@ -48,6 +49,19 @@ export class ChannelRouter {
   private links = new Map<string, string>(); // `${channel}:${externalWorkspace}:${externalUser}` -> platform user id
   private seen = new Set<string>();
   private channels = new Map<ChannelKind, ChatChannel>();
+  private sink?: Sink;
+
+  useSink(sink: Sink): void {
+    this.sink = sink;
+  }
+
+  restoreConnection(c: Connection): void {
+    this.connections.set(`${c.channel}:${c.externalWorkspace}`, c);
+  }
+
+  restoreLink(key: string, userId: string): void {
+    this.links.set(key, userId);
+  }
 
   constructor(
     private identity: IdentityService,
@@ -67,6 +81,7 @@ export class ChannelRouter {
     const existing = this.connections.get(key);
     if (existing && existing.workspaceId !== conn.workspaceId) throw new ChannelError("already connected to another organisation");
     this.connections.set(key, { ...conn });
+    this.sink?.connection({ ...conn });
     this.audit.record({ workspaceId: conn.workspaceId, actor: `user:${userId}`, action: "channel.connected", data: { channel: conn.channel } });
   }
 
@@ -76,6 +91,7 @@ export class ChannelRouter {
     const conn = this.connections.get(`${channel}:${externalWorkspace}`);
     if (!conn || conn.workspaceId !== workspaceId) throw new ChannelError("not connected");
     this.links.set(`${channel}:${externalWorkspace}:${externalUser}`, userId);
+    this.sink?.link(workspaceId, `${channel}:${externalWorkspace}:${externalUser}`, userId);
   }
 
   /** Handle one inbound message: find the organisation, the person, the employee, do the work, reply. */
@@ -90,7 +106,7 @@ export class ChannelRouter {
     const userId = this.links.get(`${msg.channel}:${msg.externalWorkspace}:${msg.externalUser}`);
     if (!userId) {
       // An unknown person gets no work done and sees nothing of the organisation.
-      await chat.send(msg.externalWorkspace, msg.conversation, "Please link your Virtual Nafree account first so I know who you are.");
+      await chat.send(msg.externalWorkspace, msg.conversation, "Please link your MAIZ agents account first so I know who you are.");
       return "unlinked";
     }
     const { employeeId, brief } = this.pickEmployee(userId, conn, msg.text);
@@ -131,9 +147,9 @@ export class ChannelRouter {
 
   /** "finance: how much runway do we have?" goes to the Finance manager; otherwise the default employee. */
   private pickEmployee(userId: string, conn: Connection, text: string) {
-    const m = /^\s*(finance|marketing|consultant|hr|admin)\s*[:,-]\s*(.+)$/is.exec(text);
+    const m = /^\s*(finance|marketing|consultant|hr|compliance|supply|admin)\s*[:,-]\s*(.+)$/is.exec(text);
     if (m) {
-      const key = { finance: "finance-manager", marketing: "marketing-manager", consultant: "business-consultant", hr: "hr-manager", admin: "admin-manager" }[m[1]!.toLowerCase() as "finance"];
+      const key = { finance: "finance-manager", marketing: "marketing-manager", consultant: "business-consultant", hr: "hr-manager", compliance: "compliance-manager", supply: "supply-chain-manager", admin: "admin-manager" }[m[1]!.toLowerCase() as "finance"];
       const emp = this.workforce.team(userId, conn.workspaceId).find((e) => e.templateKey === key);
       if (emp) return { employeeId: emp.id as string, brief: m[2]!.trim() };
     }

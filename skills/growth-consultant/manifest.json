@@ -1,0 +1,103 @@
+{
+  "name": "growth-consultant",
+  "title": "Growth marketing consultant",
+  "department": "Consultant · one-off pass",
+  "lane": "standard",
+  "tools": [
+    {
+      "name": "Business profile and setup answers",
+      "status": "available"
+    }
+  ],
+  "authority": {
+    "autonomous": [
+      "Work through the agreed plan as drafts",
+      "Keep the records for each task"
+    ],
+    "needsApproval": [
+      "Final report",
+      "Plan and budget",
+      "Ads before launch",
+      "Themes",
+      "Posts",
+      "Research questions",
+      "Any work outside the menu or the agreed plan",
+      "Using energy beyond the pass"
+    ],
+    "never": [
+      "Go beyond the pass's energy without the owner's approval",
+      "Publish, submit, send or pay for anything",
+      "Give legal, tax or financial advice",
+      "Invent facts, figures or rules"
+    ]
+  },
+  "deliverables": [
+    {
+      "name": "SEO auditor: Audit report, Fix plan",
+      "cadence": "2 to 4 working days",
+      "energy": [
+        1000,
+        2000
+      ]
+    },
+    {
+      "name": "Ad campaign builder: Campaign plan, Ad copy set, Launch checklist",
+      "cadence": "2 to 4 working days",
+      "energy": [
+        900,
+        1800
+      ]
+    },
+    {
+      "name": "Social media launch planner: Calendar, 30 drafted posts",
+      "cadence": "3 to 5 working days",
+      "energy": [
+        1000,
+        2000
+      ]
+    },
+    {
+      "name": "Market research analyst: Research report with sources, One-page summary",
+      "cadence": "4 to 6 working days",
+      "energy": [
+        2000,
+        4000
+      ]
+    }
+  ],
+  "engagement": {
+    "type": "consultant-pass",
+    "passes": [
+      {
+        "label": "7-day sprint",
+        "days": 7,
+        "gbp": 89,
+        "energy": 2500
+      },
+      {
+        "label": "30-day pass",
+        "days": 30,
+        "gbp": 279,
+        "energy": 9000
+      }
+    ],
+    "menu": [
+      {
+        "task": "SEO auditor",
+        "energy": 2000
+      },
+      {
+        "task": "Ad campaign builder",
+        "energy": 1800
+      },
+      {
+        "task": "Social media launch planner",
+        "energy": 2000
+      },
+      {
+        "task": "Market research analyst",
+        "energy": 4000
+      }
+    ]
+  }
+}

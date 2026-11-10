@@ -67,7 +67,7 @@ async function setup(choices: Partial<SignupChoices> = {}, models = new InMemory
   const storage = new InMemoryStorageProvisioner();
   const events: string[] = [];
   bus.on("*", (e) => void events.push(e.type));
-  const admin = new AdminManager(identity, wf, audit, bus, storage, models, router, { formUrl: "https://app.virtualnafree.com/app.html#setup" });
+  const admin = new AdminManager(identity, wf, audit, bus, storage, models, router, { formUrl: "https://app.example.com/app.html#setup" });
   const org = await onboarding.signUp("owner", { ...base, ...choices });
   return { audit, identity, wf, router, slack, storage, models, admin, org, events, ws: org.workspaceId };
 }
@@ -96,7 +96,7 @@ describe("welcome", () => {
     router.linkUser("owner", ws, "slack", "T1", "U_OWNER");
     expect(await admin.deliverPending("owner", ws)).toBe(2);
     expect(slack.sent.map((s) => s.conv)).toEqual(["U_OWNER", "U_OWNER"]);
-    expect(slack.sent[1]!.text).toContain("https://app.virtualnafree.com/app.html#setup");
+    expect(slack.sent[1]!.text).toContain("https://app.example.com/app.html#setup");
     msgs = admin.messages("owner", ws);
     expect(msgs.every((m) => m.delivered.includes("slack") && !m.pendingOn)).toBe(true);
 

@@ -1,0 +1,118 @@
+{
+  "name": "people-ops-consultant",
+  "title": "People, policy and operations consultant",
+  "department": "Consultant · one-off pass",
+  "lane": "standard",
+  "tools": [
+    {
+      "name": "Business profile and setup answers",
+      "status": "available"
+    }
+  ],
+  "authority": {
+    "autonomous": [
+      "Work through the agreed plan as drafts",
+      "Keep the records for each task"
+    ],
+    "needsApproval": [
+      "Facts about your business",
+      "Drafts",
+      "Job ad",
+      "Shortlist",
+      "Policy list",
+      "Draft handbook",
+      "List of processes",
+      "Plan and budget",
+      "Invitations",
+      "Any work outside the menu or the agreed plan",
+      "Using energy beyond the pass"
+    ],
+    "never": [
+      "Go beyond the pass's energy without the owner's approval",
+      "Publish, submit, send or pay for anything",
+      "Give legal, tax or financial advice",
+      "Invent facts, figures or rules"
+    ]
+  },
+  "deliverables": [
+    {
+      "name": "Website legal pack writer: Draft legal pages, Notes on what a lawyer should check",
+      "cadence": "2 to 4 working days",
+      "energy": [
+        1250,
+        2500
+      ]
+    },
+    {
+      "name": "Recruitment campaign runner: Job ad, Scorecard, Shortlist with reasons",
+      "cadence": "5 to 10 working days",
+      "energy": [
+        1500,
+        3000
+      ]
+    },
+    {
+      "name": "Staff handbook writer: Draft handbook, Notes on what a professional should check",
+      "cadence": "4 to 6 working days",
+      "energy": [
+        1750,
+        3500
+      ]
+    },
+    {
+      "name": "Process (SOP) writer: SOP documents, Checklists",
+      "cadence": "2 to 4 working days",
+      "energy": [
+        750,
+        1500
+      ]
+    },
+    {
+      "name": "Event planner: Event plan, Budget, Run sheet",
+      "cadence": "3 to 5 working days",
+      "energy": [
+        900,
+        1800
+      ]
+    }
+  ],
+  "engagement": {
+    "type": "consultant-pass",
+    "passes": [
+      {
+        "label": "7-day sprint",
+        "days": 7,
+        "gbp": 79,
+        "energy": 2500
+      },
+      {
+        "label": "30-day pass",
+        "days": 30,
+        "gbp": 249,
+        "energy": 8000
+      }
+    ],
+    "menu": [
+      {
+        "task": "Website legal pack writer",
+        "energy": 2500
+      },
+      {
+        "task": "Recruitment campaign runner",
+        "energy": 3000
+      },
+      {
+        "task": "Staff handbook writer",
+        "energy": 3500
+      },
+      {
+        "task": "Process (SOP) writer",
+        "energy": 1500
+      },
+      {
+        "task": "Event planner",
+        "energy": 1800
+      }
+    ]
+  }
+}

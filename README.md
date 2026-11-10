@@ -1,4 +1,4 @@
-# Virtual Nafree
+# MAIZ agents
 
 A store of AI employees for people who know nothing about AI. Browse, try, hire, and get work done, like shopping online.
 
@@ -26,6 +26,14 @@ npm run dev     # http://localhost:5173 (forwarded automatically in a Codespace)
 npm run build
 ```
 
+Before shipping a website change, run the browser QA (Playwright + axe-core at 375, 768 and 1440 wide) and update the evidence record, as described in [CLAUDE.md](CLAUDE.md):
+
+```
+npm run build && npm run qa
+```
+
+Set `SITE_URL` when building for the real domain (`SITE_URL=https://your-domain npm run build`); it fills the canonical link, Open Graph tags, `sitemap.xml` and `robots.txt`. Security headers for the host are in `web/public/_headers`.
+
 Pages: `/` landing, `/onboarding.html`, `/app.html` (control center demo with example data; `/app.html#setup` is the Admin manager's setup form). Onboarding and the control center are front-end demos with simulated sign-in and data until the backend modules are wired in. Design tokens are in `web/src/styles.css`.
 
 ## Run it locally
@@ -35,4 +43,14 @@ npm install && (cd web && npm install)
 npm run dev:api          # API on :8787 (mock AI unless ANTHROPIC_API_KEY is set; dev sign-up on)
 cd web && npm run dev    # website on :5173, proxies /api to the API
 ```
-Sign-up in development has no email check. Real sign-in (email link) is still to build, and the server will not start in production with dev sign-up on. Data lives in memory and resets when the API restarts, until the Postgres wiring lands.
+Sign-in is by email link (Resend). In development with no Resend key the link is printed in the API log, and `npm run dev:api` also turns on a no-check sign-up shortcut that the server refuses in production. Without `DATABASE_URL` data lives in memory and resets on restart; with it (plus `DATABASE_APP_URL` and `TOKEN_KEY`, see `.env.example`) everything is stored in Postgres and the API applies `db/*.sql` on start.
+
+Tests: `npm run check` (fast, no database), `npm run db:test` (customer isolation) and `npm run db:int` (everything survives a restart). The last two start a throwaway local Postgres.
+
+## Deploy
+
+One Docker image serves the website and the API (`npm run build`, then `npm start`). The recommended setup is Render + Neon + Resend: see [docs/DEPLOY.md](docs/DEPLOY.md) for the steps and [docs/RUNBOOK.md](docs/RUNBOOK.md) for running it. CI (`.github/workflows/ci.yml`) runs the tests, the Postgres isolation tests, the website build and a Docker smoke test on every pull request.
+
+## Working with Claude Code
+
+This repo uses the [ECC](https://github.com/affaan-m/ECC) agent harness. Website-relevant skills, agents and rules are pinned in `.claude/`; see [.claude/ECC.md](.claude/ECC.md) for how to enable the full ECC plugin, and [CLAUDE.md](CLAUDE.md) for the workflow.

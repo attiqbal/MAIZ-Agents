@@ -1,6 +1,6 @@
 import "./styles.css";
-import { drawPseudoQr } from "./common";
-import { api, setToken } from "./api";
+import { drawPseudoQr, toast } from "./common";
+import { api, getToken, setToken } from "./api";
 
 const TOTAL = 6;
 const KEY = "vn.profile";
@@ -29,13 +29,22 @@ document.addEventListener("click", (e) => {
   if (t.hasAttribute("data-back")) show(current - 1); else show(current + 1);
 });
 
-// Step 1
-$("email-go").addEventListener("click", () => {
+// Step 1: a real sign-in link by email. Without the API (demo) or with dev sign-in on, this step just moves on.
+$("email-go").addEventListener("click", async () => {
   const v = $<HTMLInputElement>("email").value.trim();
   const ok = /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v);
   $("email-err").toggleAttribute("hidden", ok);
-  if (!ok) return;
-  profile.email = v; save(); show(2);
+  $("email").setAttribute("aria-invalid", String(!ok));
+  if (!ok) { $("email").focus(); return; }
+  profile.email = v; save();
+  const r = await api<{ dev?: boolean }>("/signin/start", { body: { email: v } });
+  if (r.status === 429) { $("email-sent").textContent = "Too many emails for this address. Please try again in an hour."; $("email-sent").removeAttribute("hidden"); return; }
+  if (r.ok && !r.data?.dev) {
+    $("email-sent").textContent = `We sent a sign-in link to ${v}. Open it on this device to continue. It works once and expires in 15 minutes.`;
+    $("email-sent").removeAttribute("hidden");
+    return;
+  }
+  show(2);
 });
 
 // Step 2: simulated website read (no network; derives plausible hints from the domain)
@@ -59,7 +68,8 @@ $("size").addEventListener("click", (e) => {
 $("biz-go").addEventListener("click", () => {
   const biz = $<HTMLInputElement>("biz").value.trim();
   $("biz-err").toggleAttribute("hidden", !!biz);
-  if (!biz) return;
+  $("biz").setAttribute("aria-invalid", String(!biz));
+  if (!biz) { $("biz").focus(); return; }
   profile.biz = biz;
   profile.site = $<HTMLInputElement>("site").value.trim();
   profile.sells = $<HTMLInputElement>("sells").value.trim();
@@ -98,10 +108,14 @@ $("contact").addEventListener("click", (e) => {
 async function createOrganisation(): Promise<void> {
   // Real set-up when the API is running; otherwise the page stays a demo.
   const r = await api<{ token: string }>("/signup", {
-    body: { email: profile.email, businessName: profile.biz, website: profile.site, sells: profile.sells, size: profile.size, goal: profile.goal },
+    body: { email: profile.email, businessName: profile.biz, website: profile.site, sells: profile.sells, size: profile.size, goal: profile.goal, contact: profile.contact },
   });
   if (r.ok && r.data?.token) setToken(r.data.token);
-  else if (r.status === 409) $("prov-h").textContent = "You already have an organisation. Opening it";
+  else if (r.status === 409) {
+    // This email already has a team. Without a login on this device, the owner has to log in to reach it.
+    $("prov-h").textContent = getToken() ? "You already have a team. Open your control center." : "You already have a team. Log in to open it.";
+    if (!getToken()) { const open = $<HTMLAnchorElement>("open-app"); open.href = "/signin.html"; open.textContent = "Log in"; }
+  }
 }
 
 function provision(): void {
@@ -118,4 +132,5 @@ function provision(): void {
 
 if (profile.biz) $<HTMLInputElement>("biz").value = profile.biz;
 if (profile.email) $<HTMLInputElement>("email").value = profile.email;
-show(1);
+// Coming back from the emailed link with a verified session: skip straight past the email step.
+show(getToken() && profile.email ? 2 : 1);

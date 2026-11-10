@@ -1,0 +1,45 @@
+name: CI
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            web/package-lock.json
+      - run: npm ci
+      - run: cd web && npm ci
+      - name: Typecheck and unit tests
+        run: npm run check
+      - name: Build the website
+        run: cd web && npm run build
+      - name: Customer isolation and restart tests (Postgres)
+        # The runner image ships PostgreSQL 16; the scripts start a throwaway server as the postgres user, so they need root.
+        run: sudo -E env "PATH=$PATH" bash -c "npm run db:test && npm run db:int"
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=high
+
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build the production image
+        run: docker build -t maiz-agents .
+      - name: Start it and check health
+        run: |
+          docker run -d --name app -p 8787:8787 -e NODE_ENV=development maiz-agents
+          for i in $(seq 1 30); do curl -fsS localhost:8787/api/health && break; sleep 1; done
+          curl -fsS localhost:8787/ | grep -q "MAIZ agents"
+          docker logs app

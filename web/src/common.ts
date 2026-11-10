@@ -1,5 +1,16 @@
 // Shared bits: sticky nav behaviour, mobile menu, toast.
+import { getToken } from "./api";
+
 export function initNav(): void {
+  // Mark the page we are on, and turn "Log in" into "Open control center" for a signed-in visitor.
+  const here = location.pathname.replace(/\/index\.html$/, "/");
+  document.querySelectorAll<HTMLAnchorElement>(".nav-links a, .mobile-menu a").forEach((a) => {
+    const target = new URL(a.href, location.origin);
+    if (!target.hash && target.pathname === here) a.setAttribute("aria-current", "page");
+  });
+  if (getToken()) {
+    document.querySelectorAll<HTMLAnchorElement>("[data-account-link]").forEach((a) => { a.href = "/app.html"; a.textContent = "Open control center"; });
+  }
   const nav = document.querySelector<HTMLElement>(".nav");
   if (nav) {
     const onScroll = () => nav.classList.toggle("scrolled", window.scrollY > 8);
@@ -9,12 +20,17 @@ export function initNav(): void {
   const toggle = document.querySelector<HTMLButtonElement>(".nav-toggle");
   const menu = document.getElementById("mobile-menu");
   if (toggle && menu) {
-    toggle.addEventListener("click", () => {
-      const open = menu.hasAttribute("hidden");
+    const setOpen = (open: boolean) => {
       menu.toggleAttribute("hidden", !open);
       toggle.setAttribute("aria-expanded", String(open));
+      toggle.setAttribute("aria-label", open ? "Close menu" : "Menu");
+    };
+    toggle.addEventListener("click", () => setOpen(menu.hasAttribute("hidden")));
+    menu.querySelectorAll("a").forEach((a) => a.addEventListener("click", () => setOpen(false)));
+    // Escape closes the menu and returns focus to the button (WCAG 2.1.2, ECC accessibility skill).
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape" && !menu.hasAttribute("hidden")) { setOpen(false); toggle.focus(); }
     });
-    menu.querySelectorAll("a").forEach((a) => a.addEventListener("click", () => menu.setAttribute("hidden", "")));
   }
 }
 

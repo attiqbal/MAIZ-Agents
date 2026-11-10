@@ -1,0 +1,50 @@
+# Render blueprint (render.com > New > Blueprint, pick this repo).
+# One web service runs the website and the API together. The database is Neon (see docs/DEPLOY.md),
+# so it is not declared here. Secrets marked sync: false are typed into Render's dashboard, never committed.
+services:
+  - type: web
+    name: maiz-agents
+    runtime: docker
+    plan: starter            # always on; the free plan sleeps, and Slack needs an answer within 3 seconds
+    region: frankfurt        # pick the region nearest your Neon database
+    numInstances: 1          # keep at 1: sign-in links and rate limits are held in memory (see docs/RUNBOOK.md)
+    healthCheckPath: /api/health
+    autoDeploy: true         # deploys when main changes and CI has passed on GitHub
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: SITE_URL        # used at build time for canonical links, sitemap and Open Graph
+        sync: false
+      - key: APP_URL         # same address as SITE_URL, used in sign-in emails
+        sync: false
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: DATABASE_URL
+        sync: false
+      - key: DATABASE_APP_URL
+        sync: false
+      - key: TOKEN_KEY
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: RESEND_API_KEY
+        sync: false
+      - key: EMAIL_FROM
+        sync: false
+      - key: SLACK_CLIENT_ID
+        sync: false
+      - key: SLACK_CLIENT_SECRET
+        sync: false
+      - key: SLACK_SIGNING_SECRET
+        sync: false
+      - key: SLACK_REDIRECT_URI
+        sync: false
+      # Optional: direct connections to business apps (docs/INTEGRATIONS.md). Leave empty to keep them on file upload.
+      - key: XERO_CLIENT_ID
+        sync: false
+      - key: XERO_CLIENT_SECRET
+        sync: false
+      - key: SQUARE_CLIENT_ID
+        sync: false
+      - key: SQUARE_CLIENT_SECRET
+        sync: false

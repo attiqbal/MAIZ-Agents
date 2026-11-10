@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+<head>
+<!--@include head title="Log in · MAIZ agents" description="Log in to your AI team with a one-time link sent to your email."-->
+<meta name="robots" content="noindex">
+</head>
+<body>
+<div class="page-top">
+  <!--@include header-->
+  <main id="main">
+    <section class="section">
+      <div class="container" style="max-width:480px">
+        <div class="ob-panel" aria-live="polite">
+          <h1 id="si-h" style="font-size:1.75rem;margin:0 0 6px">Log in</h1>
+          <p id="si-p" class="sub" style="margin:0 0 18px">We will email you a one-time link. No password to remember.</p>
+          <form id="si-form">
+            <div class="field"><label for="si-email">Work email</label><input class="input" id="si-email" type="email" placeholder="you@business.com" autocomplete="email" required></div>
+            <p class="err" id="si-err" hidden></p>
+            <button class="btn btn-primary btn-block" type="submit" id="si-go">Email me a link</button>
+          </form>
+          <div id="si-signed" hidden>
+            <a class="btn btn-primary btn-block" href="/app.html">Open your control center</a>
+            <button class="btn btn-ghost btn-block" id="si-out" style="margin-top:8px">Log out</button>
+          </div>
+          <p class="hint" id="si-note" style="margin-top:14px">New here? <a href="/onboarding.html">Start your free trial</a>.</p>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+<!--@include footer-->
+<script type="module" src="/src/signin.ts"></script>
+</body>
+</html>

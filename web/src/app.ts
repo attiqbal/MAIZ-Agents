@@ -1,7 +1,11 @@
 import "./styles.css";
 import { toast } from "./common";
 import { initSetup } from "./setup";
-import { api, getToken, type Org } from "./api";
+import { initApps } from "./apps";
+import { initDash } from "./dash";
+import { initRoleDesigner } from "./role-designer";
+import { api, getToken, clearSession, type Org } from "./api";
+import { JOB_DESCRIPTIONS, getJobDescription, jdHtml } from "./jd";
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const app = $("app");
@@ -10,7 +14,8 @@ const app = $("app");
 let profile: { biz?: string; email?: string; slack?: boolean; contact?: string } = {};
 try { profile = JSON.parse(localStorage.getItem("vn.profile") ?? "{}"); } catch { /* ignore */ }
 const biz = profile.biz || "Kestrel Coffee";
-const initials = (s: string) => s.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]!.toUpperCase()).join("") || "VN";
+let orgName = biz;
+const initials = (s: string) => s.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]!.toUpperCase()).join("") || "MA";
 $("org-name").textContent = biz;
 $("org-av").textContent = initials(biz);
 const owner = profile.email ? profile.email.split("@")[0]! : "You";
@@ -18,8 +23,8 @@ $("owner-name").textContent = owner;
 $("me-av").textContent = $("owner-av").textContent = initials(owner);
 const h = new Date().getHours();
 $("greet").textContent = `${h < 12 ? "Good morning" : h < 18 ? "Good afternoon" : "Good evening"}, ${biz}`;
-if (profile.slack) $("slack-state").textContent = "On";
-document.title = `${biz} · Control center`;
+if (profile.slack) $("slack-state").textContent = "Slack on";
+
 
 // Routing
 const screens = Array.from(document.querySelectorAll<HTMLElement>("[data-screen]"));
@@ -31,7 +36,8 @@ function route(): void {
     if (a.dataset.nav === valid) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current");
   });
   app.classList.remove("menu-open");
-  if (valid === "usage") drawBars();
+  const title = screens.find((x) => x.dataset.screen === valid)?.querySelector("h1")?.textContent ?? "Control center";
+  document.title = `${valid === "home" ? "Overview" : title} · ${orgName} · MAIZ agents`;
   window.scrollTo({ top: 0 });
 }
 window.addEventListener("hashchange", route);
@@ -92,17 +98,23 @@ $("a-edit").addEventListener("click", () => toast("Editing opens in the web edit
 
 // Real data: when signed in and the API is running, replace the demo team with the real one.
 let realOrg: Org | undefined;
-const ROLE: Record<string, [string, string]> = { "finance-manager": ["FM", "av-fm"], "marketing-manager": ["MM", "av-mm"], "business-consultant": ["BC", "av-bc"], "hr-manager": ["HR", "av-hr"], "admin-manager": ["AM", "av-tl"] };
+const ROLE: Record<string, [string, string]> = { "finance-manager": ["FM", "av-fm"], "marketing-manager": ["MM", "av-mm"], "business-consultant": ["BC", "av-bc"], "hr-manager": ["HR", "av-hr"], "compliance-manager": ["CM", "av-cm"], "supply-chain-manager": ["SC", "av-sc"], "admin-manager": ["AM", "av-tl"] };
 const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]!);
 async function loadOrg(): Promise<void> {
-  if (!getToken()) return;
+  // Visitors without a login see the example business: the "Explore the demo" links land here.
+  if (!getToken()) { $("demo-banner").hidden = false; return; }
   const r = await api<Org>("/org");
-  if (!r.ok || !r.data) return;
+  // Guard: this device's login has expired -> log-in page.
+  if (r.status === 401) { clearSession(); location.replace("/signin.html"); return; }
+  // API unreachable (or not set up yet) -> keep the page usable as a demo, and say so.
+  if (!r.ok || !r.data) { $("demo-banner").hidden = false; return; }
   realOrg = r.data;
   $("org-name").textContent = realOrg.name;
   $("org-av").textContent = initials(realOrg.name);
   $("greet").textContent = `${h < 12 ? "Good morning" : h < 18 ? "Good afternoon" : "Good evening"}, ${realOrg.name}`;
-  document.title = `${realOrg.name} · Control center`;
+  orgName = realOrg.name;
+  app.classList.add("is-live");
+  route();
   const quota = realOrg.dailyQuotaPerEmployee;
   document.querySelector(".team")!.innerHTML = realOrg.team.map((e) => {
     const [abbr, cls] = ROLE[e.templateKey] ?? ["AI", "av-tl"];
@@ -113,15 +125,22 @@ async function loadOrg(): Promise<void> {
 }
 void loadOrg();
 
-// Ask bar: "finance: ..." / "marketing: ..." / "consultant: ..." / "hr: ..." picks the employee; otherwise the consultant answers.
+// Account menu: sign out, and the Settings screen's account details.
+function signOut(): void { clearSession(); location.href = "/signin.html"; }
+document.querySelectorAll("[data-signout]").forEach((b) => b.addEventListener("click", signOut));
+$("me-av").addEventListener("click", () => { location.hash = "#settings"; });
+$("set-biz").textContent = biz;
+$("set-email").textContent = profile.email || "Not set";
+
+// Ask bar: "finance: ..." / "marketing: ..." / "consultant: ..." / "hr: ..." / "compliance: ..." picks the employee; otherwise the consultant answers.
 $<HTMLFormElement>("ask").addEventListener("submit", async (e) => {
   e.preventDefault();
   const input = $<HTMLInputElement>("ask-in");
   const text = input.value.trim();
   if (!text) return;
   if (!realOrg) { toast("Admin manager got it and will route it (demo)"); input.value = ""; return; }
-  const m = /^(finance|marketing|consultant|hr)\s*[:,-]\s*(.+)$/is.exec(text);
-  const key = m ? { finance: "finance-manager", marketing: "marketing-manager", consultant: "business-consultant", hr: "hr-manager" }[m[1]!.toLowerCase() as "finance"] : "business-consultant";
+  const m = /^(finance|marketing|consultant|hr|compliance|supply)\s*[:,-]\s*(.+)$/is.exec(text);
+  const key = m ? { finance: "finance-manager", marketing: "marketing-manager", consultant: "business-consultant", hr: "hr-manager", compliance: "compliance-manager", supply: "supply-chain-manager" }[m[1]!.toLowerCase() as "finance"] : "business-consultant";
   const emp = realOrg.team.find((x) => x.templateKey === key) ?? realOrg.team[0]!;
   toast(`${emp.name} is on it…`);
   const r = await api<{ status: string; reason?: string; answer?: string }>("/ask", { body: { text: m ? m[2] : text, employeeId: emp.id } });
@@ -147,6 +166,22 @@ document.addEventListener("keydown", (e) => {
   if (e.key === "/" && tag !== "INPUT" && tag !== "TEXTAREA") { e.preventDefault(); $("ask-in").focus(); }
 });
 
+// Job descriptions in the team builder, from the same data the employees work to.
+{
+  const pick = $("jd-pick");
+  pick.innerHTML = JOB_DESCRIPTIONS.map((j, i) => `<button class="chip" aria-pressed="${i === 0}" data-key="${j.key}">${esc(j.jobTitle)}</button>`).join("");
+  const show = (key: string) => {
+    const jd = getJobDescription(key);
+    if (jd) $("jd-out").innerHTML = jdHtml(jd, 3);
+    pick.querySelectorAll<HTMLElement>(".chip").forEach((c) => c.setAttribute("aria-pressed", String(c.dataset.key === key)));
+  };
+  pick.addEventListener("click", (e) => {
+    const b = (e.target as HTMLElement).closest<HTMLButtonElement>(".chip");
+    if (b?.dataset.key) show(b.dataset.key);
+  });
+  show(JOB_DESCRIPTIONS[0]!.key);
+}
+
 // Skill tuning
 const skills: Record<string, string> = { Standard: "100 · £12.30/mo", Pro: "200 · £21.40/mo", Expert: "400 · £38.00/mo" };
 $("skill").addEventListener("click", (e) => {
@@ -156,25 +191,9 @@ $("skill").addEventListener("click", (e) => {
   $("skill-out").textContent = skills[b.textContent ?? "Standard"] ?? "";
 });
 
-// Usage chart (static example data, rendered as SVG)
-let drawn = false;
-function drawBars(): void {
-  if (drawn) return; drawn = true;
-  const days = ["Tue", "Wed", "Thu", "Fri", "Sat", "Sun", "Mon"];
-  const data = [[40, 70, 50], [55, 90, 60], [30, 110, 45], [62, 85, 70], [20, 40, 25], [15, 30, 20], [28, 79, 45]];
-  const colors = ["#305fbd", "#625fff", "#ff7dda"];
-  const x0 = 44, w = 646, top = 16, bottom = 150, max = 300, slot = w / days.length, bw = 44;
-  const y = (v: number) => bottom - ((bottom - top) * v) / max;
-  let s = `<g font-family="IBM Plex Mono, monospace" font-size="11" fill="#abaebb">`;
-  for (const v of [0, 150, 300]) s += `<line x1="${x0}" x2="690" y1="${y(v)}" y2="${y(v)}" stroke="#151e32" ${v === 300 ? 'stroke-dasharray="4 4"' : ""}/><text x="38" y="${y(v) + 4}" text-anchor="end">${v}</text>`;
-  data.forEach((row, i) => {
-    let acc = 0; const cx = x0 + slot * i + (slot - bw) / 2;
-    row.forEach((v, k) => { const y1 = y(acc + v); const hgt = y(acc) - y1; s += `<rect x="${cx}" y="${y1}" width="${bw}" height="${Math.max(hgt - 1, 0)}" rx="${k === 2 ? 4 : 1}" fill="${colors[k]}"/>`; acc += v; });
-    s += `<text x="${cx + bw / 2}" y="170" text-anchor="middle">${days[i]}</text>`;
-  });
-  $("bars").innerHTML = s + "</g>";
-}
-
+initDash();
+initRoleDesigner();
 refresh();
 initSetup(biz, profile.contact === "slack" ? "slack" : "dashboard");
+initApps();
 route();

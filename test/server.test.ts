@@ -2,6 +2,7 @@ import { createHmac } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import { createApp, makeToken, readToken, type Req } from "../src/server/app.js";
 import { createPlatform } from "../src/server/platform.js";
+import { MemoryEmailSender, ResendEmailSender } from "../src/server/email.js";
 
 const SLACK = { clientId: "cid", clientSecret: "sec", signingSecret: "sign", redirectUri: "https://x/api/slack/callback" };
 function setup(over: Record<string, unknown> = {}) {
@@ -12,11 +13,12 @@ function setup(over: Record<string, unknown> = {}) {
     if (String(url).includes("oauth.v2.access")) return { json: async () => ({ ok: true, access_token: "xoxb-9", team: { id: "T9" }, authed_user: { id: "U9" } }) };
     return { json: async () => ({ ok: true }) };
   }) as any;
-  const platform = createPlatform({ sessionSecret: "s3", allowDevAuth: true, slack: SLACK, now: () => clock.d, http, ...over });
+  const mail = new MemoryEmailSender();
+  const platform = createPlatform({ sessionSecret: "s3", allowDevAuth: true, email: mail, appUrl: "https://app.test", slack: SLACK, now: () => clock.d, http, ...over });
   const handle = createApp(platform);
   const call = (method: string, path: string, body?: unknown, headers: Record<string, string> = {}, query = "") =>
     handle({ method, path, query: new URLSearchParams(query), headers, rawBody: body === undefined ? "" : typeof body === "string" ? body : JSON.stringify(body) } as Req);
-  return { platform, call, clock, calls };
+  return { platform, call, clock, calls, mail };
 }
 async function signedUp() {
   const s = setup();
@@ -42,14 +44,27 @@ describe("signup and org", () => {
     expect((r.body as any).trialEndsAt).toBe("2026-06-17T10:00:00.000Z");
     const org = (await call("GET", "/api/org", undefined, auth)).body as any;
     expect(org.name).toBe("Kestrel Coffee");
-    expect(org.team.map((e: any) => e.templateKey)).toEqual(["admin-manager", "finance-manager", "marketing-manager", "business-consultant", "hr-manager"]);
+    expect(org.team.map((e: any) => e.templateKey)).toEqual(["admin-manager", "finance-manager", "marketing-manager", "business-consultant", "hr-manager", "compliance-manager"]);
     expect(org.team[0].energyLeft).toBe(300);
   });
   it("refuses a second signup for the same email, bad emails, and unconfigured dev auth", async () => {
     const { call } = await signedUp().then(async (x) => x);
     expect((await call("POST", "/api/signup", { email: "ann@kestrel.co", businessName: "X" })).status).toBe(409);
     expect((await call("POST", "/api/signup", { email: "nope", businessName: "X" })).status).toBe(400);
-    expect((await setup({ allowDevAuth: false }).call("POST", "/api/signup", { email: "a@b.co", businessName: "X" })).status).toBe(503);
+    expect((await setup({ allowDevAuth: false }).call("POST", "/api/signup", { email: "a@b.co", businessName: "X" })).status).toBe(401);
+  });
+  it("lists the agent store with every employee's job description, without sign-in", async () => {
+    const r = (await setup().call("GET", "/api/store")).body as any;
+    const cm = r.employees.find((e: any) => e.key === "compliance-manager");
+    expect(cm.title).toBe("Compliance manager");
+    expect(cm.jobDescription.competencies.length).toBeGreaterThan(5);
+    expect(r.employees.every((e: any) => e.jobDescription)).toBe(true);
+  });
+  it("prices a cart without sign-in, and refuses a malformed one", async () => {
+    const s = setup();
+    const r = (await s.call("POST", "/api/cart/quote", { lines: [{ key: "web-developer:month", qty: 1 }] })).body as any;
+    expect(r.onceGbp).toBe(349);
+    expect((await s.call("POST", "/api/cart/quote", { lines: "x" })).status).toBe(400);
   });
   it("requires a session for everything else", async () => {
     const { call } = setup();
@@ -101,6 +116,8 @@ describe("slack", () => {
     expect(cb.status).toBe(302);
     expect(platform.slackTokens.get("T9")).toBe("xoxb-9");
     expect((await call("GET", "/api/slack/callback", undefined, {}, "code=abc&state=forged")).status).toBe(400);
+    // An install link works once: replaying it cannot connect another Slack workspace to this organisation.
+    expect((await call("GET", "/api/slack/callback", undefined, {}, `code=abc&state=${state}`)).status).toBe(400);
   });
   it("answers Slack events only when signed, and replies in the chat afterwards", async () => {
     const { call, auth, calls, clock } = await signedUp();
@@ -116,5 +133,147 @@ describe("slack", () => {
     expect(calls.some((c) => c.url.includes("chat.postMessage") && c.init.headers.authorization === "Bearer xoxb-9")).toBe(true);
     const ch = await call("POST", "/api/slack/events", JSON.stringify({ type: "url_verification", challenge: "zz" }), { "x-slack-request-timestamp": String(ts), "x-slack-signature": sign("sign", ts, JSON.stringify({ type: "url_verification", challenge: "zz" })) });
     expect((ch.body as any).challenge).toBe("zz");
+  });
+});
+
+describe("admin manager", () => {
+  const answers = { goals: "More subscribers and tidy books", customers: "Home coffee drinkers", tone: "Warm and friendly", financialYearStart: "April", salesTaxRegistered: false, marketingChannels: ["Instagram"], staffCount: 3, hiringSoon: true };
+  it("welcomes a new owner with the team and the setup form", async () => {
+    const { call, auth } = await signedUp();
+    const s = (await call("GET", "/api/setup", undefined, auth)).body as any;
+    expect(s.state).toBe("awaiting_form");
+    expect(s.messages.map((m: any) => m.kind)).toEqual(["welcome", "form"]);
+    expect(s.form.some((f: any) => f.key === "goals" && f.required)).toBe(true);
+  });
+  it("runs setup from the form, then rolls it back on request", async () => {
+    const { call, auth } = await signedUp();
+    const bad = await call("POST", "/api/setup", { answers: { tone: "Warm and friendly" } }, auth);
+    expect(bad.status).toBe(400);
+    const ok = (await call("POST", "/api/setup", { answers }, auth)).body as any;
+    expect(ok.run.status).toBe("completed");
+    expect(ok.state).toBe("ready");
+    expect(ok.messages.at(-1).kind).toBe("ready");
+    expect((await call("POST", "/api/setup", { answers }, auth)).status).toBe(400); // already set up
+    const undone = (await call("POST", "/api/setup/rollback", undefined, auth)).body as any;
+    expect(undone.run.status).toBe("rolled_back");
+    expect(undone.state).toBe("awaiting_form");
+  });
+  it("needs a session", async () => {
+    const { call } = setup();
+    expect((await call("GET", "/api/setup")).status).toBe(401);
+    expect((await call("POST", "/api/setup", { answers: {} })).status).toBe(401);
+  });
+  it("holds the welcome for Slack until Slack is connected, then sends it", async () => {
+    const s = setup();
+    const r = await s.call("POST", "/api/signup", { email: "z@z.co", businessName: "Zed", contact: "slack" });
+    const auth = { authorization: `Bearer ${(r.body as any).token}` };
+    expect(((await s.call("GET", "/api/setup", undefined, auth)).body as any).messages.every((m: any) => m.pendingOn === "slack")).toBe(true);
+    const { url } = (await s.call("GET", "/api/slack/install", undefined, auth)).body as any;
+    await s.call("GET", "/api/slack/callback", undefined, {}, `code=abc&state=${new URL(url).searchParams.get("state")}`);
+    expect(((await s.call("GET", "/api/setup", undefined, auth)).body as any).messages.some((m: any) => m.pendingOn)).toBe(false);
+    expect(s.calls.filter((c) => c.url.includes("chat.postMessage")).length).toBe(2);
+  });
+});
+
+describe("email sign-in", () => {
+  const tokenIn = (text: string) => /#token=(\S+)/.exec(text)![1]!;
+  const strict = () => setup({ allowDevAuth: false });
+
+  it("sends a link, verifies it once, then signs up with the verified email only", async () => {
+    const s = strict();
+    expect((await s.call("POST", "/api/signup", { email: "ann@k.co", businessName: "K" })).status).toBe(401); // no shortcut
+    expect((await s.call("POST", "/api/signin/start", { email: "Ann@K.co" })).status).toBe(200);
+    expect(s.mail.sent).toHaveLength(1);
+    expect(s.mail.sent[0]!.to).toBe("ann@k.co");
+    expect(s.mail.sent[0]!.text).toContain("https://app.test/signin.html#token=");
+    const link = tokenIn(s.mail.sent[0]!.text);
+    const v = (await s.call("POST", "/api/signin/verify", { token: link })).body as any;
+    expect(v).toMatchObject({ email: "ann@k.co", hasOrganisation: false });
+    expect((await s.call("POST", "/api/signin/verify", { token: link })).status).toBe(400); // single use
+    const auth = { authorization: `Bearer ${v.token}` };
+    // the email in the body is ignored: the verified one wins
+    const r = await s.call("POST", "/api/signup", { email: "someone-else@x.co", businessName: "Kestrel" }, auth);
+    expect(r.status).toBe(201);
+    const again = (await s.call("POST", "/api/signin/start", { email: "ann@k.co" }), tokenIn(s.mail.sent[1]!.text));
+    const v2 = (await s.call("POST", "/api/signin/verify", { token: again })).body as any;
+    expect(v2.hasOrganisation).toBe(true);
+    expect(((await s.call("GET", "/api/org", undefined, { authorization: `Bearer ${v2.token}` })).body as any).name).toBe("Kestrel");
+  });
+
+  it("rejects forged, expired and wrong-kind tokens", async () => {
+    const s = strict();
+    await s.call("POST", "/api/signin/start", { email: "a@b.co" });
+    const link = tokenIn(s.mail.sent[0]!.text);
+    expect((await s.call("POST", "/api/signin/verify", { token: link.replace(/.$/, "x") })).status).toBe(400);
+    s.clock.d = new Date(s.clock.d.getTime() + 16 * 60_000);
+    expect((await s.call("POST", "/api/signin/verify", { token: link })).status).toBe(400);
+    // a sign-in link is not a session
+    expect((await s.call("GET", "/api/org", undefined, { authorization: `Bearer ${link}` })).status).toBe(401);
+  });
+
+  it("a Slack install state token cannot be used as a session", async () => {
+    const s = await signedUp();
+    const { url } = (await s.call("GET", "/api/slack/install", undefined, s.auth)).body as any;
+    const state = new URL(url).searchParams.get("state")!;
+    expect((await s.call("GET", "/api/org", undefined, { authorization: `Bearer ${state}` })).status).toBe(401);
+  });
+
+  it("answers the same for any address, validates it, and limits sends per address", async () => {
+    const s = strict();
+    expect((await s.call("POST", "/api/signin/start", { email: "nope" })).status).toBe(400);
+    for (let i = 0; i < 5; i++) expect((await s.call("POST", "/api/signin/start", { email: "a@b.co" })).status).toBe(200);
+    expect((await s.call("POST", "/api/signin/start", { email: "a@b.co" })).status).toBe(429);
+    expect((await s.call("POST", "/api/signin/start", { email: "other@b.co" })).status).toBe(200);
+  });
+
+  it("the Resend sender posts the message and reports failures", async () => {
+    let seen: any;
+    await new ResendEmailSender("key", "MAIZ agents <hi@x.co>", (async (u: any, i: any) => { seen = { u, i }; return { ok: true }; }) as any).send({ to: "a@b.co", subject: "s", text: "t" });
+    expect(seen.u).toBe("https://api.resend.com/emails");
+    expect(JSON.parse(seen.i.body)).toMatchObject({ from: "MAIZ agents <hi@x.co>", to: ["a@b.co"] });
+    await expect(new ResendEmailSender("k", "f", (async () => ({ ok: false, status: 422 })) as any).send({ to: "a", subject: "s", text: "t" })).rejects.toThrow(/422/);
+  });
+});
+
+describe("business apps API", () => {
+  it("imports a till file, posts it to the books, and runs a webhook end to end", async () => {
+    const { call, auth } = await signedUp();
+    const csv = "Date,Total,VAT\n2026-06-01,120.00,20.00\n2026-06-02,60.00,10.00";
+    const imp = await call("POST", "/api/integrations/apps/till-file/import", { csv }, auth);
+    expect(imp.status).toBe(200);
+    expect((imp.body as any).added).toBe(2);
+    const list = (await call("GET", "/api/integrations", undefined, auth)).body as any;
+    expect(list.pending).toHaveLength(2);
+    expect(list.catalogue.some((c: any) => c.key === "brightpay")).toBe(true);
+    expect((await call("POST", "/api/integrations/post", {}, auth)).body).toEqual({ posted: 2, skipped: [] });
+
+    const hook = (await call("POST", "/api/integrations/apps/webhook/connect", {}, auth)).body as any;
+    expect(hook.url).toMatch(/^https:\/\/app\.test\/api\/integrations\/hooks\//);
+    const path = new URL(hook.url).pathname;
+    expect((await call("POST", path, { sales: [{ date: "2026-06-03", gross: 500 }] })).status).toBe(200);
+    expect((await call("POST", path.replace(/[^/]+$/, "x".repeat(32)), { sales: [] })).status).toBe(404);
+  });
+  it("refuses app routes without a session and unknown apps", async () => {
+    const { call, auth } = await signedUp();
+    expect((await call("GET", "/api/integrations")).status).toBe(401);
+    expect((await call("POST", "/api/integrations/apps/nope/import", { csv: "a" }, auth)).status).toBe(400);
+    expect((await call("POST", "/api/integrations/apps/square/connect", {}, auth)).status).toBe(400); // no Square app keys in this setup
+  });
+  it("finishes an app connection only in the browser that started it, and only once", async () => {
+    const s = setup({ integrationApps: { square: { clientId: "sq", clientSecret: "sec", redirectUri: "https://app.test/api/integrations/callback" } } });
+    const { token } = (await s.call("POST", "/api/signup", { email: "ann@kestrel.co", businessName: "Kestrel Coffee", sells: "Coffee", size: "2–10", country: "GB", goal: "More customers" })).body as any;
+    const start = await s.call("POST", "/api/integrations/apps/square/connect", {}, { authorization: `Bearer ${token}` });
+    const state = new URL((start.body as any).url).searchParams.get("state")!;
+    const cookie = start.headers!["set-cookie"]!.split(";")[0]!;
+    expect(start.headers!["set-cookie"]).toMatch(/HttpOnly; SameSite=Lax; Max-Age=600; Secure$/);
+    // Someone else's browser (no cookie, or a different one) cannot complete the link they were sent.
+    expect((await s.call("GET", "/api/integrations/callback", undefined, {}, `code=x&state=${state}`)).status).toBe(400);
+    expect((await s.call("GET", "/api/integrations/callback", undefined, { cookie: "maiz_oauth=other" }, `code=x&state=${state}`)).status).toBe(400);
+    expect((await s.call("GET", "/api/integrations/callback", undefined, { cookie: `a=b; ${cookie}` }, `code=x&state=${state}`)).status).toBe(302);
+    expect((await s.call("GET", "/api/integrations/callback", undefined, { cookie }, `code=x&state=${state}`)).status).toBe(400);
+  });
+  it("only accepts a signed connect state on the OAuth return", async () => {
+    const { call } = await signedUp();
+    expect((await call("GET", "/api/integrations/callback", undefined, {}, "code=x&state=forged")).status).toBe(400);
   });
 });

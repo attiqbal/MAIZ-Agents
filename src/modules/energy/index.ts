@@ -1,3 +1,4 @@
+import type { Sink } from "../../core/persistence.js";
 import type { AuditLog } from "../audit/index.js";
 import type { IdentityService } from "../identity/index.js";
 
@@ -65,6 +66,19 @@ export function costMicro(provider: string, inputTokens: number, outputTokens: n
 export class EnergyMeter {
   private plans = new Map<string, EnergyPlan>();
   private usage: UsageRecord[] = [];
+  private sink?: Sink;
+
+  useSink(sink: Sink): void {
+    this.sink = sink;
+  }
+
+  restorePlan(workspaceId: string, plan: EnergyPlan): void {
+    this.plans.set(workspaceId, plan);
+  }
+
+  restoreUsage(u: UsageRecord): void {
+    this.usage.push(u);
+  }
 
   constructor(
     private identity: IdentityService,
@@ -75,6 +89,7 @@ export class EnergyMeter {
   setPlan(userId: string, workspaceId: string, plan: EnergyPlan): void {
     this.identity.require(userId, workspaceId, "workspace.manage");
     this.plans.set(workspaceId, plan);
+    this.sink?.plan(workspaceId, plan);
     this.audit.record({ workspaceId, actor: `user:${userId}`, action: "energy.plan_set", data: { ...plan } });
   }
 
@@ -115,6 +130,7 @@ export class EnergyMeter {
       overtime,
     };
     this.usage.push(rec);
+    this.sink?.usage(rec);
     return rec;
   }
 

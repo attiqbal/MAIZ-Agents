@@ -6,8 +6,9 @@ import { formFor, validateAnswers, type Answers, type FormField } from "../../sr
 import { SETUP_STEPS, formInviteText, readyText, welcomeText } from "../../src/modules/admin-manager/messages";
 import { getTemplate } from "../../src/modules/workforce/templates";
 import { toast } from "./common";
+import { api, getToken } from "./api";
 
-const TEAM = ["finance-manager", "marketing-manager", "business-consultant", "hr-manager"];
+const TEAM = ["finance-manager", "marketing-manager", "business-consultant", "hr-manager", "compliance-manager"];
 const KEY = "vn.setup";
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
@@ -64,7 +65,79 @@ function readAnswers(form: HTMLFormElement, fields: FormField[]): Answers {
   return a;
 }
 
-export function initSetup(biz: string, contact: "dashboard" | "slack"): void {
+type LiveStatus = {
+  state: "awaiting_form" | "setting_up" | "ready" | "needs_attention";
+  contact: "dashboard" | "slack" | "teams";
+  form: FormField[];
+  runs: { status: string; steps: { key: string; title: string; status: string }[] }[];
+  messages: { text: string; at: string }[];
+};
+
+/** Real mode: the Admin manager on the server sends the messages, owns the form and runs the steps. */
+async function initSetupLive(): Promise<boolean> {
+  if (!getToken()) return false;
+  const r = await api<LiveStatus>("/setup");
+  if (!r.ok || !r.data) return false;
+  let st = r.data;
+  const form = $<HTMLFormElement>("setup-form");
+  const fields = st.form;
+  const groups = new Map<string, FormField[]>();
+  for (const f of fields) groups.set(f.for, [...(groups.get(f.for) ?? []), f]);
+  form.innerHTML =
+    [...groups].map(([who, fs]) => `<fieldset class="sf-group"><legend>${who === "all" ? "About your business" : `For your ${esc(getTemplate(who)?.title ?? who)}`}</legend>${fs.map(fieldHtml).join("")}</fieldset>`).join("") +
+    `<div class="ob-actions"><button class="btn btn-primary" type="submit">Send to Admin manager</button></div>`;
+  $("setup-count").textContent = `${fields.length} questions · ${fields.filter((f) => f.required).length} required`;
+  form.addEventListener("click", (e) => {
+    const chip = (e.target as HTMLElement).closest<HTMLButtonElement>("[data-multi] .chip");
+    if (chip) chip.setAttribute("aria-pressed", String(chip.getAttribute("aria-pressed") !== "true"));
+  });
+  const time = (iso: string) => { const d = new Date(iso); return isNaN(+d) ? "" : `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`; };
+  const draw = (lastRun?: LiveStatus["runs"][number]) => {
+    $("setup-via").textContent = st.contact === "slack" ? "Also sent to you in Slack" : "In your dashboard";
+    $("am-msgs").innerHTML = (st.messages as unknown as { text: string; at: string }[])
+      .map((m) => `<div class="msg"><span class="av av-sm av-tl">AM</span><div><b>Admin manager</b><span class="t">${esc(time(m.at))}</span><br>${esc(m.text).replace(/\n/g, "<br>")}</div></div>`)
+      .join("");
+    const ready = st.state === "ready";
+    $("setup-form-panel").toggleAttribute("hidden", ready || st.state === "setting_up");
+    $("setup-need").toggleAttribute("hidden", ready);
+    $("setup-badge").toggleAttribute("hidden", ready);
+    const run = lastRun ?? st.runs.at(-1);
+    $("setup-run").toggleAttribute("hidden", !run || st.state === "awaiting_form");
+    if (run) {
+      $("setup-steps").innerHTML = run.steps.map((x) => `<li class="${x.status === "done" ? "done" : x.status === "running" ? "run" : x.status === "undone" ? "undone" : ""}"><span class="pdot"></span>${esc(x.title)}${x.status === "undone" ? ' <span class="hint">undone</span>' : x.status === "failed" ? ' <span class="hint">stopped here</span>' : ""}</li>`).join("");
+    }
+    $("setup-state").textContent = ready ? "Ready" : st.state === "needs_attention" ? "Needs our help" : "Waiting for your answers";
+    $("setup-undo").toggleAttribute("hidden", !ready);
+  };
+  const apply = (d: Partial<LiveStatus> & { run?: LiveStatus["runs"][number] }) => { st = { ...st, ...d } as LiveStatus; draw(d.run); };
+  draw();
+
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const v = validateAnswers(fields, readAnswers(form, fields));
+    form.querySelectorAll<HTMLElement>("[data-err]").forEach((el) => { const msg = v.errors[el.dataset.err!]; el.textContent = msg ?? ""; el.toggleAttribute("hidden", !msg); });
+    if (!v.ok) { toast("A couple of answers need a look"); return; }
+    $("setup-run").removeAttribute("hidden");
+    $("setup-run-h").textContent = "Setting up your team";
+    const res = await api<LiveStatus & { run: LiveStatus["runs"][number] }>("/setup", { body: { answers: v.clean } });
+    if (!res.ok || !res.data) { toast("Setup could not start. Try again."); return; }
+    apply(res.data);
+  });
+  $("setup-undo").addEventListener("click", async () => {
+    $("setup-run-h").textContent = "Undoing setup";
+    const res = await api<LiveStatus & { run: LiveStatus["runs"][number] }>("/setup/rollback", { body: {} });
+    if (!res.ok || !res.data) { toast("Could not undo. Try again."); return; }
+    apply(res.data);
+  });
+  return true;
+}
+
+export async function initSetup(biz: string, contact: "dashboard" | "slack"): Promise<void> {
+  if (await initSetupLive()) return;
+  initSetupDemo(biz, contact);
+}
+
+function initSetupDemo(biz: string, contact: "dashboard" | "slack"): void {
   const fields = formFor(TEAM);
   const form = $<HTMLFormElement>("setup-form");
   let saved = load() ?? {

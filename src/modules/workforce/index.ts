@@ -1,9 +1,11 @@
 import { newId, type Id } from "../../core/ids.js";
+import type { Sink } from "../../core/persistence.js";
 import type { AuditLog } from "../audit/index.js";
 import type { EventBus } from "../../core/events.js";
 import type { IdentityService } from "../identity/index.js";
 import type { ModelGateway } from "../model-gateway/gateway.js";
 import { getTemplate } from "./templates.js";
+import { getJobDescription, renderJobDescription } from "./job-descriptions.js";
 import type { EnergyMeter } from "../energy/index.js";
 import { describePack, packFor } from "./finance/rules-pack.js";
 
@@ -46,6 +48,30 @@ export class WorkforceService {
   private employees = new Map<string, Employee>();
   private profiles = new Map<string, BusinessProfile>();
   private tasks = new Map<string, TaskResult>();
+  private sink?: Sink;
+
+  useSink(sink: Sink): void {
+    this.sink = sink;
+  }
+
+  /** Extra facts per employee from other modules (for example connected apps). Kept out of this module's imports. */
+  private contextSources: ((workspaceId: string, templateKey: string) => string | undefined)[] = [];
+  addContext(source: (workspaceId: string, templateKey: string) => string | undefined): void {
+    this.contextSources.push(source);
+  }
+
+  restoreEmployee(e: Employee): void {
+    this.employees.set(e.id, e);
+  }
+
+  restoreTraining(employeeId: string, notes: string): void {
+    this.training.set(employeeId, notes);
+  }
+
+  restoreProfile(workspaceId: string, p: BusinessProfile): void {
+    this.profiles.set(workspaceId, p);
+  }
+
   /** What each employee was taught during setup (from the owner's setup form). */
   private training = new Map<string, string>();
 
@@ -60,6 +86,7 @@ export class WorkforceService {
   setProfile(userId: string, workspaceId: string, profile: BusinessProfile): void {
     this.identity.require(userId, workspaceId, "workspace.manage");
     this.profiles.set(workspaceId, profile);
+    this.sink?.profile(workspaceId, profile);
     this.audit.record({ workspaceId, actor: `user:${userId}`, action: "profile.updated" });
   }
 
@@ -76,6 +103,7 @@ export class WorkforceService {
     if (!employee || employee.workspaceId !== workspaceId) throw new Error("employee not found");
     if (notes === undefined) this.training.delete(employeeId);
     else this.training.set(employeeId, notes);
+    this.sink?.training(workspaceId, employeeId, notes);
     this.audit.record({ workspaceId, actor: `user:${userId}`, action: notes === undefined ? "employee.training_cleared" : "employee.trained", target: employeeId });
   }
 
@@ -97,6 +125,7 @@ export class WorkforceService {
       name: name ?? template.title,
     };
     this.employees.set(employee.id, employee);
+    this.sink?.employee(employee);
     this.audit.record({
       workspaceId,
       actor: `user:${userId}`,
@@ -123,14 +152,21 @@ export class WorkforceService {
     if (!template) throw new Error("employee template missing");
 
     const profile = this.profiles.get(workspaceId);
+    const jd = getJobDescription(template.key);
     const parts = [
       template.instructions,
+      // The full job description: responsibilities, skills, deliverables and authority limits.
+      ...(jd ? [renderJobDescription(jd)] : []),
       profile ? `Business profile:\n${JSON.stringify(profile, null, 2)}` : "No business profile has been set yet.",
     ];
     // The Finance manager keeps books to the owner's country rules (or a safe generic set).
     if (template.key === "finance-manager") parts.push(describePack(packFor(profile?.country)));
     const training = this.training.get(employeeId);
     if (training) parts.push(`What the owner told you during setup:\n${training}`);
+    for (const source of this.contextSources) {
+      const extra = source(workspaceId, template.key);
+      if (extra) parts.push(extra);
+    }
     const system = parts.join("\n\n");
 
     // The employee only starts work if there is energy left (or paid overtime).

@@ -19,6 +19,7 @@ A modular monolith in TypeScript: one application, strict module boundaries.
 | Audit | `src/modules/audit` | append-only, in memory |
 | Identity | `src/modules/identity` | workspaces, roles, permissions, in memory |
 | Model Gateway | `src/modules/model-gateway` | tier routing and fallback; Anthropic, OpenAI-compatible (vLLM on RunPod, hosted open models) and mock adapters |
+| Integrations | `src/modules/integrations` | business apps (Xero, Square, Stripe live; BrightPay and any till by file; Zapier/Make webhook), encrypted credentials, per-employee access, pending records posted to the ledger on the owner's say. See `docs/INTEGRATIONS.md` |
 | Admin manager | `src/modules/admin-manager` | welcomes the owner (dashboard or chat app), introduces the team, sends the setup form, then runs a journaled, rollbackable setup: profile, storage, models, training, checks |
 
 ### Signup to working team
@@ -31,3 +32,11 @@ A modular monolith in TypeScript: one application, strict module boundaries.
 ## Next
 
 PostgreSQL storage with row-level security by workspace, then Workforce (employee templates), Work (tasks), Messaging, Agent Runtime, Capability Registry, Metering and Budgets, Approvals, and the Catalogue (agent store). Storage is currently in memory behind simple classes so the real database can replace it module by module.
+
+## Sign-off gate and custom roles
+
+- `src/modules/workforce/signoff.ts`: specialised tasks (consultants, task-menu work) are proposals. The employee compiles a brief and the directions it could take; the owner asks for more information or signs off on one direction. `signOff` refuses while required information is missing or no direction is chosen, and `mayStart` is true only afterwards.
+- `src/modules/workforce/custom-roles.ts`: the Admin manager's role designer. `draftCustomRole` turns an owner's brief into a role blueprint and a full job description (same generator as blueprint specialists), flags regulated work and similar existing roles. The draft goes to the owner for sign-off.
+- Both are pure modules used by the website (`web/src/signoff-ui.ts`, `web/src/role-designer.ts`). Storing proposals and hiring a drafted specialist through the API are not built yet (see docs/AUDIT.md).
+- `web/src/dash.ts` holds the control center dashboards' example data in one place.
+

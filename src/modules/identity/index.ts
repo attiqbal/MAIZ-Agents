@@ -1,6 +1,7 @@
 import { newId, type Id } from "../../core/ids.js";
 import type { AuditLog } from "../audit/index.js";
 import type { EventBus } from "../../core/events.js";
+import type { Sink } from "../../core/persistence.js";
 
 export type Role = "owner" | "admin" | "member" | "viewer";
 export type Permission =
@@ -34,10 +35,24 @@ export class IdentityService {
   private workspaces = new Map<string, Workspace>();
   private memberships = new Map<string, Role>(); // key: workspaceId|userId
 
+  private sink?: Sink;
+
   constructor(
     private audit: AuditLog,
     private bus: EventBus,
   ) {}
+
+  useSink(sink: Sink): void {
+    this.sink = sink;
+  }
+
+  restoreWorkspace(w: Workspace): void {
+    this.workspaces.set(w.id, w);
+  }
+
+  restoreMember(workspaceId: string, userId: string, role: Role): void {
+    this.memberships.set(`${workspaceId}|${userId}`, role);
+  }
 
   async createWorkspace(
     ownerUserId: string,
@@ -53,6 +68,8 @@ export class IdentityService {
     };
     this.workspaces.set(ws.id, ws);
     this.memberships.set(`${ws.id}|${ownerUserId}`, "owner");
+    this.sink?.workspace(ws);
+    this.sink?.membership(ws.id, ownerUserId, "owner");
     this.audit.record({ workspaceId: ws.id, actor: `user:${ownerUserId}`, action: "workspace.created", target: ws.id });
     await this.bus.publish({ type: "workspace.created", workspaceId: ws.id, payload: { name: ws.name }, at: new Date() });
     return ws;
@@ -61,6 +78,7 @@ export class IdentityService {
   addMember(actorUserId: string, workspaceId: string, userId: string, role: Role): void {
     this.require(actorUserId, workspaceId, "workspace.manage");
     this.memberships.set(`${workspaceId}|${userId}`, role);
+    this.sink?.membership(workspaceId, userId, role);
     this.audit.record({
       workspaceId,
       actor: `user:${actorUserId}`,

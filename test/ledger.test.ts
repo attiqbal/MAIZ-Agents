@@ -18,6 +18,7 @@ describe("ledger", () => {
     const p = (lines: any[], date = "2026-01-05") => () => ledger.post("owner", ws, { date, memo: "x", lines });
     expect(p([dr("1000", 100), cr("4000", 99)])).toThrow(/does not balance/);
     expect(p([dr("1000", 100)])).toThrow(/at least two/);
+    expect(p([dr("1000", 1e20), cr("4000", 1e20)])).toThrow(/too large/);
     expect(p([dr("1000", 100), cr("9999", 100)])).toThrow(/unknown account/);
     expect(p([dr("1000", 10.5), cr("4000", 10.5)])).toThrow(/whole minor units/);
     expect(p([{ account: "1000", debit: 5, credit: 5 }, cr("4000", 0)])).toThrow(LedgerError);
