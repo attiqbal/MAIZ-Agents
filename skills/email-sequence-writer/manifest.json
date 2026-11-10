@@ -1,0 +1,54 @@
+{
+  "name": "email-sequence-writer",
+  "title": "Email sequence writer",
+  "department": "Task hire · Design and content",
+  "lane": "standard",
+  "tools": [
+    {
+      "name": "Business profile and setup answers",
+      "status": "available"
+    }
+  ],
+  "authority": {
+    "autonomous": [
+      "Work through the agreed scope as drafts",
+      "Keep this task's records"
+    ],
+    "needsApproval": [
+      "Plan",
+      "Emails",
+      "Any work outside the scope",
+      "Using energy beyond the included allowance"
+    ],
+    "never": [
+      "Go beyond the included energy without the owner's approval",
+      "Publish, submit, send or pay for anything",
+      "Give legal, tax or financial advice",
+      "Invent facts, figures or rules"
+    ]
+  },
+  "deliverables": [
+    {
+      "name": "Sequence plan",
+      "cadence": "Once, for this task",
+      "energy": [
+        300,
+        600
+      ]
+    },
+    {
+      "name": "Finished emails",
+      "cadence": "Once, for this task",
+      "energy": [
+        300,
+        600
+      ]
+    }
+  ],
+  "engagement": {
+    "type": "task",
+    "fixedGbp": 59,
+    "includedEnergy": 1200,
+    "turnaround": "2 to 3 working days"
+  }
+}

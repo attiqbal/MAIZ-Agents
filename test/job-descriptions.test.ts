@@ -87,3 +87,36 @@ describe("org blueprints", () => {
     expect(getJobDescription("not-a-role")).toBeUndefined();
   });
 });
+
+describe("task-based hires", () => {
+  it("each have a priced scope, approval points and a full job description", async () => {
+    const { TASK_ROLES } = await import("../src/modules/workforce/task-roles.js");
+    expect(TASK_ROLES.length).toBeGreaterThanOrEqual(20);
+    const web = TASK_ROLES.find((r) => r.key === "website-developer")!;
+    expect(web.fixedGbp).toBeGreaterThan(0);
+    for (const r of TASK_ROLES) {
+      expect(r.scope.length && r.approvalPoints.length && r.notIncluded.length && r.legal.length && r.records.length).toBeTruthy();
+      const jd = getJobDescription(r.key)!;
+      expect(jd.engagement?.fixedGbp).toBe(r.fixedGbp);
+      expect(renderJobDescription(jd)).toContain(`fixed price of £${r.fixedGbp}`);
+    }
+  });
+
+  it("warn at 80%, pause at the limit, and only run over with approval", async () => {
+    const { checkTaskUsage, getTaskRole } = await import("../src/modules/workforce/task-roles.js");
+    const role = getTaskRole("landing-page-builder")!; // 1,500 included
+    expect(checkTaskUsage(role, 1000).status).toBe("within");
+    expect(checkTaskUsage(role, 1200).status).toBe("warn");
+    expect(checkTaskUsage(role, 1500).status).toBe("paused");
+    const over = checkTaskUsage(role, 1650, 500);
+    expect(over).toMatchObject({ status: "overage", overageEnergy: 150, overageGbp: 2, includedLeft: 0 });
+    expect(checkTaskUsage(role, 2100, 500).status).toBe("paused");
+  });
+
+  it("can be hired like any employee, and every hireable role has a JD document", async () => {
+    const { getTemplate } = await import("../src/modules/workforce/templates.js");
+    const { allHireableKeys } = await import("../src/modules/workforce/skill-files.js");
+    expect(getTemplate("website-developer")?.kind).toBe("task");
+    for (const k of allHireableKeys()) expect(getJobDescription(k), k).toBeDefined();
+  });
+});

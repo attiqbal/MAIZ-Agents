@@ -7,6 +7,7 @@ import { SignupError, type SignupChoices, type TeamSize } from "../modules/onboa
 import { getTemplate, TEMPLATES } from "../modules/workforce/templates.js";
 import { getJobDescription } from "../modules/workforce/job-descriptions.js";
 import { CUSTOM_SPECIALIST, DEPARTMENTS } from "../modules/workforce/blueprints.js";
+import { OVERAGE_RULE, TASK_ROLES } from "../modules/workforce/task-roles.js";
 import type { Platform } from "./platform.js";
 
 export interface Req {
@@ -81,6 +82,9 @@ export function createApp(p: Platform) {
         // Every department and role of a typical business; roles without a ready-made employee are custom specialists.
         departments: DEPARTMENTS.map((d) => ({ key: d.key, name: d.name, mission: d.mission, roles: d.roles.map((r) => ({ key: r.key, title: r.title, purpose: r.purpose, readyMade: Boolean(r.jd) })) })),
         customSpecialist: CUSTOM_SPECIALIST,
+        // Task-based hires: one job, fixed price, included energy, one overage rule.
+        taskRoles: TASK_ROLES.map((r) => ({ key: r.key, title: r.title, category: r.category, purpose: r.purpose, fixedGbp: r.fixedGbp, includedEnergy: r.includedEnergy, turnaround: r.turnaround })),
+        overageRule: OVERAGE_RULE,
       });
     }
 

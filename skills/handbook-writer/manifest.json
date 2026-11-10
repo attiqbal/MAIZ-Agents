@@ -1,0 +1,54 @@
+{
+  "name": "handbook-writer",
+  "title": "Staff handbook writer",
+  "department": "Task hire · People and operations",
+  "lane": "premium",
+  "tools": [
+    {
+      "name": "Business profile and setup answers",
+      "status": "available"
+    }
+  ],
+  "authority": {
+    "autonomous": [
+      "Work through the agreed scope as drafts",
+      "Keep this task's records"
+    ],
+    "needsApproval": [
+      "Policy list",
+      "Draft handbook",
+      "Any work outside the scope",
+      "Using energy beyond the included allowance"
+    ],
+    "never": [
+      "Go beyond the included energy without the owner's approval",
+      "Publish, submit, send or pay for anything",
+      "Give legal, tax or financial advice",
+      "Invent facts, figures or rules"
+    ]
+  },
+  "deliverables": [
+    {
+      "name": "Draft handbook",
+      "cadence": "Once, for this task",
+      "energy": [
+        875,
+        1750
+      ]
+    },
+    {
+      "name": "Notes on what a professional should check",
+      "cadence": "Once, for this task",
+      "energy": [
+        875,
+        1750
+      ]
+    }
+  ],
+  "engagement": {
+    "type": "task",
+    "fixedGbp": 149,
+    "includedEnergy": 3500,
+    "turnaround": "4 to 6 working days"
+  }
+}

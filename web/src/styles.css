@@ -630,7 +630,7 @@ select.input { appearance: auto; }
 .jd summary::after { content: " +"; color: var(--color-ash); }
 .jd[open] summary::after { content: " –"; }
 .jd-body { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; font-size: 14px; color: var(--color-mist); font-weight: 300; overflow-wrap: anywhere; }
-.jd-body h3, .jd-body h4 { margin: 12px 0 0; font-size: 12px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.02em; color: var(--color-ash); }
+.jd-body h3, .jd-body h4, .jd-body h5 { margin: 12px 0 0; font-size: 12px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.02em; color: var(--color-ash); }
 .jd-body ul { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 4px; }
 .jd-body p { margin: 0; }
 .jd-meta { color: var(--color-ash); font-size: 13px; }
@@ -664,3 +664,18 @@ select.input { appearance: auto; }
 .bp-ready { color: #fff; border-color: var(--color-sapphire-hairline); }
 .bp-custom ol { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 6px; color: var(--color-mist); font-weight: 300; }
 .emp-card .jd-auth, .bp-role .jd-auth { grid-template-columns: 1fr; }
+
+/* Task-based hires (employees page) */
+.task-cat { font-size: 20px; margin: 32px 0 14px; }
+.task-cat:first-child { margin-top: 0; }
+.task-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; align-items: start; }
+@media (max-width: 1200px) { .task-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 760px) { .task-grid { grid-template-columns: 1fr; } }
+.task-card { display: flex; flex-direction: column; gap: 12px; }
+.task-card h4 { margin: 0; font-size: 17px; color: #fff; font-weight: 500; }
+.task-price { display: flex; flex-direction: column; gap: 2px; color: var(--color-mist); font-variant-numeric: tabular-nums; }
+.task-price b { font-size: 22px; color: #fff; font-weight: 500; }
+.task-price span { font-size: 13px; color: var(--color-ash); }
+.task-rule { margin-top: 24px; display: flex; flex-direction: column; gap: 10px; }
+.task-rule ul { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 6px; color: var(--color-mist); font-weight: 300; }
+.task-card .jd-auth { grid-template-columns: 1fr; }

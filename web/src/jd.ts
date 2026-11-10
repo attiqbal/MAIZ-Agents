@@ -8,11 +8,12 @@ const esc = (s: string) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`)
 const ul = (xs: readonly string[]) => `<ul>${xs.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>`;
 
 /** `level` is the heading level for section titles, so headings never skip a level on the page. */
-export function jdHtml(jd: JobDescription, level: 3 | 4 = 4): string {
+export function jdHtml(jd: JobDescription, level: 3 | 4 | 5 = 4): string {
   const h = `h${level}`;
   return `<div class="jd-body">
   <p class="jd-meta">${esc(jd.department)} · reports to the ${esc(jd.reportsTo.toLowerCase())}</p>
   <${h}>Role summary</${h}><p>${esc(jd.purpose)}</p>
+  ${jd.engagement ? `<${h}>The deal</${h}><p class="jd-area">£${jd.engagement.fixedGbp} fixed · ${jd.engagement.includedEnergy.toLocaleString("en-GB")} energy included · ${esc(jd.engagement.turnaround)}</p><p class="jd-area">Covered</p>${ul(jd.engagement.scope)}<p class="jd-area">Not included</p>${ul(jd.engagement.notIncluded)}<p class="jd-area">You approve</p>${ul(jd.engagement.approvalPoints)}<p class="jd-area">If the included energy runs out</p>${ul(jd.engagement.overageRule)}` : ""}
   <${h}>Key responsibilities</${h}>${jd.responsibilities.map((r) => `<p class="jd-area">${esc(r.area)}</p>${ul(r.duties)}`).join("")}
   <${h}>Skills and competencies</${h}>
   <table class="jd-table"><thead><tr><th>Skill</th><th>Level</th></tr></thead><tbody>${jd.competencies.map((c) => `<tr><td><b>${esc(c.skill)}</b><span>${esc(c.detail)}</span></td><td><span class="jd-lvl jd-${c.level.toLowerCase()}">${c.level}</span></td></tr>`).join("")}</tbody></table>

@@ -10,8 +10,10 @@
  *  - the website and app show it in the agent store and team builder.
  *
  * Pure data, no imports from the server: the website imports this file too.
+ * Mostly data, so it is allowed past the usual 800-line source-file ceiling.
  */
 import { specialistJobDescription } from "./blueprints.js";
+import { taskJobDescription } from "./task-roles.js";
 
 export type Level = "Expert" | "Advanced" | "Working";
 
@@ -73,6 +75,18 @@ export interface JobDescription {
   escalate: readonly string[];
   /** What the employee needs from the owner to take over the job. */
   handover: readonly string[];
+  /** Set for task-based hires: what the fixed price covers and how extra usage is handled. */
+  engagement?: Engagement;
+}
+
+export interface Engagement {
+  fixedGbp: number;
+  includedEnergy: number;
+  turnaround: string;
+  scope: readonly string[];
+  notIncluded: readonly string[];
+  approvalPoints: readonly string[];
+  overageRule: readonly string[];
 }
 
 export const JOB_DESCRIPTIONS: readonly JobDescription[] = [
@@ -883,9 +897,9 @@ export const JOB_DESCRIPTIONS: readonly JobDescription[] = [
   },
 ];
 
-/** A ready-made employee's JD, or one built from the org blueprint for a custom specialist. */
+/** A ready-made employee's JD, one built from the org blueprint for a custom specialist, or a task hire's. */
 export function getJobDescription(key: string): JobDescription | undefined {
-  return JOB_DESCRIPTIONS.find((j) => j.key === key) ?? specialistJobDescription(key);
+  return JOB_DESCRIPTIONS.find((j) => j.key === key) ?? specialistJobDescription(key) ?? taskJobDescription(key);
 }
 
 /** Typical energy for a deliverable, as text, e.g. "8–25 energy". */
@@ -915,7 +929,18 @@ export function renderJobDescription(jd: JobDescription): string {
     `Never: ${jd.authority.never.join("; ")}.`,
     `Tell the owner to bring in a qualified person when:\n${list(jd.escalate)}`,
     `If a request is outside this job, say so in one line and name the teammate who should do it.`,
+    ...(jd.engagement ? [engagementPrompt(jd.engagement)] : []),
   ].join("\n\n");
+}
+
+function engagementPrompt(e: Engagement): string {
+  return [
+    `You are hired for one task at a fixed price of £${e.fixedGbp}, with ${e.includedEnergy} energy included.`,
+    `Covered: ${e.scope.join("; ")}.`,
+    `Not covered (say so and suggest a separate quote): ${e.notIncluded.join("; ")}.`,
+    `Stop for the owner's approval at: ${e.approvalPoints.join("; ")}.`,
+    "Plan the work to fit the included energy. If it will not fit, say so before starting.",
+  ].join("\n");
 }
 
 /** The job description as an Agent Skills SKILL.md file (written by `npm run skills`). */
@@ -938,6 +963,7 @@ export function renderSkillMd(jd: JobDescription): string {
     "",
     jd.purpose,
     "",
+    ...(jd.engagement ? engagementMd(jd.engagement) : []),
     "## Works with",
     "",
     list(jd.worksWith),
@@ -1004,6 +1030,32 @@ export function renderSkillMd(jd: JobDescription): string {
   ].join("\n");
 }
 
+function engagementMd(e: Engagement): string[] {
+  const list = (xs: readonly string[]) => xs.map((x) => `- ${x}`).join("\n");
+  return [
+    "## Engagement: task hire",
+    "",
+    `**Fixed price:** £${e.fixedGbp} · **Included energy:** ${e.includedEnergy} · **Turnaround:** ${e.turnaround}`,
+    "",
+    "**Covered by the fixed price:**",
+    "",
+    list(e.scope),
+    "",
+    "**Not included:**",
+    "",
+    list(e.notIncluded),
+    "",
+    "**Approval points:**",
+    "",
+    list(e.approvalPoints),
+    "",
+    "**If the included energy runs out:**",
+    "",
+    list(e.overageRule),
+    "",
+  ];
+}
+
 /** Machine-readable manifest next to SKILL.md, for the capability registry and the store. */
 export function renderManifest(jd: JobDescription, tier: string): string {
   return (
@@ -1016,6 +1068,7 @@ export function renderManifest(jd: JobDescription, tier: string): string {
         tools: jd.tools,
         authority: jd.authority,
         deliverables: jd.deliverables.map((d) => ({ name: d.name, cadence: d.cadence, energy: d.energy })),
+        ...(jd.engagement ? { engagement: { type: "task", fixedGbp: jd.engagement.fixedGbp, includedEnergy: jd.engagement.includedEnergy, turnaround: jd.engagement.turnaround } } : {}),
       },
       null,
       2,

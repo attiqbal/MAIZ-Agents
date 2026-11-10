@@ -1,4 +1,5 @@
 import { getBlueprint } from "./blueprints.js";
+import { getTaskRole, priceText } from "./task-roles.js";
 
 /**
  * Employee templates are the products in the future Agent Store. A store
@@ -22,7 +23,7 @@ export interface EmployeeTemplate {
    * "employee" is hired into a package. "manager" is the free Admin manager that every
    * organisation gets: it onboards the owner, sets up the team and runs it. It is never sold.
    */
-  kind: "employee" | "manager" | "specialist";
+  kind: "employee" | "manager" | "specialist" | "task";
 }
 
 export const TEMPLATES: readonly EmployeeTemplate[] = [
@@ -129,6 +130,22 @@ export function specialistTemplate(key: string): EmployeeTemplate | undefined {
   };
 }
 
+/** A task-based hire (task-roles.ts): one job, fixed price, included energy. */
+export function taskTemplate(key: string): EmployeeTemplate | undefined {
+  const role = getTaskRole(key);
+  if (!role) return undefined;
+  return {
+    key: role.key,
+    title: role.title,
+    summary: `${role.purpose} ${priceText(role)}.`,
+    tier: role.tier,
+    kind: "task",
+    capabilities: role.scope,
+    firstJob: role.deliverables[0] ?? "Agreed brief",
+    instructions: `You are a ${role.title} hired by a small business for one task, like a freelancer. ${role.purpose} Work only from the owner's brief and what the team gives you, stay inside the agreed scope, and stop for the owner's approval at each approval point. Never invent facts, figures or rules. You draft and deliver files and documents; you never publish, submit, send or pay for anything yourself. You do not give legal, tax or financial advice: say when a qualified professional should check.`,
+  };
+}
+
 export function getTemplate(key: string): EmployeeTemplate | undefined {
-  return TEMPLATES.find((t) => t.key === key) ?? specialistTemplate(key);
+  return TEMPLATES.find((t) => t.key === key) ?? specialistTemplate(key) ?? taskTemplate(key);
 }

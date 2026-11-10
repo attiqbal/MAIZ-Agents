@@ -1,0 +1,62 @@
+{
+  "name": "recruitment-campaign",
+  "title": "Recruitment campaign runner",
+  "department": "Task hire · People and operations",
+  "lane": "standard",
+  "tools": [
+    {
+      "name": "Business profile and setup answers",
+      "status": "available"
+    }
+  ],
+  "authority": {
+    "autonomous": [
+      "Work through the agreed scope as drafts",
+      "Keep this task's records"
+    ],
+    "needsApproval": [
+      "Job ad",
+      "Shortlist",
+      "Any work outside the scope",
+      "Using energy beyond the included allowance"
+    ],
+    "never": [
+      "Go beyond the included energy without the owner's approval",
+      "Publish, submit, send or pay for anything",
+      "Give legal, tax or financial advice",
+      "Invent facts, figures or rules"
+    ]
+  },
+  "deliverables": [
+    {
+      "name": "Job ad",
+      "cadence": "Once, for this task",
+      "energy": [
+        500,
+        1000
+      ]
+    },
+    {
+      "name": "Scorecard",
+      "cadence": "Once, for this task",
+      "energy": [
+        500,
+        1000
+      ]
+    },
+    {
+      "name": "Shortlist with reasons",
+      "cadence": "Once, for this task",
+      "energy": [
+        500,
+        1000
+      ]
+    }
+  ],
+  "engagement": {
+    "type": "task",
+    "fixedGbp": 129,
+    "includedEnergy": 3000,
+    "turnaround": "5 to 10 working days"
+  }
+}

@@ -1,0 +1,62 @@
+{
+  "name": "automation-builder",
+  "title": "Automation builder",
+  "department": "Task hire · Web and technology",
+  "lane": "premium",
+  "tools": [
+    {
+      "name": "Business profile and setup answers",
+      "status": "available"
+    }
+  ],
+  "authority": {
+    "autonomous": [
+      "Work through the agreed scope as drafts",
+      "Keep this task's records"
+    ],
+    "needsApproval": [
+      "Workflow map",
+      "Test run before switching on",
+      "Any work outside the scope",
+      "Using energy beyond the included allowance"
+    ],
+    "never": [
+      "Go beyond the included energy without the owner's approval",
+      "Publish, submit, send or pay for anything",
+      "Give legal, tax or financial advice",
+      "Invent facts, figures or rules"
+    ]
+  },
+  "deliverables": [
+    {
+      "name": "Workflow map",
+      "cadence": "Once, for this task",
+      "energy": [
+        417,
+        833
+      ]
+    },
+    {
+      "name": "Working automation or exact set-up steps",
+      "cadence": "Once, for this task",
+      "energy": [
+        417,
+        833
+      ]
+    },
+    {
+      "name": "Run guide",
+      "cadence": "Once, for this task",
+      "energy": [
+        417,
+        833
+      ]
+    }
+  ],
+  "engagement": {
+    "type": "task",
+    "fixedGbp": 99,
+    "includedEnergy": 2500,
+    "turnaround": "3 to 5 working days"
+  }
+}

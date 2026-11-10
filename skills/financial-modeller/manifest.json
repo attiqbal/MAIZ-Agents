@@ -1,0 +1,54 @@
+{
+  "name": "financial-modeller",
+  "title": "Financial modeller",
+  "department": "Task hire · Finance, legal and funding",
+  "lane": "premium",
+  "tools": [
+    {
+      "name": "Business profile and setup answers",
+      "status": "available"
+    }
+  ],
+  "authority": {
+    "autonomous": [
+      "Work through the agreed scope as drafts",
+      "Keep this task's records"
+    ],
+    "needsApproval": [
+      "Assumptions",
+      "Final model",
+      "Any work outside the scope",
+      "Using energy beyond the included allowance"
+    ],
+    "never": [
+      "Go beyond the included energy without the owner's approval",
+      "Publish, submit, send or pay for anything",
+      "Give legal, tax or financial advice",
+      "Invent facts, figures or rules"
+    ]
+  },
+  "deliverables": [
+    {
+      "name": "Spreadsheet model",
+      "cadence": "Once, for this task",
+      "energy": [
+        1125,
+        2250
+      ]
+    },
+    {
+      "name": "Summary of key numbers",
+      "cadence": "Once, for this task",
+      "energy": [
+        1125,
+        2250
+      ]
+    }
+  ],
+  "engagement": {
+    "type": "task",
+    "fixedGbp": 179,
+    "includedEnergy": 4500,
+    "turnaround": "4 to 6 working days"
+  }
+}

@@ -1,0 +1,54 @@
+{
+  "name": "social-launch-planner",
+  "title": "Social media launch planner",
+  "department": "Task hire · Marketing and research",
+  "lane": "standard",
+  "tools": [
+    {
+      "name": "Business profile and setup answers",
+      "status": "available"
+    }
+  ],
+  "authority": {
+    "autonomous": [
+      "Work through the agreed scope as drafts",
+      "Keep this task's records"
+    ],
+    "needsApproval": [
+      "Themes",
+      "Posts",
+      "Any work outside the scope",
+      "Using energy beyond the included allowance"
+    ],
+    "never": [
+      "Go beyond the included energy without the owner's approval",
+      "Publish, submit, send or pay for anything",
+      "Give legal, tax or financial advice",
+      "Invent facts, figures or rules"
+    ]
+  },
+  "deliverables": [
+    {
+      "name": "Calendar",
+      "cadence": "Once, for this task",
+      "energy": [
+        500,
+        1000
+      ]
+    },
+    {
+      "name": "30 drafted posts",
+      "cadence": "Once, for this task",
+      "energy": [
+        500,
+        1000
+      ]
+    }
+  ],
+  "engagement": {
+    "type": "task",
+    "fixedGbp": 79,
+    "includedEnergy": 2000,
+    "turnaround": "3 to 5 working days"
+  }
+}

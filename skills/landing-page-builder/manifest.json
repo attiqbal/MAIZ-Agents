@@ -1,0 +1,54 @@
+{
+  "name": "landing-page-builder",
+  "title": "Landing page builder",
+  "department": "Task hire · Web and technology",
+  "lane": "standard",
+  "tools": [
+    {
+      "name": "Business profile and setup answers",
+      "status": "available"
+    }
+  ],
+  "authority": {
+    "autonomous": [
+      "Work through the agreed scope as drafts",
+      "Keep this task's records"
+    ],
+    "needsApproval": [
+      "Copy and layout",
+      "Page before publishing",
+      "Any work outside the scope",
+      "Using energy beyond the included allowance"
+    ],
+    "never": [
+      "Go beyond the included energy without the owner's approval",
+      "Publish, submit, send or pay for anything",
+      "Give legal, tax or financial advice",
+      "Invent facts, figures or rules"
+    ]
+  },
+  "deliverables": [
+    {
+      "name": "Page copy",
+      "cadence": "Once, for this task",
+      "energy": [
+        375,
+        750
+      ]
+    },
+    {
+      "name": "Finished page and publishing guide",
+      "cadence": "Once, for this task",
+      "energy": [
+        375,
+        750
+      ]
+    }
+  ],
+  "engagement": {
+    "type": "task",
+    "fixedGbp": 79,
+    "includedEnergy": 1500,
+    "turnaround": "2 to 4 working days"
+  }
+}

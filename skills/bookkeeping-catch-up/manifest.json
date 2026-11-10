@@ -1,0 +1,62 @@
+{
+  "name": "bookkeeping-catch-up",
+  "title": "Bookkeeping catch-up",
+  "department": "Task hire · Finance, legal and funding",
+  "lane": "premium",
+  "tools": [
+    {
+      "name": "Business profile and setup answers",
+      "status": "available"
+    }
+  ],
+  "authority": {
+    "autonomous": [
+      "Work through the agreed scope as drafts",
+      "Keep this task's records"
+    ],
+    "needsApproval": [
+      "Category rules",
+      "Final books",
+      "Any work outside the scope",
+      "Using energy beyond the included allowance"
+    ],
+    "never": [
+      "Go beyond the included energy without the owner's approval",
+      "Publish, submit, send or pay for anything",
+      "Give legal, tax or financial advice",
+      "Invent facts, figures or rules"
+    ]
+  },
+  "deliverables": [
+    {
+      "name": "Up-to-date ledger",
+      "cadence": "Once, for this task",
+      "energy": [
+        667,
+        1333
+      ]
+    },
+    {
+      "name": "Trial balance",
+      "cadence": "Once, for this task",
+      "energy": [
+        667,
+        1333
+      ]
+    },
+    {
+      "name": "Missing-documents list",
+      "cadence": "Once, for this task",
+      "energy": [
+        667,
+        1333
+      ]
+    }
+  ],
+  "engagement": {
+    "type": "task",
+    "fixedGbp": 149,
+    "includedEnergy": 4000,
+    "turnaround": "3 to 5 working days"
+  }
+}
