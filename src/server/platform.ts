@@ -25,6 +25,7 @@ import { SpecialistReviewService, type SpecialistRequest } from "../modules/revi
 import { templateFromRole } from "../modules/workforce/templates.js";
 import { MockPaymentProvider, PaymentService, type PaymentProvider } from "../modules/payments/index.js";
 import { quote } from "../modules/store/cart.js";
+import { RotaService } from "../modules/rota/index.js";
 
 import { ConsoleEmailSender, type EmailSender } from "./email.js";
 import { userIdFor } from "./identity.js";
@@ -150,6 +151,9 @@ export function createPlatform(cfg: PlatformConfig) {
   });
 
   let alertOwnersLate: (subject: string, text: string) => Promise<void> = async () => undefined;
+  /** Staff and shifts, so rota questions are answered from real records. */
+  const rota = new RotaService(identity, audit);
+  workforce.addContext((ws, templateKey) => rota.contextFor(ws, templateKey, now().toISOString().slice(0, 10)));
   /** Checkout and orders. What a paid order buys is hired here, from the same templates the store sells. */
   const payments = new PaymentService(identity, audit, {
     provider: cfg.payments ?? (cfg.allowDevAuth ? new MockPaymentProvider() : undefined),
@@ -267,7 +271,11 @@ export function createPlatform(cfg: PlatformConfig) {
     for (const r of s.reviews ?? []) reviews.restore(r);
     for (const c of s.priceChanges ?? []) prices.restore(c);
     for (const r of s.specialistRequests ?? []) specialists.restore(r);
-    for (const x of s.records ?? []) if (x.kind === "order") payments.restore(x.data);
+    for (const x of s.records ?? []) {
+      if (x.kind === "order") payments.restore(x.data);
+      else if (x.kind === "rota_staff") rota.restoreStaff(x.data);
+      else if (x.kind === "rota_shift" && !x.data.removed) rota.restoreShift(x.data);
+    }
     for (const r of specialists.approved()) workforce.registerCustomTemplate(r.workspaceId, customTemplateOf(r));
     if (s.aiSettings) aiSettings.restore(s.aiSettings);
     for (const d of s.aiDays ?? []) spend.restore(d);
@@ -275,7 +283,7 @@ export function createPlatform(cfg: PlatformConfig) {
     for (const j of s.batchJobs ?? []) batch.restoreJob(j);
     for (const r of s.batchRuns ?? []) batch.restoreRun(r);
     sink = store;
-    for (const part of [audit, identity, energy, workforce, ledger, router, admin, integrations, reviews, prices, specialists, aiSettings, spend, batch, payments]) part.useSink(store);
+    for (const part of [audit, identity, energy, workforce, ledger, router, admin, integrations, reviews, prices, specialists, aiSettings, spend, batch, payments, rota]) part.useSink(store);
   }
 
   const healthy = () => (sink as { healthy?: boolean } | undefined)?.healthy !== false;
@@ -284,6 +292,6 @@ export function createPlatform(cfg: PlatformConfig) {
   const usedLinks = new Set<string>();
   /** Sign-in emails sent per address and hour, to stop the form being used to spam someone. */
   const sends = new Map<string, number[]>();
-  return { payments, batch, email, usedLinks, sends, admin, reviews, prices, specialists, ai, clients, isPlatformOwner, healthy, cfg, now, audit, bus, identity, energy, workforce, ledger, onboarding, router, integrations, slackTokens, saveSlackToken, attachStore };
+  return { rota, payments, batch, email, usedLinks, sends, admin, reviews, prices, specialists, ai, clients, isPlatformOwner, healthy, cfg, now, audit, bus, identity, energy, workforce, ledger, onboarding, router, integrations, slackTokens, saveSlackToken, attachStore };
 }
 export type Platform = ReturnType<typeof createPlatform>;

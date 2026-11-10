@@ -16,6 +16,7 @@ import { CUSTOM_SPECIALIST, DEPARTMENTS } from "../modules/workforce/blueprints.
 import { OVERAGE_RULE } from "../modules/workforce/task-roles.js";
 import { CONSULTANTS, HOW_A_PASS_WORKS, menuOf } from "../modules/workforce/consultants.js";
 import { quote } from "../modules/store/cart.js";
+import { RotaError } from "../modules/rota/index.js";
 import { PaymentError, WebhookSignatureError, type Order } from "../modules/payments/index.js";
 import type { Platform } from "./platform.js";
 
@@ -291,6 +292,22 @@ export function createApp(p: Platform) {
     const org = orgOf(userId);
     if (!org) return json(404, { error: "no organisation yet" });
 
+    // ---- rota: staff and shifts ----
+    if (path.startsWith("/api/rota/")) {
+      const today = p.now().toISOString().slice(0, 10);
+      const rotaWeek = (date: string) => json(200, p.rota.week(userId, org.id, date));
+      if (method === "GET" && path === "/api/rota/week") return rotaWeek(req.query.get("date") ?? today);
+      if (method === "POST" && path === "/api/rota/staff") { const st = p.rota.addStaff(userId, org.id, body()); return json(201, { added: st, ...p.rota.week(userId, org.id, today) }); }
+      const left = /^\/api\/rota\/staff\/([\w-]{1,64})\/leave$/.exec(path);
+      if (method === "POST" && left) { p.rota.deactivate(userId, org.id, left[1]!, today); return rotaWeek(today); }
+      if (method === "POST" && path === "/api/rota/shifts") { const sh = p.rota.addShift(userId, org.id, body()); return json(201, { shift: sh, ...p.rota.week(userId, org.id, sh.date) }); }
+      const asg = /^\/api\/rota\/shifts\/([\w-]{1,64})\/assign$/.exec(path);
+      if (method === "POST" && asg) { const b = body(); const sh = p.rota.assign(userId, org.id, asg[1]!, typeof b.staffId === "string" && b.staffId ? b.staffId : null); return json(200, { shift: sh, ...p.rota.week(userId, org.id, sh.date) }); }
+      const del = /^\/api\/rota\/shifts\/([\w-]{1,64})$/.exec(path);
+      if (method === "DELETE" && del) { p.rota.removeShift(userId, org.id, del[1]!); return rotaWeek(req.query.get("date") ?? today); }
+      return json(404, { error: "not found" });
+    }
+
     // ---- buying from the store ----
     if (method === "POST" && path === "/api/checkout") {
       const { order, url } = await p.payments.checkout(userId, org.id, body().lines);
@@ -523,7 +540,7 @@ export function createApp(p: Platform) {
     try {
       return await route(req);
     } catch (err) {
-      if (err instanceof BadRequest || err instanceof SetupError || err instanceof SignupError || err instanceof LedgerError || err instanceof ChannelError || err instanceof IntegrationError || err instanceof ReviewError || err instanceof PricingError || err instanceof SettingsError || err instanceof BatchError || err instanceof PaymentError) return json(400, { error: err.message });
+      if (err instanceof BadRequest || err instanceof SetupError || err instanceof SignupError || err instanceof LedgerError || err instanceof ChannelError || err instanceof IntegrationError || err instanceof ReviewError || err instanceof PricingError || err instanceof SettingsError || err instanceof BatchError || err instanceof PaymentError || err instanceof RotaError) return json(400, { error: err.message });
       if (err instanceof PermissionError) return json(403, { error: "you don't have permission to do that" });
       console.error(`${req.method} ${req.path} failed:`, err);
       return json(500, { error: "something went wrong" });
