@@ -254,6 +254,7 @@ export function createApp(p: Platform) {
     } catch (err) {
       if (err instanceof BadRequest || err instanceof SetupError || err instanceof SignupError || err instanceof LedgerError || err instanceof ChannelError) return json(400, { error: err.message });
       if (err instanceof PermissionError) return json(403, { error: "you don't have permission to do that" });
+      console.error(`${req.method} ${req.path} failed:`, err);
       return json(500, { error: "something went wrong" });
     }
   };

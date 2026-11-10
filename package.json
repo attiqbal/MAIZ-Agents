@@ -10,16 +10,21 @@
     "check": "npm run typecheck && npm test",
     "db:test": "bash db/isolation-test.sh",
     "dev:api": "ALLOW_DEV_AUTH=1 tsx src/server/main.ts",
-    "db:int": "bash db/with-postgres.sh npx vitest run test/postgres.int.test.ts"
+    "db:int": "bash db/with-postgres.sh npx vitest run test/postgres.int.test.ts",
+    "build": "npm run typecheck && cd web && npm run build",
+    "start": "node --import tsx src/server/main.ts"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
-    "tsx": "^4.19.0",
     "typescript": "^5.6.0",
     "vitest": "^2.1.0"
   },
   "dependencies": {
     "@types/pg": "^8.23.1",
-    "pg": "^8.23.1"
+    "pg": "^8.23.1",
+    "tsx": "^4.19.0"
+  },
+  "engines": {
+    "node": ">=22"
   }
 }
