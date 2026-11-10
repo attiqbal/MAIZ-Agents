@@ -143,10 +143,12 @@ $<HTMLFormElement>("ask").addEventListener("submit", async (e) => {
   const key = m ? { finance: "finance-manager", marketing: "marketing-manager", consultant: "business-consultant", hr: "hr-manager", compliance: "compliance-manager", supply: "supply-chain-manager" }[m[1]!.toLowerCase() as "finance"] : "business-consultant";
   const emp = realOrg.team.find((x) => x.templateKey === key) ?? realOrg.team[0]!;
   toast(`${emp.name} is on it…`);
-  const r = await api<{ status: string; reason?: string; answer?: string }>("/ask", { body: { text: m ? m[2] : text, employeeId: emp.id } });
+  const u = /^urgent\s*[:,-]\s*(.+)$/is.exec(m ? m[2]! : text);
+  const r = await api<{ status: string; reason?: string; answer?: string; runsAt?: string }>("/ask", { body: { text: u ? u[1] : m ? m[2] : text, employeeId: emp.id, urgent: !!u } });
   input.value = "";
   if (!r.ok || !r.data) { toast("Could not reach your team. Try again."); return; }
   if (r.data.status === "no_energy") { toast(r.data.reason === "trial_ended" ? "Your free trial has ended" : `${emp.name} has used today's energy`); return; }
+  if (r.data.status === "queued") { toast(`Queued with your next batch${r.data.runsAt ? `, runs ${new Date(r.data.runsAt).toLocaleString([], { weekday: "short", hour: "numeric", minute: "2-digit" })}` : ""}. Start with "urgent:" to skip the wait.`); return; }
   showAnswer(emp.name, r.data.answer ?? "");
   void loadOrg();
 });

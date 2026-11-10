@@ -26,6 +26,9 @@
               <div class="tbl-wrap" tabindex="0" role="region" aria-label="Spend by kind of work, scrolls sideways on small screens"><table class="tbl" id="ai-policies"></table></div></section>
             <section class="panel" aria-labelledby="ai-days-h"><div class="panel-h"><h2 id="ai-days-h">Last 30 days</h2></div>
               <div class="tbl-wrap" tabindex="0" role="region" aria-label="Spend by day, scrolls sideways on small screens"><table class="tbl" id="ai-days"></table></div></section>
+            <section class="panel" aria-labelledby="ai-batch-h"><div class="panel-h"><h2 id="ai-batch-h">Batch queue</h2><button type="button" class="btn btn-quiet btn-sm r" id="ai-run-all">Run all now</button></div>
+              <p class="sub" style="margin:0 0 12px">Work that can wait is collected through the day and sent to RunPod together at each client's closing time, so the GPU starts once. Quick questions and urgent work are never queued.</p>
+              <div class="ow-stack" id="ai-batch" aria-live="polite"></div></section>
             <form class="ow-stack" id="ai-form" novalidate>
               <section class="panel" aria-labelledby="ai-set-h"><div class="panel-h"><h2 id="ai-set-h">Models, quality bar and budgets</h2><span class="r">Changes apply to the next task. Keys are never shown here: they live in the server's environment.</span></div>
                 <div class="ow-grid" id="ai-settings"></div></section>

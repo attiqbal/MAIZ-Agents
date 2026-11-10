@@ -30,6 +30,26 @@ Daily, monthly, per-client Claude caps and a monthly RunPod cap (US dollars, bla
 - Cache savings are shown separately (a Claude-only setup could cache too).
 - Stored per day in `platform_records` (`ai_day`), settings in `ai_settings`; no migration needed.
 
+## Batch system (`src/modules/batch/`)
+
+Most work does not need an answer this second, and a RunPod GPU that starts once for many tasks is cheaper than one that starts for each. So work is sorted when it arrives (`classify.ts`):
+
+| Kind | Examples | What happens |
+|---|---|---|
+| **Lookup** | "what's the status?", "how does the rota look?" | Answered at once by a cheap Claude model (`live` policy, no checks) reading a short digest of the queue and recent filings |
+| **Urgent** | marked urgent (start with `urgent:`), or words like asap, today, before my meeting; the Admin manager always | Normal real-time route (RunPod now) |
+| **Batch** | drafts, reports, bookkeeping, analysis | Queued. The client sees "queued, runs at 6 pm" |
+
+**When a batch runs** (`tick()` every minute): at a client's closing time (default 18:00 UTC, set per client with timezone, optional extra runs and skip weekends), early when waiting work reaches `sizeTrigger` tasks or `tokenTrigger` tokens, when anything has waited `maxQueueAgeHours`, or when a client presses Run now (or the owner presses Run all now). Every ready task from every client goes out together, so the GPU starts once. Run now is rate limited per address.
+
+**In the batch:** `concurrency` tasks at a time. Claude reads at least `qaRateMin` of the answers (nobody is waiting, so this is generous). A failed task is retried later with growing waits up to `maxAttempts`. **Claude finishes a task only on its last attempt** (`claudeAfterFailures`), so a pod outage never silently spends Claude money. Results are filed on the job, the client gets one Admin-manager message per batch, and the ledger records batch jobs, runs, savings against Claude-only and the estimated cold starts avoided (`coldStartSeconds` x GPU price x (tasks - 1)).
+
+**Stays real-time on purpose:** the Admin manager, urgent and time-sensitive work, lookups, sign-off decisions, sign-in and payments (listed on the owner page and in `REAL_TIME_RULES`).
+
+**Limits:** the dispatcher lives in one server process (single instance, as the rest of the in-memory services). Jobs are saved to Postgres and a restart puts running jobs back in the queue. Classification is keyword based and visible: an unusual urgent request may be queued, and the client can always press Run now or write `urgent:`. There is no rota module yet, so "how does the rota look" answers from whatever records exist.
+
+API: `POST /api/ask` (`urgent`), `GET /api/queue`, `POST /api/queue/run-now`, `POST /api/queue/:id/cancel`, `GET|POST /api/batch/schedule`, owner `GET /api/owner/batch`, `POST /api/owner/batch/run-now`. Settings: `batch.*` on the owner AI page.
+
 ## Owner controls (`/owner-ai.html`, `GET /api/owner/ai`, `POST /api/owner/ai/settings`, `GET /api/owner/ai/health`)
 
 Models, prices, thresholds, rates, caps and per-policy rules are data. Anything can be changed without a deploy; bad values are refused. Keys and the endpoint id are **only** environment variables (`RUNPOD_API_KEY`, `RUNPOD_ENDPOINT_ID`, `ANTHROPIC_API_KEY`) and never appear in any response.

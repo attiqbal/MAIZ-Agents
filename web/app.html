@@ -131,6 +131,15 @@
       <section class="panel" aria-labelledby="so-h"><div class="panel-h"><h2 id="so-h">Specialised work in quality review</h2><span class="r" id="so-count"></span></div>
         <p class="muted small">Specialised work never starts on its own. The specialist gathers everything it needs from you and your apps, then MAIZ quality review checks it against what you asked for and approves the direction before any work starts. If something is missing, you will see the question here.</p>
         <div class="so-list" id="so-list"></div></section>
+      <section class="panel" aria-labelledby="q-h"><div class="panel-h"><h2 id="q-h">Waiting for the batch</h2><span class="r" id="q-count"></span><button type="button" class="btn btn-quiet btn-sm" id="q-run">Run now</button></div>
+        <p class="muted small">Work that can wait is collected and run together at your closing time, which keeps costs down. Quick questions, and anything you mark urgent (start the message with "urgent:"), are answered at once.</p>
+        <div class="q-list" id="q-list"></div>
+        <form class="q-form" id="q-form" novalidate>
+          <div class="field"><label for="q-time">Closing time</label><input class="input" id="q-time" type="time"></div>
+          <div class="field"><label for="q-tz">Time zone</label><input class="input" id="q-tz" type="text" maxlength="60" placeholder="Europe/London" autocomplete="off"></div>
+          <label class="ow-check"><input type="checkbox" id="q-weekends">Skip weekends</label>
+          <button type="submit" class="btn btn-ghost btn-sm">Save schedule</button>
+        </form></section>
       <div class="chips" id="task-filter" role="group" aria-label="Show tasks by employee"></div>
       <div class="kan" id="kan" tabindex="0" role="region" aria-label="Task board, scrolls sideways on small screens"></div>
       <section class="panel" aria-labelledby="cons-h"><div class="panel-h"><h2 id="cons-h">Consultants on a pass</h2><a class="r link" href="/employees.html#store">Browse consultants</a></div>

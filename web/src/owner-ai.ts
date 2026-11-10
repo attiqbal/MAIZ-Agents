@@ -25,7 +25,7 @@ const usd = (micro: number): string => `$${(micro / 1e6).toLocaleString("en-US",
 const pct = (n: number, d: number): string => (d > 0 ? `${Math.round((n / d) * 100)}%` : "–");
 
 function demo(): Overview {
-  const t = (k: number): Totals => ({ calls: 480 * k, cacheHits: 40 * k, runpodCalls: 420 * k, claudeDirect: 20 * k, fallbacks: 8 * k, reviews: 90 * k, reviewFails: 9 * k, reviewErrors: 0, escalations: 11 * k, lowConfidence: 0, budgetRefused: 0, failures: 1, runpodMicro: 9_400_000 * k, claudeMicro: 5_100_000 * k, baselineMicro: 31_000_000 * k, cacheSavedMicro: 1_900_000 * k, runpodSeconds: 41_000 * k });
+  const t = (k: number): Totals => ({ batchJobs: 310 * k, batchRuns: 22 * k, batchActualMicro: 5_200_000 * k, batchBaselineMicro: 19_000_000 * k, coldStartSavedMicro: 2_100_000 * k, calls: 480 * k, cacheHits: 40 * k, runpodCalls: 420 * k, claudeDirect: 20 * k, fallbacks: 8 * k, reviews: 90 * k, reviewFails: 9 * k, reviewErrors: 0, escalations: 11 * k, lowConfidence: 0, budgetRefused: 0, failures: 1, runpodMicro: 9_400_000 * k, claudeMicro: 5_100_000 * k, baselineMicro: 31_000_000 * k, cacheSavedMicro: 1_900_000 * k, runpodSeconds: 41_000 * k });
   const std: Policy = { calls: 400, runpodMicro: 8_000_000, claudeMicro: 3_000_000, baselineMicro: 20_000_000, escalations: 7, reviewFails: 6 };
   return {
     configured: { runpod: true, claude: true }, status: { breakerOpen: false, breakerOpenUntil: null, consecutiveFailures: 0, cacheEntries: 112 },
@@ -34,15 +34,35 @@ function demo(): Overview {
     days: Array.from({ length: 7 }, (_, i) => ({ ...t(0.14), day: new Date(Date.now() - (6 - i) * 86_400_000).toISOString().slice(0, 10), byPolicy: {} })) as Overview["days"],
   };
 }
+function demoBatch(): BatchView {
+  const run = (i: number) => ({ id: `r${i}`, trigger: i % 5 === 4 ? "size" : "schedule", startedAt: new Date(Date.now() - i * 86_400_000).toISOString(), jobs: 14 - i, done: 14 - i, failed: 0, retried: i % 3, clients: 4, actualMicro: 240_000, baselineMicro: 880_000, savedMicro: 640_000, coldStartSavedMicro: 95_000 });
+  return {
+    queued: 9, running: 0, estTokens: 41_000, oldestMinutes: 410, nextDueAt: new Date(Date.now() + 3 * 3_600_000).toISOString(),
+    byClient: [{ id: "a", name: "Kestrel Coffee", queued: 5, nextAt: new Date(Date.now() + 3 * 3_600_000).toISOString() }, { id: "b", name: "Loaf Bakery", queued: 4, nextAt: new Date(Date.now() + 5 * 3_600_000).toISOString() }],
+    runs: [1, 2, 3, 4, 5].map(run),
+    realTime: [{ what: "The Admin manager", why: "People wait on it during sign-up" }, { what: "Anything marked urgent", why: "The person chose speed" }, { what: "Quick questions about status or the rota", why: "Answered at once by a cheap Claude model" }],
+  };
+}
 function demoSettings(): AiRoutingSettings {
   const p = (o: Partial<PolicySettings> = {}): PolicySettings => ({ primary: "runpod", claudeModel: "claude-haiku-5-5", baselineModel: "claude-haiku-5-5", reviewRate: 0.15, minScore: 7, escalate: true, escalationModel: "claude-sonnet-5-5", fallbackToClaude: true, allowOpenModel: true, cache: true, ...o });
   return {
     runpod: { enabled: true, model: "Qwen/Qwen3-30B-A3B-Instruct-2507", billing: "seconds", gpuUsdPerSecond: 0.00034, tokenPrice: { inputPer1k: 60, outputPer1k: 250 }, softDeadlineMs: 45000, hardTimeoutMs: 120000, attempts: 2, breakerFailures: 3, breakerCooldownMs: 60000 },
     reviewer: { enabled: true, model: "claude-haiku-5-5", maxInputChars: 12000, adaptive: true }, cache: { enabled: true, ttlSeconds: 3600, maxEntries: 500 },
     budgets: { claudeDailyUsd: 15, claudeMonthlyUsd: 200, claudePerWorkspaceMonthlyUsd: 20, runpodMonthlyUsd: 300, whenClaudeCapped: "degrade" }, prices: {},
-    policies: { standard: p(), premium: p({ claudeModel: "claude-sonnet-5-5", baselineModel: "claude-sonnet-5-5", reviewRate: 0.5, minScore: 8 }), "compliance-manager": p({ primary: "claude", reviewRate: 0, escalate: false, fallbackToClaude: false, allowOpenModel: false }) },
+    policies: { live: p({ primary: "claude", reviewRate: 0, escalate: false, fallbackToClaude: false, allowOpenModel: false }), standard: p(), premium: p({ claudeModel: "claude-sonnet-5-5", baselineModel: "claude-sonnet-5-5", reviewRate: 0.5, minScore: 8 }), "compliance-manager": p({ primary: "claude", reviewRate: 0, escalate: false, fallbackToClaude: false, allowOpenModel: false }) },
+    batch: { enabled: true, sizeTrigger: 20, tokenTrigger: 200_000, maxQueueAgeHours: 24, concurrency: 6, maxAttempts: 3, retryBackoffMinutes: 15, qaRateMin: 0.3, claudeAfterFailures: true, coldStartSeconds: 40, liveTemplates: ["admin-manager"] },
   };
 }
+
+interface BatchView {
+  queued: number; running: number; estTokens: number; oldestMinutes: number; nextDueAt: string | null;
+  byClient: { id: string; name: string; queued: number; nextAt: string }[];
+  runs: { id: string; trigger: string; startedAt: string; jobs: number; done: number; failed: number; retried: number; clients: number; actualMicro: number; baselineMicro: number; savedMicro: number; coldStartSavedMicro: number }[];
+  realTime: { what: string; why: string }[];
+}
+let batchView: BatchView | null = null;
+const TRIGGER_LABEL: Record<string, string> = { schedule: "Closing time", size: "Enough work gathered", age: "Waited too long", run_now: "Client pressed Run now", owner: "You pressed Run all now" };
+const when = (iso: string): string => new Date(iso).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
 
 let view: Overview;
 let live = false;
@@ -62,6 +82,8 @@ function renderKpis(): void {
     tile(saved >= 0 ? "Saved" : "Costing more", usd(Math.abs(saved)), m.baselineMicro > 0 ? `${saved >= 0 ? "" : "-"}${pct(Math.abs(saved), m.baselineMicro)} against Claude only` : "No work yet", saved >= 0 ? "up" : "warn"),
     tile("Done on RunPod", pct(m.runpodCalls, served), `${m.runpodCalls.toLocaleString("en-GB")} of ${served.toLocaleString("en-GB")} tasks`),
     tile("Claude checks", m.reviews.toLocaleString("en-GB"), m.reviews ? `${pct(m.reviews - m.reviewFails, m.reviews)} passed · ${m.escalations} redone` : "None sampled yet"),
+    tile("Done in batches", m.batchJobs.toLocaleString("en-GB"), m.batchRuns ? `${m.batchRuns} runs · ${usd(m.batchBaselineMicro - m.batchActualMicro)} saved against Claude only` : "No batch has run yet"),
+    tile("GPU starts avoided", usd(m.coldStartSavedMicro), "Estimated: one cold start per batch instead of one per task"),
     tile("Saved by the cache", usd(m.cacheSavedMicro), `${m.cacheHits.toLocaleString("en-GB")} repeat requests`),
   ].join("");
 }
@@ -97,6 +119,24 @@ function renderTables(): void {
   $("ai-days").innerHTML = `<thead><tr><th scope="col">Day</th><th scope="col" class="num">Tasks</th><th scope="col" class="num">From cache</th><th scope="col" class="num">Claude covered RunPod</th><th scope="col" class="num">Redone</th><th scope="col" class="num">Spend</th><th scope="col" class="num">Claude-only</th><th scope="col" class="num">Saved</th></tr></thead><tbody>${rows || '<tr><td colspan="8" class="muted">No work yet.</td></tr>'}</tbody>`;
 }
 
+function renderBatch(): void {
+  const b = batchView;
+  const box = $("ai-batch");
+  if (!b) { box.innerHTML = '<p class="muted">The batch queue could not be loaded.</p>'; return; }
+  const tiles = [
+    tile("Waiting", String(b.queued), b.running ? `${b.running} running now` : "Sent at closing time"),
+    tile("Next run due", b.nextDueAt ? when(b.nextDueAt) : "Nothing waiting", b.queued ? `Oldest has waited ${Math.round(b.oldestMinutes / 60 * 10) / 10} h` : "Queue is empty"),
+    tile("Estimated size", `${b.estTokens.toLocaleString("en-GB")} tokens`, `Early run at ${view.settings.batch.sizeTrigger} tasks or ${view.settings.batch.tokenTrigger.toLocaleString("en-GB")} tokens`),
+  ].join("");
+  const clients = b.byClient.map((c) => `<tr><td class="ow-title"><b>${esc(c.name)}</b></td><td class="num">${c.queued}</td><td>${esc(when(c.nextAt))}</td></tr>`).join("");
+  const runs = b.runs.map((r) => `<tr><td>${esc(when(r.startedAt))}</td><td>${esc(TRIGGER_LABEL[r.trigger] ?? r.trigger)}</td><td class="num">${r.jobs}</td><td class="num">${r.done}</td><td class="num">${r.retried}</td><td class="num">${r.failed}</td><td class="num">${r.clients}</td><td class="num">${usd(r.actualMicro)}</td><td class="num">${usd(r.savedMicro)}</td></tr>`).join("");
+  box.innerHTML = `<div class="kpis">${tiles}</div>
+    <div class="tbl-wrap" tabindex="0" role="region" aria-label="Clients with waiting tasks, scrolls sideways on small screens"><table class="tbl"><thead><tr><th scope="col">Client</th><th scope="col" class="num">Waiting</th><th scope="col">Next scheduled run</th></tr></thead><tbody>${clients || '<tr><td colspan="3" class="muted">Nothing is waiting.</td></tr>'}</tbody></table></div>
+    <div class="tbl-wrap" tabindex="0" role="region" aria-label="Recent batch runs, scrolls sideways on small screens"><table class="tbl"><thead><tr><th scope="col">Started</th><th scope="col">Why it ran</th><th scope="col" class="num">Tasks</th><th scope="col" class="num">Filed</th><th scope="col" class="num">Retry later</th><th scope="col" class="num">Failed</th><th scope="col" class="num">Clients</th><th scope="col" class="num">Spend</th><th scope="col" class="num">Saved</th></tr></thead><tbody>${runs || '<tr><td colspan="9" class="muted">No batch has run yet.</td></tr>'}</tbody></table></div>
+    <h3 style="font-size:1rem;margin:16px 0 6px">Always real-time, never batched</h3>
+    <ul class="ow-list">${b.realTime.map((r) => `<li><b>${esc(r.what)}.</b> ${esc(r.why)}.</li>`).join("")}</ul>`;
+}
+
 const val = (path: string): unknown => path.split(".").reduce<any>((o, k) => o?.[k], view.settings);
 
 interface Field { path: string; label: string; kind: "text" | "number" | "cap" | "bool" | "select"; hint?: string; options?: [string, string][]; step?: string }
@@ -112,6 +152,16 @@ const FIELDS: Field[] = [
   { path: "budgets.claudeMonthlyUsd", label: "Claude cap per month ($)", kind: "cap", hint: "Blank = no cap" },
   { path: "budgets.claudePerWorkspaceMonthlyUsd", label: "Claude cap per client per month ($)", kind: "cap", hint: "Blank = no cap" },
   { path: "budgets.runpodMonthlyUsd", label: "RunPod cap per month ($)", kind: "cap", hint: "Blank = no cap" },
+  { path: "batch.enabled", label: "Batch non-urgent work", kind: "bool", hint: "Off runs everything at once, as before" },
+  { path: "batch.sizeTrigger", label: "Run early at this many waiting tasks", kind: "number", step: "1", hint: "Across all clients" },
+  { path: "batch.tokenTrigger", label: "Or at this many estimated tokens", kind: "number", step: "1000" },
+  { path: "batch.maxQueueAgeHours", label: "Never wait longer than (hours)", kind: "number", step: "1", hint: "Runs even if closing time is far off" },
+  { path: "batch.concurrency", label: "Tasks sent at once", kind: "number", step: "1", hint: "Keep within the endpoint's max workers" },
+  { path: "batch.maxAttempts", label: "Tries before a task fails", kind: "number", step: "1" },
+  { path: "batch.retryBackoffMinutes", label: "Wait between tries (minutes)", kind: "number", step: "1", hint: "Multiplied by the try number" },
+  { path: "batch.qaRateMin", label: "Claude reads at least this share of batch answers", kind: "number", step: "0.05", hint: "0 to 1. Nobody waits on the answer, so this can be generous" },
+  { path: "batch.claudeAfterFailures", label: "Claude finishes a task after the last failed try", kind: "bool", hint: "Off means a pod outage leaves tasks failed, never on Claude" },
+  { path: "batch.coldStartSeconds", label: "Cold start length (seconds)", kind: "number", step: "1", hint: "Only used to estimate the saving" },
   { path: "budgets.whenClaudeCapped", label: "When Claude is capped", kind: "select", options: [["degrade", "Keep working, unchecked"], ["fail", "Stop Claude-only work"]] },
 ];
 
@@ -167,7 +217,7 @@ function patch(): Record<string, unknown> {
 
 function renderAll(): void {
   edits.clear();
-  renderKpis(); renderStatus(); renderTables(); renderSettings();
+  renderKpis(); renderStatus(); renderTables(); renderBatch(); renderSettings();
   $("ai-changed").textContent = "No changes yet";
   $<HTMLButtonElement>("ai-save").disabled = true;
 }
@@ -196,9 +246,27 @@ $("ai-health").addEventListener("click", async () => {
   out.textContent = h.reachable ? `RunPod answers. Workers: ${list(h.workers)}. Jobs: ${list(h.jobs)}.` : `RunPod did not answer${h.error ? `: ${h.error}` : ""}.`;
 });
 
+$("ai-run-all").addEventListener("click", async () => {
+  if (!live) { toast("Example data: connect the API to run a batch."); return; }
+  const btn = $<HTMLButtonElement>("ai-run-all");
+  btn.disabled = true;
+  const r = await api<BatchView & { started?: boolean; error?: string }>("/owner/batch/run-now", { body: {} });
+  btn.disabled = false;
+  if (!r.ok || !r.data) { toast(r.data?.error ?? "Could not start the batch. Try again."); return; }
+  batchView = r.data;
+  const o = await api<Overview>("/owner/ai");
+  if (o.ok && o.data) view = o.data;
+  renderAll();
+  toast(r.data.started ? "Batch finished." : "Nothing was waiting.");
+});
+
 void (async () => {
   const r = await ownerLoad<Overview>("/owner/ai");
   if (!r) return;
-  if (r === "demo") { view = demo(); markDemo(); } else { view = r; live = true; }
+  if (r === "demo") { view = demo(); batchView = demoBatch(); markDemo(); } else {
+    view = r; live = true;
+    const b = await api<BatchView>("/owner/batch");
+    batchView = b.ok && b.data ? b.data : null;
+  }
   renderAll();
 })();
