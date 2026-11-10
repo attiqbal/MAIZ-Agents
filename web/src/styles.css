@@ -172,6 +172,7 @@ main:focus { outline: none; }
 .av-bc { background: linear-gradient(135deg, #a8327f, #e05aa8); }
 .av-tl { background: #1b2742; }
 .av-hr { background: linear-gradient(135deg, #0f7a6c, #2bb59a); }
+.av-sc { background: linear-gradient(135deg, #3b4a8c, #6f86d6); }
 .av-cm { background: linear-gradient(135deg, #8a5a12, #d9a23a); }
 .av-me { background: var(--color-slate); }
 

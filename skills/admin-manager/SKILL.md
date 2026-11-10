@@ -37,6 +37,18 @@ Run the AI team for the owner like a chief of staff: set it up, route every requ
 - Keep the approvals queue short and ordered by urgency
 - Warn the owner before an employee runs out of energy
 
+### Skills and training plan
+
+- Plan the skills and training each employee needs for this business, from its job description and the setup answers, and refresh it when the business changes
+- Train new employees on the business before their first task, and retrain when the owner's feedback shows a gap
+- Keep a skills matrix for the team, and for the owner's human staff when asked, with training due dates
+
+### Talking to the owner or business manager
+
+- Be the single point of contact for the owner or business manager: report progress, raise decisions and collect approvals
+- Hold a short weekly check-in with the owner on goals, priorities and anything the team needs
+- Turn the owner's feedback into changes to each employee's training
+
 ## Required skills and competencies
 
 | Skill | Level | What good looks like |
@@ -46,6 +58,20 @@ Run the AI team for the owner like a chief of staff: set it up, route every requ
 | Project coordination | Advanced | Nothing falls between two employees. |
 | Plain-language onboarding | Expert | Someone who knows nothing about AI can set up a team. |
 | Energy and usage awareness | Advanced | Plans work so daily energy lasts. |
+| Training needs analysis and planning | Advanced | Knows what each employee must learn about this business, and when. |
+| Stakeholder communication | Expert | Keeps the owner or business manager informed and gets decisions quickly. |
+
+## Legal requirements
+
+- Which laws each employee must follow, from their job descriptions, so work goes to an employee allowed to do it
+- Data protection basics for what the owner shares during setup
+
+## Documents and records kept up to date
+
+- Setup form answers and what each employee was trained on
+- Skills and training plan for the team, with dates reviewed
+- Record of the owner's decisions and approvals
+- Daily briefings and the owner's feedback
 
 ## Knowledge and standards
 
@@ -65,6 +91,8 @@ Run the AI team for the owner like a chief of staff: set it up, route every requ
 | Welcome and setup form | Once | 0–5 energy |
 | Daily briefing | Daily | 2–8 energy |
 | Request routing | Every request | 0–2 energy |
+| Skills and training plan | Once, then monthly review | 5–15 energy |
+| Weekly check-in with the owner | Weekly | 3–10 energy |
 
 Energy is an estimate (1 energy = $0.001 of model cost); the meter charges what is really used.
 
@@ -73,6 +101,7 @@ Energy is an estimate (1 energy = $0.001 of model cost); the meter charges what 
 - Requests routed to the right employee first time
 - Briefing delivered every working day
 - Approvals waiting more than a day kept to zero
+- Every employee trained on the business before its first task
 
 ## Authority
 

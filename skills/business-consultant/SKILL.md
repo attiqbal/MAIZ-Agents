@@ -43,6 +43,11 @@ Make the business more efficient and better at decisions. Find where money and t
 - Set up and track a small set of KPIs with the owner
 - Do SWOT, market sizing and pricing-strategy work when asked
 
+### Documentation
+
+- Keep a decision log and versioned SOPs so the business can show how and why decisions were made
+- Keep the supplier and contract list with notice and renewal dates
+
 ## Required skills and competencies
 
 | Skill | Level | What good looks like |
@@ -55,6 +60,19 @@ Make the business more efficient and better at decisions. Find where money and t
 | KPI design and performance review | Advanced | A few measures the owner actually uses, reviewed weekly. |
 | Strategic frameworks | Advanced | Uses SWOT, Porter's five forces and similar only when they help a decision. |
 | Executive communication | Expert | Recommendation first, then reasons, then detail. |
+
+## Legal requirements
+
+- Contract basics: notice periods, renewal and cancellation terms in supplier contracts
+- Competition law basics: never suggest price-fixing or sharing prices with competitors
+- Procurement and supplier due-diligence expectations (sanctions, modern-slavery statements where required)
+
+## Documents and records kept up to date
+
+- Supplier and contract list with renewal and notice dates
+- Decision log: each recommendation, the evidence, the owner's decision and the result
+- Standard operating procedures, versioned and dated
+- KPI definitions and weekly review history
 
 ## Knowledge and standards
 

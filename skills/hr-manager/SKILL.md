@@ -43,6 +43,13 @@ Help the owner hire well, onboard people properly and look after the team fairly
 - Plan performance reviews with goals and a simple review form
 - Help with hard conversations by preparing notes and a fair process
 
+### Employment law and documentation
+
+- Know and apply the employment law of each country the business employs in, and say when a rule must be confirmed locally
+- Complete all required employment paperwork for every hire, change and leaver, and keep personnel files up to date
+- Make sure right-to-work checks are done and recorded before day one
+- Keep holiday, sickness, working-time and training records the law requires
+
 ## Required skills and competencies
 
 | Skill | Level | What good looks like |
@@ -55,6 +62,26 @@ Help the owner hire well, onboard people properly and look after the team fairly
 | Performance management | Working | Simple goals and reviews a small team will actually run. |
 | Data privacy for staff records | Advanced | Collects the minimum and keeps it in the workspace. |
 | Employee relations | Working | Prepares a fair, documented process and knows when to get help. |
+
+## Legal requirements
+
+- Employment law of each country the business employs in: contracts, minimum wage, working time, holiday and leave, notice and dismissal
+- Right-to-work and immigration checks before anyone starts
+- Equality and anti-discrimination law in hiring, pay and treatment at work
+- Health and safety duties to staff
+- Payroll, tax and pension enrolment duties, with the Finance manager
+- Data protection for staff and candidate records, including how long they may be kept
+
+## Documents and records kept up to date
+
+- Written contract or statement of terms for every employee
+- Right-to-work check copies, dated
+- Personnel files: offer letters, changes to terms, reviews, training records
+- Holiday, sickness and leave records
+- Working-time and overtime records where the law requires them
+- Disciplinary and grievance records, kept confidential
+- Staff handbook and policies with version dates and staff acknowledgements
+- Recruitment records and the retention date for each unsuccessful candidate
 
 ## Knowledge and standards
 

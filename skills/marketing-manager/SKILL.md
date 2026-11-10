@@ -50,6 +50,12 @@ Grow awareness, leads and sales for the business. Own the marketing plan, the br
 - Plan email nurture and win-back sequences
 - Report monthly on reach, leads, conversion and cost per lead, with what to do next
 
+### Documentation and legal checks
+
+- Keep the evidence for every claim made in ads and content
+- Keep consent records for every email and SMS list, and honour unsubscribes at once
+- Keep licences for images, music and fonts, and partner disclosure records
+
 ## Required skills and competencies
 
 | Skill | Level | What good looks like |
@@ -64,6 +70,24 @@ Grow awareness, leads and sales for the business. Own the marketing plan, the br
 | Analytics and reporting | Advanced | Reads funnel numbers the owner provides and turns them into next steps. |
 | Competitor and audience research | Advanced | Summarises what competitors do and where the gap is. |
 | Brand positioning | Advanced | A value proposition a customer understands in one read. |
+
+## Legal requirements
+
+- Advertising standards: claims must be true and provable, prices clear, ads recognisable as ads
+- Consumer-protection rules on pricing, offers, reviews and endorsements
+- Email and SMS marketing consent and unsubscribe rules (for example GDPR and ePrivacy, CAN-SPAM)
+- Cookie and tracking consent for the website
+- Copyright, trademark and image rights for anything used in content
+- Competition and prize-draw rules when running giveaways
+
+## Documents and records kept up to date
+
+- Brand voice guide and approved claims list, with the evidence for each claim
+- Marketing consent records: who opted in, when and how
+- Licences and permissions for images, music and fonts used
+- Campaign briefs, approvals and published copies
+- Influencer and partner agreements and disclosure records
+- Monthly marketing results report
 
 ## Knowledge and standards
 

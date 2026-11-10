@@ -21,6 +21,9 @@ describe("job descriptions", () => {
       expect(jd.kpis.length).toBeGreaterThanOrEqual(2);
       expect(jd.authority.never.length).toBeGreaterThan(0);
       expect(jd.escalate.length).toBeGreaterThan(0);
+      // Every job knows its legal requirements and keeps its required records up to date.
+      expect(jd.legal.length).toBeGreaterThanOrEqual(2);
+      expect(jd.records.length).toBeGreaterThanOrEqual(3);
       for (const d of jd.deliverables) expect(d.energy[0]).toBeLessThanOrEqual(d.energy[1]);
     }
   });
@@ -43,6 +46,7 @@ describe("job descriptions", () => {
     await workforce.assign("owner", ws.id, e.id, "What do I need to do this quarter?");
     expect(seen[0]).toContain("Your job description: Compliance manager");
     expect(seen[0]).toContain("Invent a law, section number, deadline or fine");
+    expect(seen[0]).toContain("Documents and records you keep complete and up to date");
   });
 
   it("match the generated skills/ folder (run `npm run skills` after editing)", () => {

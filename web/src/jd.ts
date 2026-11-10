@@ -14,6 +14,8 @@ export function jdHtml(jd: JobDescription): string {
   <h4>Key responsibilities</h4>${jd.responsibilities.map((r) => `<p class="jd-area">${esc(r.area)}</p>${ul(r.duties)}`).join("")}
   <h4>Skills and competencies</h4>
   <table class="jd-table"><thead><tr><th>Skill</th><th>Level</th></tr></thead><tbody>${jd.competencies.map((c) => `<tr><td><b>${esc(c.skill)}</b><span>${esc(c.detail)}</span></td><td><span class="jd-lvl jd-${c.level.toLowerCase()}">${c.level}</span></td></tr>`).join("")}</tbody></table>
+  <h4>Legal requirements it knows and applies</h4>${ul(jd.legal)}
+  <h4>Documents and records it keeps up to date</h4>${ul(jd.records)}
   <h4>Knowledge and standards</h4>${ul(jd.knowledge)}
   <h4>Deliverables</h4>
   <table class="jd-table"><thead><tr><th>Deliverable</th><th>Typical energy</th></tr></thead><tbody>${jd.deliverables.map((d) => `<tr><td><b>${esc(d.name)}</b><span>${esc(d.cadence)}</span></td><td class="mono">${energyText(d)}</td></tr>`).join("")}</tbody></table>

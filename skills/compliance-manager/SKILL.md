@@ -51,6 +51,11 @@ Look after the business's compliance end to end. Know which laws, regulations, l
 - Keep a record of processing activities and help answer data-subject requests (access, deletion) as drafts
 - Prepare supplier due-diligence checklists for suppliers who handle personal data
 
+### Documentation
+
+- Keep the evidence file for every obligation complete, dated and ready for an inspection or audit
+- Check each quarter that every other employee's required records are up to date, and list gaps to the owner
+
 ## Required skills and competencies
 
 | Skill | Level | What good looks like |
@@ -65,6 +70,25 @@ Look after the business's compliance end to end. Know which laws, regulations, l
 | Evidence and audit readiness | Advanced | Every obligation has proof on file, or is listed as missing. |
 | Source citation and legal research discipline | Expert | Names the law and regulator, dates the information and never invents a section or fine. |
 | Plain-language risk communication | Expert | Tells the owner what to do and by when, without legal jargon. |
+
+## Legal requirements
+
+- Company law filing duties and registers
+- Data protection law (GDPR-style), consumer and e-commerce law, advertising codes
+- Employment, health and safety and licensing rules, shared with the HR and Supply chain managers
+- Anti-money-laundering, anti-bribery and sanctions rules
+- Industry-specific regulation for the business's sector
+- AI rules (for example the EU AI Act) and accessibility law
+
+## Documents and records kept up to date
+
+- Compliance register with owner, evidence and next due date for each obligation
+- Compliance calendar of filings, renewals and reviews
+- Licences, permits, registrations and certificates, with renewal dates
+- Record of processing activities and data-protection impact assessments
+- Breach and incident log
+- Policy library with version dates and review dates
+- Regulatory change log with sources and dates checked
 
 ## Knowledge and standards
 

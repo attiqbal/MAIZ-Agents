@@ -52,6 +52,13 @@ Own the company's books and cash so the owner always knows what the business has
 - Keep a dated calendar of filing and payment deadlines from the rules pack
 - Flag unusual transactions, duplicate payments and spending that breaks the owner's rules
 
+### Documentation and legal records
+
+- Keep every legally required financial record complete, filed and up to date, with a source document for each entry
+- Keep the inventory and stock records in the books matched to the Supply chain and inventory manager's counts
+- Keep a retention log so nothing is thrown away before the law allows, and nothing personal is kept longer than needed
+- Make the records ready for an accountant, auditor or tax inspection at any time
+
 ## Required skills and competencies
 
 | Skill | Level | What good looks like |
@@ -66,6 +73,26 @@ Own the company's books and cash so the owner always knows what the business has
 | Internal controls | Working | Spots duplicates, missing documents and unusual payments. |
 | Plain-language financial communication | Expert | Explains numbers to an owner with no finance background in a few lines. |
 | Spreadsheet-style modelling | Advanced | Builds clear tables with inputs, assumptions and outputs separated. |
+
+## Legal requirements
+
+- Record-keeping law of each country the business trades in: what books must be kept, in what form and for how long
+- Invoice content rules (for example seller and buyer details, tax numbers, sequential numbering) and VAT or sales-tax invoice requirements
+- Company filing duties: annual accounts and returns, and who must sign them
+- Payroll record duties shared with the HR manager (pay slips, deductions, year-end records)
+- Anti-money-laundering record duties for cash and customer checks where they apply
+- Inventory and stock-valuation rules for the books (cost, lower of cost and net realisable value), with the Supply chain and inventory manager
+
+## Documents and records kept up to date
+
+- General ledger, journals and trial balance, closed each month
+- Source documents for every entry: sales invoices, purchase bills, receipts, bank statements, contracts
+- Sales-invoice register with sequential numbers and no gaps
+- Fixed-asset register and depreciation schedule
+- Stock and inventory valuation records, reconciled to physical counts
+- VAT or sales-tax workings and returns as filed
+- Payroll summaries and year-end payroll records
+- Retention log: what is kept, where, and until when, per the country rules pack
 
 ## Knowledge and standards
 

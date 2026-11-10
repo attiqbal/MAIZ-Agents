@@ -93,7 +93,7 @@ $("a-edit").addEventListener("click", () => toast("Editing opens in the web edit
 
 // Real data: when signed in and the API is running, replace the demo team with the real one.
 let realOrg: Org | undefined;
-const ROLE: Record<string, [string, string]> = { "finance-manager": ["FM", "av-fm"], "marketing-manager": ["MM", "av-mm"], "business-consultant": ["BC", "av-bc"], "hr-manager": ["HR", "av-hr"], "compliance-manager": ["CM", "av-cm"], "admin-manager": ["AM", "av-tl"] };
+const ROLE: Record<string, [string, string]> = { "finance-manager": ["FM", "av-fm"], "marketing-manager": ["MM", "av-mm"], "business-consultant": ["BC", "av-bc"], "hr-manager": ["HR", "av-hr"], "compliance-manager": ["CM", "av-cm"], "supply-chain-manager": ["SC", "av-sc"], "admin-manager": ["AM", "av-tl"] };
 const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]!);
 async function loadOrg(): Promise<void> {
   const r = await api<Org>("/org");
@@ -130,8 +130,8 @@ $<HTMLFormElement>("ask").addEventListener("submit", async (e) => {
   const text = input.value.trim();
   if (!text) return;
   if (!realOrg) { toast("Admin manager got it and will route it (demo)"); input.value = ""; return; }
-  const m = /^(finance|marketing|consultant|hr|compliance)\s*[:,-]\s*(.+)$/is.exec(text);
-  const key = m ? { finance: "finance-manager", marketing: "marketing-manager", consultant: "business-consultant", hr: "hr-manager", compliance: "compliance-manager" }[m[1]!.toLowerCase() as "finance"] : "business-consultant";
+  const m = /^(finance|marketing|consultant|hr|compliance|supply)\s*[:,-]\s*(.+)$/is.exec(text);
+  const key = m ? { finance: "finance-manager", marketing: "marketing-manager", consultant: "business-consultant", hr: "hr-manager", compliance: "compliance-manager", supply: "supply-chain-manager" }[m[1]!.toLowerCase() as "finance"] : "business-consultant";
   const emp = realOrg.team.find((x) => x.templateKey === key) ?? realOrg.team[0]!;
   toast(`${emp.name} is on it…`);
   const r = await api<{ status: string; reason?: string; answer?: string }>("/ask", { body: { text: m ? m[2] : text, employeeId: emp.id } });

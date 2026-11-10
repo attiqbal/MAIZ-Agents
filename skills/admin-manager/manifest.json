@@ -57,6 +57,22 @@
         0,
         2
       ]
+    },
+    {
+      "name": "Skills and training plan",
+      "cadence": "Once, then monthly review",
+      "energy": [
+        5,
+        15
+      ]
+    },
+    {
+      "name": "Weekly check-in with the owner",
+      "cadence": "Weekly",
+      "energy": [
+        3,
+        10
+      ]
     }
   ]
 }

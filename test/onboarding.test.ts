@@ -20,6 +20,10 @@ describe("blueprint", () => {
     expect(b.waitlist).toEqual(["video-editor"]);
     expect(b.trialDays).toBe(7);
   });
+  it("hires the Supply chain and inventory manager only as an add-on", () => {
+    expect(buildBlueprint(base).employees).not.toContain("supply-chain-manager");
+    expect(buildBlueprint({ ...base, addOns: ["supply-chain-manager"] }).employees).toContain("supply-chain-manager");
+  });
   it("sizes assistants by company size or volume", () => {
     expect(buildBlueprint(base).assistants).toEqual({ finance: 0, marketing: 0 });
     expect(buildBlueprint({ ...base, teamSize: "11-50" }).assistants.finance).toBe(2);
