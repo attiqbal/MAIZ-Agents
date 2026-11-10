@@ -131,8 +131,11 @@ export function createApp(p: Platform) {
         text: `Click to sign in. The link works once and expires in 15 minutes.\n\n${base}/signin.html#token=${link}\n\nIf you didn't ask for this, ignore this email.`,
       }).catch(() => undefined);
       // Same answer whether or not the address has an account. In development the website skips the email step.
-      // Development only: the link comes back in the reply, so an existing user (or the platform owner) can sign in without email.
-      return json(200, p.cfg.allowDevAuth ? { ok: true, dev: true, devLink: link } : { ok: true });
+      // Development only: the link comes back in the reply so a tester can sign in without email. Never for a
+      // platform owner: an owner session can approve every client's work, so it always needs the emailed link
+      // (printed in the API log in development).
+      const devLink = p.cfg.allowDevAuth && !p.isPlatformOwner(userIdFor(email)) ? { devLink: link } : {};
+      return json(200, p.cfg.allowDevAuth ? { ok: true, dev: true, ...devLink } : { ok: true });
     }
     if (method === "POST" && path === "/api/signin/verify") {
       const c = readToken(secret, String(body().token ?? ""), p.now().getTime());
@@ -150,6 +153,7 @@ export function createApp(p: Platform) {
       if (claims && typeof claims.e === "string") email = claims.e; // verified by a sign-in link
       else if (p.cfg.allowDevAuth) email = String(b.email ?? "").trim().toLowerCase(); // development only: no check
       else return json(401, { error: "verify your email first" });
+      if (!claims && p.isPlatformOwner(userIdFor(email))) return json(401, { error: "verify your email first" }); // never an unverified owner session
       if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) throw new BadRequest("a valid email is required");
       const userId = userIdFor(email);
       if (orgOf(userId)) return json(409, { error: "this email already has an organisation" });
@@ -353,7 +357,7 @@ export function createApp(p: Platform) {
       const b = body();
       const str = (v: unknown) => (typeof v === "string" ? v : undefined);
       const item = m[2] === "approve"
-        ? await p.reviews.approve(userId, m[1]!, { direction: str(b.direction), noteToClient: str(b.noteToClient), note: str(b.note) })
+        ? await p.reviews.approve(userId, m[1]!, { direction: str(b.direction), noteToClient: str(b.noteToClient), note: str(b.note), seenVersion: str(b.seenVersion) })
         : await p.reviews.requestInfo(userId, m[1]!, { question: str(b.question), note: str(b.note) });
       return json(200, { review: p.reviews.queue(userId).find((r) => r.id === item.id) });
     }

@@ -82,5 +82,6 @@ export async function initSignOff(): Promise<void> {
   });
   if (!getToken()) return; // demo visitor: examples only
   const r = await api<{ tasks: ClientReviewView[] }>("/reviews");
-  if (r.ok && r.data?.tasks.length) { tasks = r.data.tasks; live = true; render(); }
+  // A signed-in client sees only their real tasks, even when there are none: never example approvals.
+  if (r.ok && r.data) { tasks = r.data.tasks; live = true; render(); }
 }

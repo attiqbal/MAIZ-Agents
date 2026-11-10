@@ -34,7 +34,7 @@ function demo(): OwnerReviewView[] {
 function toDemoView(id: string, clientName: string, ageHours: number, proposal: OwnerReviewView["proposal"], prev?: OwnerReviewView): OwnerReviewView {
   const status = reviewStatus(proposal);
   return {
-    id, workspaceId: "example", clientName, ageHours, proposal, status, energy: planEnergy(proposal), missing: missingInfo(proposal).map((m) => m.label),
+    id, workspaceId: "example", source: "specialist", clientName, ageHours, proposal, status, energy: planEnergy(proposal), missing: missingInfo(proposal).map((m) => m.label),
     submittedAt: "", updatedAt: new Date().toISOString(), reviewNotes: prev?.reviewNotes ?? [], history: prev?.history ?? [],
   };
 }
@@ -47,7 +47,7 @@ function card(r: OwnerReviewView): string {
   const open = r.status === "in_review";
   const brief = p.brief.map((b) => `<li><span class="so-k">${esc(b.label)}${b.from === "specialist" ? " (you asked)" : ""}</span><span${b.value?.trim() ? "" : ' class="rv-missing"'}>${b.value?.trim() ? esc(b.value) : "Not answered yet"}</span></li>`).join("");
   const chosen = r.status === "approved" ? p.chosenDirection : picked.get(r.id);
-  const dirs = (p.directions ?? []).map((d) => `<label class="so-dir${chosen === d.key ? " on" : ""}"><input type="radio" name="rv-dir-${esc(r.id)}" value="${esc(d.key)}" data-rv-dir="${esc(r.id)}"${chosen === d.key ? " checked" : ""}${open ? "" : " disabled"}><span><b>${esc(d.name)}${d.recommended ? " (specialist recommends)" : ""}</b>${esc(d.summary)}</span></label>`).join("");
+  const dirs = (p.directions ?? []).map((d) => `<label class="so-dir${chosen === d.key ? " on" : ""}"><input type="radio" name="rv-dir-${esc(r.id)}" value="${esc(d.key)}" data-rv-dir="${esc(r.id)}"${chosen === d.key ? " checked" : ""}${open ? "" : " disabled"}><span><b>${esc(d.name)}${d.recommended ? (r.source === "client" ? " (client's preference)" : " (specialist recommends)") : ""}</b>${esc(d.summary)}</span></label>`).join("");
   const steps = p.plan.map((x) => `<li><span>${esc(x.title)}</span><span class="mono">${x.energy.toLocaleString()} energy</span></li>`).join("");
   const notes = r.reviewNotes.map((n) => `<li>Your note: ${esc(n.note)}</li>`).join("");
   const WHAT: Record<string, string> = { submitted: "submitted", answered: "answered", entered_review: "Joined your queue", info_requested: "You asked", approved: "You approved" };
@@ -66,7 +66,7 @@ function card(r: OwnerReviewView): string {
       <div class="acts"><button type="submit" class="btn btn-ghost btn-sm">Send back</button></div></form></div>`;
   return `<article class="so-card" id="${id}"><div class="so-h"><div><h3>${esc(p.title)}</h3>
       <div class="rv-meta"><span>Client <b>${esc(r.clientName)}</b></span><span>${esc(p.employee)}</span><span>${r.status === "approved" ? "Approved" : `Waiting ${age(r.ageHours)}`}</span><span>${p.days} working days</span><span>${r.energy.toLocaleString()} energy</span></div></div>${status(r.status)}</div>
-    <div class="so-grid"><div><h4>1. Brief the specialist compiled</h4><ul class="so-brief">${brief}</ul>${notes || hist ? `<h4 style="margin-top:14px">History</h4><ul class="rv-hist">${notes}${hist}</ul>` : ""}</div>
+    <div class="so-grid"><div><h4>1. ${r.source === "client" ? "Brief submitted by the client (not yet compiled by a specialist)" : "Brief the specialist compiled"}</h4><ul class="so-brief">${brief}</ul>${notes || hist ? `<h4 style="margin-top:14px">History</h4><ul class="rv-hist">${notes}${hist}</ul>` : ""}</div>
     <div><h4>2. Approach and directions</h4><p>${esc(p.design || "No approach yet.")}</p>${dirs ? `<fieldset class="so-dirs"><legend class="sr-only">Direction for ${esc(p.title)}</legend>${dirs}</fieldset>` : ""}<h4>3. Plan and cost</h4><ol class="so-plan">${steps}</ol></div></div>${acts}</article>`;
 }
 
@@ -95,7 +95,8 @@ async function load(): Promise<void> {
   if (r.status === 401) { gate("Log in to review tasks", "Quality review is for the MAIZ platform owner. Log in with your owner email.", ["/signin.html", "Log in"]); return; }
   if (r.status === 403) { gate("This page is for the MAIZ platform owner", "Your own specialised tasks, and where each one is in review, are on the Tasks screen of your control center.", ["/app.html#work", "Open your control center"]); return; }
   if (r.ok && r.data) { reviews = r.data.reviews; live = true; }
-  else { reviews = demo(); $("rv-eg").hidden = false; }
+  else if (r.status === 0) { reviews = demo(); $("rv-eg").hidden = false; } // no API at all: examples, clearly labelled
+  else { gate("The review queue did not load", "Nothing was changed. Reload the page to try again.", [location.pathname, "Reload"]); return; }
   const target = location.hash.slice(1);
   const hit = reviews.find((x) => x.id === target);
   if (hit) filter = inFilter(hit.status, "waiting") ? "waiting" : inFilter(hit.status, "approved") ? "approved" : "elsewhere";
@@ -145,7 +146,8 @@ document.addEventListener("submit", async (e) => {
   if (approveId) {
     const note = $<HTMLTextAreaElement>(`rv-nc-${approveId}`).value.trim();
     const direction = picked.get(approveId);
-    if (await act(approveId, "approve", { ...(direction ? { direction } : {}), ...(note ? { noteToClient: note } : {}) })) toast("Approved. The client is told and work starts.");
+    const seenVersion = reviews.find((x) => x.id === approveId)?.updatedAt;
+    if (await act(approveId, "approve", { ...(direction ? { direction } : {}), ...(note ? { noteToClient: note } : {}), ...(live && seenVersion ? { seenVersion } : {}) })) toast("Approved. The client is told and work starts.");
     return;
   }
   const question = $<HTMLInputElement>(`rv-q-${askId}`).value.trim();

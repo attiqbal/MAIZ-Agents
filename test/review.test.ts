@@ -145,8 +145,28 @@ describe("quality review: the platform owner signs off, never the client", () =>
     const s = setup();
     expect(((await s.call("GET", "/api/me", undefined, s.owner)).body as any)).toEqual({ platformOwner: true, hasOrganisation: false });
     const start = (await s.call("POST", "/api/signin/start", { email: OWNER })).body as any;
-    const verified = (await s.call("POST", "/api/signin/verify", { token: start.devLink })).body as any;
+    expect(start.devLink).toBeUndefined(); // even in development the owner must use the emailed link
+    const link = /#token=(\S+)/.exec(s.mail.sent.find((m) => m.to === OWNER)!.text)![1];
+    const verified = (await s.call("POST", "/api/signin/verify", { token: link })).body as any;
     expect(verified).toMatchObject({ platformOwner: true, hasOrganisation: false });
+    expect((await s.call("POST", "/api/signup", { email: OWNER, businessName: "Sneaky" })).status).toBe(401);
+    expect(((await s.call("POST", "/api/signin/start", { email: "ann@kestrel.co" })).body as any).devLink).toBeTruthy();
+  });
+
+  it("stops a client from rewriting an answer, stale approvals, newlines in titles and a flooded queue", async () => {
+    const s = setup();
+    const ann = await s.signUp("ann@kestrel.co", "Kestrel Coffee");
+    const task = ((await s.call("POST", "/api/reviews", { ...brandKit, title: "Brand\nkit", employeeId: "someone-else" }, ann)).body as any).task;
+    expect(task.title).toBe("Brand kit");
+    expect((await s.call("POST", `/api/reviews/${task.id}/answer`, { label: "Who you sell to", value: "Changed" }, ann)).status).toBe(400);
+    await s.call("POST", `/api/reviews/${task.id}/answer`, { label: "Colours you already use", value: "Green" }, ann);
+    const row = ((await s.call("GET", "/api/owner/reviews", undefined, s.owner)).body as any).reviews[0];
+    expect(row.source).toBe("client");
+    expect(row.employeeId).toBeUndefined();
+    expect((await s.call("POST", `/api/owner/reviews/${task.id}/approve`, { direction: "refresh", seenVersion: "2020-01-01T00:00:00.000Z" }, s.owner)).status).toBe(400);
+    expect((await s.call("POST", `/api/owner/reviews/${task.id}/approve`, { direction: "refresh", seenVersion: row.updatedAt }, s.owner)).status).toBe(200);
+    for (let i = 0; i < 20; i++) await s.call("POST", "/api/reviews", brandKit, ann);
+    expect((await s.call("POST", "/api/reviews", brandKit, ann)).status).toBe(400);
   });
 
   it("stores reviews and puts them back after a restart", async () => {

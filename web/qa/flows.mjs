@@ -1,5 +1,5 @@
 import { chromium, devices } from "playwright";
-// End-to-end flows against a running server: npm start with ALLOW_DEV_AUTH=1, then QA_URL=http://localhost:8787 npm run qa:flows
+// End-to-end flows against a running server: ALLOW_DEV_AUTH=1 PLATFORM_OWNER_EMAILS=owner@maiz.test npm start > api.log, then QA_URL=http://localhost:8787 QA_SERVER_LOG=api.log npm run qa:flows
 const B = process.env.QA_URL ?? "http://localhost:8787";
 const b = await chromium.launch();
 const res = []; const ok = (n, c, d = "") => { res.push([c ? "PASS" : "FAIL", n, d]); };
@@ -134,7 +134,13 @@ const mk = async (opts = {}) => { const ctx = await b.newContext({ viewport: { w
   const made = await (await post("/reviews", brief, client.token)).json();
   ok("owner review: client task enters quality review", made.task?.status === "in_review", JSON.stringify(made).slice(0, 120));
   ok("owner review: client cannot approve", (await post(`/owner/reviews/${made.task?.id}/approve`, { direction: "lean" }, client.token)).status() === 403);
-  await p.goto(B + "/signin.html"); await p.fill("#si-email", OWNER); await p.click("#si-go"); await p.waitForURL(/review\.html/, { timeout: 5000 }).catch(() => {});
+  // The owner never gets a dev shortcut: read the emailed link from the API log (ConsoleEmailSender prints it).
+  await p.goto(B + "/signin.html"); await p.fill("#si-email", OWNER); await p.click("#si-go"); await p.waitForTimeout(500);
+  const log = (await import("node:fs")).readFileSync(process.env.QA_SERVER_LOG ?? "", "utf8");
+  const esc = OWNER.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const link = [...log.matchAll(new RegExp(`--- email to ${esc} ---\\nYour MAIZ agents sign-in link[^#]*#token=(\\S+)`, "g"))].at(-1)?.[1];
+  ok("owner review: no dev shortcut for the owner, emailed link required", /Check your email/.test(await p.textContent("#si-h")) && !!link);
+  await p.goto("about:blank"); await p.goto(B + "/signin.html#token=" + link); await p.waitForURL(/review\.html/, { timeout: 5000 }).catch(() => {});
   ok("owner review: platform owner lands on the review queue", p.url().includes("/review.html"), p.url());
   const card = p.locator(`[id="${made.task?.id}"]`); await card.waitFor({ timeout: 5000 }).catch(() => {});
   ok("owner review: queue shows the client and age", (await card.textContent() ?? "").includes("Northside Bikes"));

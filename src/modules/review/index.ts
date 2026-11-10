@@ -35,6 +35,8 @@ export interface ReviewItem {
   id: string;
   workspaceId: string;
   employeeId?: string;
+  /** Who compiled the brief. A client's own submission is marked so the reviewer does not take it for a specialist's work. */
+  source: "specialist" | "client";
   proposal: TaskProposal;
   status: ReviewStatus;
   submittedAt: string;
@@ -86,6 +88,8 @@ export type ClientNotifier = (item: ReviewItem) => Promise<void>;
 
 export { CLIENT_STATUS_LABEL } from "../workforce/signoff.js";
 
+/** Tasks a client may have open (not yet approved) at once, so the queue cannot be flooded. */
+export const MAX_OPEN_PER_CLIENT = 20;
 const LIMITS = { title: 200, label: 300, value: 2000, design: 2000, brief: 40, directions: 6, plan: 30, maxEnergy: 100_000, maxDays: 90 };
 const DIRECTION_KEY = /^[a-z0-9-]{1,40}$/;
 
@@ -107,7 +111,7 @@ export class QualityReviewService {
   }
 
   restore(item: ReviewItem): void {
-    this.items.set(item.id, item);
+    this.items.set(item.id, { ...item, source: item.source ?? "client" });
   }
 
   private now(): Date {
@@ -121,12 +125,16 @@ export class QualityReviewService {
   async submit(actor: ReviewActor, workspaceId: string, input: unknown): Promise<ReviewItem> {
     if (actor.kind === "client") this.identity.require(actor.userId, workspaceId, "task.create");
     if (actor.kind === "platform_owner") throw new ReviewError("quality review does not submit tasks");
-    const { proposal, employeeId } = parseProposal(input);
+    const { proposal } = parseProposal(input);
+    const open = this.inWorkspace(workspaceId).filter((i) => i.status !== "approved").length;
+    if (open >= MAX_OPEN_PER_CLIENT) throw new ReviewError(`you already have ${MAX_OPEN_PER_CLIENT} specialised tasks waiting; finish some first`);
     const at = this.now().toISOString();
     const item: ReviewItem = {
       id: newId("review"),
       workspaceId,
-      ...(employeeId ? { employeeId } : {}),
+      // Only the specialist itself is trusted to name the employee; a client's own submission names none.
+      ...(actor.kind === "specialist" ? { employeeId: actor.employeeId } : {}),
+      source: actor.kind === "specialist" ? "specialist" : "client",
       proposal,
       status: "gathering_info",
       submittedAt: at,
@@ -144,7 +152,11 @@ export class QualityReviewService {
     return this.inWorkspace(workspaceId).map(clientView);
   }
 
-  /** The client (or the specialist) answers one open item of the brief. Never possible after approval. */
+  /**
+   * The client (or the specialist) answers one open item of the brief. A client can only fill a gap:
+   * an answer already given cannot be changed by the client, so the reviewer never approves a brief
+   * that changed under them. Never possible after approval.
+   */
   async answer(actor: ReviewActor, workspaceId: string, id: string, label: string, value: string): Promise<ReviewItem> {
     if (actor.kind === "client") this.identity.require(actor.userId, workspaceId, "task.create");
     if (actor.kind === "platform_owner") throw new ReviewError("quality review asks; the client or specialist answers");
@@ -154,6 +166,7 @@ export class QualityReviewService {
     const text = clean(value, LIMITS.value, "answer");
     const target = item.proposal.brief.find((b) => b.label === label);
     if (!target) throw new ReviewError("that question is not in the brief");
+    if (actor.kind === "client" && target.value?.trim()) throw new ReviewError("that question is already answered");
     const at = this.now().toISOString();
     const next: ReviewItem = { ...item, proposal: answerBrief(item.proposal, label, text), updatedAt: at, history: [...item.history, { at, by: actor.kind, action: "answered", detail: label }] };
     this.record(actor, next, "review.answered", { question: label });
@@ -171,9 +184,11 @@ export class QualityReviewService {
   }
 
   /** The platform owner approves, picking a direction when the specialist offered several. */
-  async approve(userId: string, id: string, input: { direction?: string; noteToClient?: string; note?: string }): Promise<ReviewItem> {
+  async approve(userId: string, id: string, input: { direction?: string; noteToClient?: string; note?: string; seenVersion?: string }): Promise<ReviewItem> {
     this.requireOwner(userId);
     const item = this.get(id);
+    // The page sends the version it showed; a brief that changed since then must be read again first.
+    if (input.seenVersion && input.seenVersion !== item.updatedAt) throw new ReviewError("this task changed since you opened it; reload and check it again");
     if (item.status !== "in_review") throw new ReviewError(item.status === "approved" ? "this task is already approved" : "this task is still waiting for information");
     const at = this.now();
     const r = signOff(item.proposal, at, input.direction);
@@ -296,7 +311,8 @@ function clientView(i: ReviewItem): ClientReviewView {
 }
 
 function clean(v: unknown, max: number, what: string): string {
-  const s = typeof v === "string" ? v.trim() : "";
+  // Control characters (newlines included) are flattened to spaces: these strings go into email subjects and one-line labels.
+  const s = typeof v === "string" ? v.replace(/[\u0000-\u001f\u007f]+/g, " ").trim() : "";
   if (!s) throw new ReviewError(`${what} is required`);
   if (s.length > max) throw new ReviewError(`${what} is too long`);
   return s;
@@ -318,7 +334,7 @@ function whole(v: unknown, min: number, max: number, what: string): number {
 }
 
 /** Builds a proposal from untrusted input. Sign-off fields are never taken from the input. */
-export function parseProposal(input: unknown): { proposal: TaskProposal; employeeId?: string } {
+export function parseProposal(input: unknown): { proposal: TaskProposal } {
   const b = obj(input, "task");
   const brief = list(b.brief, LIMITS.brief, "brief").map((x) => {
     const item = obj(x, "brief item");
@@ -337,7 +353,6 @@ export function parseProposal(input: unknown): { proposal: TaskProposal; employe
     const s = obj(x, "plan step");
     return { title: clean(s.title, LIMITS.title, "step"), energy: whole(s.energy, 0, LIMITS.maxEnergy, "step energy") };
   });
-  const employeeId = optionalText(b.employeeId, 64, "employee");
   const proposal: TaskProposal = {
     title: clean(b.title, LIMITS.title, "title"),
     employee: clean(b.employee, LIMITS.title, "employee"),
@@ -347,5 +362,5 @@ export function parseProposal(input: unknown): { proposal: TaskProposal; employe
     plan,
     days: whole(b.days, 1, LIMITS.maxDays, "days"),
   };
-  return { proposal, ...(employeeId ? { employeeId } : {}) };
+  return { proposal };
 }
