@@ -1,6 +1,7 @@
 import "./styles.css";
 import { toast } from "./common";
 import { initSetup } from "./setup";
+import { initApps } from "./apps";
 import { api, getToken, clearSession, type Org } from "./api";
 import { JOB_DESCRIPTIONS, getJobDescription, jdHtml } from "./jd";
 
@@ -203,4 +204,5 @@ function drawBars(): void {
 
 refresh();
 initSetup(biz, profile.contact === "slack" ? "slack" : "dashboard");
+initApps();
 route();

@@ -11,7 +11,7 @@
   },
   "responsive": {
     "status": "pass",
-    "evidence": "Full-page screenshots of all four pages at 375, 768 and 1440 show no horizontal overflow (scrollWidth equals viewport width in every run). The hero mockup's code window previously split each token onto its own line and covered the consultant message and energy values; it now renders as five code lines and the three windows no longer hide each other's text at 1440, and stack cleanly at 375."
+    "evidence": "Full-page screenshots of all four pages at 375, 768 and 1440 show no horizontal overflow (scrollWidth equals viewport width in every run). The hero mockup's code window previously split each token onto its own line and covered the consultant message and energy values; it now renders as five code lines and the three windows no longer hide each other's text at 1440, and stack cleanly at 375. Apps screen: no horizontal overflow at 375/768/1440; app cards reflow from four columns to one; the pending list moves the description to its own line under 560 px."
   },
   "contentStates": {
     "loading": {
@@ -24,7 +24,7 @@
     },
     "error": {
       "status": "pass",
-      "evidence": "Submitting 'not-an-email' on onboarding step 1 shows 'Enter a valid email address.', marks the input invalid with a red border and moves focus to it (state-error-onboarding-375x812.png)."
+      "evidence": "Submitting 'not-an-email' on onboarding step 1 shows 'Enter a valid email address.', marks the input invalid with a red border and moves focus to it (state-error-onboarding-375x812.png). Apps screen: wrong file columns, a full-access Stripe key and a refused OAuth return each show a plain-language message."
     },
     "partial": {
       "status": "pass",
@@ -84,6 +84,16 @@
       "viewport": "1440x900",
       "artifact": "store-consultants-1440.png",
       "observation": "Picker lists 5 consultants x 2 passes under 'One-off \u00b7 consultants'; opening one shows its passes, merged task menu, how a pass works, overage rule and merged job description; cart shows a 30-day pass (\u00a3349) and a 7-day sprint (\u00a3129) under the One-off heading, Due today \u00a3478. No console errors, no overflow."
+    },
+    {
+      "viewport": "1440x900",
+      "artifact": "apps-signed-in-1440x900.png",
+      "observation": "Signed in with a BrightPay and a till upload: pending list, connected apps with access chips and the catalogue render. Taken before fixing one issue it showed: Xero and Square said 'Connects directly' while their app keys were not configured; they now say 'Direct connection coming' in that case."
+    },
+    {
+      "viewport": "1440x900",
+      "artifact": "apps-upload-1440x900.png",
+      "observation": "Export steps, file input, optional pay date and actions are readable and inside the dialog."
     }
   ]
 }

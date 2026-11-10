@@ -8,6 +8,7 @@ import type { Role, Workspace } from "../modules/identity/index.js";
 import type { AdminMessage, AdminOrgRecord } from "../modules/admin-manager/index.js";
 import type { Account, JournalEntry } from "../modules/ledger/index.js";
 import type { BusinessProfile, Employee } from "../modules/workforce/index.js";
+import type { IntegrationConnection, StoredRecord } from "../modules/integrations/service.js";
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
@@ -163,6 +164,16 @@ export class PgStore implements Sink {
   slackToken(workspaceId: string, team: string, token: string): void {
     this.state(workspaceId, "slack_token", team, { enc: this.encrypt(token) });
   }
+  integration(c: IntegrationConnection): void {
+    this.state(c.workspaceId, "integration", c.id, c);
+  }
+  integrationSecret(workspaceId: string, connectionId: string, secret: string): void {
+    // Same AES-256-GCM as chat bot tokens. A removed secret is stored as an empty value.
+    this.state(workspaceId, "int_secret", connectionId, { enc: secret ? this.encrypt(secret) : "" });
+  }
+  integrationRecord(r: StoredRecord): void {
+    this.state(r.workspaceId, "int_record", r.id, r);
+  }
   entry(e: JournalEntry): void {
     this.scoped(e.workspaceId, async (c) => {
       await c.query("INSERT INTO journal_entries(id, workspace_id, entry_date, memo, source, reverses) VALUES ($1,$2,$3,$4,$5,$6)", [e.id, e.workspaceId, e.date, e.memo, e.source ?? null, e.reverses ?? null]);
@@ -215,6 +226,9 @@ export class PgStore implements Sink {
       connections: of("connection").map((s) => s.data),
       links: of("link").map((s) => ({ workspaceId: s.workspace_id, key: s.id, userId: s.data.userId })),
       slackTokens: of("slack_token").map((s) => ({ team: s.id, token: this.decrypt(s.data.enc) })),
+      integrations: of("integration").map((s) => s.data),
+      integrationSecrets: of("int_secret").filter((s) => s.data.enc).map((s) => ({ connectionId: s.id, secret: this.decrypt(s.data.enc) })),
+      integrationRecords: of("int_record").map((s) => s.data),
     } as Snapshot;
   }
 

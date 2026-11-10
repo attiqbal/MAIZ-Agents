@@ -3,6 +3,7 @@ import { SetupError } from "../modules/admin-manager/index.js";
 import { ChannelError, parseSlackEvent } from "../modules/channels/index.js";
 import { PermissionError } from "../modules/identity/index.js";
 import { LedgerError } from "../modules/ledger/index.js";
+import { IntegrationError } from "../modules/integrations/index.js";
 import { SignupError, type SignupChoices, type TeamSize } from "../modules/onboarding/index.js";
 import { getTemplate, TEMPLATES } from "../modules/workforce/templates.js";
 import { getJobDescription } from "../modules/workforce/job-descriptions.js";
@@ -192,6 +193,29 @@ export function createApp(p: Platform) {
       return { status: 302, headers: { location: "/app.html#team" } };
     }
 
+    // ---- business apps: OAuth return and webhooks are public; state or the secret link proves who they are for ----
+    if (method === "GET" && path === "/api/integrations/callback") {
+      const state = readToken(secret, req.query.get("state") ?? undefined, p.now().getTime());
+      const code = req.query.get("code");
+      if (!state?.u || state.k !== "int-oauth" || typeof state.a !== "string") return json(400, { error: "invalid or expired connect link" });
+      const org = orgOf(state.u);
+      if (!code || !org) return { status: 302, headers: { location: "/app.html#apps" } }; // owner pressed Cancel in the app
+      try {
+        await p.integrations.completeOAuth(state.u, org.id, state.a, code);
+      } catch (e) {
+        if (!(e instanceof IntegrationError)) throw e;
+        return { status: 302, headers: { location: "/app.html?connect=failed#apps" } };
+      }
+      return { status: 302, headers: { location: "/app.html#apps" } };
+    }
+    const hook = /^\/api\/integrations\/hooks\/([\w-]{1,64})\/([\w-]{16,128})$/.exec(path);
+    if (method === "POST" && hook) {
+      let payload: unknown;
+      try { payload = JSON.parse(req.rawBody || "{}"); } catch { return json(400, { error: "invalid JSON" }); }
+      const result = p.integrations.receiveWebhook(hook[1]!, hook[2]!, payload);
+      return result ? json(200, { ok: true, added: result.added, updated: result.updated, warnings: result.warnings }) : json(404, { error: "not found" });
+    }
+
     // ---- everything below needs a signed-in user ----
     const userId = session(req);
     if (!userId) return json(401, { error: "sign in first" });
@@ -258,6 +282,12 @@ export function createApp(p: Platform) {
       return json(201, { id: entry.id });
     }
 
+    // ---- business apps ----
+    if (path.startsWith("/api/integrations")) {
+      const r = await integrationRoutes(req, userId, org.id, body);
+      if (r) return r;
+    }
+
     // ---- start the Slack install; the QR code on the website encodes this URL ----
     if (method === "GET" && path === "/api/slack/install") {
       const cfg = p.cfg.slack;
@@ -274,11 +304,54 @@ export function createApp(p: Platform) {
     return json(404, { error: "not found" });
   }
 
+  async function integrationRoutes(req: Req, userId: string, orgId: string, body: () => any): Promise<Res | undefined> {
+    const { method, path } = req;
+    const ig = p.integrations;
+    if (method === "GET" && path === "/api/integrations") {
+      return json(200, { catalogue: ig.catalogue(), connections: ig.list(userId, orgId), pending: ig.pending(userId, orgId) });
+    }
+    if (method === "POST" && path === "/api/integrations/post") return json(200, ig.post(userId, orgId));
+    const app = /^\/api\/integrations\/apps\/([a-z0-9-]{2,40})\/(connect|import)$/.exec(path);
+    if (method === "POST" && app) {
+      const [, key, action] = app as unknown as [string, string, string];
+      const c = ig.registry.require(key);
+      if (action === "import") {
+        const b = body();
+        if (typeof b.csv !== "string") throw new BadRequest("attach the exported file");
+        return json(200, ig.importFile(userId, orgId, key, b.csv, { date: typeof b.date === "string" ? b.date : undefined }));
+      }
+      if (c.auth.kind === "oauth2") {
+        const state = makeToken(secret, { k: "int-oauth", u: userId, a: key }, 600, p.now().getTime());
+        return json(200, { url: ig.authorizeUrl(userId, orgId, key, state) });
+      }
+      if (c.auth.kind === "api_key") return json(201, { connection: ig.connectWithKey(userId, orgId, key, body().values ?? {}) });
+      if (c.auth.kind === "webhook") {
+        const { connection, secret: hookSecret } = ig.createWebhook(userId, orgId);
+        const base = (p.cfg.appUrl ?? "").replace(/\/$/, "");
+        // Shown once. Only a hash is stored, so a lost link is replaced, not recovered.
+        return json(201, { connection, url: `${base}/api/integrations/hooks/${connection.id}/${hookSecret}` });
+      }
+      throw new BadRequest(`${c.name} works by file upload`);
+    }
+    const conn = /^\/api\/integrations\/connections\/([\w-]{1,64})(?:\/(sync|access))?$/.exec(path);
+    if (conn) {
+      const [, id, action] = conn as unknown as [string, string, string | undefined];
+      if (method === "DELETE" && !action) { ig.disconnect(userId, orgId, id); return json(200, { ok: true }); }
+      if (method === "POST" && action === "sync") return json(200, await ig.sync(userId, orgId, id));
+      if (method === "POST" && action === "access") {
+        const b = body();
+        if (!Array.isArray(b.employees)) throw new BadRequest("employees must be a list");
+        return json(200, { connection: ig.setAccess(userId, orgId, id, b.employees) });
+      }
+    }
+    return undefined;
+  }
+
   return async function handle(req: Req): Promise<Res> {
     try {
       return await route(req);
     } catch (err) {
-      if (err instanceof BadRequest || err instanceof SetupError || err instanceof SignupError || err instanceof LedgerError || err instanceof ChannelError) return json(400, { error: err.message });
+      if (err instanceof BadRequest || err instanceof SetupError || err instanceof SignupError || err instanceof LedgerError || err instanceof ChannelError || err instanceof IntegrationError) return json(400, { error: err.message });
       if (err instanceof PermissionError) return json(403, { error: "you don't have permission to do that" });
       console.error(`${req.method} ${req.path} failed:`, err);
       return json(500, { error: "something went wrong" });
