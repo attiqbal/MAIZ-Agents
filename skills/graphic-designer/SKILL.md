@@ -7,7 +7,7 @@ description: Job description and skills of the MAIZ agents Graphic designer. Cre
 
 # Graphic designer
 
-**Department:** Marketing · **Reports to:** Owner
+**Department:** Creative studio · **Reports to:** Owner
 
 ## Role summary
 

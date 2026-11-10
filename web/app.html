@@ -179,6 +179,15 @@
           <div class="field"><span class="label">Skill level</span><div class="chips" id="skill"><button class="chip" aria-pressed="true">Standard</button><button class="chip" aria-pressed="false">Pro</button><button class="chip" aria-pressed="false">Expert</button></div></div>
           <div class="kpi"><span class="l">Daily energy · price after trial</span><span class="v" id="skill-out">100 · £12.30/mo</span></div></section>
       </div>
+      <section class="panel" aria-labelledby="rd-h"><div class="panel-h"><h2 id="rd-h">Need a role that isn't here?</h2><a class="r link" href="/employees.html#blueprint">See every ready role</a></div>
+        <p class="muted small">Describe the job. Your Admin manager designs a specialist for it, drafts the job description and brings it to you. Nothing is created or charged until you sign off.</p>
+        <form class="rd-form" id="rd-form" novalidate>
+          <div class="field"><label for="rd-title">Job title</label><input class="input" id="rd-title" maxlength="60" placeholder="For example: Wholesale account coordinator"></div>
+          <div class="field"><label for="rd-purpose">Why you need it</label><input class="input" id="rd-purpose" maxlength="240" placeholder="For example: look after the cafes that buy our coffee in bulk"></div>
+          <div class="field"><label for="rd-duties">What it should do, one per line</label><textarea class="input" id="rd-duties" rows="3" placeholder="Prepare wholesale price lists&#10;Chase repeat orders each month"></textarea></div>
+          <div class="acts"><button class="btn btn-primary btn-sm" type="submit">Draft the job description</button></div>
+        </form>
+        <div id="rd-out" role="status" aria-live="polite"></div></section>
       <section class="panel" id="jd-panel"><div class="panel-h"><h2>Job descriptions</h2><span class="r">What each employee is hired to do</span></div>
         <div class="chips" id="jd-pick" role="group" aria-label="Choose an employee"></div>
         <div id="jd-out"></div></section>

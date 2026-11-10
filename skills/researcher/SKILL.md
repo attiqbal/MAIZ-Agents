@@ -43,6 +43,7 @@ Answers questions with sources, so decisions rest on facts. Trained as a custom 
 ## Legal requirements
 
 - Copyright and fair use of sources
+- Data protection when research involves people
 
 ## Documents and records kept up to date
 

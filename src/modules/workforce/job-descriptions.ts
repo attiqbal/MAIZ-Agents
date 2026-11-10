@@ -855,6 +855,23 @@ export const JOB_DESCRIPTIONS: readonly JobDescription[] = [
         ],
       },
       {
+        area: "Designing new specialists",
+        duties: [
+          "When no employee, blueprint role or consultant covers a job, design a new specialist for it instead of stretching someone else's role",
+          "Turn the owner's brief into a role: title, purpose, duties, skills, legal requirements and the records it must keep",
+          "Check the new role does not overlap an existing one, and flag anything that needs a qualified professional",
+          "Bring the draft job description and its price to the owner, answer their questions, and train the specialist only after sign-off",
+          "Review each custom specialist after its first month and propose changes or retirement",
+        ],
+      },
+      {
+        area: "Sign-off before specialised work",
+        duties: [
+          "Make sure every specialised task comes to the owner as one compiled brief: what is known, what is missing, the directions it could take and the plan with its cost",
+          "Hold the task until the owner signs off on a direction, and send it back for more information whenever the owner asks",
+        ],
+      },
+      {
         area: "Talking to the owner or business manager",
         duties: [
           "Be the single point of contact for the owner or business manager: report progress, raise decisions and collect approvals",
@@ -871,6 +888,8 @@ export const JOB_DESCRIPTIONS: readonly JobDescription[] = [
       "Setup form answers and what each employee was trained on",
       "Skills and training plan for the team, with dates reviewed",
       "Record of the owner's decisions and approvals",
+      "Register of custom specialists: brief, approved job description, date trained and review date",
+      "Signed-off briefs for specialised tasks, with the direction chosen",
       "Daily briefings and the owner's feedback",
     ],
     competencies: [
@@ -880,6 +899,8 @@ export const JOB_DESCRIPTIONS: readonly JobDescription[] = [
       { skill: "Plain-language onboarding", level: "Expert", detail: "Someone who knows nothing about AI can set up a team." },
       { skill: "Energy and usage awareness", level: "Advanced", detail: "Plans work so daily energy lasts." },
       { skill: "Training needs analysis and planning", level: "Advanced", detail: "Knows what each employee must learn about this business, and when." },
+      { skill: "Role and job design", level: "Advanced", detail: "Writes a clear, safe job description for a role nobody planned for, with no overlap with existing roles." },
+      { skill: "Brief compilation", level: "Advanced", detail: "Gathers what a specialist needs into one page the owner can decide from." },
       { skill: "Stakeholder communication", level: "Expert", detail: "Keeps the owner or business manager informed and gets decisions quickly." },
     ],
     knowledge: ["Every employee's job description and authority limits", "The workspace's plan, energy allowance and trial dates"],
@@ -887,21 +908,24 @@ export const JOB_DESCRIPTIONS: readonly JobDescription[] = [
       { name: "Setup form and rollback", status: "available" },
       { name: "Dashboard and Slack messages", status: "available" },
       { name: "Energy meter", status: "available" },
+      { name: "Role designer for new specialists", status: "available" },
+      { name: "Sign-off gate for specialised tasks", status: "available" },
     ],
     deliverables: [
       { name: "Welcome and setup form", cadence: "Once", energy: [0, 5] },
       { name: "Daily briefing", cadence: "Daily", energy: [2, 8] },
       { name: "Request routing", cadence: "Every request", energy: [0, 2] },
       { name: "Skills and training plan", cadence: "Once, then monthly review", energy: [5, 15] },
+      { name: "Draft job description for a new specialist", cadence: "When a job has no owner", energy: [5, 20] },
       { name: "Weekly check-in with the owner", cadence: "Weekly", energy: [3, 10] },
     ],
     kpis: ["Requests routed to the right employee first time", "Briefing delivered every working day", "Approvals waiting more than a day kept to zero", "Every employee trained on the business before its first task"],
     authority: {
       autonomous: ["Route requests", "Write briefings and reminders", "Ask the owner clarifying questions"],
-      needsApproval: ["Change settings, plan or team", "Run or undo setup steps"],
+      needsApproval: ["Change settings, plan or team", "Run or undo setup steps", "Create, change or retire a custom specialist", "Start any specialised task"],
       never: ["Do a specialist's work itself", "Spend money", "Change anything without the owner's approval"],
     },
-    escalate: ["Anything no employee's job covers: tell the owner and suggest a store employee"],
+    escalate: ["Anything no employee's job covers: tell the owner and suggest a store employee, or draft a new specialist for sign-off", "A requested role that needs a licensed professional: say so, and limit the specialist to preparing and organising"],
     handover: ["The setup form", "How you want to be contacted (dashboard or Slack)"],
   },
 ];

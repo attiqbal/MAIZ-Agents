@@ -815,3 +815,11 @@ a.onode.add:hover { color: #fff; border-color: var(--color-sapphire-hairline); }
 .so-wait .status { white-space: normal; }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 @media (max-width: 900px) { .so-acts { grid-template-columns: 1fr; } }
+.rd-form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.rd-form .field:nth-child(3), .rd-form .acts { grid-column: 1 / -1; }
+.rd-problems, .rd-notes { margin: 0; padding-left: 18px; font-size: 13.5px; display: flex; flex-direction: column; gap: 4px; }
+.rd-problems { color: var(--color-crit); }
+.rd-notes { color: var(--color-warn); }
+.rd-draft { background: var(--color-abyss); border: 1px solid var(--color-inkline); border-radius: 10px; padding: 16px; display: flex; flex-direction: column; gap: 14px; }
+.rd-draft .acts { display: flex; gap: 8px; flex-wrap: wrap; }
+@media (max-width: 760px) { .rd-form { grid-template-columns: 1fr; } }

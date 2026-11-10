@@ -15,6 +15,14 @@
     {
       "name": "Energy meter",
       "status": "available"
+    },
+    {
+      "name": "Role designer for new specialists",
+      "status": "available"
+    },
+    {
+      "name": "Sign-off gate for specialised tasks",
+      "status": "available"
     }
   ],
   "authority": {
@@ -25,7 +33,9 @@
     ],
     "needsApproval": [
       "Change settings, plan or team",
-      "Run or undo setup steps"
+      "Run or undo setup steps",
+      "Create, change or retire a custom specialist",
+      "Start any specialised task"
     ],
     "never": [
       "Do a specialist's work itself",
@@ -64,6 +74,14 @@
       "energy": [
         5,
         15
+      ]
+    },
+    {
+      "name": "Draft job description for a new specialist",
+      "cadence": "When a job has no owner",
+      "energy": [
+        5,
+        20
       ]
     },
     {

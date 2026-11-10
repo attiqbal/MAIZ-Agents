@@ -3,6 +3,7 @@ import { toast } from "./common";
 import { initSetup } from "./setup";
 import { initApps } from "./apps";
 import { initDash } from "./dash";
+import { initRoleDesigner } from "./role-designer";
 import { api, getToken, clearSession, type Org } from "./api";
 import { JOB_DESCRIPTIONS, getJobDescription, jdHtml } from "./jd";
 
@@ -191,6 +192,7 @@ $("skill").addEventListener("click", (e) => {
 });
 
 initDash();
+initRoleDesigner();
 refresh();
 initSetup(biz, profile.contact === "slack" ? "slack" : "dashboard");
 initApps();
