@@ -193,6 +193,54 @@ export function createPlatform(cfg: PlatformConfig) {
     },
   });
 
+  /**
+   * The client's control center, from real records: each employee's energy, the task board and the week's totals.
+   * Everything is read through the services, so permissions and workspace walls apply.
+   */
+  const dashboard = (userId: string, workspaceId: string) => {
+    const nowDate = now();
+    const weekAgo = new Date(nowDate.getTime() - 7 * 86_400_000).toISOString();
+    const team = workforce.team(userId, workspaceId);
+    const energyDays = energy.recentDays(userId, workspaceId, 7);
+    const done = workforce.tasksSince(userId, workspaceId, weekAgo).filter((t) => t.status === "ready_for_review");
+    const open = batch.openJobsOf(workspaceId);
+    const label = (id: string) => team.find((e) => e.id === id)?.name ?? "Employee";
+    const clip = (t: string, n: number) => (t.length > n ? `${t.slice(0, n - 1)}…` : t);
+    const people = team.map((e) => {
+      const allowance = energy.quotaOf(userId, workspaceId, e.id);
+      const week = energyDays.byEmployee.get(e.id) ?? new Array(7).fill(0);
+      const mine = open.filter((j) => j.employeeId === e.id);
+      const running = mine.find((j) => j.status === "running") ?? mine[0];
+      return {
+        id: e.id, name: e.name, templateKey: e.templateKey, allowance, usedToday: week[6] as number, week,
+        doneWeek: done.filter((t) => t.employeeId === e.id).length,
+        status: running ? "working" : "idle",
+        doing: running ? clip(running.brief, 100) : null,
+      };
+    });
+    const reviewsNeedingYou = reviews.forClient(userId, workspaceId).filter((r) => r.status === "gathering_info" || r.status === "more_info_requested");
+    const inReview = reviews.forClient(userId, workspaceId).filter((r) => r.status === "in_review").length;
+    const tasks = [
+      ...open.filter((j) => j.status === "queued").map((j) => ({ id: j.id, employeeId: j.employeeId, title: clip(j.brief, 80), column: "planned" as const, runsAt: j.runsAt })),
+      ...open.filter((j) => j.status === "running").map((j) => ({ id: j.id, employeeId: j.employeeId, title: clip(j.brief, 80), column: "in_progress" as const })),
+      ...reviewsNeedingYou.map((r) => ({ id: r.id, employeeId: null, title: r.title, column: "waiting" as const, note: "Needs your answers" })),
+      ...done.slice(0, 40).map((t) => ({ id: t.id, employeeId: t.employeeId, title: clip(t.brief, 80), column: "done" as const, energy: t.energyUsed ?? 0, at: t.at })),
+    ];
+    const use = energy.usageOf(workspaceId);
+    const sched = batch.forClient(userId, workspaceId);
+    return {
+      asOf: nowDate.toISOString(),
+      team: people,
+      tasks: tasks.map((t) => ({ ...t, employeeName: t.employeeId ? label(t.employeeId) : null })),
+      totals: {
+        energyToday: use.energyToday, allowanceToday: people.reduce((n, e) => n + e.allowance, 0),
+        energyWeek: people.reduce((n, e) => n + e.week.reduce((a: number, b: number) => a + b, 0), 0), energyMonth: use.energyMonth,
+        queued: sched.queued, waitingOnYou: reviewsNeedingYou.length, inReview, doneWeek: done.length,
+        nextRunLabel: sched.nextRunLabel,
+      },
+    };
+  };
+
   /** The platform owner's AI spend and routing controls. Nothing here is visible to clients. */
   const ai = {
     overview: (userId: string) => {
@@ -296,6 +344,7 @@ export function createPlatform(cfg: PlatformConfig) {
     for (const x of s.records ?? []) {
       if (x.kind === "order") payments.restore(x.data);
       else if (x.kind === "recon") reconciliation.restore(x.data);
+      else if (x.kind === "task") workforce.restoreTask(x.data);
       else if (x.kind === "rota_staff") rota.restoreStaff(x.data);
       else if (x.kind === "rota_shift" && !x.data.removed) rota.restoreShift(x.data);
     }
@@ -315,6 +364,6 @@ export function createPlatform(cfg: PlatformConfig) {
   const usedLinks = new Set<string>();
   /** Sign-in emails sent per address and hour, to stop the form being used to spam someone. */
   const sends = new Map<string, number[]>();
-  return { reconciliation, rota, payments, batch, email, usedLinks, sends, admin, reviews, prices, specialists, ai, clients, isPlatformOwner, healthy, cfg, now, audit, bus, identity, energy, workforce, ledger, onboarding, router, integrations, slackTokens, saveSlackToken, attachStore };
+  return { dashboard, reconciliation, rota, payments, batch, email, usedLinks, sends, admin, reviews, prices, specialists, ai, clients, isPlatformOwner, healthy, cfg, now, audit, bus, identity, energy, workforce, ledger, onboarding, router, integrations, slackTokens, saveSlackToken, attachStore };
 }
 export type Platform = ReturnType<typeof createPlatform>;

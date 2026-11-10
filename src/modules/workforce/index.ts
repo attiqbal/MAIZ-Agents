@@ -48,6 +48,8 @@ export interface TaskResult {
   /** Queued tasks only: the batch job, when it is due, and why it was not run at once. */
   /** Why a failed task failed (platform use only). */
   failure?: string;
+  /** When the task finished (ISO). */
+  at?: string;
   jobId?: string;
   runsAt?: string;
   queueReason?: string;
@@ -106,6 +108,18 @@ export class WorkforceService {
     const custom = this.customTemplates.get(key);
     if (custom) return custom.workspaceId === workspaceId ? custom.template : undefined;
     return getTemplate(key);
+  }
+
+  restoreTask(t: TaskResult): void {
+    this.tasks.set(t.id, t);
+  }
+
+  /** Finished tasks for one client since a time, newest first. The board and the week's counts read this. */
+  tasksSince(userId: string, workspaceId: string, sinceIso: string): TaskResult[] {
+    this.identity.require(userId, workspaceId, "task.read");
+    return [...this.tasks.values()]
+      .filter((t) => t.workspaceId === workspaceId && t.at && t.at >= sinceIso)
+      .sort((a, b) => (b.at ?? "").localeCompare(a.at ?? ""));
   }
 
   restoreEmployee(e: Employee): void {
@@ -297,7 +311,9 @@ export class WorkforceService {
       task.status = "failed";
       task.failure = err instanceof Error ? err.message : String(err);
     }
+    task.at = new Date().toISOString();
     this.tasks.set(task.id, task);
+    this.sink?.record(workspaceId, "task", task.id, task);
     this.audit.record({
       workspaceId,
       actor: `employee:${employee.id}`,

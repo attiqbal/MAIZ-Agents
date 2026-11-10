@@ -297,6 +297,8 @@ export function createApp(p: Platform) {
     const org = orgOf(userId);
     if (!org) return json(404, { error: "no organisation yet" });
 
+    if (method === "GET" && path === "/api/dashboard") return json(200, p.dashboard(userId, org.id));
+
     // ---- rota: staff and shifts ----
     if (path.startsWith("/api/rota/")) {
       const today = p.now().toISOString().slice(0, 10);
