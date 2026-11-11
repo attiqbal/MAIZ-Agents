@@ -32,8 +32,8 @@ export type RotaWeek = NonNullable<StaffDetail["rota"]>;
 /** How the desk reaches the rota, so a person is entered once and shows in both. */
 export interface PeopleOptions {
   now?: () => Date;
-  /** Puts a new person on the rota; returns the rota id, or undefined when that was not possible. */
-  addToRota?: (userId: string, m: StaffMember) => string | undefined;
+  /** Puts a new person on the rota; returns the rota id, or why that was not possible. */
+  addToRota?: (userId: string, m: StaffMember) => { id: string } | { problem: string };
   /** Takes a person who has left off the rota (future shifts become open). */
   removeFromRota?: (userId: string, m: StaffMember, today: string) => void;
   rotaWeek?: (workspaceId: string, rotaStaffId: string, today: string) => RotaWeek | undefined;
@@ -41,12 +41,15 @@ export interface PeopleOptions {
 
 export interface PeopleView {
   settings: PeopleSettings;
-  summary: HrSummary;
+  /** `actions` holds at most MAX_ACTIONS_LISTED, most urgent first; the rest show on each person's record. */
+  summary: HrSummary & { actionsTotal: number };
   offToday: ReturnType<typeof offOn>;
 }
 
 /** Most staff a client can keep on the desk. */
 export const MAX_STAFF = 1000;
+/** Most actions the desk overview sends; a big staff list can have thousands. */
+export const MAX_ACTIONS_LISTED = 50;
 const MAX_LEAVE = 400;
 const MAX_REVIEWS = 100;
 const TEXT = { name: 120, job: 120, email: 200, phone: 40, manager: 120, payrollId: 40, note: 1000, notes: 4000 };
@@ -129,18 +132,28 @@ function profileFields(b: Input, creating: boolean): Partial<StaffMember> {
 
 export class PeopleService {
   private staff = new Map<string, StaffMember>();
+  /** Staff ids per client, so one client's desk never scans everyone else's staff. */
+  private byWorkspace = new Map<string, Set<string>>();
   private settingsBy = new Map<string, PeopleSettings>();
   private sink?: Sink;
 
   constructor(private identity: IdentityService, private audit: AuditLog, private opts: PeopleOptions = {}) {}
 
   useSink(sink: Sink): void { this.sink = sink; }
-  restore(m: StaffMember): void { this.staff.set(m.id, m); }
+  restore(m: StaffMember): void { this.put(m); }
   restoreSettings(workspaceId: string, s: PeopleSettings): void { this.settingsBy.set(workspaceId, { ...DEFAULT_SETTINGS, ...s }); }
 
   private today(): string { return toIsoDate(this.opts.now?.() ?? new Date()); }
   private stamp(): string { return (this.opts.now?.() ?? new Date()).toISOString(); }
-  private inWorkspace(ws: string): StaffMember[] { return [...this.staff.values()].filter((m) => m.workspaceId === ws); }
+  private put(m: StaffMember): void {
+    this.staff.set(m.id, m);
+    const ids = this.byWorkspace.get(m.workspaceId) ?? new Set<string>();
+    ids.add(m.id);
+    this.byWorkspace.set(m.workspaceId, ids);
+  }
+  private inWorkspace(ws: string): StaffMember[] {
+    return [...(this.byWorkspace.get(ws) ?? [])].map((id) => this.staff.get(id)).filter((m): m is StaffMember => !!m);
+  }
   private log(userId: string, ws: string, action: string, target?: string, data?: Record<string, unknown>): void {
     this.audit.record({ workspaceId: ws, actor: `user:${userId}`, action, ...(target ? { target } : {}), ...(data ? { data } : {}) });
   }
@@ -151,7 +164,7 @@ export class PeopleService {
     return m;
   }
   private save(next: StaffMember): StaffMember {
-    this.staff.set(next.id, next);
+    this.put(next);
     this.sink?.staff(next);
     return next;
   }
@@ -178,7 +191,8 @@ export class PeopleService {
     const settings = this.settings(userId, ws);
     const staff = this.inWorkspace(ws);
     const today = this.today();
-    return { settings, summary: hrSummary(staff, settings.sector, today), offToday: offOn(staff, today) };
+    const summary = hrSummary(staff, settings.sector, today);
+    return { settings, summary: { ...summary, actions: summary.actions.slice(0, MAX_ACTIONS_LISTED), actionsTotal: summary.actions.length }, offToday: offOn(staff, today) };
   }
 
   /** One person's full record. Opening it is audited, since it holds personal data. */
@@ -191,7 +205,8 @@ export class PeopleService {
     return { ...staffDetail(m, { sector, leaveYearStartMonth }, today), ...(rota ? { rota } : {}) };
   }
 
-  add(userId: string, ws: string, b: Input): StaffDetail {
+  /** Adds a person. `rotaNote` says why they could not also go on the rota, when that happens. */
+  add(userId: string, ws: string, b: Input): StaffDetail & { rotaNote?: string } {
     this.identity.require(userId, ws, "people.manage");
     if (this.inWorkspace(ws).length >= MAX_STAFF) throw new PeopleError(`the staff list holds at most ${MAX_STAFF} people`);
     const f = profileFields(b, true);
@@ -205,10 +220,11 @@ export class PeopleService {
       ...Object.fromEntries(Object.entries(f).filter(([, v]) => v !== undefined)),
       documents: {}, checklist: {}, leave: [], reviews: [], createdAt: at, updatedAt: at,
     } as StaffMember;
-    const rotaStaffId = this.opts.addToRota?.(userId, m);
-    this.save(rotaStaffId ? { ...m, rotaStaffId } : m);
+    const onRota = this.opts.addToRota?.(userId, m);
+    this.save(onRota && "id" in onRota ? { ...m, rotaStaffId: onRota.id } : m);
     this.log(userId, ws, "people.added", m.id);
-    return this.detail(userId, ws, m.id, false);
+    const rotaNote = onRota && "problem" in onRota ? `Saved, but not added to the rota: ${onRota.problem}` : undefined;
+    return { ...this.detail(userId, ws, m.id, false), ...(rotaNote ? { rotaNote } : {}) };
   }
 
   update(userId: string, ws: string, id: string, b: Input): StaffDetail {
@@ -342,6 +358,7 @@ export class PeopleService {
     const keepUntil = rtwRetainUntil(cur);
     if (!cur.endDate || cur.endDate >= this.today()) throw new PeopleError("set a leaving date in the past first; records of current staff are kept");
     this.staff.delete(id);
+    this.byWorkspace.get(ws)?.delete(id);
     this.sink?.staff(cur, true);
     this.log(userId, ws, "people.deleted", id, keepUntil && keepUntil > this.today() ? { retentionWarning: `right-to-work evidence should be kept until ${keepUntil}` } : undefined);
   }

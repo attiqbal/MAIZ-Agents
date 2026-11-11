@@ -165,10 +165,10 @@ export function createPlatform(cfg: PlatformConfig) {
     now,
     addToRota: (userId, m) => {
       try {
-        return rota.addStaff(userId, m.workspaceId, { name: m.name, role: m.jobTitle, ...(m.payBasis === "hour" && m.payPence !== undefined && m.payPence <= 100_000 ? { hourlyRateMinor: m.payPence } : {}) }).id;
+        return { id: rota.addStaff(userId, m.workspaceId, { name: m.name, role: m.jobTitle, ...(m.payBasis === "hour" && m.payPence !== undefined && m.payPence <= 100_000 ? { hourlyRateMinor: m.payPence } : {}) }).id };
       } catch (e) {
-        // Already on the rota under that name, or the rota is full: the record is still kept.
-        if (e instanceof RotaError) return undefined;
+        // Already on the rota under that name, or the rota is full: the record is still kept, and the owner is told why.
+        if (e instanceof RotaError) return { problem: e.message };
         throw e;
       }
     },
