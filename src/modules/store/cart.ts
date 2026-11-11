@@ -57,7 +57,7 @@ export interface CatalogueItem {
 }
 
 /** Draft monthly prices. A ready-made add-on matches the Standard price on the pricing page. */
-export const MONTHLY_PRICE_GBP = { employee: 20, specialistStandard: 19, specialistPremium: 29 } as const;
+export const MONTHLY_PRICE_GBP = { employee: 20, specialistStandard: 30, specialistPremium: 30 } as const;
 export const MAX_QTY = 10;
 
 /** Ready-made employees that come with every package, so they are not sold in the store. */

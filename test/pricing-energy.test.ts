@@ -15,8 +15,8 @@ describe("launch prices and team energy", () => {
     const standard = CATALOGUE.find((i) => i.kind === "specialist" && i.tier === "standard")!;
     const premium = CATALOGUE.find((i) => i.kind === "specialist" && i.tier === "premium")!;
     expect(book.weeklyEnergyFor(addOn.key)).toBe(2_000);
-    expect(book.weeklyEnergyFor(standard.key)).toBe(1_500);
-    expect(book.weeklyEnergyFor(premium.key)).toBe(2_500);
+    expect(book.weeklyEnergyFor(standard.key)).toBe(2_000);
+    expect(book.weeklyEnergyFor(premium.key)).toBe(2_000);
     expect(book.weeklyEnergyFor("finance-manager")).toBe(0);
     expect(book.weeklyEnergyFor("admin-manager")).toBe(0);
   });

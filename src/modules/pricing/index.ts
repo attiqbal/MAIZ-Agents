@@ -93,8 +93,8 @@ export const DEFAULT_GENERAL: GeneralPrices = {
   weeklyTeamEnergy: PLANS.starter!.weeklyTeamEnergy!,
   dailyTeamCeiling: PLANS.starter!.dailyTeamCeiling!,
   addOnWeeklyEnergy: 2_000,
-  specialistStandardWeeklyEnergy: 1_500,
-  specialistPremiumWeeklyEnergy: 2_500,
+  specialistStandardWeeklyEnergy: 2_000,
+  specialistPremiumWeeklyEnergy: 2_000,
 };
 
 const GENERAL_LIMITS: Record<keyof GeneralPrices, [number, number, boolean]> = {

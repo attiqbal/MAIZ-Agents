@@ -111,7 +111,7 @@ describe("custom specialists are reviewed by the platform owner", () => {
     const made = await s.call("POST", "/api/specialists", brief, ann);
     expect(made.status).toBe(201);
     const req = (made.body as any).request;
-    expect(req).toMatchObject({ status: "in_review", statusLabel: "With MAIZ for review", priceGbp: 19 });
+    expect(req).toMatchObject({ status: "in_review", statusLabel: "With MAIZ for review", priceGbp: 30 });
     expect(s.platform.specialists.mayTrain(req.id)).toBe(false);
     await Promise.resolve();
     expect(s.mail.sent.find((m) => m.to === OWNER)?.subject).toBe("New specialist to review: Wholesale account coordinator for Kestrel Coffee");
