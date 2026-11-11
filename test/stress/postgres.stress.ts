@@ -141,6 +141,40 @@ describe.skipIf(!ADMIN || !APP)("Postgres: load, restarts, slow network", () => 
     expect(flushMs).toBeLessThan(10_000);
   });
 
+  it("HR desk: 300 staff with documents and leave are stored encrypted and come back after a restart", async () => {
+    await reset();
+    const { w, store } = await boot();
+    const s = await w.signUp("hrpg@pg.test", "HR PG Ltd");
+    const ids: string[] = [];
+    const t0 = performance.now();
+    for (let i = 0; i < 300; i++) {
+      const id = ((await w.call("POST", "/api/people", { name: `Person Plaintext${i}`, jobTitle: "Chef", startDate: "2026-01-05", hoursPerWeek: 30, phone: "07700900123" }, s.auth)).body as any).member.id;
+      ids.push(id);
+      await w.call("POST", `/api/people/${id}/documents/right_to_work`, { status: "checked" }, s.auth);
+      await w.call("POST", `/api/people/${id}/leave`, { from: "2026-12-01", days: 1 }, s.auth);
+    }
+    const workMs = performance.now() - t0;
+    const f0 = performance.now();
+    await store.flush();
+    const flushMs = performance.now() - f0;
+    const c = new pg.Client({ connectionString: ADMIN });
+    await c.connect();
+    const rows = (await c.query("SELECT data::text AS d FROM state_records WHERE kind = 'staff'")).rows as { d: string }[];
+    await c.end();
+    const plaintext = rows.filter((r) => /Plaintext|07700/.test(r.d)).length;
+    const before = ((await w.call("GET", `/api/people/${ids[123]}`, undefined, s.auth)).body as any);
+    await store.close();
+    const again = await boot();
+    const desk = (await again.w.call("GET", "/api/people", undefined, again.w.sessionFor("hrpg@pg.test"))).body as any;
+    const after = (await again.w.call("GET", `/api/people/${ids[123]}`, undefined, again.w.sessionFor("hrpg@pg.test"))).body as any;
+    await again.store.close();
+    metric("pg.hr_desk_restart", { staff: 300, writes: 900, workMs: Math.round(workMs), flushMs: Math.round(flushMs), staffRows: rows.length, rowsWithPlaintextNameOrPhone: plaintext, headcountAfterRestart: desk.summary?.headcount, sameRecordAfterRestart: JSON.stringify(after.member) === JSON.stringify(before.member) });
+    expect(rows.length).toBe(300);
+    expect(plaintext).toBe(0);
+    expect(desk.summary.headcount).toBe(300);
+    expect(after.member).toEqual(before.member);
+  });
+
   it("the database drops every connection for 3 seconds: writes wait and retry, nothing is lost", async () => {
     await reset();
     const p = await delayProxy(pgPort(), 0);

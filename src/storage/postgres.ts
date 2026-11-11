@@ -101,6 +101,10 @@ export class PgStore implements Sink {
   constructor(cfg: PgConfig) {
     this.admin = new pg.Pool({ connectionString: cfg.adminUrl, max: 4 });
     this.app = new pg.Pool({ connectionString: cfg.appUrl, max: APP_POOL });
+    // An idle connection the database closes (a restart, Neon suspending, a network blip) is reported here.
+    // Without a listener Node treats it as an uncaught error and the whole server exits. The pool drops
+    // that connection and opens a new one on the next query, so logging it is enough.
+    for (const pool of [this.admin, this.app]) pool.on("error", (e) => console.error("storage idle connection lost:", e.message));
     this.key = Buffer.from(cfg.tokenKeyHex, "hex");
     if (this.key.length !== 32) throw new Error("TOKEN_KEY must be 32 bytes as 64 hex characters");
   }

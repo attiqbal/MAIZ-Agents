@@ -17,14 +17,15 @@ const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&
 const fmtDate = (iso?: string) => (iso ? new Date(`${iso}T12:00:00Z`).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }) : "");
 const plural = (n: number, w: string) => `${n} ${w}${n === 1 ? "" : "s"}`;
 
-interface Overview { settings: DeskSettings; summary: HrSummary; offToday: ReturnType<typeof offOn> }
+/** The server sends at most 50 actions; `actionsTotal` counts them all. */
+interface Overview { settings: DeskSettings; summary: HrSummary & { actionsTotal?: number }; offToday: ReturnType<typeof offOn> }
 
 /** Where the desk's records live: the API for a signed-in client, this browser for the example. */
 interface Backend {
   live: boolean;
   overview(): Promise<Overview>;
   detail(id: string): Promise<StaffDetail>;
-  add(b: Record<string, unknown>): Promise<StaffDetail>;
+  add(b: Record<string, unknown>): Promise<StaffDetail & { rotaNote?: string }>;
   update(id: string, b: Record<string, unknown>): Promise<StaffDetail>;
   setDocument(id: string, key: string, b: { status: DocStatus; expiresOn?: string }): Promise<StaffDetail>;
   setChecklist(id: string, key: string, done: boolean): Promise<StaffDetail>;
@@ -44,7 +45,7 @@ class ApiBackend implements Backend {
   }
   overview() { return this.call<Overview>(""); }
   detail(id: string) { return this.call<StaffDetail>(`/${encodeURIComponent(id)}`); }
-  add(b: Record<string, unknown>) { return this.call<StaffDetail>("", b); }
+  add(b: Record<string, unknown>) { return this.call<StaffDetail & { rotaNote?: string }>("", b); }
   update(id: string, b: Record<string, unknown>) { return this.call<StaffDetail>(`/${encodeURIComponent(id)}`, b); }
   setDocument(id: string, key: string, b: object) { return this.call<StaffDetail>(`/${encodeURIComponent(id)}/documents/${key}`, b); }
   setChecklist(id: string, key: string, done: boolean) { return this.call<StaffDetail>(`/${encodeURIComponent(id)}/checklist/${key}`, { done }); }
@@ -194,17 +195,20 @@ function actionButtons(a: HrAction): string {
 const ACTIONS_SHOWN = 8;
 let showAllActions = false;
 function renderActions(): void {
-  const all = view!.summary.actions.filter((a) => a.severity !== "low");
-  const later = view!.summary.actions.length - all.length;
-  const list = showAllActions ? view!.summary.actions : all.slice(0, ACTIONS_SHOWN);
-  $("hr-actions-note").textContent = all.length ? `${plural(all.length, "thing")} to do${later ? `, ${later} more when you can` : ""}` : "";
+  const s = view!.summary;
+  const total = s.actionsTotal ?? s.actions.length;
+  const all = s.actions.filter((a) => a.severity !== "low");
+  const later = s.bySeverity.low;
+  const now = total - later;
+  const list = showAllActions ? s.actions : all.slice(0, ACTIONS_SHOWN);
+  $("hr-actions-note").textContent = now ? `${plural(now, "thing")} to do${later ? `, ${later} more when you can` : ""}` : "";
   $("hr-actions").innerHTML = list.length
     ? list.map((a) => `<li class="hr-act"><div class="hr-act-main">${statusTag(SEV[a.severity][0], SEV[a.severity][1])}<b><button type="button" class="hr-name" data-hr="open" data-staff="${esc(a.staffId)}">${esc(a.staffName)}</button> · ${esc(a.title)}</b><span class="small muted">${esc(a.detail)}</span></div><div class="acts">${actionButtons(a)}</div></li>`).join("")
     : `<li class="all-clear">Nothing needs doing. Every record is complete and in date.</li>`;
   const more = $("hr-actions-more");
-  const hidden = view!.summary.actions.length - list.length;
+  const hidden = s.actions.length - list.length;
   more.toggleAttribute("hidden", hidden <= 0 && !showAllActions);
-  more.textContent = showAllActions ? "Show fewer" : `Show all ${view!.summary.actions.length}`;
+  more.textContent = showAllActions ? "Show fewer" : total > s.actions.length ? `Show the ${s.actions.length} most urgent of ${total}` : `Show all ${total}`;
 }
 
 function renderTable(): void {
@@ -499,6 +503,7 @@ function wire(): void {
     if (err) return;
     const d = await run(() => backend.add({ name, jobTitle, startDate, hoursPerWeek, contract: $<HTMLSelectElement>("hr-a-contract").value }), `${name} added. Here is what to collect.`);
     if (!d) return;
+    if (d.rotaNote) toast(d.rotaNote);
     add.close();
     $<HTMLFormElement>("hr-add-form").reset();
     await refresh();

@@ -207,6 +207,21 @@ describe("HR desk API", () => {
     expect(actions).toEqual(expect.arrayContaining(["people.added", "people.document_updated", "people.leave_decided", "people.checklist_updated"]));
   });
 
+  it("says when a person could not also go on the rota, and caps the overview's action list", async () => {
+    const { call, signUp } = setup();
+    const me = await signUp("owner@kestrel.test", "Kestrel Coffee");
+    const person = (name: string) => ({ name, jobTitle: "Barista", startDate: "2026-11-16", hoursPerWeek: 20 });
+    expect((await call("POST", "/api/people", person("Sam Lee"), me)).body).not.toHaveProperty("rotaNote");
+    const twin = (await call("POST", "/api/people", person("Sam Lee"), me)).body as any;
+    expect(twin.member.rotaStaffId).toBeUndefined();
+    expect(twin.rotaNote).toMatch(/not added to the rota: someone with that name/);
+    for (let i = 0; i < 10; i++) await call("POST", "/api/people", person(`Person ${i}`), me);
+    const ov = (await call("GET", "/api/people", undefined, me)).body as any;
+    expect(ov.summary.actionsTotal).toBeGreaterThan(50);
+    expect(ov.summary.actions).toHaveLength(50);
+    expect(ov.summary.headcount).toBe(12);
+  });
+
   it("refuses bad input with a clear message", async () => {
     const { call, signUp } = setup();
     const me = await signUp("owner@kestrel.test", "Kestrel Coffee");
