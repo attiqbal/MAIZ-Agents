@@ -37,8 +37,14 @@ export interface BatchSettings {
   tokenTrigger: number;
   /** A task never waits longer than this many hours, whatever the schedule says. */
   maxQueueAgeHours: number;
-  /** Tasks sent to the pod at the same time. The pod's continuous batching serves them from one warm worker. */
+  /** Tasks each GPU serves at the same time. The pod's continuous batching serves them from one warm worker. */
   concurrency: number;
+  /** How many GPUs the batch runs on. Fixed, so the night's cost is known; the plan on the owner page recommends a number. */
+  gpuWorkers: number;
+  /** Memory size of each GPU in GB: 24, 48 or 80. */
+  gpuSizeGb: 24 | 48 | 80;
+  /** Hours the overnight run has to finish in, from the clients' closing time to the morning. */
+  windowHours: number;
   /** After this many failed tries the task is marked failed and the client is told. */
   maxAttempts: number;
   retryBackoffMinutes: number;
@@ -110,7 +116,7 @@ export const DEFAULT_PRICES_BY_MODEL: Record<string, ModelPrice> = {
 export const UNKNOWN_MODEL_PRICE: ModelPrice = { inputPer1k: 4_000, outputPer1k: 20_000 };
 
 export const DEFAULT_BATCH: BatchSettings = {
-  enabled: true, sizeTrigger: 20, tokenTrigger: 200_000, maxQueueAgeHours: 24, concurrency: 6, maxAttempts: 3, retryBackoffMinutes: 15,
+  enabled: true, sizeTrigger: 20, tokenTrigger: 200_000, maxQueueAgeHours: 24, concurrency: 6, gpuWorkers: 1, gpuSizeGb: 48, windowHours: 10, maxAttempts: 3, retryBackoffMinutes: 15,
   qaRateMin: 0.3, claudeAfterFailures: true, coldStartSeconds: 40, flushAfterUrgent: true, liveTemplates: ["admin-manager"],
 };
 
@@ -248,6 +254,9 @@ function validBatch(b: Record<string, unknown>): BatchSettings {
     tokenTrigger: Math.round(num(b.tokenTrigger, "batch token trigger", 1_000, 100_000_000)),
     maxQueueAgeHours: num(b.maxQueueAgeHours, "longest wait", 1, 168),
     concurrency: Math.round(num(b.concurrency, "batch concurrency", 1, 64)),
+    gpuWorkers: b.gpuWorkers === undefined ? 1 : Math.round(num(b.gpuWorkers, "number of GPUs", 1, 16)),
+    gpuSizeGb: b.gpuSizeGb === undefined ? 48 : ((): 24 | 48 | 80 => { const v = num(b.gpuSizeGb, "GPU size", 24, 80); if (v !== 24 && v !== 48 && v !== 80) throw new SettingsError("GPU size must be 24, 48 or 80 GB"); return v; })(),
+    windowHours: b.windowHours === undefined ? 10 : num(b.windowHours, "overnight window hours", 1, 24),
     maxAttempts: Math.round(num(b.maxAttempts, "batch attempts", 1, 10)),
     retryBackoffMinutes: num(b.retryBackoffMinutes, "retry wait", 1, 1_440),
     qaRateMin: num(b.qaRateMin, "batch check rate", 0, 1),

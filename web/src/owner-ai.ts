@@ -40,6 +40,7 @@ function demoBatch(): BatchView {
     queued: 9, running: 0, estTokens: 41_000, oldestMinutes: 410, nextDueAt: new Date(Date.now() + 3 * 3_600_000).toISOString(),
     byClient: [{ id: "a", name: "Kestrel Coffee", queued: 5, nextAt: new Date(Date.now() + 3 * 3_600_000).toISOString() }, { id: "b", name: "Loaf Bakery", queued: 4, nextAt: new Date(Date.now() + 5 * 3_600_000).toISOString() }],
     runs: [1, 2, 3, 4, 5].map(run),
+    gpuPlan: { pending: 9, taskSeconds: 30, windowHours: 10, sizeGb: 80, gpus: 1, runHours: 0.01, costUsd: 0.02, current: { gpus: 1, sizeGb: 48, runHours: 0.01, costUsd: 0.01, finishesInWindow: true }, advice: "1 GPU is more than enough for 9 tasks, but your model needs 80 GB cards (you have 48 GB)." },
     realTime: [{ what: "The Admin manager", why: "People wait on it during sign-up" }, { what: "Anything marked urgent", why: "The person chose speed" }, { what: "Quick questions about status or the rota", why: "Answered at once by a cheap Claude model" }],
   };
 }
@@ -50,7 +51,7 @@ function demoSettings(): AiRoutingSettings {
     reviewer: { enabled: true, model: "claude-haiku-5-5", maxInputChars: 12000, adaptive: true }, cache: { enabled: true, ttlSeconds: 3600, maxEntries: 500 },
     budgets: { claudeDailyUsd: 15, claudeMonthlyUsd: 200, claudePerWorkspaceMonthlyUsd: 20, runpodMonthlyUsd: 300, whenClaudeCapped: "degrade" }, prices: {},
     policies: { live: p({ primary: "claude", reviewRate: 0, escalate: false, fallbackToClaude: false, allowOpenModel: false }), standard: p(), premium: p({ claudeModel: "claude-sonnet-5-5", baselineModel: "claude-sonnet-5-5", reviewRate: 0.5, minScore: 8 }), "compliance-manager": p({ primary: "claude", reviewRate: 0, escalate: false, fallbackToClaude: false, allowOpenModel: false }) },
-    batch: { enabled: true, sizeTrigger: 20, tokenTrigger: 200_000, maxQueueAgeHours: 24, concurrency: 6, maxAttempts: 3, retryBackoffMinutes: 15, qaRateMin: 0.3, claudeAfterFailures: true, coldStartSeconds: 40, flushAfterUrgent: true, liveTemplates: ["admin-manager"] },
+    batch: { enabled: true, sizeTrigger: 20, tokenTrigger: 200_000, maxQueueAgeHours: 24, concurrency: 6, gpuWorkers: 1, gpuSizeGb: 48, windowHours: 10, maxAttempts: 3, retryBackoffMinutes: 15, qaRateMin: 0.3, claudeAfterFailures: true, coldStartSeconds: 40, flushAfterUrgent: true, liveTemplates: ["admin-manager"] },
   };
 }
 
@@ -58,6 +59,7 @@ interface BatchView {
   queued: number; running: number; estTokens: number; oldestMinutes: number; nextDueAt: string | null;
   byClient: { id: string; name: string; queued: number; nextAt: string }[];
   runs: { id: string; trigger: string; startedAt: string; jobs: number; done: number; failed: number; retried: number; clients: number; actualMicro: number; baselineMicro: number; savedMicro: number; coldStartSavedMicro: number }[];
+  gpuPlan: { pending: number; taskSeconds: number; windowHours: number; sizeGb: number; gpus: number; runHours: number; costUsd: number; current: { gpus: number; sizeGb: number; runHours: number; costUsd: number; finishesInWindow: boolean }; advice: string };
   realTime: { what: string; why: string }[];
 }
 let batchView: BatchView | null = null;
@@ -128,9 +130,18 @@ function renderBatch(): void {
     tile("Next run due", b.nextDueAt ? when(b.nextDueAt) : "Nothing waiting", b.queued ? `Oldest has waited ${Math.round(b.oldestMinutes / 60 * 10) / 10} h` : "Queue is empty"),
     tile("Estimated size", `${b.estTokens.toLocaleString("en-GB")} tokens`, `Early run at ${view.settings.batch.sizeTrigger} tasks or ${view.settings.batch.tokenTrigger.toLocaleString("en-GB")} tokens`),
   ].join("");
+  const g = b.gpuPlan;
+  const plan = `<section class="panel" aria-labelledby="ai-gpu-h" style="margin:0 0 16px"><div class="panel-h"><h2 id="ai-gpu-h">Tonight's GPU plan</h2></div>
+    <p style="margin:0 0 10px"><b>${esc(g.advice)}</b></p>
+    <div class="kpis">${[
+      tile("Recommended", `${g.gpus} x ${g.sizeGb} GB`, `Finishes in about ${g.runHours < 0.1 ? "minutes" : `${Math.round(g.runHours * 10) / 10} h`}, window ${g.windowHours} h`),
+      tile("Set now", `${g.current.gpus} x ${g.current.sizeGb} GB`, g.current.finishesInWindow ? "Finishes inside the window" : "Too slow for the window"),
+      tile("Estimated cost", usd(Math.round(g.costUsd * 1_000_000)), `${g.pending} tasks at about ${g.taskSeconds} s each`),
+    ].join("")}</div>
+    <p class="muted" style="margin:8px 0 0">Planning figures, not an invoice. Set the GPU count and size under Settings, and make the RunPod endpoint's workers match.</p></section>`;
   const clients = b.byClient.map((c) => `<tr><td class="ow-title"><b>${esc(c.name)}</b></td><td class="num">${c.queued}</td><td>${esc(when(c.nextAt))}</td></tr>`).join("");
   const runs = b.runs.map((r) => `<tr><td>${esc(when(r.startedAt))}</td><td>${esc(TRIGGER_LABEL[r.trigger] ?? r.trigger)}</td><td class="num">${r.jobs}</td><td class="num">${r.done}</td><td class="num">${r.retried}</td><td class="num">${r.failed}</td><td class="num">${r.clients}</td><td class="num">${usd(r.actualMicro)}</td><td class="num">${usd(r.savedMicro)}</td></tr>`).join("");
-  box.innerHTML = `<div class="kpis">${tiles}</div>
+  box.innerHTML = `${plan}<div class="kpis">${tiles}</div>
     <div class="tbl-wrap" tabindex="0" role="region" aria-label="Clients with waiting tasks, scrolls sideways on small screens"><table class="tbl"><thead><tr><th scope="col">Client</th><th scope="col" class="num">Waiting</th><th scope="col">Next scheduled run</th></tr></thead><tbody>${clients || '<tr><td colspan="3" class="muted">Nothing is waiting.</td></tr>'}</tbody></table></div>
     <div class="tbl-wrap" tabindex="0" role="region" aria-label="Recent batch runs, scrolls sideways on small screens"><table class="tbl"><thead><tr><th scope="col">Started</th><th scope="col">Why it ran</th><th scope="col" class="num">Tasks</th><th scope="col" class="num">Filed</th><th scope="col" class="num">Retry later</th><th scope="col" class="num">Failed</th><th scope="col" class="num">Clients</th><th scope="col" class="num">Spend</th><th scope="col" class="num">Saved</th></tr></thead><tbody>${runs || '<tr><td colspan="9" class="muted">No batch has run yet.</td></tr>'}</tbody></table></div>
     <h3 style="font-size:1rem;margin:16px 0 6px">Always real-time, never batched</h3>
@@ -156,7 +167,10 @@ const FIELDS: Field[] = [
   { path: "batch.sizeTrigger", label: "Run early at this many waiting tasks", kind: "number", step: "1", hint: "Across all clients" },
   { path: "batch.tokenTrigger", label: "Or at this many estimated tokens", kind: "number", step: "1000" },
   { path: "batch.maxQueueAgeHours", label: "Never wait longer than (hours)", kind: "number", step: "1", hint: "Runs even if closing time is far off" },
-  { path: "batch.concurrency", label: "Tasks sent at once", kind: "number", step: "1", hint: "Keep within the endpoint's max workers" },
+  { path: "batch.gpuWorkers", label: "GPUs for the overnight run", kind: "number", step: "1", hint: "Fixed, so the night's cost is known. The GPU plan above recommends a number" },
+  { path: "batch.gpuSizeGb", label: "GPU memory (GB)", kind: "number", step: "1", hint: "24, 48 or 80. Set the endpoint's workers to match" },
+  { path: "batch.windowHours", label: "Overnight window (hours)", kind: "number", step: "1", hint: "From closing time until results must be in" },
+  { path: "batch.concurrency", label: "Tasks each GPU serves at once", kind: "number", step: "1", hint: "Keep within what one GPU holds in memory" },
   { path: "batch.maxAttempts", label: "Tries before a task fails", kind: "number", step: "1" },
   { path: "batch.retryBackoffMinutes", label: "Wait between tries (minutes)", kind: "number", step: "1", hint: "Multiplied by the try number" },
   { path: "batch.qaRateMin", label: "Claude reads at least this share of batch answers", kind: "number", step: "0.05", hint: "0 to 1. Nobody waits on the answer, so this can be generous" },
