@@ -57,6 +57,7 @@ describe("rate limits", () => {
     expect(limitFor("POST", "/api/slack/events")).toBeUndefined();
     expect(limitFor("POST", "/api/payments/webhook")).toBeUndefined();
     expect(limitFor("POST", "/api/checkout")?.max).toBe(20);
+    expect(limitFor("POST", "/api/ask")).toBeUndefined(); // tasks are limited by energy, not by request count
     expect(limitFor("GET", "/api/org")).toBeUndefined();
   });
   it("uses the proxy-added address, not one the client forged", () => {
