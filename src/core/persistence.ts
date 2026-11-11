@@ -65,7 +65,7 @@ export interface Sink {
 }
 
 /** Kinds stored through Sink.record. The database accepts any kind; this list is what load() hands back. */
-export const GENERIC_KINDS = ["order", "rota_staff", "rota_shift", "rota_settings", "recon", "task"] as const;
+export const GENERIC_KINDS = ["order", "rota_staff", "rota_shift", "rota_settings", "recon", "task", "conversation", "notices"] as const;
 export type GenericKind = (typeof GENERIC_KINDS)[number];
 export interface GenericRecord { workspaceId: string; kind: GenericKind; id: string; data: any }
 

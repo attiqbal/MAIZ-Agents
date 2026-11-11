@@ -1,6 +1,10 @@
 import "./styles.css";
 import { toast } from "./common";
 import { startWorking } from "./ask-status";
+import { askStream, describeOutcome } from "./stream";
+import { initChat, showChat } from "./chat";
+import { initBell } from "./notify";
+import { initSuggestions } from "./suggest";
 import { initSetup } from "./setup";
 import { initApps } from "./apps";
 import { initDash } from "./dash";
@@ -36,6 +40,7 @@ function route(): void {
   const [key = "home", sub = ""] = (location.hash.slice(1) || "home").split("/");
   const valid = screens.some((s) => s.dataset.screen === key) ? key : "home";
   if (valid === "desk") showDesk(sub);
+  if (valid === "chat") void showChat(sub);
   screens.forEach((s) => s.toggleAttribute("hidden", s.dataset.screen !== valid));
   document.querySelectorAll<HTMLAnchorElement>("[data-nav]").forEach((a) => {
     if (a.dataset.nav === (valid === "desk" ? "team" : valid)) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current");
@@ -255,46 +260,25 @@ $<HTMLFormElement>("ask").addEventListener("submit", async (e) => {
   asking = true;
   const stopWorking = startWorking(emp.name);
   const u = /^urgent\s*[:,-]\s*(.+)$/is.exec(m ? m[2]! : text);
-  const r = await api<{ status: string; reason?: string; answer?: string; runsAt?: string; message?: string }>("/ask", { body: { text: u ? u[1] : m ? m[2] : text, employeeId: emp.id, urgent: !!u, ...(chosenWhen ? { when: chosenWhen } : {}) } });
+  // The answer is written into the panel as it arrives. textContent only: streamed words are never parsed as HTML.
+  const live = streamPanel(emp.name);
+  const sent = u ? u[1]! : m ? m[2]! : text;
+  const result = await askStream({ text: sent, employeeId: emp.id, urgent: !!u, ...(chosenWhen ? { when: chosenWhen } : {}) }, live);
   stopWorking();
   asking = false;
-  if (!r.ok || !r.data) { showNote(emp.name, "I could not reach your team. Your question is still in the box, so you can send it again.", true); return; }
+  if (!result.ok) { showNote(emp.name, result.message ?? "I could not reach your team. Your question is still in the box, so you can send it again.", true); return; }
   input.value = "";
   resetWhen();
-  // The server explains why in plain words (weekly pool, daily limit, full queue, trial ended, AI unavailable).
-  if (r.data.status === "no_energy") { showNote(emp.name, r.data.message ?? (r.data.reason === "trial_ended" ? "Your free trial has ended" : "Your team is out of energy for now")); return; }
-  if (r.data.status === "queued") { showQueued(emp.name, r.data.runsAt); return; }
-  if (r.data.status === "failed" || !r.data.answer) { showNote(emp.name, r.data.message ?? `${emp.name} couldn't answer just now. Try again in a few minutes.`); return; }
-  showAnswer(emp.name, r.data.answer ?? "");
+  const out = describeOutcome(emp.name, result.done);
+  if (out.kind === "queued") { showQueued(emp.name, result.done.runsAt); return; }
+  if (out.kind === "note") { showNote(emp.name, out.text); return; }
+  showAnswer(emp.name, out.text, result.done.checked === true, key);
   void loadOrg();
-
-// Settings: auto-reload for top-ups. Off by default; it never spends more than the monthly cap the owner sets.
-type EnergyView = { team: Org["teamEnergy"] & { autoReload: { enabled: boolean; packGbp: number; monthlyCapGbp: number } | null; topUpLeft: number } | null };
-async function loadTopUps(): Promise<void> {
-  if (!getToken()) return;
-  const r = await api<EnergyView>("/energy");
-  const t = r.ok ? r.data?.team : null;
-  if (!t) return;
-  $("tu-left").textContent = `Top-up energy left: ${t.topUpLeft.toLocaleString("en-GB")}`;
-  if (t.autoReload) {
-    $<HTMLInputElement>("tu-on").checked = t.autoReload.enabled;
-    $<HTMLSelectElement>("tu-pack").value = String(t.autoReload.packGbp);
-    $<HTMLInputElement>("tu-cap").value = String(t.autoReload.monthlyCapGbp);
-  }
-}
-$("tu-form").addEventListener("submit", async (ev) => {
-  ev.preventDefault();
-  if (!getToken()) { toast("Example only: log in to change auto-reload"); return; }
-  const r = await api<EnergyView & { error?: string }>("/energy/auto-reload", { body: {
-    enabled: $<HTMLInputElement>("tu-on").checked, packGbp: Number($<HTMLSelectElement>("tu-pack").value), monthlyCapGbp: Number($<HTMLInputElement>("tu-cap").value),
-  } });
-  $("tu-msg").textContent = r.ok ? "Saved." : (r.data as { error?: string } | undefined)?.error ?? "Could not save. Please try again.";
-});
-void loadTopUps();
 });
 
 function answerBox(): HTMLElement {
   let box = document.getElementById("answer");
+  box?.removeAttribute("aria-busy");
   if (!box) {
     box = document.createElement("section");
     box.id = "answer"; box.className = "panel";
@@ -324,11 +308,24 @@ function showQueued(who: string, runsAt?: string): void {
   });
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
-function showAnswer(who: string, text: string): void {
+function showAnswer(who: string, text: string, checked: boolean, key: string): void {
   const box = answerBox();
   box.setAttribute("role", "status");
-  box.innerHTML = `<div class="panel-h"><h2>${esc(who)} says</h2><span class="r">Draft for you to review</span></div><div class="preview" style="white-space:pre-wrap">${esc(text)}</div>`;
+  box.innerHTML = `<div class="panel-h"><h2>${esc(who)} says</h2><span class="r">${checked ? "Checked, for you to review" : "Draft for you to review"}</span></div><div class="preview" style="white-space:pre-wrap">${esc(text)}</div><p><a class="btn btn-sm btn-ghost" href="#chat/${esc(key)}">Follow up in conversation</a></p>`;
   window.scrollTo({ top: 0, behavior: "smooth" });
+}
+/** An answer panel that fills in word by word. Reading aloud waits for the finished answer (aria-busy), not every word. */
+function streamPanel(who: string): { onDelta(piece: string): void; onReset(): void } {
+  const box = answerBox();
+  box.removeAttribute("role");
+  box.setAttribute("aria-busy", "true");
+  box.innerHTML = `<div class="panel-h"><h2>${esc(who)} says</h2><span class="r">Writing…</span></div><div class="preview" style="white-space:pre-wrap" id="answer-live"></div>`;
+  const el = document.getElementById("answer-live")!;
+  let shown = false;
+  return {
+    onDelta: (piece) => { el.textContent += piece; if (!shown) { shown = true; window.scrollTo({ top: 0, behavior: "smooth" }); } },
+    onReset: () => { el.textContent = ""; },
+  };
 }
 document.addEventListener("keydown", (e) => {
   const tag = (e.target as HTMLElement).tagName;
@@ -355,6 +352,14 @@ document.addEventListener("keydown", (e) => {
 
 
 initDash();
+initChat();
+initBell();
+// A suggestion's question goes into the ask bar for the person to read and send, never sent for them.
+void initSuggestions((employee, text) => {
+  const i = $<HTMLInputElement>("ask-in");
+  i.value = `${employee}: ${text}`;
+  i.focus();
+});
 initRoleDesigner();
 initDesk();
 void initPeople(biz);

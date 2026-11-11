@@ -1,4 +1,4 @@
-import { ProviderError, type ChatMessage, type Completer, type CompletionRequest, type CompletionResult, type ModelAdapter, type RoutingInfo } from "../types.js";
+import { ProviderError, type ChatMessage, type TextStream, type Completer, type CompletionRequest, type CompletionResult, type ModelAdapter, type RoutingInfo } from "../types.js";
 import { ResponseCache } from "./cache.js";
 import { SpendLedger, type CallRecord } from "./ledger.js";
 import { HARD_FAILURES, parseVerdict, reviewMessages, suspicion, type ReviewVerdict } from "./review.js";
@@ -46,6 +46,16 @@ interface Call {
   lastError?: Error;
   score?: number;
   rec: Partial<CallRecord>;
+  /** The caller's live stream, wrapped so a second attempt (retry or Claude) first tells it to start over. */
+  live?: { stream: TextStream; restart(): void };
+}
+
+function trackStream(out: TextStream): NonNullable<Call["live"]> {
+  let sent = false;
+  return {
+    stream: { text: (d) => { sent = true; out.text(d); }, reset: () => out.reset() },
+    restart: () => { if (sent) { sent = false; out.reset(); } },
+  };
 }
 
 interface Served { result: CompletionResult; fromRunpod: boolean }
@@ -109,7 +119,7 @@ export class RoutingGateway implements Completer {
     const s = this.d.settings.get();
     const policyKey = req.taskType && s.policies[req.taskType] ? req.taskType : (req.tier ?? "standard");
     const policy = s.policies[policyKey] ?? s.policies.standard!;
-    const c: Call = { req, s, policyKey, policy, ws: req.workspaceId ?? "platform", notes: [], runpodMicro: 0, claudeMicro: 0, runpodSeconds: 0, rec: {} };
+    const c: Call = { req, s, policyKey, policy, ws: req.workspaceId ?? "platform", notes: [], runpodMicro: 0, claudeMicro: 0, runpodSeconds: 0, rec: {}, ...(req.stream ? { live: trackStream(req.stream) } : {}) };
 
     // No client id, no cache: an answer must never be shareable between callers that did not say who they are.
     const key = req.workspaceId && s.cache.enabled && policy.cache ? ResponseCache.key(c.ws, `${policyKey}|${s.runpod.model}|${JSON.stringify(policy)}`, req.messages, req.maxTokens) : undefined;
@@ -149,7 +159,8 @@ export class RoutingGateway implements Completer {
     const why = this.claudeBlocked(c);
     if (why) throw new AiBudgetError(why);
     c.rec.claudeDirect = !c.rec.fallback;
-    const result = await this.claudeCall(c, policy.claudeModel, c.req.messages, c.req.maxTokens);
+    c.live?.restart();
+    const result = await this.claudeCall(c, policy.claudeModel, c.req.messages, c.req.maxTokens, c.live?.stream);
     return { result, fromRunpod: false };
   }
 
@@ -167,7 +178,8 @@ export class RoutingGateway implements Completer {
     for (let attempt = 1; attempt <= s.runpod.attempts; attempt++) {
       const t0 = this.now();
       try {
-        const r = await adapter.complete({ ...c.req, model: s.runpod.model, timeoutMs });
+        c.live?.restart();
+        const r = await adapter.complete({ ...c.req, model: s.runpod.model, timeoutMs, stream: c.live?.stream });
         const seconds = (this.now() - t0) / 1000;
         c.runpodSeconds += seconds;
         c.runpodMicro += s.runpod.billing === "seconds" ? Math.ceil(seconds * s.runpod.gpuUsdPerSecond * USD_TO_MICRO) : priceCost(s.runpod.tokenPrice, r.inputTokens, r.outputTokens);
@@ -279,13 +291,13 @@ export class RoutingGateway implements Completer {
     return undefined;
   }
 
-  private async claudeCall(c: Call, model: string, messages: ChatMessage[], maxTokens: number | undefined): Promise<CompletionResult> {
+  private async claudeCall(c: Call, model: string, messages: ChatMessage[], maxTokens: number | undefined, stream?: TextStream): Promise<CompletionResult> {
     if (!this.d.claude) throw new ProviderError("anthropic", "unavailable", "Claude is not configured");
     const reserve = modelCost(c.s, model, Math.ceil(messages.reduce((n, m) => n + m.content.length, 0) / 4), maxTokens ?? 1024);
     this.inflight.total += reserve;
     this.inflight.byWs.set(c.ws, (this.inflight.byWs.get(c.ws) ?? 0) + reserve);
     try {
-      const r = await this.d.claude.complete({ messages, maxTokens, model, timeoutMs: c.s.runpod.hardTimeoutMs });
+      const r = await this.d.claude.complete({ messages, maxTokens, model, timeoutMs: c.s.runpod.hardTimeoutMs, ...(stream ? { stream } : {}) });
       c.claudeMicro += modelCost(c.s, model, r.inputTokens, r.outputTokens);
       return r;
     } finally {

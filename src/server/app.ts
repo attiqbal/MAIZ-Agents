@@ -23,6 +23,9 @@ import { RotaError } from "../modules/rota/index.js";
 import { PeopleError } from "../modules/people/index.js";
 import { PaymentError, WebhookSignatureError, type Order } from "../modules/payments/index.js";
 import type { Platform } from "./platform.js";
+import { suggestionsFor } from "./suggestions.js";
+import type { Reply } from "../modules/conversations/index.js";
+import type { TaskResult } from "../modules/workforce/index.js";
 import { LOGIN_PROVIDERS, attemptSecrets, authorizeUrl, completeLogin, isLoginProvider, loginRedirectUri } from "./social-login.js";
 
 const OAUTH_STATE_SECONDS = 600;
@@ -71,6 +74,8 @@ export interface Res {
   headers?: Record<string, string>;
   /** Work to do after the reply is sent (Slack needs an answer within 3 seconds). */
   after?: () => Promise<void>;
+  /** A live reply (server-sent events): the server sends headers, then calls this and ends the reply when it returns. */
+  stream?: (send: (event: string, data: unknown) => void) => Promise<void>;
 }
 
 /** What a client sees of an order: never the provider's reference. */
@@ -502,18 +507,47 @@ export function createApp(p: Platform) {
     }
 
     if (method === "POST" && path === "/api/ask") {
-      const b = body();
-      const text = String(b.text ?? "").trim();
-      if (!text) throw new BadRequest("say what you need");
-      if (text.length > 4000) throw new BadRequest("that is too long");
-      const emp = p.workforce.team(userId, org.id).find((e) => e.id === b.employeeId);
-      if (!emp) throw new BadRequest("pick one of your employees");
-      const when = b.when === "now" || b.when === "tonight" ? b.when : undefined;
-      const task = await p.workforce.assign(userId, org.id, emp.id, text, { urgent: b.urgent === true, when });
-      // Plain words for anything that did not produce an answer, so the screen never shows a blank reply.
-      const message = task.status === "no_energy" ? noEnergyMessage(task.reason) : task.status === "failed" ? ASK_FAILED_MESSAGE : undefined;
-      return json(200, { status: task.status, reason: task.reason, answer: task.deliverable, energyUsed: task.energyUsed, jobId: task.jobId, runsAt: task.runsAt, queueReason: task.queueReason, ...(message ? { message } : {}) });
+      const a = prepareAsk(userId, org.id, body());
+      const task = await p.workforce.assign(userId, org.id, a.emp.id, a.text, { urgent: a.urgent, when: a.when, history: a.history });
+      return json(200, answerBody(userId, org.id, a, task));
     }
+
+    // The same question, answered as it is written: events "accepted", then "delta" pieces, then "done" (or "error").
+    // "done" carries the whole answer and is the one to trust: a quality check may have changed what was streamed.
+    if (method === "POST" && path === "/api/ask/stream") {
+      const a = prepareAsk(userId, org.id, body());
+      return {
+        status: 200,
+        headers: { "content-type": "text/event-stream; charset=utf-8", "cache-control": "no-store, no-transform", "x-accel-buffering": "no" },
+        stream: async (send) => {
+          send("accepted", { employee: a.emp.name });
+          try {
+            const task = await p.workforce.assign(userId, org.id, a.emp.id, a.text, {
+              urgent: a.urgent, when: a.when, history: a.history,
+              stream: { text: (t) => send("delta", { t }), reset: () => send("reset", {}) },
+            });
+            send("done", answerBody(userId, org.id, a, task));
+          } catch (err) {
+            console.error("ask stream failed:", err);
+            send("error", { message: err instanceof PermissionError ? "You don't have permission to ask." : ASK_FAILED_MESSAGE });
+          }
+        },
+      };
+    }
+
+    // ---- saved conversations, one thread per employee ----
+    const thread = /^\/api\/conversations\/([\w-]{1,64})(\/clear)?$/.exec(path);
+    if (thread) {
+      const emp = p.workforce.team(userId, org.id).find((e) => e.id === thread[1]);
+      if (!emp) throw new BadRequest("pick one of your employees");
+      if (method === "GET" && !thread[2]) return json(200, { employee: emp.name, turns: p.conversations.thread(userId, org.id, emp.id) });
+      if (method === "POST" && thread[2]) { p.conversations.clear(userId, org.id, emp.id); return json(200, { turns: [] }); }
+    }
+
+    // ---- the bell, and what the records suggest ----
+    if (method === "GET" && path === "/api/notifications") return json(200, p.notices.list(userId, org.id));
+    if (method === "POST" && path === "/api/notifications/seen") { p.notices.markSeen(userId, org.id); return json(200, p.notices.list(userId, org.id)); }
+    if (method === "GET" && path === "/api/suggestions") return json(200, { suggestions: suggestionsFor(p, userId, org.id) });
 
     // The app calls this when it opens or the ask box is focused, so a sleeping GPU is awake by the time the question is sent.
     if (method === "POST" && path === "/api/warm") {
@@ -699,6 +733,32 @@ export function createApp(p: Platform) {
       }
     }
     return undefined;
+  }
+
+  /** Checks an ask and gathers what both ways of asking need. */
+  function prepareAsk(userId: string, orgId: string, b: any) {
+    const text = String(b.text ?? "").trim();
+    if (!text) throw new BadRequest("say what you need");
+    if (text.length > 4000) throw new BadRequest("that is too long");
+    const emp = p.workforce.team(userId, orgId).find((e) => e.id === b.employeeId);
+    if (!emp) throw new BadRequest("pick one of your employees");
+    p.identity.require(userId, orgId, "task.create");
+    const when: "now" | "tonight" | undefined = b.when === "now" || b.when === "tonight" ? b.when : undefined;
+    return { text, emp, when, urgent: b.urgent === true, history: p.conversations.history(userId, orgId, emp.id) };
+  }
+
+  /** What the client sees of a finished ask, and the same turn saved to the conversation. */
+  function answerBody(userId: string, orgId: string, a: ReturnType<typeof prepareAsk>, task: TaskResult) {
+    // Plain words for anything that did not produce an answer, so the screen never shows a blank reply.
+    const message = task.status === "no_energy" ? noEnergyMessage(task.reason) : task.status === "failed" ? ASK_FAILED_MESSAGE : undefined;
+    const queuedText = "Queued. The answer will appear here when it is done.";
+    const reply: Reply = task.status === "ready_for_review" && task.deliverable
+      ? { text: task.deliverable, status: "answered", checked: task.checked }
+      : task.status === "queued"
+        ? { text: queuedText, status: "queued", jobId: task.jobId, runsAt: task.runsAt }
+        : { text: message ?? "No answer this time.", status: task.status === "no_energy" ? "no_energy" : "failed" };
+    p.conversations.record(userId, orgId, a.emp.id, a.text, reply);
+    return { status: task.status, reason: task.reason, answer: task.deliverable, checked: task.checked === true, energyUsed: task.energyUsed, jobId: task.jobId, runsAt: task.runsAt, queueReason: task.queueReason, ...(message ? { message } : {}) };
   }
 
   return async function handle(req: Req): Promise<Res> {

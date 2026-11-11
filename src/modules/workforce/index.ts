@@ -3,7 +3,7 @@ import type { Sink } from "../../core/persistence.js";
 import type { AuditLog } from "../audit/index.js";
 import type { EventBus } from "../../core/events.js";
 import type { IdentityService } from "../identity/index.js";
-import type { Completer } from "../model-gateway/types.js";
+import type { ChatMessage, Completer, TextStream } from "../model-gateway/types.js";
 import { getTemplate, type EmployeeTemplate } from "./templates.js";
 import { getJobDescription, renderJobDescription } from "./job-descriptions.js";
 import type { EnergyMeter } from "../energy/index.js";
@@ -50,6 +50,8 @@ export interface TaskResult {
   failure?: string;
   /** When the task finished (ISO). */
   at?: string;
+  /** A second model checked this answer before it was shown. */
+  checked?: boolean;
   jobId?: string;
   runsAt?: string;
   queueReason?: string;
@@ -62,6 +64,10 @@ export interface AssignOptions {
   when?: "now" | "tonight";
   /** Set by the workforce, never by callers: a new client whose ordinary work is answered at once. */
   liveByDefault?: boolean;
+  /** Earlier turns of the conversation, so a follow-up ("make it shorter") knows what "it" is. Oldest first. */
+  history?: ChatMessage[];
+  /** Receives a live answer as it is written. Only answers produced now stream; queued work does not. */
+  stream?: TextStream;
 }
 
 /** Answers a short question from the client's own records with no model call. Returns undefined when it does not apply. */
@@ -90,6 +96,8 @@ interface RunContext {
   /** Routing policy. "live" for quick lookups, else the employee template. */
   taskType: string;
   batch?: { allowClaudeFallback: boolean };
+  history?: ChatMessage[];
+  stream?: TextStream;
 }
 
 export class WorkforceService {
@@ -297,7 +305,7 @@ export class WorkforceService {
         return queued;
       }
     }
-    const done = await this.execute(userId, workspaceId, employee, brief, { taskType: route?.mode === "lookup" ? "live" : template.key });
+    const done = await this.execute(userId, workspaceId, employee, brief, { taskType: route?.mode === "lookup" ? "live" : template.key, history: opts.history, stream: opts.stream });
     if (done.status === "ready_for_review") this.intake?.record?.(route?.mode === "lookup" ? "lookup" : "live", Date.now() - started);
     if (route?.flushAfter && done.status === "ready_for_review") this.intake?.flush?.();
     return done;
@@ -359,8 +367,10 @@ export class WorkforceService {
         ...(run.batch ? { mode: "batch" as const, allowClaudeFallback: run.batch.allowClaudeFallback } : {}),
         // Long deliverables (reports, journals) must not be cut off mid-sentence.
         maxTokens: 4096,
+        ...(run.stream ? { stream: run.stream } : {}),
         messages: [
           { role: "system", content: system },
+          ...(run.history ?? []),
           { role: "user", content: brief },
         ],
       });
@@ -370,6 +380,7 @@ export class WorkforceService {
       task.outputTokens = result.outputTokens;
       task.costMicro = result.costMicro;
       task.baselineMicro = result.routing?.baselineMicro;
+      if (result.routing?.reviewed && !result.routing.lowConfidence) task.checked = true;
       task.energyUsed = this.energy?.record(workspaceId, employeeId, result.provider, result.inputTokens, result.outputTokens, verdict.overtime, result.costMicro).energy;
     } catch (err) {
       task.status = "failed";

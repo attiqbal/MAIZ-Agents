@@ -32,6 +32,8 @@ import { ReconciliationService } from "../modules/reconciliation/index.js";
 import { localParts } from "../modules/batch/schedule.js";
 import { RotaService, RotaError } from "../modules/rota/index.js";
 import { PeopleService } from "../modules/people/index.js";
+import { ConversationService } from "../modules/conversations/index.js";
+import { NotificationService } from "../modules/notifications/index.js";
 
 import { ConsoleEmailSender, type EmailSender } from "./email.js";
 import { userIdFor } from "./identity.js";
@@ -108,7 +110,23 @@ export function createPlatform(cfg: PlatformConfig) {
   /** Welcomes new owners and runs setup. Storage and models are stand-ins until real RunPod/bucket provisioning is wired in. */
   const admin = new AdminManager(identity, workforce, audit, bus, new InMemoryStorageProvisioner(), new InMemoryModelProvisioner(), router, { now });
   /** Batch work: compiled during the day, sent to the pod at each client's closing time or when enough has gathered. */
-  const batch = new BatchService({ identity, audit, workforce, settings: aiSettings, ledger: spend, isPlatformOwner: (id) => ownerIdSet.has(id), notify: (ws, text, link) => admin.tell(ws, text, link), now });
+  /** What each client said to each employee, kept per employee so follow-ups have context. */
+  const conversations = new ConversationService(identity, now);
+  /** The bell: one notice per event, with a read marker per person. */
+  const notices = new NotificationService(identity, now);
+  /** Tells the client in the Admin manager's inbox (and their chat app), and rings the bell once. */
+  const tellClient = async (ws: string, title: string, text: string, kind: "batch_done" | "review" | "specialist", link: string) => {
+    notices.add(ws, { kind, title, body: text, link });
+    await admin.tell(ws, text, link);
+  };
+  const batch = new BatchService({
+    identity, audit, workforce, settings: aiSettings, ledger: spend, isPlatformOwner: (id) => ownerIdSet.has(id), now,
+    notify: (ws, text, link) => tellClient(ws, "Your batch is done", text, "batch_done", link ?? "/app.html#work"),
+    ended: (job, outcome, answer) => {
+      if (outcome === "done" && answer !== undefined) conversations.fileQueued(job.workspaceId, job.employeeId, job.id, answer);
+      else if (outcome === "failed") conversations.failQueued(job.workspaceId, job.employeeId, job.id);
+    },
+  });
   // The weekly refill and "today" follow the client's own clock (the same zone as their batch schedule).
   energy.setZoneResolver((ws) => batch.scheduleOf(ws).timezone);
   workforce.setIntake(batch);
@@ -144,7 +162,7 @@ export function createPlatform(cfg: PlatformConfig) {
     notifyOwner: async () => decisionDigest.poke(),
     notifyClient: async (item) => {
       const chosen = item.proposal.directions?.find((d) => d.key === item.proposal.chosenDirection);
-      await admin.tell(item.workspaceId, `"${item.proposal.title}" passed quality review${chosen ? ` (direction: ${chosen.name})` : ""}. Your ${item.proposal.employee} has started the work.${item.noteToClient ? ` Note from MAIZ: ${item.noteToClient}` : ""}`, "/app.html#work");
+      await tellClient(item.workspaceId, "Quality review passed", `"${item.proposal.title}" passed quality review${chosen ? ` (direction: ${chosen.name})` : ""}. Your ${item.proposal.employee} has started the work.${item.noteToClient ? ` Note from MAIZ: ${item.noteToClient}` : ""}`, "review", "/app.html#work");
     },
   });
   /** New custom specialists: drafted for the client, checked and priced by the platform owner before training. */
@@ -167,7 +185,7 @@ export function createPlatform(cfg: PlatformConfig) {
         : r.status === "changes_requested"
           ? `MAIZ reviewed your new specialist "${r.role.title}" and asked for changes: ${r.messageToClient}`
           : `MAIZ will not offer the specialist "${r.role.title}": ${r.messageToClient}`;
-      await admin.tell(r.workspaceId, text, "/app.html#team");
+      await tellClient(r.workspaceId, "Update on your new specialist", text, "specialist", "/app.html#team");
     },
   });
 
@@ -398,7 +416,9 @@ export function createPlatform(cfg: PlatformConfig) {
     for (const c of s.priceChanges ?? []) prices.restore(c);
     for (const r of s.specialistRequests ?? []) specialists.restore(r);
     for (const x of s.records ?? []) {
-      if (x.kind === "order") payments.restore(x.data);
+      if (x.kind === "conversation") conversations.restore(x.data);
+      else if (x.kind === "notices") notices.restore(x.data);
+      else if (x.kind === "order") payments.restore(x.data);
       else if (x.kind === "recon") reconciliation.restore(x.data);
       else if (x.kind === "task") workforce.restoreTask(x.data);
       else if (x.kind === "rota_staff") rota.restoreStaff(x.data);
@@ -413,7 +433,7 @@ export function createPlatform(cfg: PlatformConfig) {
     for (const x of s.peopleSettings ?? []) people.restoreSettings(x.workspaceId, x.settings);
     for (const r of s.batchRuns ?? []) batch.restoreRun(r);
     sink = store;
-    for (const part of [audit, identity, energy, workforce, ledger, router, admin, integrations, reviews, prices, specialists, aiSettings, spend, batch, payments, rota, reconciliation, people]) part.useSink(store);
+    for (const part of [audit, identity, energy, workforce, ledger, router, admin, integrations, reviews, prices, specialists, aiSettings, spend, batch, payments, rota, reconciliation, people, conversations, notices]) part.useSink(store);
   }
 
   const healthy = () => (sink as { healthy?: boolean } | undefined)?.healthy !== false;
@@ -429,6 +449,6 @@ export function createPlatform(cfg: PlatformConfig) {
   const formHits = new SendLog();
   /** Starts a sleeping RunPod worker for a client who just opened the app or started typing. */
   const warm = () => routing?.warm() ?? "skipped";
-  return { warm, ownerDecisions, decisionDigest, dashboard, reconciliation, rota, people, payments, batch, email, usedLinks, sends, formHits, admin, reviews, prices, specialists, ai, clients, isPlatformOwner, healthy, cfg, now, audit, bus, identity, energy, workforce, ledger, onboarding, router, integrations, slackTokens, saveSlackToken, attachStore };
+  return { conversations, notices, warm, ownerDecisions, decisionDigest, dashboard, reconciliation, rota, people, payments, batch, email, usedLinks, sends, formHits, admin, reviews, prices, specialists, ai, clients, isPlatformOwner, healthy, cfg, now, audit, bus, identity, energy, workforce, ledger, onboarding, router, integrations, slackTokens, saveSlackToken, attachStore };
 }
 export type Platform = ReturnType<typeof createPlatform>;

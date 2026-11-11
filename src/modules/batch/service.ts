@@ -62,6 +62,8 @@ export interface BatchDeps {
   isPlatformOwner: (userId: string) => boolean;
   /** Tells a client something through the Admin manager. */
   notify: (workspaceId: string, text: string, link?: string) => Promise<unknown>;
+  /** A queued job ended: its answer (done) or nothing (failed), so the conversation it came from can be updated. Must not throw. */
+  ended?: (job: BatchJob, outcome: "done" | "failed", answer?: string) => void;
   now?: () => Date;
 }
 
@@ -351,12 +353,14 @@ export class BatchService implements Intake {
       this.latency.record("batch_wait", new Date(at).getTime() - new Date(job.createdAt).getTime());
       run.done++; run.actualMicro += task.costMicro ?? 0; run.baselineMicro += task.baselineMicro ?? 0;
       this.d.audit.record({ workspaceId: job.workspaceId, actor: `employee:${job.employeeId}`, action: "batch.filed", target: job.id, data: { runId: run.id } });
+      this.d.ended?.(job, "done", task.deliverable);
       return "done";
     }
     if (task.status === "no_energy" || last) {
       this.save({ ...job, status: "failed", finishedAt: at, attempts: job.attempts + 1, lastError: task.status === "no_energy" ? `no energy (${task.reason ?? "unknown"})` : task.failure });
       run.failed++;
       this.d.audit.record({ workspaceId: job.workspaceId, actor: "system", action: "batch.failed", target: job.id, data: { runId: run.id, error: task.status === "no_energy" ? task.reason : task.failure } });
+      this.d.ended?.(job, "failed");
       return "failed";
     }
     const wait = cfg.retryBackoffMinutes * (job.attempts + 1) * 60_000;

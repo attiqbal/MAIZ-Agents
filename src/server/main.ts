@@ -97,6 +97,14 @@ const server = createServer(async (incoming, out) => {
       rawBody: Buffer.concat(chunks).toString("utf8"),
     });
     out.writeHead(res.status, { "content-type": "application/json", ...API_HEADERS, ...res.headers });
+    if (res.stream) {
+      // A live reply: each event is written as soon as it happens. If the person closes the page the work still finishes.
+      const send = (event: string, data: unknown) => { if (!out.destroyed) out.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`); };
+      await res.stream(send);
+      out.end();
+      if (res.after) res.after().catch((err) => console.error("background task failed:", err));
+      return;
+    }
     out.end(res.body === undefined ? undefined : JSON.stringify(res.body));
     if (res.after) res.after().catch((err) => console.error("background task failed:", err));
   } catch (err) {

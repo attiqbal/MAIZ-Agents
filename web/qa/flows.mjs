@@ -67,6 +67,16 @@ const mk = async (opts = {}) => { const ctx = await b.newContext({ viewport: { w
   await p.fill("#ask-in", "finance: what is my runway?"); await p.press("#ask-in", "Enter");
   await p.waitForSelector("#answer", { timeout: 8000 }).catch(() => {});
   ok("app (signed in): ask bar returns an answer", await p.isVisible("#answer"));
+  // Conversations: the question just asked is saved, a follow-up is sent from the conversation screen, and the bell opens.
+  await p.click('.rail a[data-nav="chat"]'); await p.waitForSelector("#chat-body:not([hidden])", { timeout: 5000 }).catch(() => {});
+  await p.goto(B + "/app.html#chat/business-consultant"); await p.waitForTimeout(600);
+  await p.fill("#chat-in", "Make that shorter"); await p.click("#chat-send"); await p.waitForTimeout(1500);
+  ok("conversation: the follow-up is saved in the thread", (await p.locator("#chat-thread .turn-you").count()) >= 1 && (await p.locator("#chat-thread .turn-them").count()) >= 1);
+  await p.click("#bell-btn"); await p.waitForTimeout(400);
+  ok("bell: opens a labelled panel", await p.isVisible("#bell-panel") && (await p.getAttribute("#bell-btn", "aria-expanded")) === "true");
+  await p.keyboard.press("Escape");
+  ok("bell: Escape closes it", !(await p.isVisible("#bell-panel")));
+  await p.goto(B + "/app.html#home"); await p.waitForTimeout(400);
   for (const s of ["approvals", "work", "team", "usage", "store", "finance", "compliance", "apps", "setup", "settings"]) {
     await p.click(`.rail a[data-nav="${s}"]`); await p.waitForTimeout(150);
     ok(`app nav: ${s} screen opens`, await p.isVisible(`[data-screen="${s}"] h1`) && (await p.getAttribute(`.rail a[data-nav="${s}"]`, "aria-current")) === "page");
