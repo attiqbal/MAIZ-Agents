@@ -14,9 +14,9 @@ describe("store cart", () => {
 
   it("splits monthly and one-off totals and merges repeated lines", () => {
     const q = quote([{ key: "supply-chain-manager", qty: 1 }, { key: "web-developer:sprint", qty: 2 }, { key: "web-developer:sprint", qty: 1 }]);
-    expect(q.monthlyGbp).toBe(12);
+    expect(q.monthlyGbp).toBe(20);
     expect(q.onceGbp).toBe(297);
-    expect(q.dueTodayGbp).toBe(309);
+    expect(q.dueTodayGbp).toBe(317);
     expect(q.lines.find((l) => l.key === "web-developer:sprint")?.qty).toBe(3);
   });
 

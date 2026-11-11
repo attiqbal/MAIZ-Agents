@@ -4,7 +4,8 @@ import { noEnergyMessage } from "../src/modules/channels/index.js";
 import { CATALOGUE } from "../src/modules/store/cart.js";
 
 describe("launch prices and team energy", () => {
-  it("starts at £100 a month with 8,000 energy a week shared by the team", () => {
+  it("starts at £100 a month with 8,000 energy a week shared by the team, extra employees £20 with 2,000 more", () => {
+    expect(DEFAULT_GENERAL).toMatchObject({ addOnEmployeeMonthlyGbp: 20, addOnWeeklyEnergy: 2_000 });
     expect(DEFAULT_GENERAL).toMatchObject({ basicPackageMonthlyGbp: 100, weeklyTeamEnergy: 8_000, dailyTeamCeiling: 3_000, trialTeamEnergy: 3_000 });
   });
 
@@ -13,7 +14,7 @@ describe("launch prices and team energy", () => {
     const addOn = CATALOGUE.find((i) => i.kind === "employee")!;
     const standard = CATALOGUE.find((i) => i.kind === "specialist" && i.tier === "standard")!;
     const premium = CATALOGUE.find((i) => i.kind === "specialist" && i.tier === "premium")!;
-    expect(book.weeklyEnergyFor(addOn.key)).toBe(1_000);
+    expect(book.weeklyEnergyFor(addOn.key)).toBe(2_000);
     expect(book.weeklyEnergyFor(standard.key)).toBe(1_500);
     expect(book.weeklyEnergyFor(premium.key)).toBe(2_500);
     expect(book.weeklyEnergyFor("finance-manager")).toBe(0);

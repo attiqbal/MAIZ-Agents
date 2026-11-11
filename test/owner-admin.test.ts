@@ -41,11 +41,11 @@ describe("prices and packages", () => {
     const book = (await s.call("GET", "/api/owner/prices", undefined, s.owner())).body as any;
     const addOn = book.items.find((i: any) => i.kind === "employee");
     const pass = book.items.find((i: any) => i.kind === "consultant");
-    expect(addOn.priceGbp).toBe(12);
+    expect(addOn.priceGbp).toBe(20);
 
     const r = await s.call("POST", "/api/owner/prices/changes", { general: { addOnEmployeeMonthlyGbp: 15 }, items: { [pass.key]: { priceGbp: 99, energy: 5000 } }, note: "Launch pricing" }, s.owner());
     expect(r.status).toBe(201);
-    expect((r.body as any).change.from).toMatchObject({ "general.addOnEmployeeMonthlyGbp": 12, [`items.${pass.key}.priceGbp`]: pass.priceGbp });
+    expect((r.body as any).change.from).toMatchObject({ "general.addOnEmployeeMonthlyGbp": 20, [`items.${pass.key}.priceGbp`]: pass.priceGbp });
 
     const store = (await s.call("GET", "/api/store")).body as any;
     expect(store.catalogue.find((i: any) => i.key === addOn.key).priceGbp).toBe(15);

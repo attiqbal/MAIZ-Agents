@@ -32,8 +32,8 @@ const GENERAL: [keyof GeneralPrices, string, string, string][] = [
 function demo(): Book {
   // Demo copy of the launch defaults (src/modules/pricing DEFAULT_GENERAL); importing that module would pull server code in.
   const general: GeneralPrices = {
-    basicPackageMonthlyGbp: 100, addOnEmployeeMonthlyGbp: 12, specialistStandardMonthlyGbp: 19, specialistPremiumMonthlyGbp: 29, overageGbpPer100Energy: 1,
-    trialDays: 7, trialTeamEnergy: 3_000, weeklyTeamEnergy: 8_000, dailyTeamCeiling: 3_000, addOnWeeklyEnergy: 1_000, specialistStandardWeeklyEnergy: 1_500, specialistPremiumWeeklyEnergy: 2_500,
+    basicPackageMonthlyGbp: 100, addOnEmployeeMonthlyGbp: 20, specialistStandardMonthlyGbp: 19, specialistPremiumMonthlyGbp: 29, overageGbpPer100Energy: 1,
+    trialDays: 7, trialTeamEnergy: 3_000, weeklyTeamEnergy: 8_000, dailyTeamCeiling: 3_000, addOnWeeklyEnergy: 2_000, specialistStandardWeeklyEnergy: 1_500, specialistPremiumWeeklyEnergy: 2_500,
   };
   return {
     general,

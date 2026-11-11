@@ -163,12 +163,12 @@
     {
       "viewport": "1440x900",
       "artifact": "pricing-1440x900.png",
-      "observation": "Team card reads £100 / mo, '5 AI employees + free Admin manager' and '8,000 energy a week, shared by the team'; the three cards keep equal height and the CTA row stays aligned."
+      "observation": "Team card first (£100 / mo, 5 AI employees, 8,000 energy a week shared), then Extra employee (£20 / employee / mo, adds 2,000 energy a week) replacing the old £12 one-employee plan, then Custom; equal card heights, CTAs aligned."
     },
     {
       "viewport": "375x812",
       "artifact": "pricing-375x812.png",
-      "observation": "Cards stack in one column with 16px gutters; the longer Custom bullet 'Each employee you add tops up the team energy' wraps to two lines without clipping; no horizontal overflow."
+      "observation": "Cards stack in one column (Team, Extra employee, Custom) with 16px gutters; longer bullets wrap without clipping; no horizontal overflow."
     }
   ]
 }

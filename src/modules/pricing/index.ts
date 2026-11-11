@@ -92,7 +92,7 @@ export const DEFAULT_GENERAL: GeneralPrices = {
   trialTeamEnergy: PLANS.trial!.weeklyTeamEnergy!,
   weeklyTeamEnergy: PLANS.starter!.weeklyTeamEnergy!,
   dailyTeamCeiling: PLANS.starter!.dailyTeamCeiling!,
-  addOnWeeklyEnergy: 1_000,
+  addOnWeeklyEnergy: 2_000,
   specialistStandardWeeklyEnergy: 1_500,
   specialistPremiumWeeklyEnergy: 2_500,
 };
