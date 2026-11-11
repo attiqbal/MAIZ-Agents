@@ -23,10 +23,19 @@ const EMPLOYEES: Employee[] = [
   { key: "hr", name: "HR manager", short: "HR", abbr: "HR", cls: "av-hr", color: "#2bb59a", skill: "Standard", allowance: DAILY, used: 12, week: [18, 22, 35, 14, 0, 0, 12], status: "good", statusText: "Working", doing: "Drafting your people basics checklist", done: 4, firstTime: 100, price: 12.3 },
   { key: "cm", name: "Compliance manager", short: "Compliance", abbr: "CM", cls: "av-cm", color: "#d9a23a", skill: "Pro", allowance: DAILY, used: 36, week: [30, 44, 52, 38, 10, 8, 36], status: "good", statusText: "Working", doing: "Building your compliance register", done: 5, firstTime: 80, price: 21.4 },
 ];
-const TEAM_DISCOUNT = 0.15;
-const usedToday = EMPLOYEES.reduce((n, e) => n + e.used, 0);
-const allowanceToday = EMPLOYEES.reduce((n, e) => n + e.allowance, 0);
-const monthly = EMPLOYEES.reduce((n, e) => n + e.price, 0) * (1 - TEAM_DISCOUNT);
+// The decided plan: one £100 team package with 8,000 energy a week shared by the whole team, at most 3,000
+// in a day. The example's daily figures are scaled into that pool so every screen shows the same week.
+const WEEK_POOL = 8_000;
+const DAILY_CEILING = 3_000;
+const PACKAGE_GBP = 100;
+const SCALE = 3.61;
+const weekUsedOf = (e: Employee) => Math.round(e.week.reduce((a, b) => a + b, 0) * SCALE);
+const todayOf = (e: Employee) => Math.round(e.used * SCALE);
+const usedWeek = EMPLOYEES.reduce((n, e) => n + weekUsedOf(e), 0);
+const usedToday = EMPLOYEES.reduce((n, e) => n + todayOf(e), 0);
+const weekPct = Math.round((usedWeek / WEEK_POOL) * 100);
+const shareOf = (e: Employee) => Math.round((weekUsedOf(e) / WEEK_POOL) * 100);
+const shareBar = (pct: number) => `<div class="e-cell"><div class="energy"><i style="width:${pct}%"></i></div><span class="mono">${pct}%</span></div>`;
 
 type Column = "Planned" | "In progress" | "Waiting on you" | "Done this week";
 interface Task { title: string; who: string; col: Column; note: string; pct?: number }
@@ -71,7 +80,8 @@ export const energyBar = (used: number, allowance: number) => {
   const left = allowance - used;
   return `<div class="e-cell"><div class="energy${left / allowance < 0.25 ? " low" : ""}"><i style="width:${Math.round((left / allowance) * 100)}%"></i></div><span class="mono">${left} / ${allowance}</span></div>`;
 };
-const who = (e: Employee) => `<span class="who-cell"><span class="av av-sm ${e.cls}" aria-hidden="true">${e.abbr}</span>${esc(e.name)}</span>`;
+const DESK_KEY: Record<string, string> = { fm: "finance-manager", mm: "marketing-manager", bc: "business-consultant", hr: "hr-manager", cm: "compliance-manager" };
+const who = (e: Employee) => `<a class="who-cell desk-a" href="#desk/${DESK_KEY[e.key] ?? ""}"><span class="av av-sm ${e.cls}" aria-hidden="true">${e.abbr}</span>${esc(e.name)}</a>`;
 export const status = (tone: string, text: string) => `<span class="status ${tone === "idle" ? "" : tone}"><span class="dot"></span>${esc(text)}</span>`;
 
 function renderOverview(): void {
@@ -80,8 +90,8 @@ function renderOverview(): void {
     tile("Needs you", "3", "2 approvals, 1 question", "#approvals", "warn"),
     tile("In quality review", String(proposalCount()), "Specialised work MAIZ checks before it starts", "#work", "warn"),
     tile("Tasks in progress", String(count("In progress")), `${count("Planned")} planned, ${count("Done this week")} done this week`, "#work"),
-    tile("Energy used today", `${usedToday} / ${allowanceToday}`, "Marketing is running low", "#usage"),
-    tile("Spend this month", gbp(0), `Free trial. Then ${gbp(monthly)} a month`, "#usage"),
+    tile("Energy this week", `${weekPct}%`, `Of the team's ${WEEK_POOL.toLocaleString("en-GB")}. Refills Monday`, "#usage"),
+    tile("Spend this month", gbp(0), `Free trial. Then £${PACKAGE_GBP} a month for the team`, "#usage"),
     tile("Next deadline", dayMonth(dueDate(next.inDays)), next.title, "#compliance", next.state === "action" ? "warn" : ""),
   ].join("");
   $("ov-next").innerHTML = [
@@ -99,11 +109,11 @@ function renderTeam(): void {
     tile("Employees", String(EMPLOYEES.length), "Plus your free Admin manager"),
     tile("Working now", String(working), "1 waiting on you, 1 idle"),
     tile("Tasks done this week", String(done), `${first}% accepted first time`),
-    tile("Energy left today", `${allowanceToday - usedToday} / ${allowanceToday}`, "Refills at midnight, your time", "#usage"),
+    tile("Energy left this week", `${100 - weekPct}%`, "Shared by the whole team. Refills Monday", "#usage"),
   ].join("");
-  $("team-table").innerHTML = `<thead><tr><th scope="col">Employee</th><th scope="col">Status</th><th scope="col">Working on</th><th scope="col" class="num">Done</th><th scope="col" class="num">Accepted first time</th><th scope="col">Energy left today</th></tr></thead><tbody>` +
-    `<tr><td><span class="who-cell"><span class="av av-sm av-tl" aria-hidden="true">AM</span>Admin manager</span></td><td>${status("good", "Working")}</td><td>Routing requests and writing your daily briefing</td><td class="num">Daily</td><td class="num">–</td><td class="muted">Uses no energy</td></tr>` +
-    EMPLOYEES.map((e) => `<tr><td>${who(e)}</td><td>${status(e.status, e.statusText)}</td><td>${esc(e.doing)}</td><td class="num">${e.done}</td><td class="num">${e.firstTime}%</td><td>${energyBar(e.used, e.allowance)}</td></tr>`).join("") + "</tbody>";
+  $("team-table").innerHTML = `<thead><tr><th scope="col">Employee</th><th scope="col">Status</th><th scope="col">Working on</th><th scope="col" class="num">Done</th><th scope="col" class="num">Accepted first time</th><th scope="col">Share of the week's energy</th></tr></thead><tbody>` +
+    `<tr><td><a class="who-cell desk-a" href="#desk/admin-manager"><span class="av av-sm av-tl" aria-hidden="true">AM</span>Admin manager</a></td><td>${status("good", "Working")}</td><td>Routing requests and writing your daily briefing</td><td class="num">Daily</td><td class="num">–</td><td class="muted">Uses no energy</td></tr>` +
+    EMPLOYEES.map((e) => `<tr><td>${who(e)}</td><td>${status(e.status, e.statusText)}</td><td>${esc(e.doing)}</td><td class="num">${e.done}</td><td class="num">${e.firstTime}%</td><td>${shareBar(shareOf(e))}</td></tr>`).join("") + "</tbody>";
 }
 
 let taskFilter = "all";
@@ -124,16 +134,16 @@ function renderTasks(): void {
 }
 
 function renderUsage(): void {
-  const week = EMPLOYEES.reduce((n, e) => n + e.week.reduce((a, b) => a + b, 0), 0);
   $("usage-kpis").innerHTML = [
-    tile("Energy used today", `${usedToday} / ${allowanceToday}`, `${Math.round((usedToday / allowanceToday) * 100)}% of today's allowance`),
-    tile("Energy used, 7 days", week.toLocaleString(), `About ${Math.round(week / 7)} a day`),
+    tile("Energy used this week", `${weekPct}%`, `${usedWeek.toLocaleString("en-GB")} of ${WEEK_POOL.toLocaleString("en-GB")}. Refills Monday`),
+    tile("Used today", usedToday.toLocaleString("en-GB"), `Daily ceiling ${DAILY_CEILING.toLocaleString("en-GB")}, so one day cannot use up the week`),
     tile("Spend this month", gbp(0), "Free trial, 5 days left"),
-    tile("Monthly price after trial", gbp(monthly), `${EMPLOYEES.length} employees, 15% team discount`, "/pricing.html"),
+    tile("Price after trial", `£${PACKAGE_GBP} a month`, `Team package: ${EMPLOYEES.length} employees, ${WEEK_POOL.toLocaleString("en-GB")} energy a week`, "/pricing.html"),
   ].join("");
-  $("usage-table").innerHTML = `<thead><tr><th scope="col">Employee</th><th scope="col">Skill</th><th scope="col">Energy left today</th><th scope="col" class="num">Used, 7 days</th><th scope="col" class="num">List price a month</th></tr></thead><tbody>` +
-    EMPLOYEES.map((e) => `<tr><td>${who(e)}</td><td>${e.skill}</td><td>${energyBar(e.used, e.allowance)}</td><td class="num">${e.week.reduce((a, b) => a + b, 0)}</td><td class="num">${gbp(e.price)}</td></tr>`).join("") +
-    `<tr class="total"><td colspan="3">Total after 15% team discount</td><td class="num">${week.toLocaleString()}</td><td class="num">${gbp(monthly)}</td></tr></tbody>`;
+  $("usage-week-note").textContent = `This week: ${weekPct}% of the team's energy used`;
+  $("usage-table").innerHTML = `<thead><tr><th scope="col">Employee</th><th scope="col" class="num">Used today</th><th scope="col" class="num">Used this week</th><th scope="col">Share of the week's energy</th></tr></thead><tbody>` +
+    EMPLOYEES.map((e) => `<tr><td>${who(e)}</td><td class="num">${todayOf(e).toLocaleString("en-GB")}</td><td class="num">${weekUsedOf(e).toLocaleString("en-GB")}</td><td>${shareBar(shareOf(e))}</td></tr>`).join("") +
+    `<tr class="total"><td>Whole team</td><td class="num">${usedToday.toLocaleString("en-GB")}</td><td class="num">${usedWeek.toLocaleString("en-GB")}</td><td>${shareBar(weekPct)}</td></tr></tbody>`;
   $("bars-legend").innerHTML = EMPLOYEES.map((e) => `<span><i style="background:${e.color}"></i>${e.short}</span>`).join("");
   drawBars();
 }

@@ -115,6 +115,9 @@ export interface DocView extends Requirement {
   doc?: StaffDocument;
 }
 
+/** "25 Oct 2026": dates inside sentences read naturally, the same on the server and in the browser. */
+export const humanDate = (iso: string): string => new Date(`${iso}T12:00:00Z`).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
+
 const isTimeLimited = (m: StaffMember) => m.rtwRoute === "share_code" || m.rtwRoute === "evisa";
 
 /** When a checked document stops being valid: its own date, the permission's end, or its renewal period. */
@@ -265,7 +268,7 @@ function docAction(m: StaffMember, d: DocView, status: StaffStatus, today: strin
   const base = { staffId: m.id, staffName: m.name, ref: d.key, id: `${m.id}:doc:${d.key}` };
   if (d.state === "expired") {
     const severity: Severity = d.key === "right_to_work" ? "critical" : d.level === "legal" ? "high" : "medium";
-    return { ...base, severity, kind: "renew", title: `${d.label} expired`, detail: d.key === "right_to_work" ? "Do a follow-up right-to-work check now. They must not keep working without one." : `Expired on ${d.expiresOn}. ${d.why}`, dueOn: d.expiresOn };
+    return { ...base, severity, kind: "renew", title: `${d.label} expired`, detail: d.key === "right_to_work" ? "Do a follow-up right-to-work check now. They must not keep working without one." : `Expired on ${humanDate(d.expiresOn!)}. ${d.why}`, dueOn: d.expiresOn };
   }
   if (d.state === "expiring") {
     const severity: Severity = (d.daysLeft ?? 0) <= EXPIRY_URGENT_DAYS ? "high" : "medium";
@@ -301,7 +304,7 @@ export function staffActions(m: StaffMember, sector: Sector, today: string, docs
     if (a) out.push(a);
   }
   for (const l of m.leave) {
-    if (l.status === "requested") out.push({ id: `${m.id}:leave:${l.id}`, staffId: m.id, staffName: m.name, severity: "medium", kind: "approve_leave", ref: l.id, title: `${l.kind === "holiday" ? "Holiday" : "Leave"} request: ${l.days} day${l.days === 1 ? "" : "s"}`, detail: `${l.from} to ${l.to}. Approve or decline.`, dueOn: l.from });
+    if (l.status === "requested") out.push({ id: `${m.id}:leave:${l.id}`, staffId: m.id, staffName: m.name, severity: "medium", kind: "approve_leave", ref: l.id, title: `${l.kind === "holiday" ? "Holiday" : "Leave"} request: ${l.days} day${l.days === 1 ? "" : "s"}`, detail: `${humanDate(l.from)} to ${humanDate(l.to)}. Approve or decline.`, dueOn: l.from });
   }
   const reviews = [...m.reviews];
   if (m.probationEndsOn && !reviews.some((r) => r.kind === "probation")) reviews.push({ id: "probation", kind: "probation", dueOn: m.probationEndsOn });
@@ -314,7 +317,7 @@ export function staffActions(m: StaffMember, sector: Sector, today: string, docs
   }
   if (status === "leaving" && m.endDate) {
     const open = leavingChecklist().filter((i) => !m.checklist[i.key]);
-    if (open.length) out.push({ id: `${m.id}:leaving`, staffId: m.id, staffName: m.name, severity: daysBetween(today, m.endDate) <= 14 ? "medium" : "low", kind: "checklist", title: `Leaving on ${m.endDate}`, detail: `${open.length} leaving step${open.length === 1 ? "" : "s"} to do.`, dueOn: m.endDate });
+    if (open.length) out.push({ id: `${m.id}:leaving`, staffId: m.id, staffName: m.name, severity: daysBetween(today, m.endDate) <= 14 ? "medium" : "low", kind: "checklist", title: `Leaving on ${humanDate(m.endDate)}`, detail: `${open.length} leaving step${open.length === 1 ? "" : "s"} to do.`, dueOn: m.endDate });
   }
   return sortActions(out);
 }
@@ -396,4 +399,42 @@ export function requestMessage(m: StaffMember, req: Requirement, businessName: s
 /** The date right-to-work evidence may be deleted: 2 years after employment ends. */
 export function rtwRetainUntil(m: StaffMember): string | undefined {
   return m.endDate ? addDays(addMonths(m.endDate, 24), 0) : undefined;
+}
+
+// ---- one person's full record, as the desk shows it ----
+
+export interface DeskSettings {
+  sector: Sector;
+  /** 1 = the leave year starts on 1 January. */
+  leaveYearStartMonth: number;
+}
+
+export interface StaffDetail {
+  member: StaffMember;
+  status: StaffStatus;
+  documents: DocView[];
+  complete: number;
+  actions: HrAction[];
+  onboarding: (ChecklistItem & { doneOn?: string })[];
+  leaving: (ChecklistItem & { doneOn?: string })[];
+  leave: LeaveBalance;
+  rtwRetainUntil?: string;
+  rota?: { weekStart: string; shifts: { date: string; start: string; end: string; hours: number; role?: string }[]; hours: number; cap: number };
+}
+
+export function staffDetail(m: StaffMember, s: DeskSettings, today: string): StaffDetail {
+  const docs = documentViews(m, s.sector, today);
+  const tick = (i: ChecklistItem) => ({ ...i, ...(m.checklist[i.key] ? { doneOn: m.checklist[i.key] } : {}) });
+  const retain = rtwRetainUntil(m);
+  return {
+    member: m,
+    status: staffStatus(m, today),
+    documents: docs,
+    complete: completeness(docs),
+    actions: staffActions(m, s.sector, today, docs),
+    onboarding: onboardingChecklist(s.sector).map(tick),
+    leaving: m.endDate ? leavingChecklist().map(tick) : [],
+    leave: leaveBalance(m, today, s.leaveYearStartMonth),
+    ...(retain ? { rtwRetainUntil: retain } : {}),
+  };
 }

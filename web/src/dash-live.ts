@@ -9,8 +9,9 @@ const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&
 
 interface LiveEmployee { id: string; name: string; templateKey: string; allowance: number; usedToday: number; week: number[]; doneWeek: number; status: "working" | "idle"; doing: string | null }
 interface LiveTask { id: string; employeeId: string | null; employeeName: string | null; title: string; column: "planned" | "in_progress" | "waiting" | "done"; runsAt?: string; note?: string; energy?: number }
+interface TeamEnergy { pool: number; used: number; left: number; percentUsed: number; leftToday: number; dailyCeiling: number | null; refillsAt: string | null }
 interface Live {
-  team: LiveEmployee[]; tasks: LiveTask[];
+  team: LiveEmployee[]; tasks: LiveTask[]; teamEnergy?: TeamEnergy | null;
   totals: { energyToday: number; allowanceToday: number; energyWeek: number; energyMonth: number; queued: number; waitingOnYou: number; inReview: number; doneWeek: number; nextRunLabel: string };
 }
 
@@ -19,9 +20,15 @@ const LOOK: Record<string, [abbr: string, cls: string, color: string]> = {
   "hr-manager": ["HR", "av-hr", "#2bb59a"], "compliance-manager": ["CM", "av-cm", "#d9a23a"], "supply-chain-manager": ["SC", "av-sc", "#6f86d6"], "admin-manager": ["AM", "av-tl", "#8a93b2"],
 };
 const look = (key: string): [string, string, string] => LOOK[key] ?? ["AI", "av-tl", "#8a93b2"];
-const who = (e: LiveEmployee) => `<span class="who-cell"><span class="av av-sm ${look(e.templateKey)[1]}" aria-hidden="true">${look(e.templateKey)[0]}</span>${esc(e.name)}</span>`;
+const who = (e: LiveEmployee) => `<a class="who-cell desk-a" href="#desk/${esc(e.templateKey)}"><span class="av av-sm ${look(e.templateKey)[1]}" aria-hidden="true">${look(e.templateKey)[0]}</span>${esc(e.name)}</a>`;
 const sum = (xs: number[]) => xs.reduce((a, b) => a + b, 0);
 const COLUMNS: [LiveTask["column"], string][] = [["planned", "Planned"], ["in_progress", "In progress"], ["waiting", "Waiting on you"], ["done", "Done this week"]];
+
+const n = (x: number) => x.toLocaleString("en-GB");
+/** When the shared weekly energy refills, in words. */
+const refills = (te: TeamEnergy) => te.refillsAt ? `Refills ${new Date(te.refillsAt).toLocaleDateString("en-GB", { weekday: "long" })}` : "For the whole trial";
+/** One employee's share of the week's shared energy, as a bar and a percentage. */
+const share = (used: number, pool: number) => { const pct = pool > 0 ? Math.min(100, Math.round((used / pool) * 100)) : 0; return `<div class="e-cell"><div class="energy"><i style="width:${pct}%"></i></div><span class="mono">${pct}%</span></div>`; };
 
 function hideExampleTag(screen: string): void {
   document.querySelector(`[data-screen="${screen}"] .eg`)?.remove();
@@ -30,11 +37,14 @@ function hideExampleTag(screen: string): void {
 function overview(d: Live): void {
   const t = d.totals;
   const inProgress = d.tasks.filter((x) => x.column === "in_progress").length;
+  $("need-count").textContent = t.waitingOnYou ? `${t.waitingOnYou} need${t.waitingOnYou === 1 ? "s" : ""} you` : "All clear";
   $("ov-kpis").innerHTML = [
     tile("Needs you", String(t.waitingOnYou), t.waitingOnYou ? "Questions from specialised tasks" : "Nothing is waiting on you", "#work", t.waitingOnYou ? "warn" : ""),
     tile("In quality review", String(t.inReview), "Specialised work MAIZ checks before it starts", "#work"),
     tile("Tasks in progress", String(inProgress), `${t.queued} waiting for the next batch, ${t.doneWeek} done this week`, "#work"),
-    tile("Energy used today", `${t.energyToday} / ${t.allowanceToday}`, t.energyToday >= t.allowanceToday * 0.75 ? "Getting low" : "Plenty left", "#usage"),
+    d.teamEnergy
+      ? tile("Energy this week", `${d.teamEnergy.percentUsed}%`, `Of the team's ${n(d.teamEnergy.pool)}. ${refills(d.teamEnergy)}`, "#usage", d.teamEnergy.percentUsed >= 75 ? "warn" : "")
+      : tile("Energy used today", `${t.energyToday} / ${t.allowanceToday}`, t.energyToday >= t.allowanceToday * 0.75 ? "Getting low" : "Plenty left", "#usage"),
     tile("Energy this month", t.energyMonth.toLocaleString(), "Across your whole team", "#usage"),
     tile("Next batch", t.nextRunLabel, `${t.queued} task${t.queued === 1 ? "" : "s"} waiting`, "#work"),
   ].join("");
@@ -51,10 +61,12 @@ function team(d: Live): void {
     tile("Employees", String(d.team.length), "Includes your free Admin manager"),
     tile("Working now", String(d.team.filter((e) => e.status === "working").length), `${d.team.filter((e) => e.status === "idle").length} idle`),
     tile("Tasks done this week", String(t.doneWeek), "Drafts waiting for your review"),
-    tile("Energy left today", `${Math.max(0, t.allowanceToday - t.energyToday)} / ${t.allowanceToday}`, "Refills at midnight (UTC)", "#usage"),
+    d.teamEnergy
+      ? tile("Energy left this week", `${100 - d.teamEnergy.percentUsed}%`, `Shared by the whole team. ${refills(d.teamEnergy)}`, "#usage")
+      : tile("Energy left today", `${Math.max(0, t.allowanceToday - t.energyToday)} / ${t.allowanceToday}`, "Refills at midnight (UTC)", "#usage"),
   ].join("");
-  $("team-table").innerHTML = `<thead><tr><th scope="col">Employee</th><th scope="col">Status</th><th scope="col">Working on</th><th scope="col" class="num">Done this week</th><th scope="col">Energy left today</th></tr></thead><tbody>` +
-    d.team.map((e) => `<tr><td>${who(e)}</td><td>${status(e.status === "working" ? "good" : "idle", e.status === "working" ? "Working" : "Ready")}</td><td>${esc(e.doing ?? "Waiting for your next request")}</td><td class="num">${e.doneWeek}</td><td>${energyBar(e.usedToday, Math.max(e.allowance, 1))}</td></tr>`).join("") + "</tbody>";
+  $("team-table").innerHTML = `<thead><tr><th scope="col">Employee</th><th scope="col">Status</th><th scope="col">Working on</th><th scope="col" class="num">Done this week</th><th scope="col">${d.teamEnergy ? "Share of the week's energy" : "Energy left today"}</th></tr></thead><tbody>` +
+    d.team.map((e) => `<tr><td>${who(e)}</td><td>${status(e.status === "working" ? "good" : "idle", e.status === "working" ? "Working" : "Ready")}</td><td>${esc(e.doing ?? "Waiting for your next request")}</td><td class="num">${e.doneWeek}</td><td>${d.teamEnergy ? share(sum(e.week), d.teamEnergy.pool) : energyBar(e.usedToday, Math.max(e.allowance, 1))}</td></tr>`).join("") + "</tbody>";
   hideExampleTag("team");
 }
 
@@ -91,7 +103,9 @@ function tasks(d: Live): void {
 function usage(d: Live): void {
   const t = d.totals;
   $("usage-kpis").innerHTML = [
-    tile("Energy used today", `${t.energyToday} / ${t.allowanceToday}`, `${t.allowanceToday ? Math.round((t.energyToday / t.allowanceToday) * 100) : 0}% of today's allowance`),
+    d.teamEnergy
+      ? tile("Energy used this week", `${d.teamEnergy.percentUsed}%`, `${n(d.teamEnergy.used)} of ${n(d.teamEnergy.pool)}. ${refills(d.teamEnergy)}`)
+      : tile("Energy used today", `${t.energyToday} / ${t.allowanceToday}`, `${t.allowanceToday ? Math.round((t.energyToday / t.allowanceToday) * 100) : 0}% of today's allowance`),
     tile("Energy used, 7 days", t.energyWeek.toLocaleString(), `About ${Math.round(t.energyWeek / 7)} a day`),
     tile("Energy this month", t.energyMonth.toLocaleString(), "Across your whole team"),
     tile("Spend this month", "£0.00", "Nothing is charged yet", "/pricing.html"),
@@ -101,7 +115,9 @@ function usage(d: Live): void {
   $("bars-legend").innerHTML = d.team.map((e) => `<span><i style="background:${look(e.templateKey)[2]}"></i>${esc(e.name)}</span>`).join("");
   bars(d);
   const allowance = document.querySelector<HTMLElement>('[data-screen="usage"] .panel-h .r');
-  if (allowance) allowance.textContent = `Daily allowance: ${t.allowanceToday.toLocaleString()} across the team`;
+  if (allowance) allowance.textContent = d.teamEnergy
+    ? `This week: ${d.teamEnergy.percentUsed}% of the team's energy used${d.teamEnergy.dailyCeiling ? `, at most ${n(d.teamEnergy.dailyCeiling)} a day` : ""}`
+    : `Daily allowance: ${t.allowanceToday.toLocaleString()} across the team`;
   hideExampleTag("usage");
 }
 

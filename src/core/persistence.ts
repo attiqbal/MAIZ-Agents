@@ -13,8 +13,7 @@ import type { AiRoutingSettings } from "../modules/model-gateway/routing/setting
 import type { AiDay } from "../modules/model-gateway/routing/ledger.js";
 import type { BatchJob, BatchRunRecord } from "../modules/batch/service.js";
 import type { ClientSchedule } from "../modules/batch/schedule.js";
-import type { StaffMember } from "../modules/people/rules.js";
-import type { PeopleSettings } from "../modules/people/index.js";
+import type { StaffMember, DeskSettings as PeopleSettings } from "../modules/people/rules.js";
 
 /**
  * Where services report every change so it can be stored. Services stay fast and

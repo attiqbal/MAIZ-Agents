@@ -5,10 +5,9 @@ import type { IdentityService } from "../identity/index.js";
 import { addDays, isIsoDate, toIsoDate } from "./dates.js";
 import { ALL_REQUIREMENT_KEYS, SECTORS, requiredDocuments, type Sector } from "./requirements.js";
 import {
-  ALL_CHECKLIST_KEYS, CONTRACT_LABEL, RTW_LABEL, completeness, documentViews, hrSummary, leaveBalance, leavingChecklist,
-  offOn, onboardingChecklist, rtwRetainUntil, staffActions, staffStatus,
-  type ContractType, type DocStatus, type DocView, type HrAction, type HrSummary, type LeaveBalance, type LeaveKind,
-  type PensionStatus, type ReviewKind, type RtwRoute, type StaffMember, type StaffStatus, type ChecklistItem,
+  ALL_CHECKLIST_KEYS, CONTRACT_LABEL, RTW_LABEL, hrSummary, offOn, rtwRetainUntil, staffDetail,
+  type ContractType, type DeskSettings, type DocStatus, type HrSummary, type LeaveKind,
+  type PensionStatus, type ReviewKind, type RtwRoute, type StaffDetail, type StaffMember,
 } from "./rules.js";
 
 export * from "./rules.js";
@@ -25,33 +24,10 @@ export * from "./dates.js";
  */
 export class PeopleError extends Error {}
 
-export interface PeopleSettings {
-  sector: Sector;
-  /** 1 = the leave year starts on 1 January. */
-  leaveYearStartMonth: number;
-}
+export type PeopleSettings = DeskSettings;
 export const DEFAULT_SETTINGS: PeopleSettings = { sector: "other", leaveYearStartMonth: 1 };
 
-export interface StaffDetail {
-  member: StaffMember;
-  status: StaffStatus;
-  documents: DocView[];
-  complete: number;
-  actions: HrAction[];
-  onboarding: (ChecklistItem & { doneOn?: string })[];
-  leaving: (ChecklistItem & { doneOn?: string })[];
-  leave: LeaveBalance;
-  rtwRetainUntil?: string;
-  rota?: RotaWeek;
-}
-
-/** A person's shifts this week, from the rota module. */
-export interface RotaWeek {
-  weekStart: string;
-  shifts: { date: string; start: string; end: string; hours: number; role?: string }[];
-  hours: number;
-  cap: number;
-}
+export type RotaWeek = NonNullable<StaffDetail["rota"]>;
 
 /** How the desk reaches the rota, so a person is entered once and shows in both. */
 export interface PeopleOptions {
@@ -210,21 +186,9 @@ export class PeopleService {
     const { sector, leaveYearStartMonth } = this.settings(userId, ws);
     const m = this.find(ws, id);
     const today = this.today();
-    const docs = documentViews(m, sector, today);
     if (audit) this.log(userId, ws, "people.record_viewed", id);
-    const tick = (i: ChecklistItem) => ({ ...i, ...(m.checklist[i.key] ? { doneOn: m.checklist[i.key] } : {}) });
-    return {
-      member: m,
-      status: staffStatus(m, today),
-      documents: docs,
-      complete: completeness(docs),
-      actions: staffActions(m, sector, today, docs),
-      onboarding: onboardingChecklist(sector).map(tick),
-      leaving: m.endDate ? leavingChecklist().map(tick) : [],
-      leave: leaveBalance(m, today, leaveYearStartMonth),
-      rtwRetainUntil: rtwRetainUntil(m),
-      ...(m.rotaStaffId && this.opts.rotaWeek ? { rota: this.opts.rotaWeek(ws, m.rotaStaffId, today) } : {}),
-    };
+    const rota = m.rotaStaffId ? this.opts.rotaWeek?.(ws, m.rotaStaffId, today) : undefined;
+    return { ...staffDetail(m, { sector, leaveYearStartMonth }, today), ...(rota ? { rota } : {}) };
   }
 
   add(userId: string, ws: string, b: Input): StaffDetail {
