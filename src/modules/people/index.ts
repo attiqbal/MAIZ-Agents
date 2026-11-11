@@ -3,7 +3,7 @@ import { newId } from "../../core/ids.js";
 import type { Sink } from "../../core/persistence.js";
 import type { AuditLog } from "../audit/index.js";
 import type { IdentityService } from "../identity/index.js";
-import { addDays, isIsoDate, toIsoDate } from "./dates.js";
+import { addDays, daysBetween, isIsoDate, toIsoDate } from "./dates.js";
 import { ALL_REQUIREMENT_KEYS, SECTORS, requiredDocuments, type Sector } from "./requirements.js";
 import {
   ALL_CHECKLIST_KEYS, CONTRACT_LABEL, RTW_LABEL, hrSummary, offOn, rtwRetainUntil, staffDetail, staffStatus,
@@ -462,6 +462,11 @@ export class PeopleService {
     return m;
   }
 
+  /** Whether a form link is live, so the server can rate-limit unknown links together instead of one bucket each. */
+  formLinkLive(token: unknown): boolean {
+    try { this.byToken(token); return true; } catch { return false; }
+  }
+
   /** What the person sees on their form. */
   formView(token: unknown): StaffFormView {
     const m = this.byToken(token);
@@ -500,8 +505,10 @@ export class PeopleService {
       if (from < this.today()) throw new PeopleError("time off has to start today or later");
       if (to < from) throw new PeopleError("the last day off is before the first");
       if (to > addDays(from, 366)) throw new PeopleError("ask for at most a year in one go");
+      if (from > addDays(this.today(), 550)) throw new PeopleError("time off can be asked for up to 18 months ahead");
       const days = num(t.days, 0.5, 260, "working days off", true)!;
       if (Math.round(days * 2) !== days * 2) throw new PeopleError("days must be whole or half days");
+      if (days > daysBetween(from, to) + 1) throw new PeopleError("that is more working days than the dates cover");
       if (cur.leave.filter((l) => l.status === "requested").length >= MAX_OPEN_REQUESTS) throw new PeopleError("you already have several requests waiting; ask your manager to decide those first");
       if (cur.leave.length >= MAX_LEAVE) throw new PeopleError("too many leave records; ask your manager");
       const note = text(t.note, TEXT.note, "note");
@@ -509,16 +516,22 @@ export class PeopleService {
       asked = { days };
     }
     this.save(this.withEmergencyDoc(next, "staff form"));
-    this.audit.record({ workspaceId: ws, actor: `staff:${cur.id}`, action: "people.form_submitted", target: cur.id, data: { fields: Object.keys(changes), ...(asked ? { timeOffDays: asked.days } : {}) } });
+    const contact = (["phone", "email"] as const).filter((k) => k in b && next[k] !== cur[k]);
+    this.audit.record({ workspaceId: ws, actor: `staff:${cur.id}`, action: "people.form_submitted", target: cur.id, data: { fields: [...Object.keys(changes), ...contact], ...(asked ? { timeOffDays: asked.days } : {}) } });
     return this.formView(token);
   }
 
   /** An emergency contact given on the form counts as the "emergency contact" record, unless already checked. */
   private withEmergencyDoc(m: StaffMember, by: string): StaffMember {
     const p = m.profile;
-    if (!p?.emergencyName || !p.emergencyPhone || m.documents.emergency_contact?.status === "checked") return m;
+    const cur = m.documents.emergency_contact?.status;
+    if (!p?.emergencyName || !p.emergencyPhone || (cur && cur !== "missing" && cur !== "requested")) return m;
     const today = this.today();
-    return { ...m, documents: { ...m.documents, emergency_contact: { status: "checked", checkedOn: today, checkedBy: by, updatedAt: today, note: "From the staff details form" } } };
+    // The owner entering it is a check; the person's own answer is "received" until the owner looks at it.
+    const doc = by === "staff form"
+      ? { status: "received" as const, updatedAt: today, note: "From the staff details form" }
+      : { status: "checked" as const, checkedOn: today, checkedBy: by, updatedAt: today, note: "Entered on the HR desk" };
+    return { ...m, documents: { ...m.documents, emergency_contact: doc } };
   }
 
   /** Deletes a record for good (a data request, or the retention period has passed). Owner only. */

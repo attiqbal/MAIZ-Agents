@@ -94,12 +94,15 @@ describe("staff form link", () => {
     expect(d.member.profile).toMatchObject({ emergencyName: "Raj Shah", hoursMax: 30, updatedBy: "staff" });
     expect(d.member.phone).toBe("07700900123");
     expect(d.member.formLink).toEqual({ createdOn: "2026-11-11", expiresOn: "2026-11-25", usedOn: "2026-11-11" });
-    expect(d.documents.find((x: any) => x.key === "emergency_contact").state).toBe("ok");
+    // The person's own answer waits for the owner to look at it; it is not a check.
+    expect(d.documents.find((x: any) => x.key === "emergency_contact").state).toBe("to_check");
     expect(d.actions.find((a: any) => a.kind === "approve_leave")).toBeTruthy();
 
     const ws = platform.identity.workspacesFor(userIdFor("owner@kestrel.test"))[0]!;
     const log = platform.audit.list(ws.id);
-    expect(log.find((e) => e.action === "people.form_submitted")?.actor).toBe(`staff:${p.id}`);
+    const sub = log.find((e) => e.action === "people.form_submitted")!;
+    expect(sub.actor).toBe(`staff:${p.id}`);
+    expect((sub.data as any).fields).toContain("phone");
     expect(JSON.stringify(log)).not.toContain(token);
   });
 
@@ -137,6 +140,9 @@ describe("staff form link", () => {
     expect(((await save({ timeOff: { from: "2026-11-01", days: 1 } })).body as any).error).toMatch(/today or later/);
     expect(((await save({ timeOff: { from: "2026-12-01", days: 0.3 } })).body as any).error).toMatch(/between 0.5/);
     expect(((await save({ email: "not-an-email" })).body as any).error).toMatch(/does not look right/);
+    expect(((await save({ timeOff: { from: "2026-12-01", to: "2026-12-02", days: 5 } })).body as any).error).toMatch(/more working days than the dates cover/);
+    expect(((await save({ timeOff: { from: "2028-12-01", days: 1 } })).body as any).error).toMatch(/18 months/);
+    expect((await call("POST", "/api/staff-form/save", null)).status).toBe(400);
 
     const ws = platform.identity.workspacesFor(userIdFor("owner@kestrel.test"))[0]!;
     await platform.identity.addMember(userIdFor("owner@kestrel.test"), ws.id, userIdFor("m@kestrel.test"), "member");
@@ -145,6 +151,11 @@ describe("staff form link", () => {
     let last = 0;
     for (let i = 0; i < 31; i++) last = (await call("POST", "/api/staff-form/open", { token })).status;
     expect(last).toBe(429);
+    // Random links share one allowance, so a flood of made-up links is throttled together.
+    let unknown = 0;
+    for (let i = 0; i < 301; i++) unknown = (await call("POST", "/api/staff-form/open", { token: `made-up-link-number-${i}` })).status;
+    expect(unknown).toBe(429);
+    expect(platform.formHits.size).toBeLessThan(5);
   });
 });
 

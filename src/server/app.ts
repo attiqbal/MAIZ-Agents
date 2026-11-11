@@ -1,4 +1,4 @@
-import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
+import { createHash, createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import { userIdFor } from "./identity.js";
 import { SetupError } from "../modules/admin-manager/index.js";
 import { ChannelError, noEnergyMessage, parseSlackEvent } from "../modules/channels/index.js";
@@ -42,6 +42,8 @@ function readCookie(header: string | undefined, name: string): string | undefine
 
 /** Opens or saves of one staff form link per hour. */
 const STAFF_FORM_PER_HOUR = 30;
+/** Tries with links that do not exist, across everyone, per hour. */
+const UNKNOWN_FORM_LINKS_PER_HOUR = 300;
 
 export interface Req {
   method: string;
@@ -155,13 +157,17 @@ export function createApp(p: Platform) {
 
     // ---- a member of staff filling in their own details from their form link (no account) ----
     if (method === "POST" && (path === "/api/staff-form/open" || path === "/api/staff-form/save")) {
-      const b = body();
+      const raw = body();
+      if (!raw || typeof raw !== "object" || Array.isArray(raw)) throw new BadRequest("send the form as an object");
+      const b = raw as Record<string, unknown>;
       const token = typeof b.token === "string" ? b.token.slice(0, 64) : "";
       const nowMs = p.now().getTime();
-      const key = `staff-form:${path.endsWith("save") ? "save" : "open"}:${token}`;
-      if (p.formHits.recent(key, nowMs).length >= STAFF_FORM_PER_HOUR) return json(429, { error: "too many tries, please wait a while and try again" });
+      // A live link gets its own allowance; every unknown link shares one, so random links cannot fill memory.
+      const live = p.people.formLinkLive(token);
+      const key = live ? `staff-form:${createHash("sha256").update(token).digest("hex")}` : "staff-form:unknown";
+      if (p.formHits.recent(key, nowMs).length >= (live ? STAFF_FORM_PER_HOUR : UNKNOWN_FORM_LINKS_PER_HOUR)) return json(429, { error: "too many tries, please wait a while and try again" });
       p.formHits.record(key, nowMs);
-      return json(200, path.endsWith("save") ? p.people.submitForm(token, b) : p.people.formView(token));
+      return { ...json(200, path.endsWith("save") ? p.people.submitForm(token, b) : p.people.formView(token)), headers: { "cache-control": "no-store" } };
     }
 
     // ---- sign in by email link ----
