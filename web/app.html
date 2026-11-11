@@ -34,7 +34,7 @@
     <a class="ni" href="#setup" data-nav="setup"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h16v11H9l-5 4z"/></svg>Setup<span class="count" id="setup-badge">1</span></a>
     <a class="ni" href="#settings" data-nav="settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M18.4 5.6l-2.1 2.100M7.7 16.3l-2.1 2.1"/></svg>Settings</a>
     </nav>
-    <div class="trial"><b>Trial: 5 days left</b><span class="muted">No card needed until day 7</span><div class="energy"><i style="width:29%"></i></div></div>
+    <div class="trial" id="trial-box"><b id="trial-left">Trial: 5 days left</b><span class="muted" id="trial-note">No card needed until day 7</span><div class="energy"><i id="trial-bar" style="width:29%"></i></div></div>
   </aside>
   <div class="scrim" id="scrim"></div>
 
@@ -102,7 +102,7 @@
             <p class="small muted">Shares of the team's weekly energy. It refills on Monday; urgent work is never held back.</p></section>
           <section class="panel" aria-labelledby="ovp-h"><div class="panel-h"><h2 id="ovp-h">People today</h2><a class="r link" href="#people">Open HR desk</a></div>
             <div id="ov-people"></div></section>
-          <section class="panel"><div class="panel-h"><h2>Coming up</h2><a class="r link" href="#compliance">Compliance calendar</a></div>
+          <section class="panel" data-example><div class="panel-h"><h2>Coming up</h2><a class="r link" href="#compliance">Compliance calendar</a></div>
             <ul class="brief" id="ov-next"></ul></section>
         </div>
       </div>
