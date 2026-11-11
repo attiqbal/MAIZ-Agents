@@ -27,7 +27,7 @@ async function verify(t: string): Promise<void> {
     const profile = JSON.parse(localStorage.getItem("vn.profile") ?? "{}");
     localStorage.setItem("vn.profile", JSON.stringify({ ...profile, email: r.data.email }));
   } catch { /* storage unavailable */ }
-  // The MAIZ platform owner lands on the quality review queue; clients on their control center.
+  // The MAIZ platform owner lands on the quality review queue; clients on their control centre.
   location.replace(r.data.platformOwner ? "/review.html" : r.data.hasOrganisation ? "/app.html" : "/onboarding.html");
 }
 
@@ -39,7 +39,7 @@ $<HTMLFormElement>("si-form").addEventListener("submit", async (e) => {
   $("si-go").setAttribute("disabled", "");
   const r = await api<{ devLink?: string }>("/signin/start", { body: { email } });
   $("si-go").removeAttribute("disabled");
-  if (r.status === 429) { err.textContent = "Too many emails for this address. Please try again in an hour."; err.hidden = false; return; }
+  if (r.status === 429) { err.textContent = "Too many sign-in emails from this connection. Please wait 10 minutes and try again."; err.hidden = false; return; }
   if (!r.ok) { err.textContent = r.status === 0 ? "We can't reach the service right now. Please try again." : "Enter a valid email address."; err.hidden = false; return; }
   // Development API only: the link comes straight back, so there is no email to wait for.
   if (r.data?.devLink) { void verify(r.data.devLink); return; }
@@ -54,5 +54,5 @@ else if (getToken()) {
   $("si-form").hidden = true;
   $("si-note").hidden = true;
   $("si-signed").hidden = false;
-  say("You're logged in", "Open your control center, or log out of this device.");
+  say("You're logged in", "Open your control centre, or log out of this device.");
 }

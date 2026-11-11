@@ -1,4 +1,4 @@
-// Dashboards in the control center: overview tiles, employee status, task board, energy and spend,
+// Dashboards in the control centre: overview tiles, employee status, task board, energy and spend,
 // and the compliance calendar. The figures are one example business (Kestrel Coffee) kept in this file,
 // so every screen tells the same story. Screens show an "Example data" tag when a real owner is signed in.
 import { toast } from "./common";
@@ -17,11 +17,11 @@ interface Employee {
 
 const DAILY = 100;
 const EMPLOYEES: Employee[] = [
-  { key: "fm", name: "Finance manager", short: "Finance", abbr: "FM", cls: "av-fm", color: "#2d7be0", skill: "Standard", allowance: DAILY, used: 28, week: [40, 55, 30, 62, 20, 15, 28], status: "warn", statusText: "Waiting on you", doing: "October profit and loss, needs your VAT answer", done: 9, firstTime: 89, price: 12.3 },
-  { key: "mm", name: "Marketing manager", short: "Marketing", abbr: "MM", cls: "av-mm", color: "#8a5cf5", skill: "Standard", allowance: DAILY, used: 79, week: [70, 90, 96, 85, 40, 30, 79], status: "good", statusText: "Working", doing: "Drafting the November email to subscribers", done: 11, firstTime: 82, price: 12.3 },
-  { key: "bc", name: "Business consultant", short: "Consultant", abbr: "BC", cls: "av-bc", color: "#e05aa8", skill: "Standard", allowance: DAILY, used: 45, week: [50, 60, 45, 70, 25, 20, 45], status: "idle", statusText: "Idle", doing: "Finished the supplier cost check. Next: weekly review on Monday", done: 6, firstTime: 83, price: 12.3 },
-  { key: "hr", name: "HR manager", short: "HR", abbr: "HR", cls: "av-hr", color: "#2bb59a", skill: "Standard", allowance: DAILY, used: 12, week: [18, 22, 35, 14, 0, 0, 12], status: "good", statusText: "Working", doing: "Drafting your people basics checklist", done: 4, firstTime: 100, price: 12.3 },
-  { key: "cm", name: "Compliance manager", short: "Compliance", abbr: "CM", cls: "av-cm", color: "#d9a23a", skill: "Pro", allowance: DAILY, used: 36, week: [30, 44, 52, 38, 10, 8, 36], status: "good", statusText: "Working", doing: "Building your compliance register", done: 5, firstTime: 80, price: 21.4 },
+  { key: "fm", name: "Finance manager", short: "Finance", abbr: "FM", cls: "av-fm", color: "#202020", skill: "Standard", allowance: DAILY, used: 28, week: [40, 55, 30, 62, 20, 15, 28], status: "warn", statusText: "Waiting on you", doing: "October profit and loss, needs your VAT answer", done: 9, firstTime: 89, price: 12.3 },
+  { key: "mm", name: "Marketing manager", short: "Marketing", abbr: "MM", cls: "av-mm", color: "#ff682c", skill: "Standard", allowance: DAILY, used: 79, week: [70, 90, 96, 85, 40, 30, 79], status: "good", statusText: "Working", doing: "Drafting the November email to subscribers", done: 11, firstTime: 82, price: 12.3 },
+  { key: "bc", name: "Business consultant", short: "Consultant", abbr: "BC", cls: "av-bc", color: "#816729", skill: "Standard", allowance: DAILY, used: 45, week: [50, 60, 45, 70, 25, 20, 45], status: "idle", statusText: "Idle", doing: "Finished the supplier cost check. Next: weekly review on Monday", done: 6, firstTime: 83, price: 12.3 },
+  { key: "hr", name: "HR manager", short: "HR", abbr: "HR", cls: "av-hr", color: "#4d4d4d", skill: "Standard", allowance: DAILY, used: 12, week: [18, 22, 35, 14, 0, 0, 12], status: "good", statusText: "Working", doing: "Drafting your people basics checklist", done: 4, firstTime: 100, price: 12.3 },
+  { key: "cm", name: "Compliance manager", short: "Compliance", abbr: "CM", cls: "av-cm", color: "#828282", skill: "Pro", allowance: DAILY, used: 36, week: [30, 44, 52, 38, 10, 8, 36], status: "good", statusText: "Working", doing: "Building your compliance register", done: 5, firstTime: 80, price: 21.4 },
 ];
 // The decided plan: one £100 team package with 8,000 energy a week shared by the whole team, at most 3,000
 // in a day. The example's daily figures are scaled into that pool so every screen shows the same week.
@@ -153,8 +153,8 @@ function drawBars(): void {
   const days = Array.from({ length: 7 }, (_, i) => { const d = new Date(today); d.setDate(today.getDate() - (6 - i)); return d.toLocaleDateString(undefined, { weekday: "short" }); });
   const x0 = 44, right = 690, top = 16, bottom = 150, max = 300, slot = (right - x0) / 7, bw = 44;
   const y = (v: number) => bottom - ((bottom - top) * v) / max;
-  let s = `<g font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" fill="#abaebb">`;
-  for (const v of [0, max / 2, max]) s += `<line x1="${x0}" x2="${right}" y1="${y(v)}" y2="${y(v)}" stroke="#151e32" ${v === max ? 'stroke-dasharray="4 4"' : ""}/><text x="38" y="${y(v) + 4}" text-anchor="end">${v}</text>`;
+  let s = `<g font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" fill="#4d4d4d">`;
+  for (const v of [0, max / 2, max]) s += `<line x1="${x0}" x2="${right}" y1="${y(v)}" y2="${y(v)}" stroke="#e8e8e8" ${v === max ? 'stroke-dasharray="4 4"' : ""}/><text x="38" y="${y(v) + 4}" text-anchor="end">${v}</text>`;
   days.forEach((label, i) => {
     let acc = 0;
     const cx = x0 + slot * i + (slot - bw) / 2;

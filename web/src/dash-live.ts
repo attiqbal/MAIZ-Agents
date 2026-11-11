@@ -1,4 +1,4 @@
-// The control center's real numbers. dash.ts draws an example business first; when the client is signed in and the
+// The control centre's real numbers. dash.ts draws an example business first; when the client is signed in and the
 // API answers, this replaces the overview, team, tasks and energy screens with their own records (GET /api/dashboard).
 // Compliance, approvals and finance stay examples until their data exists, and keep their "Example data" tag.
 import { api, getToken } from "./api";
@@ -16,10 +16,10 @@ interface Live {
 }
 
 const LOOK: Record<string, [abbr: string, cls: string, color: string]> = {
-  "finance-manager": ["FM", "av-fm", "#2d7be0"], "marketing-manager": ["MM", "av-mm", "#8a5cf5"], "business-consultant": ["BC", "av-bc", "#e05aa8"],
-  "hr-manager": ["HR", "av-hr", "#2bb59a"], "compliance-manager": ["CM", "av-cm", "#d9a23a"], "supply-chain-manager": ["SC", "av-sc", "#6f86d6"], "admin-manager": ["AM", "av-tl", "#8a93b2"],
+  "finance-manager": ["FM", "av-fm", "#202020"], "marketing-manager": ["MM", "av-mm", "#ff682c"], "business-consultant": ["BC", "av-bc", "#816729"],
+  "hr-manager": ["HR", "av-hr", "#4d4d4d"], "compliance-manager": ["CM", "av-cm", "#828282"], "supply-chain-manager": ["SC", "av-sc", "#828282"], "admin-manager": ["AM", "av-tl", "#828282"],
 };
-const look = (key: string): [string, string, string] => LOOK[key] ?? ["AI", "av-tl", "#8a93b2"];
+const look = (key: string): [string, string, string] => LOOK[key] ?? ["AI", "av-tl", "#828282"];
 const who = (e: LiveEmployee) => `<a class="who-cell desk-a" href="#desk/${esc(e.templateKey)}"><span class="av av-sm ${look(e.templateKey)[1]}" aria-hidden="true">${look(e.templateKey)[0]}</span>${esc(e.name)}</a>`;
 const sum = (xs: number[]) => xs.reduce((a, b) => a + b, 0);
 const COLUMNS: [LiveTask["column"], string][] = [["planned", "Planned"], ["in_progress", "In progress"], ["waiting", "Waiting on you"], ["done", "Done this week"]];
@@ -128,8 +128,8 @@ function bars(d: Live): void {
   const max = Math.max(50, Math.ceil(Math.max(...dayTotals) / 50) * 50);
   const x0 = 44, right = 690, top = 16, bottom = 150, slot = (right - x0) / 7, bw = 44;
   const y = (v: number) => bottom - ((bottom - top) * v) / max;
-  let s = `<g font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" fill="#abaebb">`;
-  for (const v of [0, max / 2, max]) s += `<line x1="${x0}" x2="${right}" y1="${y(v)}" y2="${y(v)}" stroke="#151e32"/><text x="38" y="${y(v) + 4}" text-anchor="end">${v}</text>`;
+  let s = `<g font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" fill="#4d4d4d">`;
+  for (const v of [0, max / 2, max]) s += `<line x1="${x0}" x2="${right}" y1="${y(v)}" y2="${y(v)}" stroke="#e8e8e8"/><text x="38" y="${y(v) + 4}" text-anchor="end">${v}</text>`;
   labels.forEach((label, i) => {
     let acc = 0;
     const cx = x0 + slot * i + (slot - bw) / 2;

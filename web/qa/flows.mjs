@@ -20,7 +20,8 @@ const mk = async (opts = {}) => { const ctx = await b.newContext({ viewport: { w
       if (!seen.has(key)) {
         const r = await p.request.get(u.origin + u.pathname); let good = r.ok();
         if (good && u.hash && !u.pathname.startsWith("/app")) { const html = await r.text(); good = new RegExp(`id="${u.hash.slice(1)}"`).test(html); }
-        if (good && u.hash && u.pathname.startsWith("/app")) { const html = await r.text(); good = new RegExp(`data-screen="${u.hash.slice(1)}"`).test(html); }
+        if (good && u.hash && u.pathname.startsWith("/app") && u.hash !== "#main") { // #main is the skip link target, not a screen
+          const html = await r.text(); good = new RegExp(`data-screen="${u.hash.slice(1)}"`).test(html); }
         seen.set(key, good);
       }
       if (!seen.get(key)) broken.push(pg + " -> " + h);

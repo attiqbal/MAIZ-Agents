@@ -181,7 +181,7 @@ function renderPlan(): void {
   $("plan-apps-h").textContent = plan.apps.length ? "Apps to connect" : "Apps worth connecting";
   $("plan-apps").className = "plan-apps";
   $("plan-apps").innerHTML = apps.map((a) => `<div class="plan-app"><span>${esc(a.name)}</span><span class="how">${HOW[a.how]}</span><span class="ds">${esc(a.gives)}</span></div>`).join("") +
-    `<p class="hint">You connect these from your control center after setup. Skipping is fine: your team can start from what you tell it.</p>`;
+    `<p class="hint">You connect these from your control centre after setup. Skipping is fine: your team can start from what you tell it.</p>`;
   const facts = countryFacts(plan.country);
   const fact = (label: string, value: string, src: string) => `<div class="prow"><span>${label}<span class="src">${src}</span></span><span class="val">${esc(value)}</span></div>`;
   const rows = [
@@ -214,7 +214,7 @@ $("email-go").addEventListener("click", async () => {
   if (!ok) { $("email").focus(); return; }
   profile.email = v; save();
   const r = await api<{ dev?: boolean }>("/signin/start", { body: { email: v } });
-  if (r.status === 429) { $("email-sent").textContent = "Too many emails for this address. Please try again in an hour."; $("email-sent").removeAttribute("hidden"); return; }
+  if (r.status === 429) { $("email-sent").textContent = "Too many sign-in emails from this connection. Please wait 10 minutes and try again."; $("email-sent").removeAttribute("hidden"); return; }
   if (r.ok && !r.data?.dev) {
     $("email-sent").textContent = `We sent a sign-in link to ${v}. Open it on this device and your plan will be waiting. It works once and expires in 15 minutes.`;
     $("email-sent").removeAttribute("hidden");
@@ -228,15 +228,14 @@ $("slack-sim").addEventListener("click", async () => {
   // With the API and a Slack app configured this opens Slack's real install page.
   const r = await api<{ url: string }>("/slack/install");
   if (r.ok && r.data?.url) { window.location.href = r.data.url; return; }
-  profile.slack = true; save();
-  $("slack-ds").textContent = `Connected to ${profile.biz ?? "your"} workspace`;
+  // No live Slack install yet (not signed in, or Slack not set up on the server): say so, never fake a connection.
+  $("slack-ds").textContent = "You can connect Slack from Apps once your team is set up";
   $("slack-sim").setAttribute("hidden", "");
-  $("connect-go").textContent = "Continue";
 });
 single($("contact"), (b) => { profile.contact = b.dataset.v === "slack" ? "slack" : "dashboard"; save(); });
 
 // ---- Step 6: create the organisation ----
-async function createOrganisation(): Promise<void> {
+async function createOrganisation(): Promise<boolean> {
   // Real set-up when the API is running; otherwise the page stays a demo.
   const r = await api<{ token: string }>("/signup", {
     body: {
@@ -244,16 +243,20 @@ async function createOrganisation(): Promise<void> {
       addOns: profile.addOns, size: profile.size, country: profile.country, website: profile.site, contact: profile.contact,
     },
   });
-  if (r.ok && r.data?.token) setToken(r.data.token);
-  else if (r.status === 409) {
+  if (r.ok && r.data?.token) { setToken(r.data.token); return true; }
+  if (r.status === 409) {
     // This email already has a team. Without a login on this device, the owner has to log in to reach it.
-    $("prov-h").textContent = getToken() ? "You already have a team. Open your control center." : "You already have a team. Log in to open it.";
+    $("prov-h").textContent = getToken() ? "You already have a team. Open your control centre." : "You already have a team. Log in to open it.";
     if (!getToken()) { const open = $<HTMLAnchorElement>("open-app"); open.href = "/signin.html"; open.textContent = "Log in"; }
+    return true;
   }
+  if (r.status === 0 || r.status === 404) return true; // no API running: the page is a demo
+  $("prov-h").textContent = r.status === 429 ? "Too many sign-ups from this connection. Wait 10 minutes and try again." : "We couldn't finish setting up your team. Nothing was created and nothing is charged.";
+  return false;
 }
 
 function provision(): void {
-  void createOrganisation();
+  const created = createOrganisation();
   const plan = currentPlan();
   $("prov-h").textContent = `Setting up ${profile.biz ?? "your company"}`;
   if (plan) {
@@ -264,12 +267,14 @@ function provision(): void {
   const items = Array.from(document.querySelectorAll<HTMLElement>("#prov li"));
   items.forEach((li) => li.classList.remove("run", "done"));
   $("open-app").setAttribute("hidden", "");
+  $("prov-retry").setAttribute("hidden", "");
   items.forEach((li, i) => {
     window.setTimeout(() => { li.classList.add("run"); }, i * 700);
-    window.setTimeout(() => { li.classList.remove("run"); li.classList.add("done"); if (i === items.length - 1) $("open-app").removeAttribute("hidden"); }, i * 700 + 650);
+    window.setTimeout(() => { li.classList.remove("run"); li.classList.add("done"); if (i === items.length - 1) void created.then((ok) => { $(ok ? "open-app" : "prov-retry").removeAttribute("hidden"); }); }, i * 700 + 650);
   });
 }
 
+$("prov-retry").addEventListener("click", () => provision());
 if (profile.biz) $<HTMLInputElement>("biz").value = profile.biz;
 if (profile.sells) $<HTMLInputElement>("sells").value = profile.sells;
 if (profile.site) $<HTMLInputElement>("site").value = profile.site;

@@ -1,6 +1,6 @@
 // Quality review (review.html): the MAIZ platform owner's queue of every client's specialised tasks.
 // The server only answers this page for emails in PLATFORM_OWNER_EMAILS; clients get a 403 and a link
-// back to their control center. With no API running, the page shows example tasks that work locally.
+// back to their control centre. With no API running, the page shows example tasks that work locally.
 import "./styles.css";
 import { api } from "./api";
 import { initNav, toast } from "./common";
