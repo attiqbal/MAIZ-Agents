@@ -21,69 +21,68 @@
 
   <main class="ob-main"><div class="container" style="display:grid;place-items:start center">
 
-  <!-- 1 Sign in -->
+  <!-- 1 Business -->
   <section class="ob-card" data-step="1">
-    <h1>Hire your AI team in three minutes</h1>
-    <p class="sub">A finance manager, a marketing manager, an HR manager and a business consultant who learn your business. Free for 7 days, no card.</p>
+    <h1>What kind of business do you run?</h1>
+    <p class="sub">Three quick taps and your AI team is set up for you. Free for 7 days, no card.</p>
     <div class="ob-panel">
-      <div class="field"><label for="email">Work email</label><input class="input" id="email" type="email" aria-describedby="email-err" placeholder="you@business.com" autocomplete="email"><span class="hint">We will email a sign-in link. No password.</span></div>
-      <button class="btn btn-primary btn-block" id="email-go">Continue</button>
-      <p class="err" id="email-err" role="alert" hidden>Enter a valid email address.</p>
-      <p class="hint" id="email-sent" hidden role="status"></p>
+      <div class="sectors" role="group" aria-label="Kind of business" id="sectors"></div>
+      <div class="field" id="sells-f" hidden><label for="sells">What do you do, in a few words?</label><input class="input" id="sells" maxlength="300" placeholder="Mobile dog grooming"></div>
+      <div class="field"><label for="biz">Business name</label><input class="input" id="biz" maxlength="120" aria-describedby="biz-err" placeholder="Kestrel Coffee" autocomplete="organization"></div>
+      <div class="field"><label for="country">Where are you based?</label><select class="input" id="country"></select><span class="hint">We guessed from your device. It sets your currency and the rules your team follows.</span></div>
+      <p class="err" id="biz-err" role="alert" hidden>Pick the kind of business and add its name to continue.</p>
+      <button class="btn btn-primary btn-block" id="biz-go">Continue</button>
     </div>
-    <p class="hint">We only use your email to sign you in and to reach you about your team.</p>
+    <p class="hint">Already have a team? <a href="/signin.html">Log in</a>.</p>
   </section>
 
-  <!-- 2 Business -->
+  <!-- 2 Needs -->
   <section class="ob-card" data-step="2" hidden>
-    <h1>Tell us about your business</h1>
-    <p class="sub">Only the name and team size are needed. A website saves you the rest.</p>
+    <h1>What should your team take off your plate?</h1>
+    <p class="sub" id="needs-sub">We ticked what businesses like yours ask for most. Change anything.</p>
     <div class="ob-panel">
-      <div class="field"><label for="biz">Business name</label><input class="input" id="biz" aria-describedby="biz-err" placeholder="Kestrel Coffee" autocomplete="organization"></div>
-      <div class="field"><label for="site">Website or social page <span class="hint">(optional)</span></label><input class="input" id="site" placeholder="kestrelcoffee.co.uk" inputmode="url"></div>
-      <div class="learn" id="learn" hidden><b>Reading your website…</b><span id="learn-text"></span></div>
-      <div class="field"><label for="sells">What do you sell, in one line?</label><input class="input" id="sells" placeholder="Freshly roasted coffee by monthly subscription"></div>
+      <div class="field"><span class="label" id="needs-l">Pick up to five</span>
+        <div class="chips" role="group" aria-labelledby="needs-l" id="needs"></div>
+        <p class="err" id="needs-err" role="alert" hidden>Pick at least one, and no more than five.</p></div>
       <div class="field"><span class="label" id="size-l">How many people work here?</span>
         <div class="chips" role="group" aria-labelledby="size-l" id="size">
           <button class="chip" aria-pressed="false">Just me</button><button class="chip" aria-pressed="true">2–10</button><button class="chip" aria-pressed="false">11–50</button><button class="chip" aria-pressed="false">50+</button>
         </div></div>
-      <p class="err" id="biz-err" role="alert" hidden>Add your business name to continue.</p>
-      <div class="ob-actions"><button class="btn btn-ghost" data-back>Back</button><button class="btn btn-primary" id="biz-go">Continue</button></div>
+      <div class="ob-actions"><button class="btn btn-ghost" data-back>Back</button><button class="btn btn-primary" id="needs-go">Continue</button></div>
     </div>
   </section>
 
-  <!-- 3 Confirm -->
+  <!-- 3 Apps -->
   <section class="ob-card" data-step="3" hidden>
-    <h1>Here is what your team will know about you</h1>
-    <p class="sub">Tap any value to fix it. Dashed chips are our guess.</p>
+    <h1>Which of these do you already use?</h1>
+    <p class="sub">Your team reads from them so you never type figures twice. Nothing connects yet, and none is fine.</p>
     <div class="ob-panel">
-      <div>
-        <div class="prow"><span>Country</span><span class="val"><input class="input" id="c-country" value="United Kingdom" aria-label="Country"><span class="src">browser</span></span></div>
-        <div class="prow"><span>Currency · time zone</span><span class="val" id="c-cur">GBP · Europe/London</span></div>
-        <div class="prow"><span>Business type</span><span class="val"><input class="input" id="c-type" aria-label="Business type"><span class="src">site</span></span></div>
-        <div class="prow"><span>Customers</span><span class="val" id="c-cust">Home coffee drinkers<span class="src">site</span></span></div>
-        <div class="prow"><span>Tone</span><span class="val" id="c-tone">Warm, plain, a bit playful<span class="src">site</span></span></div>
-      </div>
-      <div class="field"><span class="label" id="goal-l">Main goal for the next 3 months</span>
-        <div class="chips" role="group" aria-labelledby="goal-l" id="goal">
-          <button class="chip guess" aria-pressed="true">More customers</button><button class="chip" aria-pressed="false">Cut costs</button><button class="chip" aria-pressed="false">Raise money</button><button class="chip" aria-pressed="false">Get organised</button>
-        </div></div>
-      <div class="ob-actions"><button class="btn btn-ghost" data-back>Back</button><button class="btn btn-primary" data-next>Looks right</button></div>
+      <div class="field"><span class="label" id="apps-l">Common for businesses like yours</span>
+        <div class="chips" role="group" aria-labelledby="apps-l" id="apps"></div></div>
+      <details class="more-apps"><summary>Show more apps</summary>
+        <div class="chips" role="group" aria-label="More apps" id="apps-more"></div></details>
+      <div class="field"><label for="site">Website or social page <span class="hint">(optional)</span></label><input class="input" id="site" maxlength="200" placeholder="kestrelcoffee.co.uk" inputmode="url"><span class="hint">Saved to your business profile, so your Marketing manager knows where to look.</span></div>
+      <div class="ob-actions"><button class="btn btn-ghost" data-back>Back</button><button class="btn btn-primary" id="apps-go">Show my plan</button></div>
     </div>
   </section>
 
-  <!-- 4 Team -->
+  <!-- 4 Plan and account -->
   <section class="ob-card" data-step="4" hidden>
-    <h1>Your team is ready to start</h1>
-    <p class="sub">Each employee has a first useful job lined up.</p>
+    <h1 id="plan-h">Your team and what happens first</h1>
+    <p class="sub">Built from your answers. Nothing is sent or published without your OK.</p>
     <div class="ob-panel">
-      <div class="team-row"><span class="av av-tl">AM</span><div><b>Admin manager</b> <span class="first">· free, sets up and runs the team</span></div></div>
-      <div class="team-row"><span class="av av-fm">FM</span><div><b>Finance manager</b><div class="first">First: cash snapshot</div><div class="energy"><i style="width:100%"></i></div></div></div>
-      <div class="team-row"><span class="av av-mm">MM</span><div><b>Marketing manager</b><div class="first">First: 30-day plan</div><div class="energy"><i style="width:100%"></i></div></div></div>
-      <div class="team-row"><span class="av av-bc">BC</span><div><b>Business consultant</b><div class="first">First: cost check</div><div class="energy"><i style="width:100%"></i></div></div></div>
-      <div class="team-row"><span class="av av-hr">HR</span><div><b>HR manager</b><div class="first">First: people basics checklist</div><div class="energy"><i style="width:100%"></i></div></div></div>
-      <p class="small muted">Free for 7 days with full energy. After that <span class="mono" style="color:#fff">£100/mo</span> for this team, changeable any time.</p>
-      <div class="ob-actions"><button class="btn btn-ghost" data-back>Back</button><button class="btn btn-primary" data-next>Start my team</button></div>
+      <h2 class="plan-h2">Starting today</h2>
+      <div id="plan-focus"></div>
+      <p class="small muted" id="plan-standby"></p>
+      <div id="plan-offers"></div>
+      <h2 class="plan-h2" id="plan-apps-h">Apps to connect</h2>
+      <div id="plan-apps"></div>
+      <details class="plan-facts"><summary id="plan-facts-h">What we filled in for you</summary><div id="plan-facts"></div></details>
+      <p class="small muted">Free for 7 days with full energy, no card. After that <span class="mono" style="color:#fff">£100/mo</span> for this team, changeable any time.</p>
+      <div class="field" id="email-f"><label for="email">Work email, to save your team</label><input class="input" id="email" type="email" aria-describedby="email-err" placeholder="you@business.com" autocomplete="email"><span class="hint">We email a sign-in link. No password. We only use it to sign you in and to reach you about your team.</span></div>
+      <p class="err" id="email-err" role="alert" hidden>Enter a valid email address.</p>
+      <p class="hint" id="email-sent" hidden role="status"></p>
+      <div class="ob-actions"><button class="btn btn-ghost" data-back>Back</button><button class="btn btn-primary" id="email-go">Start my free week</button></div>
     </div>
   </section>
 
@@ -116,11 +115,11 @@
     <div class="ob-panel">
       <ul class="prov" id="prov">
         <li><span class="pdot"></span>Private workspace created</li>
-        <li><span class="pdot"></span>Admin manager and 5 employees hired</li>
+        <li><span class="pdot"></span><span id="prov-team">Admin manager and 5 employees hired</span></li>
         <li><span class="pdot"></span>Bookkeeping rules and accounts loaded</li>
-        <li><span class="pdot"></span>Admin manager sending your welcome and setup form</li>
+        <li><span class="pdot"></span>Setup form filled in from your answers</li>
       </ul>
-      <div class="learn"><b>Next</b>Your Admin manager will introduce the team and send a 3-minute setup form. Once it is in, it trains the team, creates your storage and prepares your AI models. Each step can be undone.</div>
+      <div class="learn"><b>Next</b><span id="prov-next">Your Admin manager will introduce the team and show you the setup form, already filled in from your answers. Check it, press send, and your team starts work. Each step can be undone.</span></div>
       <a class="btn btn-primary btn-block" id="open-app" href="/app.html" hidden>Open my control center</a>
     </div>
   </section>
