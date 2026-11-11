@@ -158,6 +158,14 @@ export class BatchService implements Intake {
     };
   }
 
+  /** Waiting and running jobs for one client, for the dashboard's board (the caller already checked permission). */
+  openJobsOf(workspaceId: string): { id: string; employeeId: string; brief: string; status: JobStatus; runsAt?: string }[] {
+    return [...this.jobs.values()]
+      .filter((j) => j.workspaceId === workspaceId && (j.status === "queued" || j.status === "running"))
+      .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
+      .map((j) => ({ id: j.id, employeeId: j.employeeId, brief: clip(j.brief, 120), status: j.status, ...(j.status === "queued" ? { runsAt: j.notBefore && j.notBefore > j.runAfter ? j.notBefore : j.runAfter } : {}) }));
+  }
+
   /** Run now: this client's waiting tasks are sent to the pod now (together with anything else already waiting). */
   async runNow(userId: string, workspaceId: string): Promise<BatchRunRecord | undefined> {
     this.d.identity.require(userId, workspaceId, "task.create");

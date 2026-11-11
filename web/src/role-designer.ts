@@ -17,8 +17,15 @@ function renderRequests(list: ClientSpecialistView[]): void {
   const box = document.getElementById("rd-requests");
   if (!box) return;
   box.innerHTML = list.length
-    ? `<h3 class="small" style="margin:8px 0">Your new specialists</h3><ul class="so-brief">${list.map((r) => `<li><span class="so-k">${esc(r.title)} · £${r.priceGbp} a month</span><span><span class="status ${TONE[r.status] ?? ""}"><span class="dot"></span>${esc(r.statusLabel)}</span>${r.messageToClient ? ` <span class="xs muted">MAIZ: ${esc(r.messageToClient)}</span>` : ""}</span></li>`).join("")}</ul>`
+    ? `<h3 class="small" style="margin:8px 0">Your new specialists</h3><ul class="so-brief">${list.map((r) => `<li><span class="so-k">${esc(r.title)} · £${r.priceGbp} a month</span><span><span class="status ${TONE[r.status] ?? ""}"><span class="dot"></span>${esc(r.statusLabel)}</span>${r.messageToClient ? ` <span class="xs muted">MAIZ: ${esc(r.messageToClient)}</span>` : ""}${r.canHire ? ` <button type="button" class="btn btn-primary btn-sm" data-hire="${esc(r.id)}">Hire at £${r.priceGbp} a month</button>` : ""}${r.hiredEmployeeId ? ` <span class="xs muted">On your team</span>` : ""}</span></li>`).join("")}</ul>`
     : "";
+  box.querySelectorAll<HTMLButtonElement>("[data-hire]").forEach((b) => b.addEventListener("click", async () => {
+    b.disabled = true;
+    const r = await api<{ error?: string }>(`/specialists/${encodeURIComponent(b.dataset.hire!)}/hire`, { method: "POST" });
+    if (!r.ok) { b.disabled = false; toast(r.data?.error ?? "Could not hire it. Try again."); return; }
+    toast("Hired. It is on your team now.");
+    void loadRequests();
+  }));
 }
 
 async function loadRequests(): Promise<void> {

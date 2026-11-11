@@ -445,6 +445,35 @@ section[id] { scroll-margin-top: 72px; } /* clears the sticky nav when jumping t
 .team-row b { font-weight: 500; }
 .team-row .first { font-size: 13px; color: var(--color-ash); }
 .team-row .energy { margin-top: 6px; }
+/* Signup: sector tiles, plan screen */
+.sectors { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.sector {
+  display: flex; flex-direction: column; gap: 2px; text-align: left; min-height: 64px; padding: 10px 12px;
+  border: 1px solid var(--color-obsidian-edge); background: var(--color-abyss); color: var(--color-mist); border-radius: 10px;
+  transition: border-color .15s, background .15s, color .15s;
+}
+.sector b { font-weight: 500; font-size: 15px; color: var(--color-quartz); letter-spacing: -0.02em; }
+.sector span { font-size: 12.5px; color: var(--color-ash); line-height: 1.35; }
+.sector:hover { border-color: var(--color-sapphire-hairline); }
+.sector[aria-pressed="true"] { background: var(--color-cobalt-panel); border-color: var(--color-frosted-lilac); }
+.sector[aria-pressed="true"] span { color: var(--color-mist); }
+@media (max-width: 420px) { .sector { padding: 9px 10px; } .sector b { font-size: 14px; } .sector span { font-size: 12px; } }
+.plan-facts summary { cursor: pointer; min-height: 40px; display: flex; align-items: center; font-size: 14px; color: var(--color-frosted-lilac); }
+.plan-facts .prow > span:first-child { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.ob-card .chip { min-height: 40px; }
+.more-apps summary { cursor: pointer; font-size: 13px; color: var(--color-frosted-lilac); min-height: 40px; display: flex; align-items: center; }
+.more-apps[open] summary { margin-bottom: 8px; }
+.plan-h2 { font-family: var(--font-inter); font-size: 12px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.04em; color: var(--color-frosted-lilac); margin-bottom: -6px; }
+.plan-list { display: flex; flex-direction: column; gap: 14px; }
+.plan-list .why { font-size: 12.5px; color: var(--color-ash); }
+.plan-apps { display: flex; flex-direction: column; gap: 8px; }
+.plan-app { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 12px; align-items: center; padding: 10px 12px; border: 1px solid var(--color-obsidian-edge); border-radius: 10px; background: var(--color-abyss); font-size: 14.5px; }
+.plan-app .ds { grid-column: 1 / -1; font-size: 12.5px; color: var(--color-ash); }
+.plan-app .how { font-family: var(--font-mono); font-size: 10.5px; color: var(--color-frosted-lilac); border: 1px solid var(--color-obsidian-edge); border-radius: var(--radius-full); padding: 1px 7px; white-space: nowrap; }
+.offer { display: grid; grid-template-columns: 24px minmax(0, 1fr); gap: 12px; align-items: start; padding: 12px 14px; border: 1px dashed var(--color-sapphire-hairline); border-radius: 10px; font-size: 14px; color: var(--color-mist); cursor: pointer; }
+.offer input { width: 20px; height: 20px; margin: 2px 0 0; accent-color: var(--color-signal-blue); }
+.offer b { color: var(--color-quartz); font-weight: 500; }
+.later { font-size: 13px; color: var(--color-ash); }
 .app-row { display: grid; grid-template-columns: 34px 1fr auto; align-items: center; gap: 12px; padding: 12px 14px; border: 1px solid var(--color-obsidian-edge); border-radius: 10px; background: var(--color-abyss); }
 .app-row .lg { width: 34px; height: 34px; border-radius: 8px; display: grid; place-items: center; background: var(--color-deep-sea); border: 1px solid var(--color-inkline); }
 .app-row .lg svg { width: 20px; height: 20px; }

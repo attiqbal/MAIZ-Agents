@@ -73,3 +73,21 @@ Not done yet, deliberately: email ingest (needs an inbound mail provider; the re
 - Square and Stripe days are UTC days.
 - Organisations default to USD as base currency unless onboarding sets one; records in another currency are kept but not posted (the owner sees why).
 - Square tokens last 30 days; refresh is not wired for Square yet, so the card asks the owner to reconnect when Square refuses.
+
+## Contract tests and what still needs real keys
+
+`test/contracts.test.ts` checks, with no network, the exact URL, headers and body we send to Resend, Claude, RunPod, Slack (install link, code exchange, event signature) and Square, how we read each reply, and that each adapter only talks to its own vendor's host. Xero and Stripe request shapes are checked in `test/integrations.test.ts`. These tests catch accidental changes. They cannot show that a vendor still behaves as recorded, so each of these needs one real call once its key exists:
+
+| Service | Key or setting | First real check |
+| --- | --- | --- |
+| Resend | `RESEND_API_KEY`, `EMAIL_FROM` on a verified domain | sign-in email arrives, not in spam |
+| Claude | `ANTHROPIC_API_KEY` | a reply comes back and the spend page shows its cost |
+| RunPod | `RUNPOD_API_KEY`, `RUNPOD_ENDPOINT_ID` | `/owner-ai.html` health check shows a worker, then a batch run finishes |
+| Slack | the four `SLACK_*` settings | install from the website, send a message, get a reply |
+| Xero | `XERO_CLIENT_ID`, `XERO_CLIENT_SECRET` | connect a demo company, sync a month |
+| Square | `SQUARE_CLIENT_ID`, `SQUARE_CLIENT_SECRET` | connect a sandbox seller, sync payments |
+| Payments | a real provider class (not written) plus its keys and webhook secret | a test-mode checkout is paid, the webhook hires the employee once |
+
+### Adding Stripe later
+
+Write `StripePaymentProvider implements PaymentProvider` (`src/modules/payments/types.ts`): `createCheckout` makes a Checkout Session in `subscription` mode for the monthly lines (and a one-time line for the first-day extras) with `client_reference_id` set to the order id; `parseWebhook` verifies the `Stripe-Signature` header against the raw body with the endpoint secret and maps `checkout.session.completed`, `invoice.payment_failed` and `customer.subscription.deleted` to `ProviderEvent`; `cancelSubscription` cancels at period end. Pass it to `createPlatform({ payments })` from `main.ts` and allow its name in `checkEnv`. Nothing else changes.

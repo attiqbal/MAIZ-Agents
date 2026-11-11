@@ -365,6 +365,28 @@ export class EnergyMeter {
     return cap === undefined ? team.leftToday : Math.min(team.leftToday, Math.max(0, cap - used));
   }
 
+  /** Daily allowance of one employee (the platform owner's per-agent figure, else the plan's). */
+  quotaOf(userId: string, workspaceId: string, employeeId: string): number {
+    this.identity.require(userId, workspaceId, "task.read");
+    return this.dailyQuota(workspaceId, employeeId);
+  }
+
+  /** Energy used by each employee on each of the last `days` days, oldest first, today last. */
+  recentDays(userId: string, workspaceId: string, days: number): { days: string[]; byEmployee: Map<string, number[]> } {
+    this.identity.require(userId, workspaceId, "task.read");
+    const end = Date.parse(`${this.today()}T00:00:00Z`);
+    const labels = Array.from({ length: days }, (_, i) => new Date(end - (days - 1 - i) * 86_400_000).toISOString().slice(0, 10));
+    const byEmployee = new Map<string, number[]>();
+    for (const u of this.usage) {
+      if (u.workspaceId !== workspaceId) continue;
+      const i = labels.indexOf(u.day);
+      if (i < 0) continue;
+      const row = byEmployee.get(u.employeeId) ?? byEmployee.set(u.employeeId, new Array(days).fill(0)).get(u.employeeId)!;
+      row[i]! += u.energy;
+    }
+    return { days: labels, byEmployee };
+  }
+
   /** What we see: real cost and energy for the month. Admin/owner view. */
   monthSummary(userId: string, workspaceId: string, month = this.today().slice(0, 7)) {
     this.identity.require(userId, workspaceId, "workspace.manage");

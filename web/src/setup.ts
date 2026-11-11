@@ -5,6 +5,7 @@
 import { formFor, validateAnswers, type Answers, type FormField } from "../../src/modules/admin-manager/form";
 import { SETUP_STEPS, formInviteText, readyText, welcomeText } from "../../src/modules/admin-manager/messages";
 import { getTemplate } from "../../src/modules/workforce/templates";
+import { planSignup, readSignupAnswers } from "../../src/modules/onboarding/recommend";
 import { toast } from "./common";
 import { api, getToken } from "./api";
 
@@ -65,10 +66,49 @@ function readAnswers(form: HTMLFormElement, fields: FormField[]): Answers {
   return a;
 }
 
+type Prefill = { answers: Answers; source: Record<string, "you" | "guess"> };
+
+/** Puts the answers worked out at signup into the form, each labelled with where it came from. Returns how many were filled. */
+function fillAnswers(form: HTMLFormElement, fields: FormField[], prefill: Prefill | undefined): number {
+  if (!prefill) return 0;
+  let filled = 0;
+  for (const f of fields) {
+    const v = prefill.answers[f.key];
+    if (v === undefined) continue;
+    if (f.type === "multi") {
+      if (!Array.isArray(v)) continue;
+      form.querySelectorAll<HTMLElement>(`[data-multi="${f.key}"] .chip`).forEach((c) => c.setAttribute("aria-pressed", String(v.includes(c.textContent ?? ""))));
+    } else {
+      const el = form.elements.namedItem(f.key) as HTMLInputElement | null;
+      if (!el) continue;
+      el.value = typeof v === "boolean" ? (v ? "yes" : "no") : String(v);
+      const note = document.createElement("span");
+      note.className = "hint";
+      note.textContent = prefill.source[f.key] === "guess" ? "Our guess. Change it if it is wrong." : "From your signup answers.";
+      el.after(note);
+    }
+    filled++;
+  }
+  return filled;
+}
+
+/** The demo (no API) works the same plan out in the browser from what was typed at signup. */
+function demoPrefill(): Prefill | undefined {
+  try {
+    const p = JSON.parse(localStorage.getItem("vn.profile") ?? "{}");
+    if (typeof p.biz !== "string" || !p.biz) return undefined;
+    return planSignup(readSignupAnswers({ businessName: p.biz, sector: p.sector, needs: p.needs, apps: p.apps, size: p.size, country: p.country, sells: p.sells })).prefill;
+  } catch { return undefined; }
+}
+
+const countText = (fields: FormField[], filled: number): string =>
+  `${fields.length} questions · ${fields.filter((f) => f.required).length} required${filled ? ` · ${filled} already filled in from signup` : ""}`;
+
 type LiveStatus = {
   state: "awaiting_form" | "setting_up" | "ready" | "needs_attention";
   contact: "dashboard" | "slack" | "teams";
   form: FormField[];
+  prefill?: Prefill;
   runs: { status: string; steps: { key: string; title: string; status: string }[] }[];
   messages: { text: string; at: string }[];
 };
@@ -86,7 +126,7 @@ async function initSetupLive(): Promise<boolean> {
   form.innerHTML =
     [...groups].map(([who, fs]) => `<fieldset class="sf-group"><legend>${who === "all" ? "About your business" : `For your ${esc(getTemplate(who)?.title ?? who)}`}</legend>${fs.map(fieldHtml).join("")}</fieldset>`).join("") +
     `<div class="ob-actions"><button class="btn btn-primary" type="submit">Send to Admin manager</button></div>`;
-  $("setup-count").textContent = `${fields.length} questions · ${fields.filter((f) => f.required).length} required`;
+  $("setup-count").textContent = countText(fields, fillAnswers(form, fields, st.prefill));
   form.addEventListener("click", (e) => {
     const chip = (e.target as HTMLElement).closest<HTMLButtonElement>("[data-multi] .chip");
     if (chip) chip.setAttribute("aria-pressed", String(chip.getAttribute("aria-pressed") !== "true"));
@@ -157,7 +197,7 @@ function initSetupDemo(biz: string, contact: "dashboard" | "slack"): void {
     [...groups]
       .map(([who, fs]) => `<fieldset class="sf-group"><legend>${who === "all" ? "About your business" : `For your ${esc(getTemplate(who)?.title ?? who)}`}</legend>${fs.map(fieldHtml).join("")}</fieldset>`)
       .join("") + `<div class="ob-actions"><button class="btn btn-primary" type="submit">Send to Admin manager</button></div>`;
-  $("setup-count").textContent = `${fields.length} questions · ${fields.filter((f) => f.required).length} required`;
+  $("setup-count").textContent = countText(fields, fillAnswers(form, fields, demoPrefill()));
 
   form.addEventListener("click", (e) => {
     const chip = (e.target as HTMLElement).closest<HTMLButtonElement>("[data-multi] .chip");

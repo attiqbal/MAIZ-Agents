@@ -32,6 +32,11 @@ export interface SpecialistRequest {
   /** The platform owner's message to the client (what to change, or why it was declined). */
   messageToClient?: string;
   decidedBy?: string;
+  /** Set when the client hired the approved specialist: the employee it became. A request is hired once. */
+  hiredEmployeeId?: string;
+  hiredAt?: string;
+  /** The monthly price the client agreed to when hiring (the price MAIZ confirmed at that moment). */
+  hiredPriceGbp?: number;
   history: { at: string; by: "client" | "platform_owner"; action: SpecialistStatus | "submitted"; detail?: string }[];
 }
 
@@ -43,6 +48,9 @@ export interface ClientSpecialistView {
   priceGbp: number;
   messageToClient?: string;
   submittedAt: string;
+  /** True when MAIZ approved it and it has not been hired yet. */
+  canHire: boolean;
+  hiredEmployeeId?: string;
 }
 
 export const SPECIALIST_STATUS_LABEL: Record<SpecialistStatus, string> = {
@@ -64,7 +72,7 @@ export class SpecialistReviewService {
     private audit: AuditLog,
     private isPlatformOwner: (userId: string) => boolean,
     private priceFor: (tier: "standard" | "premium") => number,
-    private opts: { now?: () => Date; notifyOwner?: (r: SpecialistRequest, clientName: string) => Promise<void>; notifyClient?: (r: SpecialistRequest) => Promise<void> } = {},
+    private opts: { now?: () => Date; notifyOwner?: (r: SpecialistRequest, clientName: string) => Promise<void>; notifyClient?: (r: SpecialistRequest) => Promise<void>; hire?: (userId: string, r: SpecialistRequest) => Promise<{ id: string }> } = {},
   ) {}
 
   useSink(sink: Sink): void {
@@ -114,7 +122,7 @@ export class SpecialistReviewService {
     return [...this.items.values()]
       .filter((r) => r.workspaceId === workspaceId)
       .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
-      .map((r) => ({ id: r.id, title: r.role.title, status: r.status, statusLabel: SPECIALIST_STATUS_LABEL[r.status], priceGbp: r.priceGbp, ...(r.messageToClient ? { messageToClient: r.messageToClient } : {}), submittedAt: r.submittedAt }));
+      .map((r) => ({ id: r.id, title: r.role.title, status: r.status, statusLabel: SPECIALIST_STATUS_LABEL[r.status], priceGbp: r.priceGbp, canHire: r.status === "approved" && !r.hiredEmployeeId, ...(r.hiredEmployeeId ? { hiredEmployeeId: r.hiredEmployeeId } : {}), ...(r.messageToClient ? { messageToClient: r.messageToClient } : {}), submittedAt: r.submittedAt }));
   }
 
   /** Every client's requests for the platform owner, waiting ones first. */
@@ -155,6 +163,31 @@ export class SpecialistReviewService {
     this.audit.record({ workspaceId: r.workspaceId, actor: `platform-owner:${userId}`, action: `specialist.${decision}`, target: `specialist:${r.id}`, data: { priceGbp } });
     await this.opts.notifyClient?.(next).catch((e) => console.error("client notification failed:", e));
     return next;
+  }
+
+  /**
+   * The client hires a specialist MAIZ approved. Only the client that asked for it can hire it, only once, and only at
+   * the price MAIZ confirmed. Nothing is charged here: the payment layer (src/modules/payments) bills the monthly price.
+   */
+  async hire(userId: string, workspaceId: string, id: string): Promise<SpecialistRequest> {
+    this.identity.require(userId, workspaceId, "employee.hire");
+    const r = this.items.get(id);
+    // Another client's request looks exactly like one that does not exist.
+    if (!r || r.workspaceId !== workspaceId) throw new ReviewError("request not found");
+    if (r.status !== "approved") throw new ReviewError("MAIZ has not approved this specialist yet");
+    if (r.hiredEmployeeId) throw new ReviewError("you already hired this specialist");
+    if (!this.opts.hire) throw new ReviewError("hiring is not available");
+    const employee = await this.opts.hire(userId, r);
+    const at = this.now();
+    const next: SpecialistRequest = { ...r, hiredEmployeeId: employee.id, hiredAt: at, hiredPriceGbp: r.priceGbp, updatedAt: at };
+    this.save(next);
+    this.audit.record({ workspaceId, actor: `user:${userId}`, action: "specialist.hired", target: `specialist:${r.id}`, data: { employeeId: employee.id, priceGbp: r.priceGbp } });
+    return next;
+  }
+
+  /** Approved requests, so the platform can put their templates back after a restart. */
+  approved(): SpecialistRequest[] {
+    return [...this.items.values()].filter((r) => r.status === "approved");
   }
 
   /** A specialist may be trained (and hired) only after the platform owner approved it. */

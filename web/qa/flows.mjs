@@ -37,13 +37,17 @@ const mk = async (opts = {}) => { const ctx = await b.newContext({ viewport: { w
 {
   const p = await mk();
   await p.goto(B + "/onboarding.html", { waitUntil: "networkidle" });
+  await p.click("#biz-go"); ok("onboarding: no sector or name shows error", await p.isVisible("#biz-err"));
+  await p.click('#sectors [data-v="food-drink"]'); await p.fill("#biz", "Example Bakery"); await p.selectOption("#country", "GB"); await p.click("#biz-go");
+  ok("onboarding: needs are ticked for the sector", (await p.locator('#needs .chip[aria-pressed="true"]').count()) === 3);
+  await p.click('#needs [data-v="stock"]'); await p.click("#needs-go");
+  ok("onboarding: sector apps offered", await p.isVisible('#apps [data-v="square"]'));
+  await p.click('#apps [data-v="square"]'); await p.click("#apps-go");
+  ok("onboarding: plan leads with the Finance manager", (await p.textContent("#plan-focus .team-row b")) === "Finance manager", await p.textContent("#plan-focus"));
+  ok("onboarding: plan offers the stock manager and lists Square", await p.isVisible('[data-addon="supply-chain-manager"]') && (await p.textContent("#plan-apps")).includes("Square"));
   await p.click("#email-go"); ok("onboarding: invalid email shows error", await p.isVisible("#email-err"));
   await p.fill("#email", `owner${Date.now()}@example-bakery.test`); await p.click("#email-go");
-  await p.waitForSelector('[data-step="2"]:not([hidden])', { timeout: 5000 }).catch(() => {});
-  ok("onboarding: step 2 shown after email", await p.isVisible("#biz"));
-  await p.click("#biz-go"); ok("onboarding: empty business name shows error", await p.isVisible("#biz-err"));
-  await p.fill("#biz", "Example Bakery"); await p.fill("#sells", "Fresh bread and cakes"); await p.click("#biz-go");
-  for (const step of [3, 4]) { await p.click(`[data-step="${step}"] [data-next]`); }
+  await p.waitForSelector('[data-step="5"]:not([hidden])', { timeout: 5000 }).catch(() => {});
   ok("onboarding: reached step 5", await p.isVisible('[data-step="5"]'));
   await p.click('[data-step="5"] [data-next]');
   await p.waitForSelector("#open-app", { state: "visible", timeout: 8000 }).catch(() => {});
@@ -52,7 +56,8 @@ const mk = async (opts = {}) => { const ctx = await b.newContext({ viewport: { w
   ok("onboarding: account created (login stored)", !!token);
   await p.click("#open-app"); await p.waitForURL(/app\.html/); await p.waitForTimeout(800);
   ok("app (signed in): shows the real business name", (await p.textContent("#org-name")) === "Example Bakery", await p.textContent("#org-name"));
-  ok("app (signed in): demo bar hidden, example tags shown", !(await p.isVisible("#demo-banner")) && await p.isVisible('[data-screen="home"] .eg'));
+  // The overview, team, tasks and energy screens show the client's own records; screens still on example data keep their tag.
+  ok("app (signed in): demo bar hidden, real screens untagged, example screens tagged", !(await p.isVisible("#demo-banner")) && (await p.locator('[data-screen="home"] .eg').count()) === 0 && (await p.locator('[data-screen="team"] .eg').count()) === 0 && await p.locator('[data-screen="finance"] .eg').count() === 1);
   await p.fill("#ask-in", "finance: what is my runway?"); await p.press("#ask-in", "Enter");
   await p.waitForSelector("#answer", { timeout: 8000 }).catch(() => {});
   ok("app (signed in): ask bar returns an answer", await p.isVisible("#answer"));

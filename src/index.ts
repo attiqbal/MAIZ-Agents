@@ -17,6 +17,7 @@ export { GENERIC_PACK, registerPack, packFor, describePack, type RulesPack } fro
 export { Ledger, LedgerError, DEFAULT_CHART, type Account, type AccountType, type JournalEntry, type JournalLine } from "./modules/ledger/index.js";
 export { EnergyMeter, PLANS, DEFAULT_PRICES, costMicro, type EnergyPlan, type Verdict, type UsageRecord } from "./modules/energy/index.js";
 export { OnboardingService, buildBlueprint, STANDARD_TEAM, ADMIN_MANAGER, SignupError, type SignupChoices, type Blueprint, type Organisation, type ContactChannel } from "./modules/onboarding/index.js";
+export { planSignup, readSignupAnswers, guessSector, SignupPlanError, type SignupAnswers, type SignupPlan } from "./modules/onboarding/recommend.js";
 export { ChannelRouter, ChannelError, SlackChannel, channelAllowed, parseSlackEvent, verifySlackSignature, type ChatChannel, type InboundMessage, type Connection, type ChannelKind } from "./modules/channels/index.js";
 export {
   AdminManager,
