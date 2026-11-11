@@ -10,6 +10,8 @@ import type { Account, JournalEntry } from "../modules/ledger/index.js";
 import type { BusinessProfile, Employee } from "../modules/workforce/index.js";
 import type { IntegrationConnection, StoredRecord } from "../modules/integrations/service.js";
 import type { ReviewItem } from "../modules/review/index.js";
+import type { StaffMember } from "../modules/people/rules.js";
+import type { PeopleSettings } from "../modules/people/index.js";
 import type { PriceChange } from "../modules/pricing/index.js";
 import type { SpecialistRequest } from "../modules/review/specialists.js";
 import type { AiRoutingSettings } from "../modules/model-gateway/routing/settings.js";
@@ -226,6 +228,13 @@ export class PgStore implements Sink {
   batchJob(j: BatchJob): void {
     this.state(j.workspaceId, "batch_job", j.id, j);
   }
+  /** Staff records are personal data: encrypted like app credentials. A deleted record keeps an empty value. */
+  staff(m: StaffMember, removed = false): void {
+    this.state(m.workspaceId, "staff", m.id, { enc: removed ? "" : this.encrypt(JSON.stringify(m)) });
+  }
+  peopleSettings(workspaceId: string, s: PeopleSettings): void {
+    this.state(workspaceId, "people_settings", "current", s);
+  }
   batchSchedule(workspaceId: string, s: ClientSchedule): void {
     this.state(workspaceId, "batch_schedule", "current", s);
   }
@@ -300,6 +309,8 @@ export class PgStore implements Sink {
       priceChanges: (await q("SELECT data FROM platform_records WHERE kind = 'price_change' ORDER BY updated_at, id")).map((r) => r.data),
       aiSettings: (await q("SELECT data FROM platform_records WHERE kind = 'ai_settings' AND id = 'current'"))[0]?.data,
       batchJobs: of("batch_job").map((s) => s.data),
+      staff: of("staff").filter((s) => s.data.enc).map((s) => JSON.parse(this.decrypt(s.data.enc))),
+      peopleSettings: of("people_settings").map((s) => ({ workspaceId: s.workspace_id, settings: s.data })),
       batchSchedules: of("batch_schedule").map((s) => ({ workspaceId: s.workspace_id, schedule: s.data })),
       batchRuns: (await q("SELECT data FROM platform_records WHERE kind = 'batch_run' ORDER BY updated_at, id")).map((r) => r.data),
       aiDays: (await q("SELECT data FROM platform_records WHERE kind = 'ai_day' ORDER BY id")).map((r) => r.data),

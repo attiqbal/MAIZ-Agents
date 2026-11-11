@@ -13,6 +13,8 @@ import type { AiRoutingSettings } from "../modules/model-gateway/routing/setting
 import type { AiDay } from "../modules/model-gateway/routing/ledger.js";
 import type { BatchJob, BatchRunRecord } from "../modules/batch/service.js";
 import type { ClientSchedule } from "../modules/batch/schedule.js";
+import type { StaffMember } from "../modules/people/rules.js";
+import type { PeopleSettings } from "../modules/people/index.js";
 
 /**
  * Where services report every change so it can be stored. Services stay fast and
@@ -57,6 +59,10 @@ export interface Sink {
   batchRun(r: BatchRunRecord): void;
   /** A client's record of a newer kind (orders, rota, reconciliation reports), replaced on every change. */
   record(workspaceId: string, kind: GenericKind, id: string, data: unknown): void;
+  /** One member of a client's staff (HR desk), replaced on every change. removed = deleted for good. The store must encrypt it. */
+  staff(m: StaffMember, removed?: boolean): void;
+  /** A client's HR desk settings (sector, leave year). */
+  peopleSettings(workspaceId: string, s: PeopleSettings): void;
 }
 
 /** Kinds stored through Sink.record. The database accepts any kind; this list is what load() hands back. */
@@ -91,6 +97,8 @@ export interface Snapshot {
   aiDays?: AiDay[];
   batchJobs?: BatchJob[];
   batchSchedules?: { workspaceId: string; schedule: ClientSchedule }[];
+  staff?: StaffMember[];
+  peopleSettings?: { workspaceId: string; settings: PeopleSettings }[];
   batchRuns?: BatchRunRecord[];
   records?: GenericRecord[];
 }

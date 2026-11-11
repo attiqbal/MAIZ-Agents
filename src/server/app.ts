@@ -20,6 +20,7 @@ import { OVERAGE_RULE } from "../modules/workforce/task-roles.js";
 import { CONSULTANTS, HOW_A_PASS_WORKS, menuOf } from "../modules/workforce/consultants.js";
 import { quote } from "../modules/store/cart.js";
 import { RotaError } from "../modules/rota/index.js";
+import { PeopleError } from "../modules/people/index.js";
 import { PaymentError, WebhookSignatureError, type Order } from "../modules/payments/index.js";
 import type { Platform } from "./platform.js";
 
@@ -323,6 +324,9 @@ export function createApp(p: Platform) {
       return json(404, { error: "not found" });
     }
 
+    // ---- HR manager desk: staff records (owner and admins only; personal data) ----
+    if (path === "/api/people" || path.startsWith("/api/people/")) return peopleRoutes(req, userId, org.id, body);
+
     // ---- buying from the store ----
     if (method === "POST" && path === "/api/checkout") {
       const { order, url } = await p.payments.checkout(userId, org.id, body().lines);
@@ -470,6 +474,30 @@ export function createApp(p: Platform) {
   }
 
   /** Only the platform owner gets past the first line. The service checks again, so no route can skip it. */
+  function peopleRoutes(req: Req, userId: string, ws: string, body: () => any): Res {
+    const { method, path } = req;
+    const P = p.people;
+    if (method === "GET" && path === "/api/people") return json(200, P.overview(userId, ws));
+    if (method === "POST" && path === "/api/people") return json(201, P.add(userId, ws, body()));
+    if (method === "POST" && path === "/api/people/settings") return json(200, { settings: P.updateSettings(userId, ws, body()) });
+    const id = "([\\w-]{1,64})";
+    let m: RegExpExecArray | null;
+    if ((m = new RegExp(`^/api/people/${id}$`).exec(path))) {
+      if (method === "GET") return json(200, P.detail(userId, ws, m[1]!));
+      if (method === "POST") return json(200, P.update(userId, ws, m[1]!, body()));
+      if (method === "DELETE") { P.remove(userId, ws, m[1]!); return json(200, { deleted: true }); }
+    }
+    if (method !== "POST") return json(404, { error: "not found" });
+    if ((m = new RegExp(`^/api/people/${id}/documents/([a-z_]{1,40})$`).exec(path))) return json(200, P.setDocument(userId, ws, m[1]!, m[2]!, body()));
+    if ((m = new RegExp(`^/api/people/${id}/checklist/([a-z_]{1,40})$`).exec(path))) return json(200, P.setChecklist(userId, ws, m[1]!, m[2]!, body().done));
+    if ((m = new RegExp(`^/api/people/${id}/leave$`).exec(path))) return json(200, P.addLeave(userId, ws, m[1]!, body()));
+    if ((m = new RegExp(`^/api/people/${id}/leave/${id}/decide$`).exec(path))) return json(200, P.decideLeave(userId, ws, m[1]!, m[2]!, body().approve));
+    if ((m = new RegExp(`^/api/people/${id}/reviews$`).exec(path))) return json(200, P.addReview(userId, ws, m[1]!, body()));
+    if ((m = new RegExp(`^/api/people/${id}/reviews/${id}/done$`).exec(path))) return json(200, P.completeReview(userId, ws, m[1]!, m[2]!, body()));
+    if ((m = new RegExp(`^/api/people/${id}/leaving$`).exec(path))) return json(200, P.setLeaving(userId, ws, m[1]!, body().endDate));
+    return json(404, { error: "not found" });
+  }
+
   async function ownerReviewRoutes(req: Req, userId: string, body: () => any): Promise<Res> {
     if (!p.isPlatformOwner(userId)) return json(403, { error: "only the MAIZ platform owner can see quality review" });
     const { method, path } = req;
@@ -566,7 +594,7 @@ export function createApp(p: Platform) {
     try {
       return await route(req);
     } catch (err) {
-      if (err instanceof BadRequest || err instanceof SetupError || err instanceof SignupError || err instanceof LedgerError || err instanceof ChannelError || err instanceof IntegrationError || err instanceof ReviewError || err instanceof PricingError || err instanceof EnergyError || err instanceof SettingsError || err instanceof BatchError || err instanceof PaymentError || err instanceof RotaError) return json(400, { error: err.message });
+      if (err instanceof BadRequest || err instanceof SetupError || err instanceof SignupError || err instanceof LedgerError || err instanceof ChannelError || err instanceof IntegrationError || err instanceof ReviewError || err instanceof PeopleError || err instanceof PricingError || err instanceof EnergyError || err instanceof SettingsError || err instanceof BatchError || err instanceof PaymentError || err instanceof RotaError) return json(400, { error: err.message });
       if (err instanceof PermissionError) return json(403, { error: "you don't have permission to do that" });
       console.error(`${req.method} ${req.path} failed:`, err);
       return json(500, { error: "something went wrong" });

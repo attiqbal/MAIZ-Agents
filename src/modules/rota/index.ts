@@ -162,6 +162,11 @@ export class RotaService {
     return this.weekOf(workspaceId, anyDateInWeek);
   }
 
+  /** The week for code that already checked permission (the HR desk shows a person's own shifts). */
+  weekFor(workspaceId: string, anyDateInWeek: string) {
+    return this.weekOf(workspaceId, anyDateInWeek);
+  }
+
   private weekOf(workspaceId: string, anyDateInWeek: string) {
     const from = weekStart(anyDateInWeek);
     const to = dateOf(dayNumber(from) + 6);
