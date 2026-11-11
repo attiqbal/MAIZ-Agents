@@ -38,7 +38,7 @@ export async function ownerLoad<T>(path: string): Promise<T | "demo" | undefined
   if (r.ok && r.data) return r.data;
   if (r.status === 0) return "demo";
   if (r.status === 401) gate("Log in as the platform owner", "Your login has ended. Log in again with your owner email.", ["/signin.html", "Log in"]);
-  else if (r.status === 403) gate("This page is for the MAIZ platform owner", "Your own team, tasks and specialists are in your control center.", ["/app.html", "Open your control center"]);
+  else if (r.status === 403) gate("This page is for the MAIZ platform owner", "Your own team, tasks and specialists are in your control centre.", ["/app.html", "Open your control centre"]);
   else gate("This page did not load", "Nothing was changed. Reload the page to try again.", [location.pathname, "Reload"]);
   return undefined;
 }

@@ -3,20 +3,21 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Control center · MAIZ agents</title>
+<title>Control centre · MAIZ agents</title>
 <meta name="robots" content="noindex">
-<meta name="theme-color" content="#0b0c0e">
+<meta name="theme-color" content="#ffffff">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@500;600&family=Inter:wght@300;400;500;600&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400&family=Inter:wght@400;500;600&display=swap">
 </head>
 <body>
+<a class="skip-link" href="#main" id="skip-main">Skip to content</a>
 <div class="app" id="app">
   <aside class="rail" id="rail" aria-label="Sidebar">
-    <a class="logo" href="/"><svg viewBox="0 0 32 32" aria-hidden="true"><defs><linearGradient id="lg" x1="0" x2="1" y1="0" y2="1"><stop offset="0" stop-color="#625fff"/><stop offset="1" stop-color="#ff7dda"/></linearGradient></defs><rect width="32" height="32" rx="8" fill="#0e111b" stroke="#24375a"/><path d="M8 23V10l8 9 8-9v13" fill="none" stroke="url(#lg)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>MAIZ agents</a>
+    <a class="logo" href="/"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M6 0H32V32H0V6A6 6 0 0 1 6 0Z" fill="#202020"/><path d="M8 23V10l8 9 8-9v13" fill="none" stroke="#ffffff" stroke-width="2.6" stroke-linecap="square" stroke-linejoin="miter"/><rect x="22.5" y="5" width="4" height="4" fill="#ff682c"/></svg>MAIZ agents</a>
     <div class="rail-org"><span class="av av-sm av-me" id="org-av">KC</span><span id="org-name">Kestrel Coffee</span></div>
-    <nav class="rail-nav" aria-label="Control center">
+    <nav class="rail-nav" aria-label="Control centre">
     <a class="ni" href="#home" data-nav="home"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>Overview</a>
     <a class="ni" href="#approvals" data-nav="approvals"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>Approvals<span class="count" id="appr-count">3</span></a>
     <a class="ni" href="#work" data-nav="work"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="5" height="16" rx="1.5"/><rect x="10" y="4" width="5" height="10" rx="1.5"/><rect x="17" y="4" width="4" height="13" rx="1.5"/></svg>Tasks and consultants</a>
@@ -36,14 +37,14 @@
   </aside>
   <div class="scrim" id="scrim"></div>
 
-  <div class="main" role="main" id="main">
+  <div class="main" role="main" id="main" tabindex="-1">
     <div class="topbar">
       <button class="menu-btn" id="menu-btn" aria-label="Open menu"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
       <form class="ask" id="ask"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4-4"/></svg><input id="ask-in" placeholder="Ask your team anything…" aria-label="Ask your team"><span class="kbd hide-sm">/</span></form>
       <div class="right"><a class="status warn hide-sm" href="#approvals"><span class="dot"></span><span id="need-count">3 need you</span></a><a class="badge badge-dark mono hide-sm" href="#usage">Wallet £0.00</a><button class="av av-sm av-me" id="me-av" aria-label="Account and settings" title="Account and settings" style="border:0;cursor:pointer">AI</button></div>
     </div>
 
-    <div id="demo-banner" class="demo-bar" hidden role="status"><span><b>Example business.</b> You are exploring the control center with sample data for Kestrel Coffee.</span><span class="demo-acts"><a class="btn btn-sm btn-primary" href="/onboarding.html">Start free trial</a><a class="btn btn-sm btn-ghost" href="/signin.html">Log in</a></span></div>
+    <div id="demo-banner" class="demo-bar" hidden role="status"><span><b>Example business.</b> You are exploring the control centre with sample data for Kestrel Coffee.</span><span class="demo-acts"><a class="btn btn-sm btn-primary" href="/onboarding.html">Start free trial</a><a class="btn btn-sm btn-ghost" href="/signin.html">Log in</a></span></div>
 
     <!-- HOME -->
     <div class="content" data-screen="home">
@@ -75,9 +76,9 @@
         <section class="panel" aria-labelledby="pulse-h">
           <div class="panel-h"><h2 id="pulse-h">Business pulse</h2><a class="r link" href="#finance">Open Finance desk</a></div>
           <div class="grid3">
-            <div class="kpi"><span class="l">Cash in bank</span><span class="v">£18,420</span><span class="dl">Runway 7.5 months</span><svg class="spark" viewBox="0 0 120 36" preserveAspectRatio="none" aria-hidden="true"><path d="M0 22 L20 20 L40 24 L60 18 L80 16 L100 19 L120 14" fill="none" stroke="#85a6e9" stroke-width="2" vector-effect="non-scaling-stroke"/></svg></div>
-            <div class="kpi"><span class="l">Revenue this month</span><span class="v">£6,210</span><span class="dl up">+9% vs last month</span><svg class="spark" viewBox="0 0 120 36" preserveAspectRatio="none" aria-hidden="true"><path d="M0 28 L20 26 L40 24 L60 25 L80 18 L100 15 L120 10" fill="none" stroke="#4ade9a" stroke-width="2" vector-effect="non-scaling-stroke"/></svg></div>
-            <div class="kpi"><span class="l">Active customers</span><span class="v">412</span><span class="dl up">+23 this month</span><svg class="spark" viewBox="0 0 120 36" preserveAspectRatio="none" aria-hidden="true"><path d="M0 26 L20 25 L40 22 L60 22 L80 19 L100 16 L120 13" fill="none" stroke="#625fff" stroke-width="2" vector-effect="non-scaling-stroke"/></svg></div>
+            <div class="kpi"><span class="l">Cash in bank</span><span class="v">£18,420</span><span class="dl">Runway 7.5 months</span><svg class="spark" viewBox="0 0 120 36" preserveAspectRatio="none" aria-hidden="true"><path d="M0 22 L20 20 L40 24 L60 18 L80 16 L100 19 L120 14" fill="none" stroke="#202020" stroke-width="2" vector-effect="non-scaling-stroke"/></svg></div>
+            <div class="kpi"><span class="l">Revenue this month</span><span class="v">£6,210</span><span class="dl up">+9% vs last month</span><svg class="spark" viewBox="0 0 120 36" preserveAspectRatio="none" aria-hidden="true"><path d="M0 28 L20 26 L40 24 L60 25 L80 18 L100 15 L120 10" fill="none" stroke="#ff682c" stroke-width="2" vector-effect="non-scaling-stroke"/></svg></div>
+            <div class="kpi"><span class="l">Active customers</span><span class="v">412</span><span class="dl up">+23 this month</span><svg class="spark" viewBox="0 0 120 36" preserveAspectRatio="none" aria-hidden="true"><path d="M0 26 L20 25 L40 22 L60 22 L80 19 L100 16 L120 13" fill="none" stroke="#816729" stroke-width="2" vector-effect="non-scaling-stroke"/></svg></div>
           </div>
           <div class="panel-h" style="margin-top:4px"><h2>Activity today</h2><a class="r link" href="#work">Open tasks</a></div>
           <ul class="feed">

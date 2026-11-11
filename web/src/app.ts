@@ -35,15 +35,27 @@ function route(): void {
   document.querySelectorAll<HTMLAnchorElement>("[data-nav]").forEach((a) => {
     if (a.dataset.nav === valid) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current");
   });
-  app.classList.remove("menu-open");
-  const title = screens.find((x) => x.dataset.screen === valid)?.querySelector("h1")?.textContent ?? "Control center";
+  app.classList.remove("menu-open"); $("menu-btn").setAttribute("aria-expanded", "false");
+  const title = screens.find((x) => x.dataset.screen === valid)?.querySelector("h1")?.textContent ?? "Control centre";
   document.title = `${valid === "home" ? "Overview" : title} · ${orgName} · MAIZ agents`;
   window.scrollTo({ top: 0 });
 }
 window.addEventListener("hashchange", route);
+// The skip link must not change the hash: the hash picks the screen.
+$("skip-main").addEventListener("click", (e) => { e.preventDefault(); $("main").focus(); });
 
-$("menu-btn").addEventListener("click", () => app.classList.toggle("menu-open"));
-$("scrim").addEventListener("click", () => app.classList.remove("menu-open"));
+// Mobile menu: say whether it is open, move focus in on open, Escape closes and returns focus.
+const menuBtn = $("menu-btn");
+menuBtn.setAttribute("aria-controls", "rail");
+menuBtn.setAttribute("aria-expanded", "false");
+const setMenu = (open: boolean): void => {
+  app.classList.toggle("menu-open", open);
+  menuBtn.setAttribute("aria-expanded", String(open));
+  if (open) document.querySelector<HTMLElement>("#rail a.ni")?.focus();
+};
+menuBtn.addEventListener("click", () => setMenu(!app.classList.contains("menu-open")));
+$("scrim").addEventListener("click", () => setMenu(false));
+document.addEventListener("keydown", (e) => { if (e.key === "Escape" && app.classList.contains("menu-open")) { setMenu(false); menuBtn.focus(); } });
 
 // Toasts
 document.addEventListener("click", (e) => {
@@ -113,6 +125,7 @@ async function loadOrg(): Promise<void> {
   $("org-av").textContent = initials(realOrg.name);
   $("greet").textContent = `${h < 12 ? "Good morning" : h < 18 ? "Good afternoon" : "Good evening"}, ${realOrg.name}`;
   orgName = realOrg.name;
+  $("set-biz").textContent = realOrg.name; // Settings shows the signed-in company, not this device's last signup.
   app.classList.add("is-live");
   route();
   const quota = realOrg.dailyQuotaPerEmployee;
@@ -133,7 +146,7 @@ async function loadOrg(): Promise<void> {
       : `<div><div class="e-lab"><span>Energy</span><span>${e.energyLeft} / ${quota}</span></div>${bar(e.energyLeft, quota)}</div>`;
     return `<div class="ecard"><div class="who"><span class="av ${cls}">${abbr}</span><div><b>${esc(e.name)}</b><span>Standard</span></div></div><span class="status good"><span class="dot"></span>Ready</span><div class="doing">Waiting for your first request</div>${energy}</div>`;
   }).join("");
-  if (realOrg.trialEndsAt) toast(`Free trial until ${new Date(realOrg.trialEndsAt).toLocaleDateString()}`);
+  if (realOrg.trialEndsAt) toast(`Free trial until ${new Date(realOrg.trialEndsAt).toLocaleDateString("en-GB", { day: "numeric", month: "long" })}`);
 }
 void loadOrg();
 
@@ -166,7 +179,7 @@ function signOut(): void { clearSession(); location.href = "/signin.html"; }
 document.querySelectorAll("[data-signout]").forEach((b) => b.addEventListener("click", signOut));
 $("me-av").addEventListener("click", () => { location.hash = "#settings"; });
 $("set-biz").textContent = biz;
-$("set-email").textContent = profile.email || "Not set";
+$("set-email").textContent = profile.email || "The address you log in with";
 
 // Ask bar: "finance: ..." / "marketing: ..." / "consultant: ..." / "hr: ..." / "compliance: ..." picks the employee; otherwise the consultant answers.
 $<HTMLFormElement>("ask").addEventListener("submit", async (e) => {
@@ -180,11 +193,13 @@ $<HTMLFormElement>("ask").addEventListener("submit", async (e) => {
   const emp = realOrg.team.find((x) => x.templateKey === key) ?? realOrg.team[0]!;
   toast(`${emp.name} is on it…`);
   const u = /^urgent\s*[:,-]\s*(.+)$/is.exec(m ? m[2]! : text);
-  const r = await api<{ status: string; reason?: string; answer?: string; runsAt?: string }>("/ask", { body: { text: u ? u[1] : m ? m[2] : text, employeeId: emp.id, urgent: !!u } });
+  const r = await api<{ status: string; reason?: string; answer?: string; runsAt?: string; message?: string }>("/ask", { body: { text: u ? u[1] : m ? m[2] : text, employeeId: emp.id, urgent: !!u } });
   input.value = "";
   if (!r.ok || !r.data) { toast("Could not reach your team. Try again."); return; }
-  if (r.data.status === "no_energy") { toast(r.data.reason === "trial_ended" ? "Your free trial has ended" : `${emp.name} has used today's energy`); return; }
+  // The server explains why in plain words (weekly pool, daily limit, full queue, trial ended, AI unavailable).
+  if (r.data.status === "no_energy") { toast(r.data.message ?? (r.data.reason === "trial_ended" ? "Your free trial has ended" : "Your team is out of energy for now")); return; }
   if (r.data.status === "queued") { toast(`Queued with your next batch${r.data.runsAt ? `, runs ${new Date(r.data.runsAt).toLocaleString([], { weekday: "short", hour: "numeric", minute: "2-digit" })}` : ""}. Start with "urgent:" to skip the wait.`); return; }
+  if (r.data.status === "failed" || !r.data.answer) { toast(r.data.message ?? `${emp.name} couldn't answer just now. Try again in a few minutes.`); return; }
   showAnswer(emp.name, r.data.answer ?? "");
   void loadOrg();
 

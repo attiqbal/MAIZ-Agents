@@ -14,7 +14,7 @@ This repo follows the ECC harness. Skills, agents and rules are pinned in `.clau
 
 ## Website rules
 
-- Direction: dark "aurora over a midnight terminal" (chosen by the owner). Tokens live in `web/src/styles.css`; use them, do not add new colours ad hoc.
+- Direction: light editorial "warm paper, one orange ember" (chosen by the owner on 2026-11-11, replacing the dark aurora style). Tokens live at the top of `web/src/styles.css` (the owner's palette verbatim plus a small semantic layer: `--text-2`, `--text-muted`, `--accent-text`, `--line`, `--line-strong`); use them, do not add new colours ad hoc. Orange (`--accent`) is never text or a button fill; Brass is the readable accent. Square buttons, asymmetric feature cards, 20px data cards, pill nav, no shadows.
 - Before UI work, read `frontend-design-direction` and `rules/ecc/web/design-quality.md`. Polish with `make-interfaces-feel-better` (no `transition: all`, tabular numbers for figures, 40px+ hit areas).
 - Accessibility: WCAG 2.2 AA (`accessibility`, `frontend-a11y`). One `main` landmark per page, all content inside landmarks, visible focus, 4.5:1 text contrast.
 - SEO (`seo`): one H1, titles about 50 to 60 characters, honest meta descriptions, JSON-LD that matches visible content. App and onboarding pages are `noindex`.

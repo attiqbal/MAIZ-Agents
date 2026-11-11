@@ -45,6 +45,6 @@ export function readyText(employeeKeys: readonly string[]): string {
   return [
     "Your team is set up and trained on your answers. First jobs lined up:",
     ...teamOf(employeeKeys).map((t) => `• ${t.title}: ${t.firstJob}`),
-    "You can undo the setup from the control center at any time.",
+    "You can undo the setup from the control centre at any time.",
   ].join("\n");
 }
