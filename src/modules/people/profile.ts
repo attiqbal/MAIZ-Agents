@@ -10,6 +10,9 @@ import type { Sector } from "./requirements.js";
 
 export class PeopleError extends Error {}
 
+/** How long a staff form link works. */
+export const FORM_LINK_DAYS = 14;
+
 /** Monday = 0 … Sunday = 6, as on a UK rota. */
 export const WEEKDAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"] as const;
 

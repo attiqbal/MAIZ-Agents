@@ -1038,3 +1038,41 @@ body > main, body > .page-top { flex: none; }
 }
 .desk-body .ubar .status, .hr-panel .status { white-space: normal; }
 .desk-body .ubar { gap: 12px; }
+
+/* ---------- Staff details form (HR desk "About them" tab and the staff's own form page) ---------- */
+.sf-form { display: flex; flex-direction: column; gap: 20px; }
+.sf-set { border: 1px solid var(--line); border-radius: var(--radius-cards); padding: 16px 18px 18px; margin: 0; min-width: 0; display: flex; flex-direction: column; gap: 12px; background: var(--color-canvas-white); }
+.sf-set legend { padding: 0 6px; margin-left: -6px; font-family: var(--font-polysans); font-size: 1.05rem; color: var(--color-graphite); }
+.sf-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; }
+.sf-wide { grid-column: 1 / -1; }
+.sf-form textarea.input { resize: vertical; min-height: 64px; font: inherit; }
+.sf-days { display: flex; flex-direction: column; border-top: 1px solid var(--line); }
+.sf-day { display: grid; grid-template-columns: 7.5rem minmax(9rem, 14rem) minmax(8.5rem, 10rem) minmax(8.5rem, 10rem); gap: 8px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--line); }
+.sf-dayname { font-weight: 500; }
+.sf-day input[hidden] { display: none; }
+.sf-two { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; }
+.sf-checks { display: flex; flex-direction: column; gap: 2px; margin-top: 6px; }
+.sf-check { display: flex; gap: 10px; align-items: center; min-height: 40px; cursor: pointer; }
+.sf-check input { width: 18px; height: 18px; accent-color: var(--color-graphite); }
+.sf-skills { display: flex; flex-direction: column; gap: 8px; }
+.sf-skill { display: grid; grid-template-columns: minmax(0, 1fr) 11rem; gap: 8px; align-items: end; }
+.sf-exp { display: flex; flex-direction: column; gap: 4px; }
+.sf-form > .acts, .sf-form .acts { display: flex; gap: 8px; flex-wrap: wrap; }
+.hr-formlink { display: flex; gap: 12px; align-items: center; justify-content: space-between; flex-wrap: wrap; padding: 12px 14px; border-radius: var(--radius-cards); background: var(--surface-ivory-surface); margin-bottom: 8px; }
+.hr-formlink p { margin: 0; flex: 1 1 260px; }
+.sf-top { border-bottom: 1px solid var(--line); padding: 14px 0; background: var(--color-canvas-white); }
+.sf-wrap { max-width: 760px; }
+.sf-wrap h1 { font-size: clamp(1.6rem, 4vw, 2.2rem); margin: 0 0 8px; }
+.sf-wrap h1:focus { outline: none; }
+.sf-wrap .sub { margin: 0 0 20px; }
+.sf-demo { padding: 10px 14px; border-radius: var(--radius-cards); background: var(--surface-ivory-surface); margin: 0 0 16px; }
+.sf-done-h { font-size: 1.3rem; margin: 0; }
+.sf-done:focus-visible { outline: 2px solid var(--accent-text); outline-offset: 4px; }
+@media (max-width: 560px) {
+  .sf-set { padding: 14px 12px 16px; }
+  .sf-day { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .sf-day .input { width: 100%; min-width: 0; }
+  .sf-dayname { grid-column: 1 / -1; }
+  .sf-day select { grid-column: 1 / -1; }
+  .sf-skill { grid-template-columns: 1fr; }
+}

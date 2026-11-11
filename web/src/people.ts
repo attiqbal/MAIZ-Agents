@@ -6,11 +6,12 @@ import { api, getToken } from "./api";
 import { toast } from "./common";
 import {
   CATEGORY_LABEL, CONTRACT_LABEL, DOC_STATE_LABEL, RTW_LABEL, SECTORS, STATUS_LABEL,
-  addDays, hrSummary, isIsoDate, offOn, requestMessage, sectorLabel, staffDetail, toIsoDate,
+  FORM_LINK_DAYS, SECTOR_QUESTIONS, addDays, hrSummary, isIsoDate, mergeProfile, offOn, readProfile, requestMessage, sectorLabel, staffDetail, toIsoDate,
   type Category, type ContractType, type DeskSettings, type DocState, type DocStatus, type DocView, type HrAction,
   type HrSummary, type Severity, type StaffDetail, type StaffMember, type StaffStatus,
 } from "../../src/modules/people/browser";
 import { EXAMPLE_SETTINGS, exampleStaff } from "./people-examples";
+import { profileFieldsHtml, readProfileFields, wireProfileFields } from "./staff-fields";
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
@@ -34,6 +35,9 @@ interface Backend {
   completeReview(id: string, reviewId: string): Promise<StaffDetail>;
   setLeaving(id: string, endDate: string | null): Promise<StaffDetail>;
   settings(b: Partial<DeskSettings>): Promise<DeskSettings>;
+  updateProfile(id: string, b: Record<string, unknown>): Promise<StaffDetail>;
+  createFormLink(id: string): Promise<{ url: string; expiresOn: string }>;
+  stopFormLink(id: string): Promise<StaffDetail>;
 }
 
 class ApiBackend implements Backend {
@@ -54,6 +58,12 @@ class ApiBackend implements Backend {
   completeReview(id: string, reviewId: string) { return this.call<StaffDetail>(`/${encodeURIComponent(id)}/reviews/${encodeURIComponent(reviewId)}/done`, {}); }
   setLeaving(id: string, endDate: string | null) { return this.call<StaffDetail>(`/${encodeURIComponent(id)}/leaving`, { endDate }); }
   async settings(b: Partial<DeskSettings>) { return (await this.call<{ settings: DeskSettings }>("/settings", b)).settings; }
+  updateProfile(id: string, b: Record<string, unknown>) { return this.call<StaffDetail>(`/${encodeURIComponent(id)}/profile`, b); }
+  async createFormLink(id: string) {
+    const r = await this.call<{ url: string; expiresOn: string }>(`/${encodeURIComponent(id)}/form-link`, {});
+    return { ...r, url: new URL(r.url, location.origin).href };
+  }
+  stopFormLink(id: string) { return this.call<StaffDetail>(`/${encodeURIComponent(id)}/form-link`, undefined, "DELETE"); }
 }
 
 /** The example business, kept in this browser. Uses the same rules; checks are lighter than the server's. */
@@ -118,6 +128,22 @@ class LocalBackend implements Backend {
     return Promise.resolve(this.put({ ...rest, ...(endDate ? { endDate } : {}), updatedAt: new Date().toISOString() }));
   }
   settings(b: Partial<DeskSettings>) { this.s = { ...this.s, ...b }; return Promise.resolve(this.s); }
+  updateProfile(id: string, b: Record<string, unknown>) {
+    try {
+      const changes = readProfile(b, this.s.sector);
+      return this.change(id, (m) => ({ profile: mergeProfile(m.profile, changes, "owner", this.today()) }));
+    } catch (e) { return Promise.reject(e); }
+  }
+  async createFormLink(id: string) {
+    const expiresOn = addDays(this.today(), FORM_LINK_DAYS);
+    await this.change(id, () => ({ formLink: { createdOn: this.today(), expiresOn } }));
+    // The example has no server, so its link opens a preview that saves nothing.
+    return { url: `${location.origin}/staff-form.html#demo`, expiresOn };
+  }
+  stopFormLink(id: string) {
+    const { formLink: _old, ...rest } = this.get(id);
+    return Promise.resolve(this.put({ ...rest, updatedAt: new Date().toISOString() }));
+  }
 }
 
 // ---------- state ----------
@@ -129,8 +155,8 @@ let staffFilter: "attention" | "starting" | "leaving" | "all" = "all";
 let query = "";
 let open: StaffDetail | undefined;
 let tab: Tab = "overview";
-type Tab = "overview" | "documents" | "contract" | "leave" | "checklists" | "reviews";
-const TABS: [Tab, string][] = [["overview", "Overview"], ["documents", "Documents"], ["contract", "Contract and pay"], ["leave", "Leave and rota"], ["checklists", "Checklists"], ["reviews", "Reviews"]];
+type Tab = "overview" | "about" | "documents" | "contract" | "leave" | "checklists" | "reviews";
+const TABS: [Tab, string][] = [["overview", "Overview"], ["about", "About them"], ["documents", "Documents"], ["contract", "Contract and pay"], ["leave", "Leave and rota"], ["checklists", "Checklists"], ["reviews", "Reviews"]];
 
 const SEV: Record<Severity, [tone: string, label: string]> = { critical: ["crit", "Urgent"], high: ["warn", "Soon"], medium: ["info", "This month"], low: ["", "When you can"] };
 const DOC_TONE: Record<DocState, string> = { ok: "good", expiring: "warn", expired: "crit", to_check: "warn", requested: "info", missing: "crit" };
@@ -188,6 +214,8 @@ function actionButtons(a: HrAction): string {
     case "check": return `<button type="button" class="btn btn-primary btn-sm" data-hr="open" data-tab="documents" ${data}>Check it</button>`;
     case "approve_leave": return `<button type="button" class="btn btn-primary btn-sm" data-hr="leave-yes" ${data}>Approve</button><button type="button" class="btn btn-ghost btn-sm" data-hr="leave-no" ${data}>Decline</button>`;
     case "review": return `<button type="button" class="btn btn-ghost btn-sm" data-hr="review-done" ${data}>Mark done</button>`;
+    case "send_form": return `<button type="button" class="btn btn-ghost btn-sm" data-hr="form" ${data}>Copy form link</button><button type="button" class="btn btn-quiet btn-sm" data-hr="open" data-tab="about" ${data}>Fill it in</button>`;
+    case "skill": return `<button type="button" class="btn btn-ghost btn-sm" data-hr="open" data-tab="about" ${data}>Open</button>`;
     default: return `<button type="button" class="btn btn-ghost btn-sm" data-hr="open" data-tab="checklists" ${data}>Open checklist</button>`;
   }
 }
@@ -263,7 +291,7 @@ function renderPerson(): void {
   $("hr-p-meta").innerHTML = `${esc(m.jobTitle)} · ${esc(CONTRACT_LABEL[m.contract])} · ${open.status === "starting" ? "starts" : "started"} ${esc(fmtDate(m.startDate))} ${statusTag(STATUS_TONE[open.status], STATUS_LABEL[open.status])} <span class="hr-rec">${meter(open.complete)}</span>`;
   $("hr-tabs").innerHTML = TABS.map(([k, label]) => `<button type="button" role="tab" id="hr-tab-${k}" aria-controls="hr-panel" aria-selected="${k === tab}" tabindex="${k === tab ? 0 : -1}" data-tab-key="${k}">${esc(label)}${k === "documents" ? ` <span class="mono">${open!.documents.filter((x) => x.state !== "ok").length || ""}</span>` : ""}</button>`).join("");
   $("hr-panel").setAttribute("aria-labelledby", `hr-tab-${tab}`);
-  $("hr-panel").innerHTML = ({ overview: tabOverview, documents: tabDocuments, contract: tabContract, leave: tabLeave, checklists: tabChecklists, reviews: tabReviews } as const)[tab]();
+  $("hr-panel").innerHTML = ({ overview: tabOverview, about: tabAbout, documents: tabDocuments, contract: tabContract, leave: tabLeave, checklists: tabChecklists, reviews: tabReviews } as const)[tab]();
 }
 
 function tabOverview(): string {
@@ -279,6 +307,41 @@ function tabOverview(): string {
       ${fact("Holiday left", lb.basis === "days" ? `${lb.left} of ${lb.allowance} days` : "Builds up at 12.07% of hours worked")}${fact("Probation ends", m.probationEndsOn ? fmtDate(m.probationEndsOn) : "Not set")}${fact("Leaving", m.endDate ? fmtDate(m.endDate) : "No")}
     </div>`;
 }
+function tabAbout(): string {
+  const m = open!.member;
+  const p = m.profile ?? {};
+  const first = m.name.split(" ")[0]!;
+  const link = m.formLink;
+  const linkLine = link
+    ? `Form link made ${esc(fmtDate(link.createdOn))}, works until ${esc(fmtDate(link.expiresOn))}.${link.usedOn ? ` ${esc(first)} last filled it in on ${esc(fmtDate(link.usedOn))}.` : " Not filled in yet."}`
+    : `Send ${esc(first)} a link to fill this in themselves. It works for ${FORM_LINK_DAYS} days and shows only their own details, never pay or documents.`;
+  const filled = p.updatedOn ? `<p class="small muted">Last updated ${esc(fmtDate(p.updatedOn))} by ${p.updatedBy === "staff" ? esc(first) : "you"}.</p>` : "";
+  return `<div class="hr-formlink"><p class="small">${linkLine}</p><div class="acts">
+      <button type="button" class="btn btn-ghost btn-sm" data-form-link="copy">${link ? "Copy a new link" : "Copy form link"}</button>
+      ${link ? `<button type="button" class="btn btn-quiet btn-sm" data-form-link="stop">Stop the link</button>` : ""}
+    </div></div>
+    ${filled}
+    <form id="hr-about" class="sf-form" novalidate>
+      ${profileFieldsHtml(p, questionsNow(), { self: false })}
+      <div class="acts"><button type="submit" class="btn btn-primary">Save</button></div>
+    </form>`;
+}
+const questionsNow = () => SECTOR_QUESTIONS[view?.settings.sector ?? "other"];
+
+/** Makes a fresh form link and copies it with a short message, ready to paste into a text or WhatsApp. */
+async function copyFormLink(staffId: string): Promise<void> {
+  const d = open?.member.id === staffId ? open : await run(() => backend.detail(staffId));
+  if (!d) return;
+  const r = await run(() => backend.createFormLink(staffId));
+  if (!r) return;
+  const first = d.member.name.split(" ")[0];
+  const msg = `Hi ${first}, please fill in your details for ${businessName}: when you can work, your emergency contact and any certificates. It takes about 5 minutes: ${r.url} (the link works until ${fmtDate(r.expiresOn)}).`;
+  let copied = true;
+  try { await navigator.clipboard.writeText(msg); } catch { copied = false; }
+  toast(copied ? `Link copied. Paste it into a message to ${first}.` : `Copy this link for ${first}: ${r.url}`);
+  if (open?.member.id === staffId) setOpen(await run(() => backend.detail(staffId))); else void refresh();
+}
+
 const fact = (k: string, v: string) => `<div class="kpi"><span class="l">${esc(k)}</span><span class="small">${esc(v)}</span></div>`;
 
 function docRow(x: DocView): string {
@@ -394,6 +457,7 @@ function wire(): void {
       const act = hr.dataset.hr;
       if (act === "open") return void openPerson(staff, (hr.dataset.tab as Tab) ?? "overview");
       if (act === "copy") return void copyRequest(staff, ref);
+      if (act === "form") return void copyFormLink(staff);
       if (act === "leave-yes" || act === "leave-no") { await run(() => backend.decideLeave(staff, ref, act === "leave-yes"), act === "leave-yes" ? "Leave approved" : "Leave declined"); return void refresh(); }
       if (act === "review-done") { await run(() => backend.completeReview(staff, ref), "Review marked as held"); return void refresh(); }
     }
@@ -424,6 +488,8 @@ function wire(): void {
       const status = doc.dataset.doc as DocStatus;
       return setOpen(await run(() => backend.setDocument(id, key, { status, ...(expiry && status === "checked" ? { expiresOn: expiry } : {}) }), status === "checked" ? "Marked as checked" : undefined));
     }
+    const fl = t.closest<HTMLElement>("[data-form-link]");
+    if (fl) return fl.dataset.formLink === "copy" ? void copyFormLink(id) : setOpen(await run(() => backend.stopFormLink(id), "Link stopped. It no longer opens."));
     const lv = t.closest<HTMLElement>("[data-leave]");
     if (lv) return setOpen(await run(() => backend.decideLeave(id, lv.dataset.id!, lv.dataset.leave === "yes"), lv.dataset.leave === "yes" ? "Leave approved" : "Leave declined"));
     const rv = t.closest<HTMLElement>("[data-review]");
@@ -439,9 +505,10 @@ function wire(): void {
 
   document.addEventListener("submit", async (e) => {
     const f = e.target as HTMLFormElement;
-    if (!open || !["hr-contract", "hr-leaving", "hr-leave-form"].includes(f.id)) return;
+    if (!open || !["hr-contract", "hr-leaving", "hr-leave-form", "hr-about"].includes(f.id)) return;
     e.preventDefault();
     const id = open.member.id;
+    if (f.id === "hr-about") return setOpen(await run(() => backend.updateProfile(id, readProfileFields(f, questionsNow()).profile), "Saved. The rota now follows these hours."));
     if (f.id === "hr-contract") {
       const v = (k: string) => (f.elements.namedItem(k) as HTMLInputElement | null)?.value.trim() ?? "";
       const pay = v("pay");
@@ -464,6 +531,8 @@ function wire(): void {
     if (!isIsoDate(from) || !(days > 0)) { toast("Add the first day and how many working days"); return; }
     setOpen(await run(() => backend.addLeave(id, { kind: $<HTMLSelectElement>("hr-l-kind").value, from, to, days }), "Leave added"));
   });
+
+  wireProfileFields($("hr-panel"));
 
   // Tabs: arrow keys move between them (WAI-ARIA tabs pattern).
   $("hr-tabs").addEventListener("keydown", (e) => {

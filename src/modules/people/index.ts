@@ -10,7 +10,7 @@ import {
   type ContractType, type DeskSettings, type DocStatus, type HrSummary, type LeaveKind,
   type PensionStatus, type ReviewKind, type RtwRoute, type StaffDetail, type StaffMember,
 } from "./rules.js";
-import { PeopleError, SECTOR_QUESTIONS, availabilityLines, mergeProfile, readProfile, type DayAvailability, type SectorQuestion, type StaffProfile } from "./profile.js";
+import { FORM_LINK_DAYS, PeopleError, SECTOR_QUESTIONS, availabilityLines, mergeProfile, readProfile, type DayAvailability, type SectorQuestion, type StaffProfile } from "./profile.js";
 
 export * from "./rules.js";
 export * from "./requirements.js";
@@ -68,8 +68,6 @@ export interface StaffFormView {
   expiresOn: string;
 }
 
-/** How long a staff form link works. */
-export const FORM_LINK_DAYS = 14;
 /** Undecided time-off requests one person can have open from their form. */
 const MAX_OPEN_REQUESTS = 10;
 const hashToken = (t: string): string => createHash("sha256").update(t).digest("hex");
