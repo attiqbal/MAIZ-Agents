@@ -82,7 +82,8 @@ function renderPicker(): void {
   if (picked && getItem(picked)) $<HTMLSelectElement>("store-pick").value = picked;
 }
 
-export function initStore(): void {
+/** onPaid runs after a paid checkout, so the control centre can refresh the team. */
+export function initStore(opts: { onPaid?: () => void } = {}): void {
   renderPicker();
   $("store-pick").addEventListener("change", renderItem);
   $("cart-lines").addEventListener("click", (e) => {
@@ -104,7 +105,7 @@ export function initStore(): void {
     if (r.status === 400 && /not switched on/.test(r.data?.error ?? "")) { $("cart-note").textContent = PLACEHOLDER; return; }
     if (!r.ok) { $("cart-note").textContent = r.data?.error ?? "Could not start the payment. Nothing was charged."; return; }
     if (r.data?.url) { location.assign(r.data.url); return; }
-    if (r.data?.order?.status === "paid") { cart = []; save(cart); renderCart(); $("cart-note").textContent = "Done. Your new employees are on your team."; return; }
+    if (r.data?.order?.status === "paid") { cart = []; save(cart); renderCart(); $("cart-note").textContent = "Done. Your new employees are on your team."; opts.onPaid?.(); return; }
     $("cart-note").textContent = "The payment did not go through. Nothing was charged.";
   });
   $("task-rule").innerHTML = `<h3>How a consultant pass works</h3><ul>${HOW_A_PASS_WORKS.map((x) => `<li>${esc(x)}</li>`).join("")}</ul><h3>If a pass needs more energy</h3><ul>${OVERAGE_RULE.map((x) => `<li>${esc(x)}</li>`).join("")}</ul><p class="jd-note">Prices are list prices in GBP and may change before launch.</p>`;

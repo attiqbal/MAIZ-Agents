@@ -30,7 +30,9 @@ const STATUS: Record<string, string> = { queued: "Waiting", running: "Running no
 function render(): void {
   const s = view.schedule;
   $("q-count").textContent = view.queued ? `${view.queued} waiting · next run ${view.nextRunLabel}` : "Nothing waiting";
-  $<HTMLButtonElement>("q-run").disabled = view.queued === 0;
+  const run = $<HTMLButtonElement>("q-run");
+  run.disabled = view.queued === 0;
+  run.title = view.queued === 0 ? "Nothing is waiting. Work you send appears here until the next batch." : "Run everything that is waiting now, instead of at the next batch";
   $("q-list").innerHTML = view.jobs.map((j) => `<div class="q-row"><div><b>${esc(j.brief)}</b><span class="hint">${esc(STATUS[j.status] ?? j.status)}${j.runsAtLabel ? ` · runs ${esc(j.runsAtLabel)}` : ""}${j.problem ? ` · ${esc(j.problem)}` : ""}</span></div>${j.status === "queued" ? `<button type="button" class="btn btn-quiet btn-sm" data-q-cancel="${esc(j.id)}" aria-label="Cancel: ${esc(j.brief)}">Cancel</button>` : ""}</div>`).join("") || `<p class="all-clear">Nothing queued. Quick questions and urgent work are answered at once.</p>`;
   $<HTMLInputElement>("q-time").value = s.closingTime;
   $<HTMLInputElement>("q-tz").value = s.timezone;

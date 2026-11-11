@@ -28,7 +28,7 @@
     <div class="ob-panel">
       <div class="sectors" role="group" aria-label="Kind of business" id="sectors"></div>
       <div class="field" id="sells-f" hidden><label for="sells">What do you do, in a few words?</label><input class="input" id="sells" maxlength="300" placeholder="Mobile dog grooming"></div>
-      <div class="field"><label for="biz">Business name</label><input class="input" id="biz" maxlength="120" aria-describedby="biz-err" placeholder="Kestrel Coffee" autocomplete="organization"></div>
+      <div class="field"><label for="biz">Business name</label><input class="input" id="biz" maxlength="120" aria-describedby="biz-err" aria-required="true" placeholder="Kestrel Coffee" autocomplete="organization"></div>
       <div class="field"><label for="country">Where are you based?</label><select class="input" id="country"></select><span class="hint">We guessed from your device. It sets your currency and the rules your team follows.</span></div>
       <p class="err" id="biz-err" role="alert" hidden>Pick the kind of business and add its name to continue.</p>
       <button class="btn btn-primary btn-block" id="biz-go">Continue</button>
@@ -61,7 +61,7 @@
         <div class="chips" role="group" aria-labelledby="apps-l" id="apps"></div></div>
       <details class="more-apps"><summary>Show more apps</summary>
         <div class="chips" role="group" aria-label="More apps" id="apps-more"></div></details>
-      <div class="field"><label for="site">Website or social page <span class="hint">(optional)</span></label><input class="input" id="site" maxlength="200" placeholder="kestrelcoffee.co.uk" inputmode="url"><span class="hint">Saved to your business profile, so your Marketing manager knows where to look.</span></div>
+      <div class="field"><label for="site">Website or social page <span class="hint">(optional)</span></label><input class="input" id="site" maxlength="200" placeholder="kestrelcoffee.co.uk" inputmode="url" aria-describedby="site-err"><span class="hint">Saved to your business profile, so your Marketing manager knows where to look.</span><span class="err" id="site-err" role="alert" hidden>That doesn't look like a web address. Try something like kestrelcoffee.co.uk or instagram.com/kestrel.</span></div>
       <div class="ob-actions"><button class="btn btn-ghost" data-back>Back</button><button class="btn btn-primary" id="apps-go">Show my plan</button></div>
     </div>
   </section>
@@ -79,7 +79,7 @@
       <div id="plan-apps"></div>
       <details class="plan-facts"><summary id="plan-facts-h">What we filled in for you</summary><div id="plan-facts"></div></details>
       <p class="small muted">Free for 7 days with 3,000 energy, no card. After that <b class="mono">£100/mo</b> for this team, with 8,000 energy a week shared. Change it any time.</p>
-      <div class="field" id="email-f"><label for="email">Work email, to save your team</label><input class="input" id="email" type="email" aria-describedby="email-err" placeholder="you@business.com" autocomplete="email"><span class="hint">We email a sign-in link. No password. We only use it to sign you in and to reach you about your team.</span></div>
+      <div class="field" id="email-f"><label for="email">Work email, to save your team</label><input class="input" id="email" type="email" aria-describedby="email-err" aria-required="true" placeholder="you@business.com" autocomplete="email"><span class="hint">We email a sign-in link. No password. We only use it to sign you in and to reach you about your team.</span></div>
       <p class="err" id="email-err" role="alert" hidden>Enter a valid email address.</p>
       <p class="hint" id="email-sent" hidden role="status"></p>
       <div class="ob-actions"><button class="btn btn-ghost" data-back>Back</button><button class="btn btn-primary" id="email-go">Start my free week</button></div>

@@ -24,7 +24,7 @@
     <div class="group" id="g-team">Team</div>
     <a class="ni" href="#team" data-nav="team"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.3 2.7-5.5 6-5.5s6 2.200 6 5.5"/><path d="M16 5.5a3 3 0 010 5.5M18 14.7c1.800.7 3 2.400 3 5.3"/></svg>Team</a>
     <a class="ni" href="#usage" data-nav="usage"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 2L4 14h7l-1 8 9-12h-7z"/></svg>Energy and spend</a>
-    <a class="ni" href="/employees.html#store"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8l2-4h12l2 4M4 8v11h16V8M4 8h16M9 12h6"/></svg>Hire from the store</a>
+    <a class="ni" href="#store" data-nav="store"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8l2-4h12l2 4M4 8v11h16V8M4 8h16M9 12h6"/></svg>Hire from the store</a>
     <div class="group">Business</div>
     <a class="ni" href="#finance" data-nav="finance"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19V9M10 19V5M16 19v-7M22 19H2"/></svg>Finance desk</a>
     <a class="ni" href="#people" data-nav="people"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="3" width="16" height="18" rx="2.5"/><circle cx="12" cy="10" r="2.6"/><path d="M7.5 17.5c.8-2 2.500-3 4.500-3s3.700 1 4.500 3"/></svg>HR desk<span class="count" id="hr-count" hidden></span></a>
@@ -34,7 +34,7 @@
     <a class="ni" href="#setup" data-nav="setup"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h16v11H9l-5 4z"/></svg>Setup<span class="count" id="setup-badge">1</span></a>
     <a class="ni" href="#settings" data-nav="settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M18.4 5.6l-2.1 2.100M7.7 16.3l-2.1 2.1"/></svg>Settings</a>
     </nav>
-    <div class="trial"><b>Trial: 5 days left</b><span class="muted">No card needed until day 7</span><div class="energy"><i style="width:29%"></i></div></div>
+    <div class="trial" id="trial-box"><b id="trial-left">Trial: 5 days left</b><span class="muted" id="trial-note">No card needed until day 7</span><div class="energy"><i id="trial-bar" style="width:29%"></i></div></div>
   </aside>
   <div class="scrim" id="scrim"></div>
 
@@ -102,7 +102,7 @@
             <p class="small muted">Shares of the team's weekly energy. It refills on Monday; urgent work is never held back.</p></section>
           <section class="panel" aria-labelledby="ovp-h"><div class="panel-h"><h2 id="ovp-h">People today</h2><a class="r link" href="#people">Open HR desk</a></div>
             <div id="ov-people"></div></section>
-          <section class="panel"><div class="panel-h"><h2>Coming up</h2><a class="r link" href="#compliance">Compliance calendar</a></div>
+          <section class="panel" data-example><div class="panel-h"><h2>Coming up</h2><a class="r link" href="#compliance">Compliance calendar</a></div>
             <ul class="brief" id="ov-next"></ul></section>
         </div>
       </div>
@@ -147,7 +147,7 @@
         </form></section>
       <div class="chips" id="task-filter" role="group" aria-label="Show tasks by employee"></div>
       <div class="kan" id="kan" tabindex="0" role="region" aria-label="Task board, scrolls sideways on small screens"></div>
-      <section class="panel" aria-labelledby="cons-h"><div class="panel-h"><h2 id="cons-h">Consultants on a pass</h2><a class="r link" href="/employees.html#store">Browse consultants</a></div>
+      <section class="panel" aria-labelledby="cons-h"><div class="panel-h"><h2 id="cons-h">Consultants on a pass</h2><a class="r link" href="#store">Browse consultants</a></div>
         <p class="muted small">A consultant joins for 7 or 30 days, paid once, to finish a defined piece of work. None is working for you right now. This is how a pass is tracked once you hire one:</p>
         <div class="tbl-wrap" tabindex="0" role="region" aria-label="Consultant pass preview"><table class="tbl" id="cons-table"></table></div>
         <p class="xs muted">You are told at 80% of the included energy, and nothing extra is charged without your approval.</p></section>
@@ -167,7 +167,7 @@
 
     <!-- TEAM -->
     <div class="content" data-screen="team" hidden>
-      <div class="page-h"><div><h1>Team</h1><p>Who is working, what on, and how much of the team energy is left.</p></div><span class="badge badge-dark eg">Example data</span><a class="btn btn-primary btn-sm" href="/employees.html#store">Hire from the store</a></div>
+      <div class="page-h"><div><h1>Team</h1><p>Who is working, what on, and how much of the team energy is left.</p></div><span class="badge badge-dark eg">Example data</span><a class="btn btn-primary btn-sm" href="#store">Hire from the store</a></div>
       <div class="kpis kpis-4" id="team-kpis"></div>
       <section class="panel" aria-labelledby="ts-h"><div class="panel-h"><h2 id="ts-h">Employee status</h2><span class="r">This week</span></div>
         <div class="tbl-wrap" tabindex="0" role="region" aria-label="Employee status table"><table class="tbl" id="team-table"></table></div></section>
@@ -362,6 +362,24 @@
           <div class="ubar ubar-2"><span>Auto-refill</span><span class="mono">Off</span></div>
           <p class="small muted">Payments are not open yet. Nothing is charged during the trial, and top-ups will only ever come from your wallet, up to your cap.</p></section>
       </div>
+    </div>
+    <div class="content" data-screen="store" hidden>
+      <div class="page-h"><div><h1>Hire from the store</h1><p>Add an employee or a specialist, billed monthly, or a consultant for 7 or 30 days, paid once. Each employee you add tops up the team energy.</p></div></div>
+      <div class="store">
+        <section class="panel store-pick" aria-label="Choose what to add">
+          <label class="label" for="store-pick">What do you want to add?</label>
+          <select id="store-pick" class="input"></select>
+          <div id="store-item" aria-live="polite"></div>
+        </section>
+        <aside class="panel store-cart" aria-labelledby="cart-h">
+          <div class="panel-h"><h2 id="cart-h">Your cart</h2></div>
+          <div id="cart-lines"></div>
+          <dl class="cart-totals" id="cart-totals"></dl>
+          <button class="btn btn-primary" id="cart-checkout" type="button">Checkout</button>
+          <p class="jd-note" id="cart-note" role="status"></p>
+        </aside>
+      </div>
+      <section class="panel task-rule" id="task-rule" aria-label="How consultant passes work"></section>
     </div>
   </div>
 </div>

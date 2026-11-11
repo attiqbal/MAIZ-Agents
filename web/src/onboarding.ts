@@ -30,8 +30,16 @@ const AVATAR: Record<string, [string, string]> = {
 };
 const HOW: Record<AppHow, string> = { direct: "Connects directly", file: "Upload an export", bridge: "Through Zapier or Make", chat: "One scan" };
 
-function show(n: number, moveFocus = true): void {
+// Where the owner is, so a refresh or the browser's Back button keeps their place.
+const STEP_KEY = "vn.obStep";
+const RESUMABLE_MAX = 5; // step 6 creates the team; never re-run it on a refresh
+
+function show(n: number, moveFocus = true, fromHistory = false): void {
+  const prev = current;
   current = Math.min(Math.max(n, 1), TOTAL);
+  try { sessionStorage.setItem(STEP_KEY, String(Math.min(current, RESUMABLE_MAX))); } catch { /* storage unavailable */ }
+  if (!fromHistory && current !== prev) history.pushState({ obStep: current }, "", `#step-${current}`);
+  else if (!fromHistory) history.replaceState({ obStep: current }, "", `#step-${current}`);
   steps.forEach((s) => s.toggleAttribute("hidden", Number(s.dataset.step) !== current));
   document.querySelectorAll("#progress i").forEach((el, i) => el.classList.toggle("on", i < current));
   $("step-label").textContent = `Step ${current} of ${TOTAL}`;
@@ -51,6 +59,12 @@ document.addEventListener("click", (e) => {
   const t = (e.target as HTMLElement).closest<HTMLElement>("[data-next],[data-back]");
   if (!t) return;
   if (t.hasAttribute("data-back")) show(current - 1); else show(current + 1);
+});
+
+window.addEventListener("popstate", (e) => {
+  const step = Number((e.state as { obStep?: number } | null)?.obStep);
+  // Never walk back into the set-up step; Back from there returns to the start of the app.
+  if (step >= 1 && step < 6) show(step, true, true);
 });
 
 /** One-of-many chips: pressing one releases the others. */
@@ -147,7 +161,14 @@ for (const id of ["apps", "apps-more"]) {
 }
 $("apps-go").addEventListener("click", () => {
   profile.apps = [...pressed($("apps")), ...pressed($("apps-more"))];
-  profile.site = $<HTMLInputElement>("site").value.trim() || undefined;
+  const site = $<HTMLInputElement>("site");
+  const raw = site.value.trim();
+  // Optional, but if given it should look like a web address: a dot, no spaces (https:// is added later if missing).
+  const looksLikeUrl = !raw || /^(https?:\/\/)?[^\s/]+\.[^\s/]{2,}(\/\S*)?$/i.test(raw);
+  if (looksLikeUrl) site.removeAttribute("aria-invalid"); else site.setAttribute("aria-invalid", "true");
+  $("site-err").toggleAttribute("hidden", looksLikeUrl);
+  if (!looksLikeUrl) { site.focus(); return; }
+  profile.site = raw || undefined;
   save(); show(PLAN_STEP);
 });
 
@@ -281,4 +302,19 @@ if (profile.site) $<HTMLInputElement>("site").value = profile.site;
 if (profile.email) $<HTMLInputElement>("email").value = profile.email;
 if (profile.size) $("size").querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", String(b.textContent === profile.size)));
 // Coming back from the emailed link with a verified session: the plan is waiting, one tap from done.
-show(getToken() && profile.biz ? PLAN_STEP : 1, false);
+// Someone who already has a team goes straight to it. Otherwise resume where they were in this tab,
+// or at the plan when they come back from the emailed link.
+async function start(): Promise<void> {
+  if (getToken()) {
+    const r = await api<{ id: string }>("/org");
+    if (r.ok && r.data?.id) { location.replace("/app.html"); return; }
+  }
+  let resume = 1;
+  try { resume = Number(sessionStorage.getItem(STEP_KEY)) || 1; } catch { /* storage unavailable */ }
+  if (resume > 1 && !profile.sector) resume = 1; // answers were cleared: start again
+  if (getToken() && profile.biz) resume = Math.max(resume, PLAN_STEP);
+  current = 0;
+  history.replaceState({ obStep: resume }, "", `#step-${resume}`);
+  show(resume, false, true);
+}
+void start();

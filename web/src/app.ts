@@ -45,6 +45,15 @@ function route(): void {
   window.scrollTo({ top: 0 });
 }
 window.addEventListener("hashchange", route);
+// The store opens inside the control centre, so hiring never leaves the app. Loaded on first visit.
+let storeReady = false;
+function openStoreIfShown(): void {
+  if (storeReady || location.hash !== "#store") return;
+  storeReady = true;
+  void import("./store").then((m) => m.initStore({ onPaid: () => { void loadOrg(); } }));
+}
+window.addEventListener("hashchange", openStoreIfShown);
+openStoreIfShown();
 // The skip link must not change the hash: the hash picks the screen.
 $("skip-main").addEventListener("click", (e) => { e.preventDefault(); $("main").focus(); });
 
@@ -67,6 +76,8 @@ document.addEventListener("click", (e) => {
   if (t) toast(t.dataset.toast ?? "");
 });
 
+// A signed-in client should not glimpse the example count while their own data loads.
+if (getToken()) $("need-count").textContent = "Checking…";
 // Needs-you + approvals share one list of pending items.
 const pending = new Set(["posts", "vat", "pack"]);
 const details: Record<string, { title: string; cost: string; leaves: string; prev: string; why: string; ok: string }> = {
@@ -85,7 +96,11 @@ function refresh(): void {
   $("need-count").textContent = n === 0 ? "All clear" : `${n} need${n === 1 ? "s" : ""} you`;
   const needs = $("needs");
   let clear = needs.querySelector(".all-clear");
-  if (n === 0 && !clear) { clear = document.createElement("p"); clear.className = "all-clear"; clear.textContent = "Nothing needs you right now. Your team is working."; needs.style.display = "block"; needs.appendChild(clear); }
+  // The setup card counts too: never say "nothing needs you" right under it.
+  const setupOpen = !!document.getElementById("setup-need") && !$("setup-need").hidden;
+  $("need-count").textContent = n + (setupOpen ? 1 : 0) === 0 ? "All clear" : `${n + (setupOpen ? 1 : 0)} need${n + (setupOpen ? 1 : 0) === 1 ? "s" : ""} you`;
+  if (setupOpen && clear) { clear.remove(); clear = null; }
+  if (n === 0 && !clear && !setupOpen) { clear = document.createElement("p"); clear.className = "all-clear"; clear.textContent = "Nothing needs you right now. Your team is working."; needs.style.display = "block"; needs.appendChild(clear); }
   if (!pending.has(selected)) selected = [...pending][0] ?? "";
   $("adetail").toggleAttribute("hidden", !selected);
   $("appr-empty").toggleAttribute("hidden", n > 0);
@@ -96,6 +111,9 @@ function refresh(): void {
     $("a-leaves").innerHTML = d.leaves; $("a-prev").innerHTML = d.prev; $("a-why").textContent = d.why; $("a-ok").textContent = d.ok;
   }
 }
+// When the setup form is sent (setup.ts hides its card), recount what needs the owner.
+const setupCard = document.getElementById("setup-need");
+if (setupCard) new MutationObserver(() => refresh()).observe(setupCard, { attributes: true, attributeFilter: ["hidden"] });
 function resolve(id: string, msg: string): void {
   const card = document.querySelector<HTMLElement>(`[data-need="${id}"]`);
   card?.classList.add("gone");
@@ -116,6 +134,16 @@ $("a-edit").addEventListener("click", () => toast("Editing opens in the web edit
 let realOrg: Org | undefined;
 const ROLE: Record<string, [string, string]> = { "finance-manager": ["FM", "av-fm"], "marketing-manager": ["MM", "av-mm"], "business-consultant": ["BC", "av-bc"], "hr-manager": ["HR", "av-hr"], "compliance-manager": ["CM", "av-cm"], "supply-chain-manager": ["SC", "av-sc"], "admin-manager": ["AM", "av-tl"] };
 const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]!);
+/** The sidebar trial box from the real trial end; hidden once the client is on a paid plan. */
+function showTrial(endsAt: string | undefined): void {
+  if (!endsAt) { $("trial-box").hidden = true; return; }
+  const DAY = 86_400_000, TRIAL_DAYS = 7;
+  const left = Math.max(0, Math.ceil((new Date(endsAt).getTime() - Date.now()) / DAY));
+  $("trial-left").textContent = left === 0 ? "Trial ends today" : `Trial: ${left} day${left === 1 ? "" : "s"} left`;
+  $("trial-note").textContent = `Ends ${new Date(endsAt).toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" })}. No card needed until then.`;
+  $("trial-bar").style.width = `${Math.min(100, Math.round(((TRIAL_DAYS - left) / TRIAL_DAYS) * 100))}%`;
+}
+
 async function loadOrg(): Promise<void> {
   // Visitors without a login see the example business: the "Explore the demo" links land here.
   if (!getToken()) { $("demo-banner").hidden = false; return; }
@@ -131,6 +159,7 @@ async function loadOrg(): Promise<void> {
   orgName = realOrg.name;
   $("set-biz").textContent = realOrg.name; // Settings shows the signed-in company, not this device's last signup.
   setPeopleBusiness(realOrg.name);
+  showTrial(realOrg.trialEndsAt);
   app.classList.add("is-live");
   // A real client never sees the example business's requests, and example-only panels say so.
   document.querySelectorAll<HTMLElement>("[data-need]").forEach((el) => el.remove());

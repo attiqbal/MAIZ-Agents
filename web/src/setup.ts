@@ -16,6 +16,22 @@ const esc = (s: string) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`)
 
 type Saved = { state: "awaiting_form" | "ready"; answers?: Answers; messages: { text: string; at: string }[] };
 
+
+/** Show each answer's error next to its field, tie it to the field for screen readers, and move to the first one. */
+function showFieldErrors(form: HTMLElement, errors: Record<string, string | undefined>): void {
+  let first: HTMLElement | null = null;
+  form.querySelectorAll<HTMLElement>("[data-err]").forEach((el) => {
+    const msg = errors[el.dataset.err!];
+    el.textContent = msg ?? "";
+    el.toggleAttribute("hidden", !msg);
+    const control = el.closest(".field")?.querySelector<HTMLElement>("input, select, textarea, .chips");
+    if (!control) return;
+    if (msg) { control.setAttribute("aria-invalid", "true"); control.setAttribute("aria-describedby", el.id); first ??= control; }
+    else { control.removeAttribute("aria-invalid"); if (control.getAttribute("aria-describedby") === el.id) control.removeAttribute("aria-describedby"); }
+  });
+  if (first) { (first as HTMLElement).scrollIntoView({ block: "center" }); (first as HTMLElement).focus({ preventScroll: true }); }
+}
+
 function load(): Saved | undefined {
   try { return JSON.parse(localStorage.getItem(KEY) ?? "null") ?? undefined; } catch { return undefined; }
 }
@@ -49,7 +65,7 @@ function fieldHtml(f: FormField): string {
     default:
       input = `<input class="input" id="${id}" name="${f.key}">`;
   }
-  return `<div class="field">${label}${input}${help}<span class="err" data-err="${f.key}" hidden></span></div>`;
+  return `<div class="field">${label}${input}${help}<span class="err" data-err="${f.key}" id="sf-err-${f.key}" hidden></span></div>`;
 }
 
 function readAnswers(form: HTMLFormElement, fields: FormField[]): Answers {
@@ -155,8 +171,8 @@ async function initSetupLive(): Promise<boolean> {
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
     const v = validateAnswers(fields, readAnswers(form, fields));
-    form.querySelectorAll<HTMLElement>("[data-err]").forEach((el) => { const msg = v.errors[el.dataset.err!]; el.textContent = msg ?? ""; el.toggleAttribute("hidden", !msg); });
-    if (!v.ok) { toast("A couple of answers need a look"); return; }
+    showFieldErrors(form, v.errors);
+    if (!v.ok) { toast("Some answers need a look. The first one is highlighted."); return; }
     $("setup-run").removeAttribute("hidden");
     $("setup-run-h").textContent = "Setting up your team";
     const res = await api<LiveStatus & { run: LiveStatus["runs"][number] }>("/setup", { body: { answers: v.clean } });
@@ -227,12 +243,8 @@ function initSetupDemo(biz: string, contact: "dashboard" | "slack"): void {
   form.addEventListener("submit", (e) => {
     e.preventDefault();
     const v = validateAnswers(fields, readAnswers(form, fields));
-    form.querySelectorAll<HTMLElement>("[data-err]").forEach((el) => {
-      const msg = v.errors[el.dataset.err!];
-      el.textContent = msg ?? "";
-      el.toggleAttribute("hidden", !msg);
-    });
-    if (!v.ok) { toast("A couple of answers need a look"); return; }
+    showFieldErrors(form, v.errors);
+    if (!v.ok) { toast("Some answers need a look. The first one is highlighted."); return; }
     saved.answers = v.clean;
     say("Thanks, got your answers. Setting up your team now.");
     $("setup-form-panel").setAttribute("hidden", "");
