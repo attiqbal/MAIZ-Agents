@@ -1,7 +1,7 @@
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import { userIdFor } from "./identity.js";
 import { SetupError } from "../modules/admin-manager/index.js";
-import { ChannelError, parseSlackEvent } from "../modules/channels/index.js";
+import { ChannelError, noEnergyMessage, parseSlackEvent } from "../modules/channels/index.js";
 import { PermissionError } from "../modules/identity/index.js";
 import { LedgerError } from "../modules/ledger/index.js";
 import { IntegrationError } from "../modules/integrations/index.js";
@@ -25,6 +25,7 @@ import { PaymentError, WebhookSignatureError, type Order } from "../modules/paym
 import type { Platform } from "./platform.js";
 
 const OAUTH_STATE_SECONDS = 600;
+const ASK_FAILED_MESSAGE = "Your team could not finish this just now because the AI service is busy. Nothing was charged. Try again in a few minutes.";
 const OAUTH_COOKIE = "maiz_oauth";
 const oauthCookie = (nonce: string, maxAge: number, appUrl?: string): string =>
   `${OAUTH_COOKIE}=${nonce}; Path=/api/integrations; HttpOnly; SameSite=Lax; Max-Age=${maxAge}${appUrl?.startsWith("https://") ? "; Secure" : ""}`;
@@ -414,7 +415,9 @@ export function createApp(p: Platform) {
       const emp = p.workforce.team(userId, org.id).find((e) => e.id === b.employeeId);
       if (!emp) throw new BadRequest("pick one of your employees");
       const task = await p.workforce.assign(userId, org.id, emp.id, text, { urgent: b.urgent === true });
-      return json(200, { status: task.status, reason: task.reason, answer: task.deliverable, energyUsed: task.energyUsed, jobId: task.jobId, runsAt: task.runsAt, queueReason: task.queueReason });
+      // Plain words for anything that did not produce an answer, so the screen never shows a blank reply.
+      const message = task.status === "no_energy" ? noEnergyMessage(task.reason) : task.status === "failed" ? ASK_FAILED_MESSAGE : undefined;
+      return json(200, { status: task.status, reason: task.reason, answer: task.deliverable, energyUsed: task.energyUsed, jobId: task.jobId, runsAt: task.runsAt, queueReason: task.queueReason, ...(message ? { message } : {}) });
     }
 
     // ---- batch queue: work that waits for the client's closing time ----

@@ -102,6 +102,28 @@ describe("batch queue end to end", () => {
     expect(await s.platform.batch.tick()).toBeUndefined(); // nothing left
   });
 
+  it("only queues what the energy left can pay for, and never more than 200 tasks per client", async () => {
+    const s = setup();
+    const c = await s.client();
+    // 3,000 trial energy and about 60 a task (no history yet): roughly 50 tasks fit, the rest are refused now, not tonight.
+    const statuses: string[] = [];
+    for (let i = 0; i < 80; i++) statuses.push(((await s.call("POST", "/api/ask", { employeeId: c.empId, text: `Plan post ${i}` }, c.auth)).body as any).status);
+    const queued = statuses.filter((x) => x === "queued").length;
+    expect(queued).toBeGreaterThan(40);
+    expect(queued).toBeLessThanOrEqual(50);
+    const refused = (await s.call("POST", "/api/ask", { employeeId: c.empId, text: "Plan one more post" }, c.auth)).body as any;
+    expect(refused).toMatchObject({ status: "no_energy", reason: "queue_exceeds_energy" });
+  });
+
+  it("does work straight away when the trial ends before tonight's batch", async () => {
+    const s = setup();
+    const c = await s.client();
+    s.clock.d = new Date("2026-11-17T08:00:00Z"); // trial ends 09:00 today, the batch would run at 18:00
+    const ann = { authorization: `Bearer ${makeToken("s3", { k: "session", u: userIdFor("ann@kestrel.co"), e: "ann@kestrel.co" }, 7 * 86400, s.clock.d.getTime())}` };
+    const r = (await s.call("POST", "/api/ask", { employeeId: c.empId, text: "Plan next month's posts" }, ann)).body as any;
+    expect(r.status).toBe("ready_for_review");
+  });
+
   it("answers quick questions at once with Claude, and urgent work at once on the pod", async () => {
     const s = setup();
     const c = await s.client();

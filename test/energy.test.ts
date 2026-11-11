@@ -217,4 +217,25 @@ describe("team energy pool", () => {
       }
     }
   });
+
+  it("sets energy aside while tasks run, so tasks started together cannot overspend the pool", async () => {
+    const s = await setup(1000, 1000, undefined, { ...PLANS.starter!, weeklyTeamEnergy: 60 });
+    // Each task costs 6 energy; warm the estimate with one, then start 30 at once.
+    await s.wf.assign("owner", s.ws, s.emp, "Write the first post");
+    const all = await Promise.all(Array.from({ length: 30 }, (_, i) => s.wf.assign("owner", s.ws, s.emp, `Write post ${i}`)));
+    const team = s.energy.teamEnergyOf(s.ws)!;
+    expect(team.used).toBeLessThanOrEqual(60 + 6);
+    expect(all.filter((t) => t.status === "no_energy").length).toBeGreaterThan(0);
+    // Nothing stays set aside once the tasks have finished.
+    expect(team.left).toBe(Math.max(0, 60 - team.used));
+  });
+
+  it("keeps the daily ceiling on top-up work once the weekly pool is empty", async () => {
+    const s = await setup(1000, 1000, undefined, { ...PLANS.starter!, weeklyTeamEnergy: 6, dailyTeamCeiling: 12 });
+    s.energy.addTopUp(s.ws, 1_000, 5, "test");
+    const done = [];
+    for (let i = 0; i < 10; i++) done.push((await s.wf.assign("owner", s.ws, s.emp, `Write post ${i}`)).status);
+    expect(done.filter((x) => x === "ready_for_review")).toHaveLength(2);
+    expect(s.energy.check(s.ws, s.emp)).toEqual({ allowed: false, reason: "daily_ceiling_reached" });
+  });
 });
