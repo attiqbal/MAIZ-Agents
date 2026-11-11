@@ -9,7 +9,9 @@ import { ReviewError } from "../modules/review/index.js";
 import { PricingError } from "../modules/pricing/index.js";
 import { BatchError } from "../modules/batch/schedule.js";
 import { SettingsError } from "../modules/model-gateway/routing/settings.js";
-import { SignupError, type SignupChoices, type TeamSize } from "../modules/onboarding/index.js";
+import { SignupError, type SignupChoices } from "../modules/onboarding/index.js";
+import { planSignup, readSignupAnswers } from "../modules/onboarding/recommend.js";
+import { OTHER_SECTOR, getSector } from "../modules/onboarding/sectors.js";
 import { getTemplate, TEMPLATES } from "../modules/workforce/templates.js";
 import { getJobDescription } from "../modules/workforce/job-descriptions.js";
 import { CUSTOM_SPECIALIST, DEPARTMENTS } from "../modules/workforce/blueprints.js";
@@ -73,7 +75,6 @@ export function readToken(secret: string, token: string | undefined, nowMs: numb
 }
 
 export { userIdFor };
-const SIZES: Record<string, TeamSize> = { "just me": "solo", solo: "solo", "2–10": "2-10", "2-10": "2-10", "11–50": "11-50", "11-50": "11-50", "51+": "51+" };
 
 export function createApp(p: Platform) {
   const secret = p.cfg.sessionSecret;
@@ -162,17 +163,23 @@ export function createApp(p: Platform) {
       if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) throw new BadRequest("a valid email is required");
       const userId = userIdFor(email);
       if (orgOf(userId)) return json(409, { error: "this email already has an organisation" });
+      // The three tapped answers (kind of business, needs, apps) become a plan by rules, with no AI call.
+      const answers = readSignupAnswers(b);
+      const plan = answers.businessName ? planSignup(answers) : undefined;
+      const sectorLabel = plan && plan.sector !== OTHER_SECTOR ? getSector(plan.sector).label : "";
       const choices: SignupChoices = {
         ownerEmail: email,
-        businessName: String(b.businessName ?? ""),
-        businessType: String(b.sells ?? "") || "small business",
-        description: [b.sells, b.goal ? `Main goal: ${b.goal}` : "", b.website ? `Website: ${b.website}` : ""].filter(Boolean).join(". ") || String(b.businessName ?? ""),
-        country: String(b.country ?? "GB"),
-        teamSize: SIZES[String(b.size ?? "").toLowerCase()] ?? "2-10",
+        businessName: answers.businessName,
+        businessType: sectorLabel || String(b.sells ?? "") || "small business",
+        description: [answers.sells, plan ? plan.prefill.answers.goals : b.goal ? `Main goal: ${b.goal}` : "", answers.website ? `Website: ${answers.website}` : ""].filter(Boolean).join(" ") || answers.businessName,
+        country: answers.country ?? "GB",
+        currency: plan?.currency,
+        teamSize: answers.size ?? "2-10",
         monthlyVolume: typeof b.monthlyVolume === "number" ? b.monthlyVolume : undefined,
-        addOns: Array.isArray(b.addOns) ? b.addOns.map(String) : [],
+        addOns: answers.addOns ? [...answers.addOns] : [],
         prepaidMonths: typeof b.prepaidMonths === "number" ? b.prepaidMonths : undefined,
         contact: b.contact === "slack" ? "slack" : "dashboard",
+        plan,
       };
       const org = await p.onboarding.signUp(userId, choices);
       await p.admin.welcome(userId, org);

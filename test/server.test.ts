@@ -47,6 +47,27 @@ describe("signup and org", () => {
     expect(org.team.map((e: any) => e.templateKey)).toEqual(["admin-manager", "finance-manager", "marketing-manager", "business-consultant", "hr-manager", "compliance-manager"]);
     expect(org.team[0].energyLeft).toBe(300);
   });
+  it("turns the tapped signup answers into a plan and a prefilled setup form", async () => {
+    const s = setup();
+    const r = await s.call("POST", "/api/signup", { email: "sam@plumb.co", businessName: "Sam's Plumbing", sector: "trades", needs: ["get-paid", "stock", "<x>"], apps: ["xero", "nope"], addOns: ["supply-chain-manager"], size: "Just me", country: "ie" });
+    expect(r.status).toBe(201);
+    const bp = (r.body as any).blueprint;
+    expect(bp.profile.currency).toBe("EUR");
+    expect(bp.profile.stage).toBe("Trades and construction");
+    expect(bp.employees).toContain("supply-chain-manager");
+    expect(bp.signup.needs).toEqual(["get-paid", "stock"]);
+    expect(bp.signup.team.filter((t: any) => t.focus).map((t: any) => t.key)).toEqual(["finance-manager", "supply-chain-manager"]);
+    expect(bp.signup.apps.map((a: any) => a.key)).toEqual(["xero"]);
+    const st = (await s.call("GET", "/api/setup", undefined, { authorization: `Bearer ${(r.body as any).token}` })).body as any;
+    expect(st.prefill.answers.goals).toMatch(/get paid on time/);
+    expect(st.prefill.answers.staffCount).toBe(0);
+    expect(st.prefill.source.customers).toBe("guess");
+  });
+  it("still signs up with only a business name, guessing the sector from the description", async () => {
+    const r = await setup().call("POST", "/api/signup", { email: "jo@pizza.co", businessName: "Jo's", sells: "Wood-fired pizza" });
+    expect(r.status).toBe(201);
+    expect((r.body as any).blueprint.signup.sector).toBe("food-drink");
+  });
   it("refuses a second signup for the same email, bad emails, and unconfigured dev auth", async () => {
     const { call } = await signedUp().then(async (x) => x);
     expect((await call("POST", "/api/signup", { email: "ann@kestrel.co", businessName: "X" })).status).toBe(409);

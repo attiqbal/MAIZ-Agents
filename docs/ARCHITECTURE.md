@@ -25,6 +25,7 @@ A modular monolith in TypeScript: one application, strict module boundaries.
 
 ### Signup to working team
 
+0. The signup screens ask three things by tapping: kind of business, what the owner wants help with, and apps already in use. `planSignup` in `src/modules/onboarding/recommend.ts` turns those into a plan by fixed rules (no AI call, no API key): which employees lead and their first jobs, add-ons to offer, apps and how each connects, currency, and answers for the setup form. Sector, need, app and country data live in `sectors.ts`. The website runs the same code to show the plan before the account exists; `POST /api/signup` reads the answers with `readSignupAnswers` (unknown keys dropped, text capped) and stores the plan on the blueprint as `signup`. `GET /api/setup` returns it as `prefill`, so the setup form arrives filled in with each answer labelled "you" or "guess". Design and research: https://claude.ai/artifact/2NNT6WwgaFF4Me4cL5uUtX
 1. `OnboardingService.signUp` creates the workspace, books, trial energy, the basic team (Finance, Marketing, Business consultant, HR) and the free Admin manager.
 2. `AdminManager.welcome` posts a welcome that lists every employee's capabilities, then the setup form link, to the dashboard inbox and to the owner's chosen chat app (held until connected).
 3. `AdminManager.submitForm` validates the answers and runs the setup steps through `StepRunner`. Every step records its output and has an undo; a failure rolls back finished steps newest first. `AdminManager.rollback` lets the owner undo a finished setup.

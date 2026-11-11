@@ -5,6 +5,7 @@ import type { Ledger } from "../ledger/index.js";
 import { PLANS, type EnergyMeter } from "../energy/index.js";
 import { EMPLOYEE_TEMPLATES } from "../workforce/templates.js";
 import type { ChannelKind } from "../channels/index.js";
+import type { SignupPlan } from "./recommend.js";
 
 /** The basic package every customer gets. Everything else is an add-on. */
 export const STANDARD_TEAM = ["finance-manager", "marketing-manager", "business-consultant", "hr-manager", "compliance-manager"] as const;
@@ -37,6 +38,8 @@ export interface SignupChoices {
   trialDays?: 3 | 7;
   /** Where the Admin manager should contact the owner. Defaults to the dashboard. */
   contact?: ContactChannel;
+  /** What signup worked out from the owner's taps: who starts first, apps, and the setup form prefilled. */
+  plan?: SignupPlan;
 }
 
 export interface Blueprint {
@@ -51,6 +54,8 @@ export interface Blueprint {
   plan: keyof typeof PLANS;
   trialDays: number;
   contact: ContactChannel;
+  /** The signup plan, kept so the Admin manager can prefill the setup form and start with the right jobs. */
+  signup?: SignupPlan;
 }
 
 export interface Organisation {
@@ -99,6 +104,7 @@ export function buildBlueprint(c: SignupChoices): Blueprint {
     trialDays: c.trialDays ?? 7,
     // Teams is a paid add-on; without it the Admin manager uses the dashboard instead.
     contact: c.contact === "teams" && !(c.addOns ?? []).includes("teams") ? "dashboard" : (c.contact ?? "dashboard"),
+    ...(c.plan ? { signup: c.plan } : {}),
   };
 }
 
@@ -131,7 +137,10 @@ export class OnboardingService {
       workspaceId: ws.id,
       actor: `user:${userId}`,
       action: "organisation.provisioned",
-      data: { privacy: blueprint.privacy, employees: blueprint.employees, waitlist: blueprint.waitlist, trialEndsAt, contact: blueprint.contact },
+      data: {
+        privacy: blueprint.privacy, employees: blueprint.employees, waitlist: blueprint.waitlist, trialEndsAt, contact: blueprint.contact,
+        ...(blueprint.signup ? { sector: blueprint.signup.sector, needs: blueprint.signup.needs, apps: blueprint.signup.apps.map((a) => a.key) } : {}),
+      },
     });
     return { workspaceId: ws.id, blueprint: { ...blueprint, trialDays }, trialEndsAt, employeeIds, adminManagerId };
   }
