@@ -230,12 +230,16 @@ export function createPlatform(cfg: PlatformConfig) {
     ];
     const use = energy.usageOf(workspaceId);
     const sched = batch.forClient(userId, workspaceId);
+    // The team's shared pool (null on older per-employee plans): what the dashboard shows as the allowance.
+    const teamEnergy = energy.teamEnergy(userId, workspaceId) ?? null;
     return {
       asOf: nowDate.toISOString(),
       team: people,
+      teamEnergy,
       tasks: tasks.map((t) => ({ ...t, employeeName: t.employeeId ? label(t.employeeId) : null })),
       totals: {
-        energyToday: use.energyToday, allowanceToday: people.reduce((n, e) => n + e.allowance, 0),
+        energyToday: use.energyToday,
+        allowanceToday: teamEnergy ? teamEnergy.leftToday + use.energyToday : people.reduce((n, e) => n + e.allowance, 0),
         energyWeek: people.reduce((n, e) => n + e.week.reduce((a: number, b: number) => a + b, 0), 0), energyMonth: use.energyMonth,
         queued: sched.queued, waitingOnYou: reviewsNeedingYou.length, inReview, doneWeek: done.length,
         nextRunLabel: sched.nextRunLabel,
