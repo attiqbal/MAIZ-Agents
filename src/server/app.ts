@@ -304,6 +304,8 @@ export function createApp(p: Platform) {
         name: org.name,
         trialEndsAt: plan.expiresAt,
         dailyQuotaPerEmployee: plan.dailyQuotaPerEmployee,
+        /** The team's shared energy: pool, left, left today, daily ceiling, refill time. Absent on older plans. */
+        teamEnergy: p.energy.teamEnergy(userId, org.id) ?? null,
         team: p.workforce.team(userId, org.id).map((e) => ({
           id: e.id,
           templateKey: e.templateKey,

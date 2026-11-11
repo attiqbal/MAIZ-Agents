@@ -176,6 +176,11 @@ export class WorkforceService {
     return [...this.employees.values()].filter((e) => e.workspaceId === workspaceId).length;
   }
 
+  /** Platform-level (no user check): the template of every employee a client has. */
+  templatesIn(workspaceId: string): string[] {
+    return [...this.employees.values()].filter((e) => e.workspaceId === workspaceId).map((e) => e.templateKey);
+  }
+
   /** Platform-level lookup (no user check): which template an employee was hired from. */
   templateOf(employeeId: string): string | undefined {
     return this.employees.get(employeeId)?.templateKey;

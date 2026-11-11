@@ -116,10 +116,22 @@ async function loadOrg(): Promise<void> {
   app.classList.add("is-live");
   route();
   const quota = realOrg.dailyQuotaPerEmployee;
-  document.querySelector(".team")!.innerHTML = realOrg.team.map((e) => {
+  const pool = realOrg.teamEnergy;
+  const n = (x: number) => x.toLocaleString("en-GB");
+  const bar = (left: number, of: number) => {
+    const pct = of > 0 ? Math.round((left / of) * 100) : 0;
+    return `<div class="energy${pct < 25 ? " low" : ""}" style="margin-top:6px"><i style="width:${pct}%"></i></div>`;
+  };
+  // One shared pool: show it once, with when it refills, so a limit is never a surprise.
+  const poolCard = pool
+    ? `<div class="ecard"><div class="who"><span class="av av-tl">EN</span><div><b>Team energy</b><span>${pool.refillsAt ? `Refills ${esc(new Date(pool.refillsAt).toLocaleDateString("en-GB", { weekday: "long", timeZone: "UTC" }))}` : "For the whole trial"}</span></div></div><div class="doing">${n(pool.leftToday)} can be used today${pool.dailyCeiling !== null ? ` (daily limit ${n(pool.dailyCeiling)})` : ""}</div><div><div class="e-lab"><span>Left</span><span>${n(pool.left)} / ${n(pool.pool)}</span></div>${bar(pool.left, pool.pool)}</div></div>`
+    : "";
+  document.querySelector(".team")!.innerHTML = poolCard + realOrg.team.map((e) => {
     const [abbr, cls] = ROLE[e.templateKey] ?? ["AI", "av-tl"];
-    const pct = Math.round((e.energyLeft / quota) * 100);
-    return `<div class="ecard"><div class="who"><span class="av ${cls}">${abbr}</span><div><b>${esc(e.name)}</b><span>Standard</span></div></div><span class="status good"><span class="dot"></span>Ready</span><div class="doing">Waiting for your first request</div><div><div class="e-lab"><span>Energy</span><span>${e.energyLeft} / ${quota}</span></div><div class="energy${pct < 25 ? " low" : ""}" style="margin-top:6px"><i style="width:${pct}%"></i></div></div></div>`;
+    const energy = pool
+      ? `<div class="e-lab"><span>Uses the team energy</span></div>`
+      : `<div><div class="e-lab"><span>Energy</span><span>${e.energyLeft} / ${quota}</span></div>${bar(e.energyLeft, quota)}</div>`;
+    return `<div class="ecard"><div class="who"><span class="av ${cls}">${abbr}</span><div><b>${esc(e.name)}</b><span>Standard</span></div></div><span class="status good"><span class="dot"></span>Ready</span><div class="doing">Waiting for your first request</div>${energy}</div>`;
   }).join("");
   if (realOrg.trialEndsAt) toast(`Free trial until ${new Date(realOrg.trialEndsAt).toLocaleDateString()}`);
 }

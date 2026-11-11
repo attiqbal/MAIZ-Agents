@@ -45,5 +45,7 @@ export interface Org {
   name: string;
   trialEndsAt?: string;
   dailyQuotaPerEmployee: number;
+  /** The team's shared energy pool; null on older plans that still have a per-employee daily amount. */
+  teamEnergy: { pool: number; used: number; left: number; leftToday: number; dailyCeiling: number | null; refillsAt: string | null } | null;
   team: { id: string; templateKey: string; name: string; energyLeft: number }[];
 }

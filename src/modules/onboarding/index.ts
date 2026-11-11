@@ -111,8 +111,8 @@ export class OnboardingService {
     private energy: EnergyMeter,
     private audit: AuditLog,
     private now: () => Date = () => new Date(),
-    /** Trial length and daily energy set by the platform owner on the Prices page. */
-    private trialTerms?: () => { days: number; dailyEnergy: number },
+    /** Trial length and the team's trial energy, set by the platform owner on the Prices page. */
+    private trialTerms?: () => { days: number; teamEnergy: number; dailyTeamCeiling: number },
   ) {}
 
   async signUp(userId: string, choices: SignupChoices): Promise<Organisation> {
@@ -125,8 +125,11 @@ export class OnboardingService {
     for (const key of blueprint.employees) employeeIds.push((await this.workforce.hire(userId, ws.id, key)).id);
     const terms = this.trialTerms?.();
     const trialDays = choices.trialDays ?? terms?.days ?? blueprint.trialDays;
+    const startedAt = this.now().toISOString();
     const trialEndsAt = new Date(this.now().getTime() + trialDays * 86_400_000).toISOString();
-    this.energy.setPlan(userId, ws.id, { ...PLANS.trial!, ...(terms ? { dailyQuotaPerEmployee: terms.dailyEnergy } : {}), expiresAt: trialEndsAt });
+    // One shared pool for the whole trial; the daily ceiling never cuts below it, so a keen trial is not stopped early.
+    const pool = terms?.teamEnergy ?? PLANS.trial!.weeklyTeamEnergy!;
+    this.energy.setPlan(userId, ws.id, { ...PLANS.trial!, weeklyTeamEnergy: pool, dailyTeamCeiling: Math.max(pool, terms?.dailyTeamCeiling ?? 0), startedAt, expiresAt: trialEndsAt });
     this.audit.record({
       workspaceId: ws.id,
       actor: `user:${userId}`,

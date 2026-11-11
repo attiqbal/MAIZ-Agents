@@ -1,5 +1,5 @@
 // Prices and packages (owner-prices.html): the platform owner edits package prices, trial terms,
-// each agent's daily energy and every store price. Only changed fields are sent, as one change that
+// the team's energy pool, optional per-agent daily caps and every store price. Only changed fields are sent, as one change that
 // starts now or on a chosen date. The server keeps the history with what each value replaced.
 import "./styles.css";
 import { api } from "./api";
@@ -21,15 +21,24 @@ const GENERAL: [keyof GeneralPrices, string, string, string][] = [
   ["specialistPremiumMonthlyGbp", "Specialist (premium), per month", "£", "Roles near regulated work"],
   ["overageGbpPer100Energy", "Extra energy, per 100", "£", "Only with the client's approval"],
   ["trialDays", "Free trial length", "days", "For new sign-ups"],
-  ["defaultDailyEnergyPerEmployee", "Default daily energy per agent", "energy", "For new trials and agents without their own"],
+  ["trialTeamEnergy", "Trial energy, whole trial", "energy", "Shared by the team for the entire trial"],
+  ["weeklyTeamEnergy", "Team energy per week", "energy", "Shared by the basic team, refills every Monday"],
+  ["dailyTeamCeiling", "Daily safety limit", "energy", "Most the team can use in one day"],
+  ["addOnWeeklyEnergy", "Add-on employee adds, per week", "energy", "Added to the team pool"],
+  ["specialistStandardWeeklyEnergy", "Specialist (standard) adds, per week", "energy", "Added to the team pool"],
+  ["specialistPremiumWeeklyEnergy", "Specialist (premium) adds, per week", "energy", "Added to the team pool"],
 ];
 
 function demo(): Book {
-  const general: GeneralPrices = { basicPackageMonthlyGbp: 41, addOnEmployeeMonthlyGbp: 12, specialistStandardMonthlyGbp: 19, specialistPremiumMonthlyGbp: 29, overageGbpPer100Energy: 1, trialDays: 7, defaultDailyEnergyPerEmployee: 300 };
+  // Demo copy of the launch defaults (src/modules/pricing DEFAULT_GENERAL); importing that module would pull server code in.
+  const general: GeneralPrices = {
+    basicPackageMonthlyGbp: 100, addOnEmployeeMonthlyGbp: 12, specialistStandardMonthlyGbp: 19, specialistPremiumMonthlyGbp: 29, overageGbpPer100Energy: 1,
+    trialDays: 7, trialTeamEnergy: 3_000, weeklyTeamEnergy: 8_000, dailyTeamCeiling: 3_000, addOnWeeklyEnergy: 1_000, specialistStandardWeeklyEnergy: 1_500, specialistPremiumWeeklyEnergy: 2_500,
+  };
   return {
     general,
     items: CATALOGUE.map((i) => ({ ...i, available: true })),
-    agents: EMPLOYEE_TEMPLATES.map((t) => ({ key: t.key, title: t.title, dailyEnergy: 300, custom: false })),
+    agents: EMPLOYEE_TEMPLATES.map((t) => ({ key: t.key, title: t.title, dailyEnergy: null, custom: false })),
     history: [],
   };
 }
@@ -51,10 +60,10 @@ function renderGeneral(): void {
 }
 
 function renderAgents(): void {
-  const rows = book.agents.map((a) => `<tr><td class="ow-title"><b>${esc(a.title)}</b><span>${a.custom ? "Own allowance" : "Uses the default"}</span></td>
-    <td class="num">${a.dailyEnergy.toLocaleString("en-GB")}</td>
-    <td><input class="input" type="number" min="0" step="1" inputmode="numeric" data-k="agents.${esc(a.key)}" value="${a.custom ? a.dailyEnergy : ""}" placeholder="Default" aria-label="Daily energy for ${esc(a.title)}"></td></tr>`).join("");
-  $("pr-agents").innerHTML = `<thead><tr><th scope="col">Agent</th><th scope="col" class="num">Daily energy now</th><th scope="col">New daily energy</th></tr></thead><tbody>${rows}</tbody>`;
+  const rows = book.agents.map((a) => `<tr><td class="ow-title"><b>${esc(a.title)}</b><span>${a.custom ? "Own daily cap" : "Draws from the team pool"}</span></td>
+    <td class="num">${a.dailyEnergy === null ? "No cap" : a.dailyEnergy.toLocaleString("en-GB")}</td>
+    <td><input class="input" type="number" min="0" step="1" inputmode="numeric" data-k="agents.${esc(a.key)}" value="${a.custom && a.dailyEnergy !== null ? a.dailyEnergy : ""}" placeholder="No cap" aria-label="Daily energy cap for ${esc(a.title)}"></td></tr>`).join("");
+  $("pr-agents").innerHTML = `<thead><tr><th scope="col">Agent</th><th scope="col" class="num">Daily cap now</th><th scope="col">New daily cap</th></tr></thead><tbody>${rows}</tbody>`;
 }
 
 function renderItems(): void {
@@ -80,12 +89,12 @@ function renderItems(): void {
 const label = (path: string): string => {
   const [scope, a, b] = path.split(".");
   if (scope === "general") return GENERAL.find(([k]) => k === a)?.[1] ?? a!;
-  if (scope === "agents") return `${book.agents.find((x) => x.key === a)?.title ?? a} daily energy`;
+  if (scope === "agents") return `${book.agents.find((x) => x.key === a)?.title ?? a} daily cap`;
   const item = book.items.find((x) => x.key === a)?.title ?? a;
   return `${item}: ${b === "priceGbp" ? "price" : b === "available" ? "in the store" : b}`;
 };
 const show = (path: string, v: unknown): string => {
-  if (v === null || v === undefined) return "default";
+  if (v === null || v === undefined) return "no cap";
   if (typeof v === "boolean") return v ? "on" : "off";
   return path.endsWith("Gbp") || path.endsWith("priceGbp") || path.includes("Gbp") ? gbp(Number(v)) : Number(v).toLocaleString("en-GB");
 };

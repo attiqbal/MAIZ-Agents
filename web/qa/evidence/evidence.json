@@ -1,5 +1,5 @@
 {
-  "contract": "Surface: every MAIZ agents page: landing (/), employees and store, pricing, security, log in, 404, onboarding and all ten control center screens (/app.html). Audience: founders and small-business owners with no AI background. Job: understand what the AI employees do and start a free trial. Primary action: 'Start free trial'. Direction: dark 'aurora over a midnight terminal' chosen by the owner, tokens in web/src/styles.css. Hierarchy: hero headline + live product mockup first, then how it works, employees, control center, Slack, pricing, FAQ. Constraints: WCAG 2.2 AA, no framework, landing JS < 150 kB gz and CSS < 30 kB gz, max two web font families, target viewports 375x812, 768x1024, 1440x900. References: the existing site and the project's AgentQL-style dark reference. Quality review (2026-11-10): /review.html is the MAIZ platform owner's queue (noindex); specialised-task sign-off moved from the client to the platform owner. Owner admin (2026-11-10): /owner-specialists.html, /owner-clients.html and /owner-prices.html join /review.html behind a shared platform-owner menu (all noindex): custom specialists wait for the owner's approval and price, a clients table shows trial, setup, energy, AI cost and what is waiting, and a prices and packages page edits package prices, trial length, store prices and each agent's daily energy now or from a date, with history. AI spend (2026-11-10): /owner-ai.html (noindex, in the same owner menu) shows month spend against a Claude-only baseline, provider and budget meters, per-work and per-day tables, and editable models, pass marks and caps. Checked with axe at 375/768/1440 and by eye on screenshots with mocked data (the QA run itself shows the log-in gate). Batch queue (2026-11-10): /app.html#work gains a 'Waiting for the batch' panel (queued tasks, run now, cancel, closing-time form) and /owner-ai.html gains a batch queue panel, batch settings and batch savings tiles.",
+  "contract": "Surface: every MAIZ agents page: landing (/), employees and store, pricing, security, log in, 404, onboarding and all ten control center screens (/app.html). Audience: founders and small-business owners with no AI background. Job: understand what the AI employees do and start a free trial. Primary action: 'Start free trial'. Direction: dark 'aurora over a midnight terminal' chosen by the owner, tokens in web/src/styles.css. Hierarchy: hero headline + live product mockup first, then how it works, employees, control center, Slack, pricing, FAQ. Constraints: WCAG 2.2 AA, no framework, landing JS < 150 kB gz and CSS < 30 kB gz, max two web font families, target viewports 375x812, 768x1024, 1440x900. References: the existing site and the project's AgentQL-style dark reference. Quality review (2026-11-10): /review.html is the MAIZ platform owner's queue (noindex); specialised-task sign-off moved from the client to the platform owner. Owner admin (2026-11-10): /owner-specialists.html, /owner-clients.html and /owner-prices.html join /review.html behind a shared platform-owner menu (all noindex): custom specialists wait for the owner's approval and price, a clients table shows trial, setup, energy, AI cost and what is waiting, and a prices and packages page edits package prices, trial length, store prices and each agent's daily energy now or from a date, with history. AI spend (2026-11-10): /owner-ai.html (noindex, in the same owner menu) shows month spend against a Claude-only baseline, provider and budget meters, per-work and per-day tables, and editable models, pass marks and caps. Checked with axe at 375/768/1440 and by eye on screenshots with mocked data (the QA run itself shows the log-in gate). Batch queue (2026-11-10): /app.html#work gains a 'Waiting for the batch' panel (queued tasks, run now, cancel, closing-time form) and /owner-ai.html gains a batch queue panel, batch settings and batch savings tiles. Team energy pool (2026-11-11): the Team package is £100 a month with 8,000 energy a week shared by the team (refills Monday); pricing and landing cards, the energy FAQ, the owner prices page (pool, trial energy, daily safety limit, add-on energy, optional per-agent daily cap) and the live team view (one Team energy card) say so.",
   "targetViewports": [
     "375x812",
     "768x1024",
@@ -68,7 +68,7 @@
     {
       "viewport": "1440x900",
       "artifact": "store-1440x900.png",
-      "observation": "Store picker (grouped dropdown) with the chosen item, quantity and Add to cart on the left; cart on the right splits Monthly (\u00a358) from One-off tasks (\u00a3249) with Due today \u00a3307 and a Checkout button that says payments open soon. No horizontal overflow, no console errors."
+      "observation": "Store picker (grouped dropdown) with the chosen item, quantity and Add to cart on the left; cart on the right splits Monthly (£58) from One-off tasks (£249) with Due today £307 and a Checkout button that says payments open soon. No horizontal overflow, no console errors."
     },
     {
       "viewport": "375x812",
@@ -78,12 +78,12 @@
     {
       "viewport": "1440x900",
       "artifact": "store-billing-1440x900.png",
-      "observation": "Cart groups items under 'Recurring \u00b7 monthly' and 'One-off \u00b7 task based' headings, each with its own billing note; totals show Recurring, One-off, Due today and From next month. Blueprint roles show a Core \u00b7 included, Recurring or One-off tag and an Add to cart button (core roles say 'Included in every package'). No console errors."
+      "observation": "Cart groups items under 'Recurring · monthly' and 'One-off · task based' headings, each with its own billing note; totals show Recurring, One-off, Due today and From next month. Blueprint roles show a Core · included, Recurring or One-off tag and an Add to cart button (core roles say 'Included in every package'). No console errors."
     },
     {
       "viewport": "1440x900",
       "artifact": "store-consultants-1440.png",
-      "observation": "Picker lists 5 consultants x 2 passes under 'One-off \u00b7 consultants'; opening one shows its passes, merged task menu, how a pass works, overage rule and merged job description; cart shows a 30-day pass (\u00a3349) and a 7-day sprint (\u00a3129) under the One-off heading, Due today \u00a3478. No console errors, no overflow."
+      "observation": "Picker lists 5 consultants x 2 passes under 'One-off · consultants'; opening one shows its passes, merged task menu, how a pass works, overage rule and merged job description; cart shows a 30-day pass (£349) and a 7-day sprint (£129) under the One-off heading, Due today £478. No console errors, no overflow."
     },
     {
       "viewport": "1440x900",
@@ -159,6 +159,16 @@
       "viewport": "375x812",
       "artifact": "owner-prices-375x812.png",
       "observation": "Fields stack one per row; save bar sits in the flow rather than covering the form; wide tables scroll inside labelled regions; no page overflow."
+    },
+    {
+      "viewport": "1440x900",
+      "artifact": "pricing-1440x900.png",
+      "observation": "Team card reads £100 / mo, '5 AI employees + free Admin manager' and '8,000 energy a week, shared by the team'; the three cards keep equal height and the CTA row stays aligned."
+    },
+    {
+      "viewport": "375x812",
+      "artifact": "pricing-375x812.png",
+      "observation": "Cards stack in one column with 16px gutters; the longer Custom bullet 'Each employee you add tops up the team energy' wraps to two lines without clipping; no horizontal overflow."
     }
   ]
 }

@@ -77,9 +77,11 @@ export function createPlatform(cfg: PlatformConfig) {
     const key = workforce.templateOf(employeeId);
     return key ? prices.agentAllowance(key) : undefined;
   });
+  // Add-on employees and specialists add their weekly energy to a paid team pool.
+  energy.setPoolBonusResolver((ws) => workforce.templatesIn(ws).reduce((sum, key) => sum + prices.weeklyEnergyFor(key), 0));
   const onboarding = new OnboardingService(identity, workforce, ledger, energy, audit, now, () => {
     const g = prices.general();
-    return { days: g.trialDays, dailyEnergy: g.defaultDailyEnergyPerEmployee };
+    return { days: g.trialDays, teamEnergy: g.trialTeamEnergy, dailyTeamCeiling: g.dailyTeamCeiling };
   });
   const router = new ChannelRouter(identity, workforce, audit);
   /** Business apps (tills, payroll). Employees get only the app data the owner granted them. */

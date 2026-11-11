@@ -45,7 +45,8 @@ describe("signup and org", () => {
     const org = (await call("GET", "/api/org", undefined, auth)).body as any;
     expect(org.name).toBe("Kestrel Coffee");
     expect(org.team.map((e: any) => e.templateKey)).toEqual(["admin-manager", "finance-manager", "marketing-manager", "business-consultant", "hr-manager", "compliance-manager"]);
-    expect(org.team[0].energyLeft).toBe(300);
+    expect(org.team[0].energyLeft).toBe(3_000);
+    expect(org.teamEnergy).toMatchObject({ pool: 3_000, left: 3_000, refillsAt: null });
   });
   it("refuses a second signup for the same email, bad emails, and unconfigured dev auth", async () => {
     const { call } = await signedUp().then(async (x) => x);

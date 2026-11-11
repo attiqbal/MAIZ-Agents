@@ -58,9 +58,9 @@ describe("prices and packages", () => {
     const s = setup();
     const r = await s.call("POST", "/api/owner/prices/changes", { general: { basicPackageMonthlyGbp: 49 }, effectiveFrom: "2026-12-01T00:00:00Z" }, s.owner());
     const id = (r.body as any).change.id;
-    expect((r.body as any).general.basicPackageMonthlyGbp).toBe(41);
+    expect((r.body as any).general.basicPackageMonthlyGbp).toBe(100);
     expect((r.body as any).history[0]).toMatchObject({ id, upcoming: true });
-    expect(((await s.call("GET", "/api/store")).body as any).prices.basicPackageMonthlyGbp).toBe(41);
+    expect(((await s.call("GET", "/api/store")).body as any).prices.basicPackageMonthlyGbp).toBe(100);
     s.clock.d = new Date("2026-12-02T00:00:00Z");
     expect(((await s.call("GET", "/api/store")).body as any).prices.basicPackageMonthlyGbp).toBe(49);
     expect((await s.call("DELETE", `/api/owner/prices/changes/${id}`, undefined, s.owner())).status).toBe(400);
@@ -71,18 +71,26 @@ describe("prices and packages", () => {
     expect(((await s.call("GET", "/api/store")).body as any).prices.basicPackageMonthlyGbp).toBe(49);
   });
 
-  it("uses the owner's trial length for new clients and each agent's own daily energy for everyone", async () => {
+  it("uses the owner's trial length and trial energy for new clients, and an agent's own daily cap inside the pool", async () => {
     const s = setup();
-    await s.call("POST", "/api/owner/prices/changes", { general: { trialDays: 14, defaultDailyEnergyPerEmployee: 200 }, agents: { "marketing-manager": 500 } }, s.owner());
+    await s.call("POST", "/api/owner/prices/changes", { general: { trialDays: 14, trialTeamEnergy: 4_000 }, agents: { "marketing-manager": 500 } }, s.owner());
     const r = await s.call("POST", "/api/signup", { email: "bob@bakery.co", businessName: "Bob's Bakery", sells: "Bread", size: "2–10", country: "GB" });
     expect((r.body as any).trialEndsAt).toBe("2026-11-24T09:00:00.000Z");
-    const org = (await s.call("GET", "/api/org", undefined, { authorization: `Bearer ${(r.body as any).token}` })).body as any;
+    const auth = { authorization: `Bearer ${(r.body as any).token}` };
+    const org = (await s.call("GET", "/api/org", undefined, auth)).body as any;
+    expect(org.teamEnergy).toMatchObject({ pool: 4_000, left: 4_000, leftToday: 4_000, refillsAt: null });
     const energy = Object.fromEntries(org.team.map((e: any) => [e.templateKey, e.energyLeft]));
     expect(energy["marketing-manager"]).toBe(500);
-    expect(energy["finance-manager"]).toBe(200);
+    expect(energy["finance-manager"]).toBe(4_000);
     await s.call("POST", "/api/owner/prices/changes", { agents: { "marketing-manager": null } }, s.owner());
-    const again = (await s.call("GET", "/api/org", undefined, { authorization: `Bearer ${(r.body as any).token}` })).body as any;
-    expect(again.team.find((e: any) => e.templateKey === "marketing-manager").energyLeft).toBe(200);
+    const again = (await s.call("GET", "/api/org", undefined, auth)).body as any;
+    expect(again.team.find((e: any) => e.templateKey === "marketing-manager").energyLeft).toBe(4_000);
+  });
+
+  it("refuses the old per-agent default setting now that the team shares a pool", async () => {
+    const s = setup();
+    const r = await s.call("POST", "/api/owner/prices/changes", { general: { defaultDailyEnergyPerEmployee: 200 } }, s.owner());
+    expect(r.status).toBe(400);
   });
 
   it("hides an item switched off from the store and the cart", async () => {
