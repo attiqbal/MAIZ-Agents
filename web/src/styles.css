@@ -1081,3 +1081,5 @@ body > main, body > .page-top { flex: none; }
   .sf-day select { grid-column: 1 / -1; }
   .sf-skill { grid-template-columns: 1fr; }
 }
+
+.ask-status { margin: 0 0 12px; padding: 10px 16px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface-page-canvas); color: var(--text-2); font-size: 14px; }
