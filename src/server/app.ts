@@ -23,6 +23,7 @@ import { RotaError } from "../modules/rota/index.js";
 import { PeopleError } from "../modules/people/index.js";
 import { PaymentError, WebhookSignatureError, type Order } from "../modules/payments/index.js";
 import type { Platform } from "./platform.js";
+import { LOGIN_PROVIDERS, attemptSecrets, authorizeUrl, completeLogin, isLoginProvider, loginRedirectUri } from "./social-login.js";
 
 const OAUTH_STATE_SECONDS = 600;
 const SESSION_SECONDS = 7 * 86_400;
@@ -30,6 +31,17 @@ const RENEW_AFTER_SECONDS = 86_400;
 const MAX_SESSION_SECONDS = 30 * 86_400;
 const ASK_FAILED_MESSAGE = "Your team could not finish this just now because the AI service is busy. Nothing was charged. Try again in a few minutes.";
 const OAUTH_COOKIE = "maiz_oauth";
+/** Over https the cookie uses the __Host- prefix (Secure, whole site, no Domain), so a sibling subdomain cannot plant one. */
+const loginCookieName = (appUrl?: string): string => (appUrl?.startsWith("https://") ? "__Host-maiz_login" : "maiz_login");
+const loginCookie = (value: string, maxAge: number, appUrl?: string): string =>
+  `${loginCookieName(appUrl)}=${value}; Path=${appUrl?.startsWith("https://") ? "/" : "/api/signin/oauth"}; HttpOnly; SameSite=Lax; Max-Age=${maxAge}${appUrl?.startsWith("https://") ? "; Secure" : ""}`;
+/** A social sign-in link is redeemed by the next page load, so it lives for two minutes rather than fifteen. */
+const SOCIAL_LINK_SECONDS = 120;
+/** Where the sign-in page sends people when Google or Microsoft did not work out. Only these codes exist, so nothing is reflected. */
+const loginFailed = (code: "cancelled" | "failed" | "unverified" | "owner", appUrl?: string): Res => ({
+  status: 302,
+  headers: { location: `/signin.html?error=${code}`, "set-cookie": loginCookie("", 0, appUrl), "cache-control": "no-store" },
+});
 const oauthCookie = (nonce: string, maxAge: number, appUrl?: string): string =>
   `${OAUTH_COOKIE}=${nonce}; Path=/api/integrations; HttpOnly; SameSite=Lax; Max-Age=${maxAge}${appUrl?.startsWith("https://") ? "; Secure" : ""}`;
 function readCookie(header: string | undefined, name: string): string | undefined {
@@ -200,6 +212,44 @@ export function createApp(p: Platform) {
       return json(200, { token: issueSession(c.e), email: c.e, hasOrganisation: !!orgOf(userIdFor(c.e)), platformOwner: p.isPlatformOwner(userIdFor(c.e)) });
     }
 
+    // ---- sign in with Google or Microsoft: proves an email, then hands over the same one-time link as email sign-in ----
+    if (method === "GET" && path === "/api/signin/providers") {
+      const on = p.cfg.appUrl ? LOGIN_PROVIDERS.filter((k) => p.cfg.loginApps?.[k]) : [];
+      return json(200, { providers: on });
+    }
+    const oauthLogin = /^\/api\/signin\/oauth\/([a-z]+)\/(start|callback)$/.exec(path);
+    if (method === "GET" && oauthLogin) {
+      const provider = oauthLogin[1];
+      const app = isLoginProvider(provider) && p.cfg.appUrl ? p.cfg.loginApps?.[provider] : undefined;
+      if (!isLoginProvider(provider) || !app || !p.cfg.appUrl) return json(404, { error: "this sign-in method is not switched on" });
+      const redirectUri = loginRedirectUri(p.cfg.appUrl, provider);
+      const nowMs = p.now().getTime();
+      if (oauthLogin[2] === "start") {
+        // The cookie value is a random secret that never appears in a URL; the state only carries a hash of it,
+        // and the PKCE verifier and ID-token nonce are worked out from the cookie value.
+        const secretValue = randomBytes(24).toString("hex");
+        const { binding, challenge, idNonce } = attemptSecrets(secret, secretValue);
+        const state = makeToken(secret, { k: "login-oauth", pr: provider, b: binding }, OAUTH_STATE_SECONDS, nowMs);
+        return { status: 302, headers: { location: authorizeUrl(provider, app, { redirectUri, state, challenge, idNonce }), "set-cookie": loginCookie(secretValue, OAUTH_STATE_SECONDS, p.cfg.appUrl), "cache-control": "no-store" } };
+      }
+      // The callback. The signed state says we started this, and the cookie says this browser did.
+      const state = readToken(secret, req.query.get("state") ?? undefined, nowMs);
+      if (!state || state.k !== "login-oauth" || state.pr !== provider || typeof state.b !== "string") return loginFailed("failed", p.cfg.appUrl);
+      const held = readCookie(req.headers["cookie"], loginCookieName(p.cfg.appUrl)) ?? "";
+      const mine = attemptSecrets(secret, held);
+      if (!held || mine.binding !== state.b || p.usedLinks.has(state.b)) return loginFailed("failed", p.cfg.appUrl);
+      p.usedLinks.add(state.b, state.exp * 1000);
+      const code = req.query.get("code");
+      if (!code || code.length > 2048) return loginFailed(req.query.get("error") ? "cancelled" : "failed", p.cfg.appUrl);
+      const { verifier, idNonce } = mine;
+      const got = await completeLogin(provider, app, { code, redirectUri, verifier, idNonce, http: p.cfg.http ?? fetch, nowMs });
+      if ("problem" in got) return loginFailed(got.problem, p.cfg.appUrl);
+      // A platform owner session can approve every client's work, so it always needs the emailed link.
+      if (p.isPlatformOwner(userIdFor(got.email))) return loginFailed("owner", p.cfg.appUrl);
+      const link = makeToken(secret, { k: "magic", e: got.email, n: randomBytes(12).toString("hex") }, SOCIAL_LINK_SECONDS, nowMs);
+      return { status: 302, headers: { location: `/signin.html#token=${link}`, "set-cookie": loginCookie("", 0, p.cfg.appUrl), "cache-control": "no-store" } };
+    }
+
     // ---- sign up: needs a verified email (or the development shortcut) ----
     if (method === "POST" && path === "/api/signup") {
       const b = body();
@@ -221,7 +271,7 @@ export function createApp(p: Platform) {
         businessName: answers.businessName,
         businessType: sectorLabel || String(b.sells ?? "") || "small business",
         description: [answers.sells, plan ? plan.prefill.answers.goals : b.goal ? `Main goal: ${b.goal}` : "", answers.website ? `Website: ${answers.website}` : ""].filter(Boolean).join(" ") || answers.businessName,
-        country: answers.country ?? "GB",
+        country: answers.country ?? answers.countryName ?? "GB",
         currency: plan?.currency,
         teamSize: answers.size ?? "2-10",
         monthlyVolume: typeof b.monthlyVolume === "number" ? b.monthlyVolume : undefined,
@@ -441,7 +491,9 @@ export function createApp(p: Platform) {
       const b = body();
       if (!b.answers || typeof b.answers !== "object" || Array.isArray(b.answers)) throw new BadRequest("answers are required");
       const run = await p.admin.submitForm(userId, org.id, b.answers);
-      return json(200, { run, ...p.admin.status(userId, org.id), messages: p.admin.messages(userId, org.id) });
+      const res = json(200, { run, ...p.admin.status(userId, org.id), messages: p.admin.messages(userId, org.id) });
+      // The owner's reply goes out first. The first jobs (which call the AI) start in the background once setup finished.
+      return run.status === "completed" ? { ...res, after: async () => { await p.admin.startFirstJobs(org.id); } } : res;
     }
     if (method === "POST" && path === "/api/setup/rollback") {
       const run = await p.admin.rollback(userId, org.id);

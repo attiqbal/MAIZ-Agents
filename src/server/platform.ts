@@ -20,7 +20,8 @@ import { BatchService } from "../modules/batch/service.js";
 import { WorkforceService } from "../modules/workforce/index.js";
 import { IntegrationService, defaultRegistry, type OAuthApp } from "../modules/integrations/index.js";
 import { QualityReviewService } from "../modules/review/index.js";
-import { PriceBook } from "../modules/pricing/index.js";
+import type { LoginApps } from "./social-login.js";
+import { PriceBook, paidTeamPlan } from "../modules/pricing/index.js";
 import { SpecialistReviewService, type SpecialistRequest } from "../modules/review/specialists.js";
 import { templateFromRole } from "../modules/workforce/templates.js";
 import { MockPaymentProvider, PaymentService, type PaymentProvider } from "../modules/payments/index.js";
@@ -47,6 +48,8 @@ export interface PlatformConfig {
   /** Dev-only sign-in by email, no verification. Must stay off in production. */
   allowDevAuth: boolean;
   slack?: { clientId: string; clientSecret: string; signingSecret: string; redirectUri: string };
+  /** "Continue with Google / Microsoft": the provider apps that are switched on (from environment variables). */
+  loginApps?: LoginApps;
   /** Our OAuth app for each connector that has one (for example square), from environment variables. */
   integrationApps?: Record<string, OAuthApp>;
   /**
@@ -203,6 +206,9 @@ export function createPlatform(cfg: PlatformConfig) {
         const templateKey = line.key.split(":")[0]!;
         for (let i = 0; i < line.qty; i++) ids.push((await workforce.hire(order.userId, order.workspaceId, templateKey)).id);
       }
+      // A recurring line makes the client a paying one: they leave the free trial and start the paid plan with a full
+      // pool (the trial's energy is not held against it). One-off consultant passes alone do not end the trial.
+      if (order.lines.some((l) => l.billing === "monthly")) energy.switchToPaid(order.workspaceId, paidTeamPlan(prices.general()), `user:${order.userId}`);
       return ids;
     },
   });

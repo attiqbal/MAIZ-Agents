@@ -1081,3 +1081,10 @@ body > main, body > .page-top { flex: none; }
   .sf-day select { grid-column: 1 / -1; }
   .sf-skill { grid-template-columns: 1fr; }
 }
+
+/* Continue with Google / Microsoft (signup plan screen and log in) */
+.social { display: grid; gap: 10px; margin: 0 0 14px; }
+.social-row { display: grid; gap: 8px; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); }
+.social-row .btn { min-height: 44px; }
+.social-or { display: flex; align-items: center; gap: 10px; margin: 2px 0 0; }
+.social-or::before, .social-or::after { content: ""; flex: 1; height: 1px; background: var(--line); }

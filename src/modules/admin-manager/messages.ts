@@ -48,3 +48,26 @@ export function readyText(employeeKeys: readonly string[]): string {
     "You can undo the setup from the control centre at any time.",
   ].join("\n");
 }
+
+/** One first job and how it went, for the note the owner gets once the jobs have started. */
+export interface FirstJobReport {
+  employee: string;
+  job: string;
+  status: "ready_for_review" | "queued" | "no_energy" | "failed";
+}
+
+const FIRST_JOB_STATUS: Record<FirstJobReport["status"], string> = {
+  ready_for_review: "done, ready for you to review",
+  queued: "queued, it will run at your next batch time",
+  no_energy: "waiting, the team has no energy left to start it",
+  failed: "could not start, I will try again if you ask",
+};
+
+export function firstJobsText(reports: readonly FirstJobReport[]): string {
+  const failed = reports.some((r) => r.status === "failed");
+  return [
+    "I've started your first jobs, so there is something to look at already. Each one is a draft: nothing leaves your company until you approve it.",
+    ...reports.map((r) => `• ${r.employee}: ${r.job} (${FIRST_JOB_STATUS[r.status]})`),
+    failed ? "One could not start just now. You can ask that employee again from your team page." : "You'll find the results on your task board.",
+  ].join("\n");
+}

@@ -34,6 +34,15 @@ services:
       # Your sign-in email as the MAIZ platform owner: you review and sign off specialised tasks.
       - key: PLATFORM_OWNER_EMAILS
         sync: false
+      # Optional: "Continue with Google / Microsoft" on the sign-in and signup pages (see .env.example).
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: MICROSOFT_CLIENT_ID
+        sync: false
+      - key: MICROSOFT_CLIENT_SECRET
+        sync: false
       - key: SLACK_CLIENT_ID
         sync: false
       - key: SLACK_CLIENT_SECRET
