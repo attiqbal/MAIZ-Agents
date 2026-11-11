@@ -73,6 +73,9 @@ export interface PriceBookView {
 
 export class PricingError extends Error {}
 
+/** Top-up pack sizes in pounds; the energy in each follows the owner's extra-energy price. */
+export const TOP_UP_PACK_GBP = [5, 10, 25] as const;
+
 /**
  * The energy plan a client gets when they buy the basic package, from the prices in force at the sale.
  * Payments are not built yet; checkout calls this so the owner's pool settings reach paid clients.
@@ -244,6 +247,17 @@ export class PriceBook {
   /** What clients can buy right now. */
   catalogue(at = this.now()): CatalogueItem[] {
     return this.items(at).filter((i) => i.available).map(({ available: _a, ...i }) => i);
+  }
+
+  /**
+   * Top-up packs a paid client can buy when the week's energy runs out. Priced at the extra-energy rate,
+   * they roll over and never expire (like Macro's credit packs), and nothing is ever charged automatically
+   * unless the client turns auto-reload on with a monthly cap.
+   */
+  topUpPacks(at = this.now()): { gbp: number; energy: number }[] {
+    const rate = this.stateAt(at).general.overageGbpPer100Energy;
+    if (rate <= 0) return [];
+    return TOP_UP_PACK_GBP.map((gbp) => ({ gbp, energy: Math.floor((gbp / rate) * 100) }));
   }
 
   /** Weekly energy an employee adds to a paid team pool: add-ons and specialists do; the core team does not. */

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { AuditLog, EnergyMeter, EventBus, IdentityService, ModelGateway, PermissionError, WorkforceService, costMicro } from "../src/index.js";
-import { PLANS, effectiveCostCapMicro, weekStart, type EnergyPlan } from "../src/modules/energy/index.js";
+import { PLANS, effectiveCostCapMicro, parseAutoReload, weekStart, type EnergyPlan } from "../src/modules/energy/index.js";
 
 /** A plan without a team pool: each employee has its own daily quota (plans made before the pool). */
 const PER_EMPLOYEE: EnergyPlan = { dailyQuotaPerEmployee: 300, monthlyOvertimeCap: 0, monthlyCostCapMicro: 5_000_000 };
@@ -123,12 +123,63 @@ describe("team energy pool", () => {
     expect(energy.teamEnergy("owner", ws)!.used).toBe(1_000);
   });
 
-  it("uses bought top-ups (overtime) once the pool is empty", async () => {
-    const { wf, energy, ws, emp } = await setup(1_000_000, 0, undefined, { ...PAID, weeklyTeamEnergy: 1_000, dailyTeamCeiling: undefined, monthlyOvertimeCap: 1_000 });
+  it("uses bought top-ups once the pool is empty, and they roll over to the next week", async () => {
+    const { wf, energy, ws, emp, clock } = await setup(1_000_000, 0, undefined, { ...PAID, weeklyTeamEnergy: 1_000, dailyTeamCeiling: undefined });
     await wf.assign("owner", ws, emp, "a");
-    expect((await wf.assign("owner", ws, emp, "b")).status).toBe("ready_for_review");
-    expect(energy.monthSummary("owner", ws).overtimeEnergy).toBe(1_000);
-    expect(await wf.assign("owner", ws, emp, "c")).toMatchObject({ reason: "overtime_cap_reached" });
+    expect(await wf.assign("owner", ws, emp, "b")).toMatchObject({ reason: "weekly_pool_used" });
+    energy.addTopUp(ws, 2_500, 25, "checkout");
+    expect((await wf.assign("owner", ws, emp, "c")).status).toBe("ready_for_review");
+    expect(energy.topUpLeft(ws)).toBe(1_500);
+    clock.d = new Date("2026-03-17T09:00:00Z"); // next week: pool refilled, top-up still there
+    expect(energy.teamEnergyOf(ws)).toMatchObject({ left: 1_000, topUpLeft: 1_500, percentUsed: 0 });
+    await wf.assign("owner", ws, emp, "d"); // from the pool first
+    expect(energy.topUpLeft(ws)).toBe(1_500);
+  });
+
+  it("never auto-reloads unless the client turned it on, and stops at their monthly cap", async () => {
+    const { wf, energy, ws, emp } = await setup(500_000, 0, undefined, { ...PAID, weeklyTeamEnergy: 500, dailyTeamCeiling: undefined });
+    const charges: number[] = [];
+    energy.setTopUpCharger((_w, gbp) => { charges.push(gbp); return true; });
+    await wf.assign("owner", ws, emp, "a");
+    expect(await wf.assign("owner", ws, emp, "b")).toMatchObject({ reason: "weekly_pool_used" });
+    expect(charges).toEqual([]); // off by default: nothing charged
+    energy.setAutoReload("owner", ws, { enabled: true, packGbp: 5, packEnergy: 500, monthlyCapGbp: 10 });
+    expect((await wf.assign("owner", ws, emp, "c")).status).toBe("ready_for_review");
+    expect((await wf.assign("owner", ws, emp, "d")).status).toBe("ready_for_review");
+    expect(await wf.assign("owner", ws, emp, "e")).toMatchObject({ reason: "weekly_pool_used" });
+    expect(charges).toEqual([5, 5]);
+  });
+
+  it("does not auto-reload when payment fails or no payment provider is connected", async () => {
+    const { wf, energy, ws, emp } = await setup(500_000, 0, undefined, { ...PAID, weeklyTeamEnergy: 500, dailyTeamCeiling: undefined });
+    energy.setAutoReload("owner", ws, { enabled: true, packGbp: 5, packEnergy: 500, monthlyCapGbp: 100 });
+    await wf.assign("owner", ws, emp, "a");
+    expect(await wf.assign("owner", ws, emp, "b")).toMatchObject({ reason: "weekly_pool_used" });
+    energy.setTopUpCharger(() => false);
+    expect(await wf.assign("owner", ws, emp, "c")).toMatchObject({ reason: "weekly_pool_used" });
+    expect(energy.topUpLeft(ws)).toBe(0);
+  });
+
+  it("refuses top-ups on a trial and lets only owners change auto-reload", async () => {
+    const { identity, energy, ws } = await setup(1, 1, undefined, { ...PLANS.trial!, startedAt: "2026-03-10T09:00:00Z", expiresAt: "2026-03-17T09:00:00Z" });
+    expect(() => energy.addTopUp(ws, 500, 5, "checkout")).toThrow(/paid team plans/);
+    identity.addMember("owner", ws, "m", "member");
+    expect(() => energy.setAutoReload("m", ws, { enabled: true, packGbp: 5, packEnergy: 500, monthlyCapGbp: 10 })).toThrow(PermissionError);
+  });
+
+  it("shows usage as a percentage of the week's energy", async () => {
+    const { wf, energy, ws, emp } = await setup(1_000_000, 0, undefined, PAID);
+    await wf.assign("owner", ws, emp, "a");
+    expect(energy.teamEnergyOf(ws)!.percentUsed).toBe(13); // 1,000 of 8,000
+  });
+
+  it("checks auto-reload settings", () => {
+    const packs = [{ gbp: 5, energy: 500 }, { gbp: 10, energy: 1_000 }];
+    expect(parseAutoReload({ enabled: true, packGbp: 10, monthlyCapGbp: 30 }, packs)).toEqual({ enabled: true, packGbp: 10, packEnergy: 1_000, monthlyCapGbp: 30 });
+    expect(parseAutoReload({ enabled: false, monthlyCapGbp: 0 }, packs)).toMatchObject({ enabled: false });
+    expect(() => parseAutoReload({ enabled: true, packGbp: 10, monthlyCapGbp: 5 }, packs)).toThrow(/at least one pack/);
+    expect(() => parseAutoReload({ enabled: "yes", monthlyCapGbp: 5 }, packs)).toThrow();
+    expect(() => parseAutoReload({ enabled: true, packGbp: 5, monthlyCapGbp: -1 }, packs)).toThrow();
   });
 
   it("adds add-on energy to a paid pool but not to a trial", async () => {

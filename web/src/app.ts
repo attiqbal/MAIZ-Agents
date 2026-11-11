@@ -124,7 +124,7 @@ async function loadOrg(): Promise<void> {
   };
   // One shared pool: show it once, with when it refills, so a limit is never a surprise.
   const poolCard = pool
-    ? `<div class="ecard"><div class="who"><span class="av av-tl">EN</span><div><b>Team energy</b><span>${pool.refillsAt ? `Refills ${esc(new Date(pool.refillsAt).toLocaleDateString("en-GB", { weekday: "long", timeZone: "UTC" }))}` : "For the whole trial"}</span></div></div><div class="doing">${n(pool.leftToday)} can be used today${pool.dailyCeiling !== null ? ` (daily limit ${n(pool.dailyCeiling)})` : ""}</div><div><div class="e-lab"><span>Left</span><span>${n(pool.left)} / ${n(pool.pool)}</span></div>${bar(pool.left, pool.pool)}</div></div>`
+    ? `<div class="ecard"><div class="who"><span class="av av-tl">EN</span><div><b>Team energy</b><span>${pool.refillsAt ? `Refills ${esc(new Date(pool.refillsAt).toLocaleDateString("en-GB", { weekday: "long", timeZone: "UTC" }))}` : "For the whole trial"}</span></div></div><div class="doing">${pool.percentUsed}% of ${pool.refillsAt ? "this week's" : "the trial's"} energy used${pool.topUpLeft > 0 ? ` · ${n(pool.topUpLeft)} top-up energy saved` : ""}</div><div><div class="e-lab"><span>Left</span><span>${100 - pool.percentUsed}%</span></div>${bar(pool.left, pool.pool)}</div></div>`
     : "";
   document.querySelector(".team")!.innerHTML = poolCard + realOrg.team.map((e) => {
     const [abbr, cls] = ROLE[e.templateKey] ?? ["AI", "av-tl"];
@@ -136,6 +136,30 @@ async function loadOrg(): Promise<void> {
   if (realOrg.trialEndsAt) toast(`Free trial until ${new Date(realOrg.trialEndsAt).toLocaleDateString()}`);
 }
 void loadOrg();
+
+// Settings: auto-reload for top-ups. Off by default; it never spends more than the monthly cap the owner sets.
+type EnergyView = { team: Org["teamEnergy"] & { autoReload: { enabled: boolean; packGbp: number; monthlyCapGbp: number } | null; topUpLeft: number } | null };
+async function loadTopUps(): Promise<void> {
+  if (!getToken()) return;
+  const r = await api<EnergyView>("/energy");
+  const t = r.ok ? r.data?.team : null;
+  if (!t) return;
+  $("tu-left").textContent = `Top-up energy left: ${t.topUpLeft.toLocaleString("en-GB")}`;
+  if (t.autoReload) {
+    $<HTMLInputElement>("tu-on").checked = t.autoReload.enabled;
+    $<HTMLSelectElement>("tu-pack").value = String(t.autoReload.packGbp);
+    $<HTMLInputElement>("tu-cap").value = String(t.autoReload.monthlyCapGbp);
+  }
+}
+$("tu-form").addEventListener("submit", async (ev) => {
+  ev.preventDefault();
+  if (!getToken()) { toast("Example only: log in to change auto-reload"); return; }
+  const r = await api<EnergyView & { error?: string }>("/energy/auto-reload", { body: {
+    enabled: $<HTMLInputElement>("tu-on").checked, packGbp: Number($<HTMLSelectElement>("tu-pack").value), monthlyCapGbp: Number($<HTMLInputElement>("tu-cap").value),
+  } });
+  $("tu-msg").textContent = r.ok ? "Saved." : (r.data as { error?: string } | undefined)?.error ?? "Could not save. Please try again.";
+});
+void loadTopUps();
 
 // Account menu: sign out, and the Settings screen's account details.
 function signOut(): void { clearSession(); location.href = "/signin.html"; }
@@ -163,6 +187,30 @@ $<HTMLFormElement>("ask").addEventListener("submit", async (e) => {
   if (r.data.status === "queued") { toast(`Queued with your next batch${r.data.runsAt ? `, runs ${new Date(r.data.runsAt).toLocaleString([], { weekday: "short", hour: "numeric", minute: "2-digit" })}` : ""}. Start with "urgent:" to skip the wait.`); return; }
   showAnswer(emp.name, r.data.answer ?? "");
   void loadOrg();
+
+// Settings: auto-reload for top-ups. Off by default; it never spends more than the monthly cap the owner sets.
+type EnergyView = { team: Org["teamEnergy"] & { autoReload: { enabled: boolean; packGbp: number; monthlyCapGbp: number } | null; topUpLeft: number } | null };
+async function loadTopUps(): Promise<void> {
+  if (!getToken()) return;
+  const r = await api<EnergyView>("/energy");
+  const t = r.ok ? r.data?.team : null;
+  if (!t) return;
+  $("tu-left").textContent = `Top-up energy left: ${t.topUpLeft.toLocaleString("en-GB")}`;
+  if (t.autoReload) {
+    $<HTMLInputElement>("tu-on").checked = t.autoReload.enabled;
+    $<HTMLSelectElement>("tu-pack").value = String(t.autoReload.packGbp);
+    $<HTMLInputElement>("tu-cap").value = String(t.autoReload.monthlyCapGbp);
+  }
+}
+$("tu-form").addEventListener("submit", async (ev) => {
+  ev.preventDefault();
+  if (!getToken()) { toast("Example only: log in to change auto-reload"); return; }
+  const r = await api<EnergyView & { error?: string }>("/energy/auto-reload", { body: {
+    enabled: $<HTMLInputElement>("tu-on").checked, packGbp: Number($<HTMLSelectElement>("tu-pack").value), monthlyCapGbp: Number($<HTMLInputElement>("tu-cap").value),
+  } });
+  $("tu-msg").textContent = r.ok ? "Saved." : (r.data as { error?: string } | undefined)?.error ?? "Could not save. Please try again.";
+});
+void loadTopUps();
 });
 
 function showAnswer(who: string, text: string): void {

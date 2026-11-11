@@ -7,6 +7,7 @@ import { LedgerError } from "../modules/ledger/index.js";
 import { IntegrationError } from "../modules/integrations/index.js";
 import { ReviewError } from "../modules/review/index.js";
 import { PricingError } from "../modules/pricing/index.js";
+import { EnergyError, parseAutoReload } from "../modules/energy/index.js";
 import { BatchError } from "../modules/batch/schedule.js";
 import { SettingsError } from "../modules/model-gateway/routing/settings.js";
 import { SignupError, type SignupChoices, type TeamSize } from "../modules/onboarding/index.js";
@@ -297,6 +298,15 @@ export function createApp(p: Platform) {
       return json(200, { task: p.reviews.forClient(userId, org.id).find((t) => t.id === answer[1]) });
     }
 
+    // ---- Team energy: the week's pool, top-ups that roll over, and opt-in auto-reload with a monthly cap ----
+    if (method === "GET" && path === "/api/energy") {
+      return json(200, { team: p.energy.teamEnergy(userId, org.id) ?? null, packs: p.prices.topUpPacks() });
+    }
+    if (method === "POST" && path === "/api/energy/auto-reload") {
+      p.energy.setAutoReload(userId, org.id, parseAutoReload(body(), p.prices.topUpPacks()));
+      return json(200, { team: p.energy.teamEnergy(userId, org.id) ?? null, packs: p.prices.topUpPacks() });
+    }
+
     if (method === "GET" && path === "/api/org") {
       const plan = p.energy.planOf(org.id);
       return json(200, {
@@ -495,7 +505,7 @@ export function createApp(p: Platform) {
     try {
       return await route(req);
     } catch (err) {
-      if (err instanceof BadRequest || err instanceof SetupError || err instanceof SignupError || err instanceof LedgerError || err instanceof ChannelError || err instanceof IntegrationError || err instanceof ReviewError || err instanceof PricingError || err instanceof SettingsError || err instanceof BatchError) return json(400, { error: err.message });
+      if (err instanceof BadRequest || err instanceof SetupError || err instanceof SignupError || err instanceof LedgerError || err instanceof ChannelError || err instanceof IntegrationError || err instanceof ReviewError || err instanceof PricingError || err instanceof EnergyError || err instanceof SettingsError || err instanceof BatchError) return json(400, { error: err.message });
       if (err instanceof PermissionError) return json(403, { error: "you don't have permission to do that" });
       console.error(`${req.method} ${req.path} failed:`, err);
       return json(500, { error: "something went wrong" });

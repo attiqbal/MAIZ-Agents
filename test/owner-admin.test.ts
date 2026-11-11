@@ -41,11 +41,11 @@ describe("prices and packages", () => {
     const book = (await s.call("GET", "/api/owner/prices", undefined, s.owner())).body as any;
     const addOn = book.items.find((i: any) => i.kind === "employee");
     const pass = book.items.find((i: any) => i.kind === "consultant");
-    expect(addOn.priceGbp).toBe(20);
+    expect(addOn.priceGbp).toBe(25);
 
     const r = await s.call("POST", "/api/owner/prices/changes", { general: { addOnEmployeeMonthlyGbp: 15 }, items: { [pass.key]: { priceGbp: 99, energy: 5000 } }, note: "Launch pricing" }, s.owner());
     expect(r.status).toBe(201);
-    expect((r.body as any).change.from).toMatchObject({ "general.addOnEmployeeMonthlyGbp": 20, [`items.${pass.key}.priceGbp`]: pass.priceGbp });
+    expect((r.body as any).change.from).toMatchObject({ "general.addOnEmployeeMonthlyGbp": 25, [`items.${pass.key}.priceGbp`]: pass.priceGbp });
 
     const store = (await s.call("GET", "/api/store")).body as any;
     expect(store.catalogue.find((i: any) => i.key === addOn.key).priceGbp).toBe(15);
@@ -87,6 +87,18 @@ describe("prices and packages", () => {
     expect(again.team.find((e: any) => e.templateKey === "marketing-manager").energyLeft).toBe(4_000);
   });
 
+  it("shows the team's energy as a percentage with top-up packs, and saves auto-reload only with a valid cap", async () => {
+    const s = setup();
+    const r = await s.call("POST", "/api/signup", { email: "cat@cafe.co", businessName: "Cat Cafe", sells: "Coffee", size: "2–10", country: "GB" });
+    const auth = { authorization: `Bearer ${(r.body as any).token}` };
+    const e = (await s.call("GET", "/api/energy", undefined, auth)).body as any;
+    expect(e.team).toMatchObject({ percentUsed: 0, topUpLeft: 0, autoReload: null });
+    expect(e.packs[0]).toEqual({ gbp: 5, energy: 500 });
+    expect((await s.call("POST", "/api/energy/auto-reload", { enabled: true, packGbp: 10, monthlyCapGbp: 5 }, auth)).status).toBe(400);
+    const ok = await s.call("POST", "/api/energy/auto-reload", { enabled: true, packGbp: 10, monthlyCapGbp: 30 }, auth);
+    expect((ok.body as any).team.autoReload).toEqual({ enabled: true, packGbp: 10, packEnergy: 1_000, monthlyCapGbp: 30 });
+  });
+
   it("refuses the old per-agent default setting now that the team shares a pool", async () => {
     const s = setup();
     const r = await s.call("POST", "/api/owner/prices/changes", { general: { defaultDailyEnergyPerEmployee: 200 } }, s.owner());
@@ -111,7 +123,7 @@ describe("custom specialists are reviewed by the platform owner", () => {
     const made = await s.call("POST", "/api/specialists", brief, ann);
     expect(made.status).toBe(201);
     const req = (made.body as any).request;
-    expect(req).toMatchObject({ status: "in_review", statusLabel: "With MAIZ for review", priceGbp: 30 });
+    expect(req).toMatchObject({ status: "in_review", statusLabel: "With MAIZ for review", priceGbp: 35 });
     expect(s.platform.specialists.mayTrain(req.id)).toBe(false);
     await Promise.resolve();
     expect(s.mail.sent.find((m) => m.to === OWNER)?.subject).toBe("New specialist to review: Wholesale account coordinator for Kestrel Coffee");

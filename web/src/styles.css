@@ -885,3 +885,11 @@ body > main, body > .page-top { flex: none; }
 .q-form { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 14px; }
 .q-form .field { min-width: 150px; }
 .ow-list { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 6px; color: var(--color-mist); font-size: 14px; }
+
+/* Pricing: compare with hiring part-time */
+.calc { margin-top: 32px; padding: 28px; display: flex; flex-direction: column; gap: 16px; }
+.calc h2 { font-size: 24px; }
+.calc-in { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.calc-out { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+@media (max-width: 640px) { .calc { padding: 20px; } .calc-in, .calc-out { grid-template-columns: 1fr; } .calc-out > :first-child:nth-last-child(odd) { grid-column: auto; } }
+#tu-form .acts { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
