@@ -25,6 +25,9 @@ export function checkEnv(env: Record<string, string | undefined>): string[] {
   if (!!env.RUNPOD_API_KEY !== !!env.RUNPOD_ENDPOINT_ID) problems.push("RUNPOD_API_KEY and RUNPOD_ENDPOINT_ID must be set together (or neither)");
   if (env.RUNPOD_ENDPOINT_ID && !/^[a-z0-9]{6,40}$/i.test(env.RUNPOD_ENDPOINT_ID)) problems.push("RUNPOD_ENDPOINT_ID must be the endpoint's id (letters and digits only), not a URL");
 
+  if (env.PAYMENTS_PROVIDER && env.PAYMENTS_PROVIDER !== "mock") problems.push(`PAYMENTS_PROVIDER "${env.PAYMENTS_PROVIDER}" is not built yet (only "mock", for development)`);
+  if (production && env.PAYMENTS_PROVIDER === "mock") problems.push("PAYMENTS_PROVIDER=mock must not be used in production: it hands out paid items for free");
+
   const owners = (env.PLATFORM_OWNER_EMAILS ?? "").split(",").map((e) => e.trim()).filter(Boolean);
   if (owners.some((e) => !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e))) problems.push("PLATFORM_OWNER_EMAILS must be a comma-separated list of email addresses");
 

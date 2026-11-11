@@ -16,6 +16,8 @@ import { CUSTOM_SPECIALIST, DEPARTMENTS } from "../modules/workforce/blueprints.
 import { OVERAGE_RULE } from "../modules/workforce/task-roles.js";
 import { CONSULTANTS, HOW_A_PASS_WORKS, menuOf } from "../modules/workforce/consultants.js";
 import { quote } from "../modules/store/cart.js";
+import { RotaError } from "../modules/rota/index.js";
+import { PaymentError, WebhookSignatureError, type Order } from "../modules/payments/index.js";
 import type { Platform } from "./platform.js";
 
 const OAUTH_STATE_SECONDS = 600;
@@ -45,6 +47,9 @@ export interface Res {
   /** Work to do after the reply is sent (Slack needs an answer within 3 seconds). */
   after?: () => Promise<void>;
 }
+
+/** What a client sees of an order: never the provider's reference. */
+const orderView = (o: Order) => ({ id: o.id, status: o.status, lines: o.lines, dueTodayMinor: o.dueTodayMinor, monthlyMinor: o.monthlyMinor, currency: o.currency, createdAt: o.createdAt, paidAt: o.paidAt, employeeIds: o.employeeIds, ...(o.problem && !o.fulfilledAt && o.status === "paid" ? { problem: "We took your payment but could not finish setting up. MAIZ has been alerted." } : {}) });
 
 const json = (status: number, body: unknown): Res => ({ status, body });
 
@@ -180,6 +185,17 @@ export function createApp(p: Platform) {
       return json(201, { token, workspaceId: org.workspaceId, blueprint: org.blueprint, trialEndsAt: org.trialEndsAt });
     }
 
+    // ---- payment provider webhooks: public, authenticated by the provider's signature over the exact bytes ----
+    if (method === "POST" && path === "/api/payments/webhook") {
+      if (!p.payments.enabled) return json(503, { error: "payments are not switched on" });
+      try {
+        return json(200, { result: await p.payments.handleWebhook(req.rawBody, req.headers) });
+      } catch (e) {
+        if (e instanceof WebhookSignatureError) return json(400, { error: "bad signature" });
+        throw e;
+      }
+    }
+
     // ---- Slack events: public, signed by Slack ----
     if (method === "POST" && path === "/api/slack/events") {
       if (!p.cfg.slack) return json(503, { error: "slack is not configured" });
@@ -261,6 +277,11 @@ export function createApp(p: Platform) {
         const run = await p.batch.runAllNow(userId);
         return json(200, { started: !!run, run: run ?? null, ...p.batch.ownerView(userId) });
       }
+      if (method === "GET" && path === "/api/owner/reconciliation") return json(200, { reports: p.reconciliation.all().map((r) => ({ ...r, clientName: p.identity.workspaceById(r.workspaceId)?.name ?? r.workspaceId })) });
+      if (method === "POST" && path === "/api/owner/reconciliation/run") {
+        for (const w of p.identity.allWorkspaces()) await p.reconciliation.runOne(w.id);
+        return json(200, { reports: p.reconciliation.all().map((r) => ({ ...r, clientName: p.identity.workspaceById(r.workspaceId)?.name ?? r.workspaceId })) });
+      }
       if (method === "GET" && path === "/api/owner/clients") return json(200, { clients: p.clients(userId) });
       if (method === "GET" && path === "/api/owner/specialists") return json(200, { requests: p.specialists.queue(userId) });
       const d = /^\/api\/owner\/specialists\/([\w-]{1,64})\/decide$/.exec(path);
@@ -276,11 +297,44 @@ export function createApp(p: Platform) {
     const org = orgOf(userId);
     if (!org) return json(404, { error: "no organisation yet" });
 
+    if (method === "GET" && path === "/api/dashboard") return json(200, p.dashboard(userId, org.id));
+
+    // ---- rota: staff and shifts ----
+    if (path.startsWith("/api/rota/")) {
+      const today = p.now().toISOString().slice(0, 10);
+      const rotaWeek = (date: string) => json(200, p.rota.week(userId, org.id, date));
+      if (method === "GET" && path === "/api/rota/week") return rotaWeek(req.query.get("date") ?? today);
+      if (method === "POST" && path === "/api/rota/staff") { const st = p.rota.addStaff(userId, org.id, body()); return json(201, { added: st, ...p.rota.week(userId, org.id, today) }); }
+      const left = /^\/api\/rota\/staff\/([\w-]{1,64})\/leave$/.exec(path);
+      if (method === "POST" && left) { p.rota.deactivate(userId, org.id, left[1]!, today); return rotaWeek(today); }
+      if (method === "POST" && path === "/api/rota/shifts") { const sh = p.rota.addShift(userId, org.id, body()); return json(201, { shift: sh, ...p.rota.week(userId, org.id, sh.date) }); }
+      const asg = /^\/api\/rota\/shifts\/([\w-]{1,64})\/assign$/.exec(path);
+      if (method === "POST" && asg) { const b = body(); const sh = p.rota.assign(userId, org.id, asg[1]!, typeof b.staffId === "string" && b.staffId ? b.staffId : null); return json(200, { shift: sh, ...p.rota.week(userId, org.id, sh.date) }); }
+      const del = /^\/api\/rota\/shifts\/([\w-]{1,64})$/.exec(path);
+      if (method === "DELETE" && del) { p.rota.removeShift(userId, org.id, del[1]!); return rotaWeek(req.query.get("date") ?? today); }
+      return json(404, { error: "not found" });
+    }
+
+    // ---- buying from the store ----
+    if (method === "POST" && path === "/api/checkout") {
+      const { order, url } = await p.payments.checkout(userId, org.id, body().lines);
+      return json(201, { order: orderView(order), ...(url ? { url } : {}) });
+    }
+    if (method === "GET" && path === "/api/orders") return json(200, { enabled: p.payments.enabled, orders: p.payments.mine(userId, org.id).map(orderView) });
+    const cancelOrder = /^\/api\/orders\/([\w-]{1,64})\/cancel$/.exec(path);
+    if (method === "POST" && cancelOrder) return json(200, { order: orderView(await p.payments.cancel(userId, org.id, cancelOrder[1]!)) });
+
     // ---- new custom specialists: the client asks, MAIZ reviews before anything is trained ----
     if (method === "GET" && path === "/api/specialists") return json(200, { requests: p.specialists.forClient(userId, org.id) });
     if (method === "POST" && path === "/api/specialists") {
       const r = await p.specialists.request(userId, org.id, body());
       return json(201, { request: p.specialists.forClient(userId, org.id).find((x) => x.id === r.id), jobDescription: r.jobDescription, notes: r.notes });
+    }
+
+    const hireSpecialist = /^\/api\/specialists\/([\w-]{1,64})\/hire$/.exec(path);
+    if (method === "POST" && hireSpecialist) {
+      const r = await p.specialists.hire(userId, org.id, hireSpecialist[1]!);
+      return json(201, { request: p.specialists.forClient(userId, org.id).find((x) => x.id === r.id), employeeId: r.hiredEmployeeId });
     }
 
     // ---- specialised tasks: the client follows them through quality review but never approves ----
@@ -310,7 +364,7 @@ export function createApp(p: Platform) {
           id: e.id,
           templateKey: e.templateKey,
           name: e.name,
-          blurb: getTemplate(e.templateKey)?.title,
+          blurb: p.workforce.templateFor(e.templateKey, org.id)?.title,
           energyLeft: p.energy.remainingToday(userId, org.id, e.id),
         })),
       });
@@ -495,7 +549,7 @@ export function createApp(p: Platform) {
     try {
       return await route(req);
     } catch (err) {
-      if (err instanceof BadRequest || err instanceof SetupError || err instanceof SignupError || err instanceof LedgerError || err instanceof ChannelError || err instanceof IntegrationError || err instanceof ReviewError || err instanceof PricingError || err instanceof SettingsError || err instanceof BatchError) return json(400, { error: err.message });
+      if (err instanceof BadRequest || err instanceof SetupError || err instanceof SignupError || err instanceof LedgerError || err instanceof ChannelError || err instanceof IntegrationError || err instanceof ReviewError || err instanceof PricingError || err instanceof SettingsError || err instanceof BatchError || err instanceof PaymentError || err instanceof RotaError) return json(400, { error: err.message });
       if (err instanceof PermissionError) return json(403, { error: "you don't have permission to do that" });
       console.error(`${req.method} ${req.path} failed:`, err);
       return json(500, { error: "something went wrong" });

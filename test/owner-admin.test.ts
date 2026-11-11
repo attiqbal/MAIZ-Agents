@@ -138,6 +138,38 @@ describe("custom specialists are reviewed by the platform owner", () => {
   });
 });
 
+describe("hiring an approved custom specialist", () => {
+  const brief = { title: "Wholesale account coordinator", purpose: "Look after cafes that buy in bulk", duties: ["Prepare price lists", "Chase repeat orders"] };
+
+  it("can be hired once after approval, becomes a team member, and works from its own job description", async () => {
+    const s = setup();
+    const ann = await s.signUp("ann@kestrel.co", "Kestrel Coffee");
+    const id = ((await s.call("POST", "/api/specialists", brief, ann)).body as any).request.id;
+    expect((await s.call("POST", `/api/specialists/${id}/hire`, undefined, ann)).status).toBe(400); // not approved yet
+    await s.call("POST", `/api/owner/specialists/${id}/decide`, { decision: "approved", priceGbp: 24 }, s.owner());
+    const hired = await s.call("POST", `/api/specialists/${id}/hire`, undefined, ann);
+    expect(hired.status).toBe(201);
+    expect((hired.body as any).request).toMatchObject({ canHire: false });
+    expect((await s.call("POST", `/api/specialists/${id}/hire`, undefined, ann)).status).toBe(400); // only once
+    const org = (await s.call("GET", "/api/org", undefined, ann)).body as any;
+    const member = org.team.find((e: any) => e.id === (hired.body as any).employeeId);
+    expect(member).toMatchObject({ name: "Wholesale account coordinator", blurb: "Wholesale account coordinator" });
+    const answer = await s.call("POST", "/api/ask", { text: "What is the status?", employeeId: member.id, urgent: true }, ann);
+    expect(answer.status).toBe(200);
+  });
+
+  it("is invisible to every other client, and to the one that asked until MAIZ approves", async () => {
+    const s = setup();
+    const ann = await s.signUp("ann@kestrel.co", "Kestrel Coffee");
+    const bob = await s.signUp("bob@northside.co", "Northside Bikes");
+    const id = ((await s.call("POST", "/api/specialists", brief, ann)).body as any).request.id;
+    await s.call("POST", `/api/owner/specialists/${id}/decide`, { decision: "approved" }, s.owner());
+    expect((await s.call("POST", `/api/specialists/${id}/hire`, undefined, bob)).status).toBe(400);
+    const bobWs = s.platform.identity.workspacesFor(userIdFor("bob@northside.co"))[0]!;
+    await expect(s.platform.workforce.hire(userIdFor("bob@northside.co"), bobWs.id, `custom-${id}`)).rejects.toThrow(/unknown employee template/);
+  });
+});
+
 describe("clients screen", () => {
   it("shows every client to the platform owner only, with trial, setup, energy and open reviews", async () => {
     const s = setup();

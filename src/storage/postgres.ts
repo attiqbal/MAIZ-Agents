@@ -1,6 +1,6 @@
 import { createCipheriv, createDecipheriv, randomBytes } from "node:crypto";
 import pg from "pg";
-import type { Sink, Snapshot } from "../core/persistence.js";
+import { GENERIC_KINDS, type GenericKind, type Sink, type Snapshot } from "../core/persistence.js";
 import type { AuditEvent } from "../modules/audit/index.js";
 import type { Connection } from "../modules/channels/index.js";
 import type { EnergyPlan, UsageRecord } from "../modules/energy/index.js";
@@ -185,6 +185,9 @@ export class PgStore implements Sink {
     // Stored under the client's workspace, so row-level security keeps one client's tasks from another.
     this.state(r.workspaceId, "review", r.id, r);
   }
+  record(workspaceId: string, kind: GenericKind, id: string, data: unknown): void {
+    this.state(workspaceId, kind, id, data);
+  }
   specialistRequest(r: SpecialistRequest): void {
     this.state(r.workspaceId, "specialist_req", r.id, r);
   }
@@ -293,6 +296,7 @@ export class PgStore implements Sink {
       integrationRecords: of("int_record").map((s) => s.data),
       reviews: of("review").map((s) => s.data),
       specialistRequests: of("specialist_req").map((s) => s.data),
+      records: states.filter((s) => (GENERIC_KINDS as readonly string[]).includes(s.kind)).map((s) => ({ workspaceId: s.workspace_id, kind: s.kind, id: s.id, data: s.data })),
       priceChanges: (await q("SELECT data FROM platform_records WHERE kind = 'price_change' ORDER BY updated_at, id")).map((r) => r.data),
       aiSettings: (await q("SELECT data FROM platform_records WHERE kind = 'ai_settings' AND id = 'current'"))[0]?.data,
       batchJobs: of("batch_job").map((s) => s.data),
