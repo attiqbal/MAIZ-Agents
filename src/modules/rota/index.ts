@@ -21,7 +21,19 @@ export interface Staff {
   /** Personal cap per week; otherwise the default applies. */
   maxHoursPerWeek?: number;
   active: boolean;
+  /** What the person told the HR desk: when they can work and approved time off. Shifts outside it are refused. */
+  limits?: StaffLimits;
 }
+
+/** Days are Monday = 0 … Sunday = 6. A day not listed means any time. */
+export interface StaffLimits {
+  availability: { day: number; off?: boolean; from?: string; to?: string }[];
+  maxShiftHours?: number;
+  /** The most hours a week they want; lower than the legal cap, it becomes their cap. */
+  maxHoursPerWeek?: number;
+  away: { from: string; to: string }[];
+}
+const DAY_NAMES = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 
 export interface Shift {
   id: string;
@@ -69,6 +81,8 @@ function span(s: Pick<Shift, "date" | "start" | "end">): { from: number; to: num
   if (to <= from) to += MIN_PER_DAY;
   return { from, to };
 }
+/** Their own weekly cap: the lower of what they asked for and the legal default (or a cap set on the rota). */
+const capOf = (p: Staff): number => Math.min(p.maxHoursPerWeek ?? DEFAULT_MAX_WEEKLY_HOURS, p.limits?.maxHoursPerWeek || Infinity);
 const hoursOf = (s: Shift): number => { const x = span(s); return (x.to - x.from) / 60; };
 
 export class RotaService {
@@ -109,6 +123,16 @@ export class RotaService {
     for (const sh of this.mine(workspaceId, this.shifts)) if (sh.staffId === staffId && sh.date >= today) this.saveShift({ ...sh, staffId: undefined });
     this.audit.record({ workspaceId, actor: `user:${userId}`, action: "rota.staff_left", target: `staff:${staffId}` });
     return { ...s, active: false };
+  }
+
+  /**
+   * Called by the HR desk (which has already checked permission) when someone's availability, hours wanted
+   * or approved time off changes. Not audited here: the HR desk audits the change that caused it.
+   */
+  setLimits(workspaceId: string, staffId: string, limits: StaffLimits): void {
+    const s = this.staffOf(workspaceId, staffId);
+    if (JSON.stringify(s.limits ?? null) === JSON.stringify(limits)) return;
+    this.saveStaff({ ...s, limits });
   }
 
   // ---------- shifts ----------
@@ -174,7 +198,7 @@ export class RotaService {
     const people = this.mine(workspaceId, this.staff).filter((s) => s.active);
     const byPerson = people.map((p) => {
       const hours = shifts.filter((s) => s.staffId === p.id).reduce((n, s) => n + hoursOf(s), 0);
-      return { staffId: p.id, name: p.name, hours: round2(hours), cap: p.maxHoursPerWeek ?? DEFAULT_MAX_WEEKLY_HOURS, costMinor: p.hourlyRateMinor !== undefined ? Math.round(hours * p.hourlyRateMinor) : null };
+      return { staffId: p.id, name: p.name, hours: round2(hours), cap: capOf(p), costMinor: p.hourlyRateMinor !== undefined ? Math.round(hours * p.hourlyRateMinor) : null };
     });
     const known = byPerson.every((p) => p.costMinor !== null || p.hours === 0);
     return {
@@ -198,7 +222,17 @@ export class RotaService {
       for (const s of w.shifts.slice(0, 60)) lines.push(`- ${s.date} ${s.start}-${s.end} ${people.find((p) => p.id === s.staffId)?.name ?? "OPEN"}${s.role ? ` (${s.role})` : ""}`);
       for (const p of w.hoursByPerson) if (p.hours > 0) lines.push(`  ${p.name}: ${p.hours}h of ${p.cap}h cap`);
     }
-    lines.push(`Staff: ${people.map((p) => `${p.name}${p.role ? ` (${p.role})` : ""}`).join(", ")}.`, "Answer only from these records. Never invent shifts, hours or pay.");
+    lines.push(`Staff: ${people.map((p) => `${p.name}${p.role ? ` (${p.role})` : ""}`).join(", ")}.`);
+    for (const p of people) {
+      const l = p.limits;
+      if (!l) continue;
+      const bits = l.availability.map((a) => `${DAY_NAMES[a.day]} ${a.off ? "off" : `${a.from}-${a.to} only`}`);
+      if (l.maxShiftHours) bits.push(`shifts up to ${l.maxShiftHours}h`);
+      if (l.maxHoursPerWeek) bits.push(`up to ${l.maxHoursPerWeek}h a week`);
+      for (const a of l.away.slice(0, 5)) bits.push(`away ${a.from} to ${a.to}`);
+      if (bits.length) lines.push(`  ${p.name} limits: ${bits.join("; ")}.`);
+    }
+    lines.push("Answer only from these records. Never invent shifts, hours or pay.");
     return lines.join("\n");
   }
 
@@ -215,10 +249,29 @@ export class RotaService {
       const gap = me.from >= o.to ? (me.from - o.to) / 60 : (o.from - me.to) / 60;
       if (gap < MIN_REST_HOURS) throw new RotaError(`${person.name} would get only ${round2(gap)}h rest around ${other.date} ${other.start}-${other.end} (at least ${MIN_REST_HOURS}h needed)`);
     }
+    this.checkLimits(person, shift);
     const wk = weekStart(shift.date);
     const inWeek = theirs.filter((s) => weekStart(s.date) === wk).reduce((n, s) => n + hoursOf(s), 0) + hoursOf(shift);
-    const cap = person.maxHoursPerWeek ?? DEFAULT_MAX_WEEKLY_HOURS;
+    const cap = capOf(person);
     if (inWeek > cap) throw new RotaError(`that would put ${person.name} at ${round2(inWeek)}h in the week of ${wk}, over the ${cap}h limit`);
+  }
+
+  /** What the person said on the HR desk: days off, only certain hours, longest shift, approved time off. */
+  private checkLimits(person: Staff, shift: Shift): void {
+    const l = person.limits;
+    if (!l) return;
+    const name = person.name;
+    const away = l.away.find((a) => shift.date >= a.from && shift.date <= a.to);
+    if (away) throw new RotaError(`${name} has approved time off from ${away.from} to ${away.to}`);
+    const dow = (dayNumber(shift.date) + 3) % 7;
+    const rule = l.availability.find((a) => a.day === dow);
+    if (rule?.off) throw new RotaError(`${name} is not available on ${DAY_NAMES[dow]}s (HR desk)`);
+    if (rule?.from && rule.to) {
+      const win = span({ date: shift.date, start: rule.from, end: rule.to });
+      const me = span(shift);
+      if (me.from < win.from || me.to > win.to) throw new RotaError(`${name} can only work ${rule.from} to ${rule.to} on ${DAY_NAMES[dow]}s (HR desk)`);
+    }
+    if (l.maxShiftHours && hoursOf(shift) > l.maxShiftHours) throw new RotaError(`${name} asked for shifts of at most ${l.maxShiftHours} hours`);
   }
 
   private staffOf(workspaceId: string, id: string): Staff {

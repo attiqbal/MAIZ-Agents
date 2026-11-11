@@ -21,7 +21,7 @@ function person(over: Partial<StaffMember> = {}): StaffMember {
 const checked = (checkedOn = "2026-03-01", extra: Record<string, string> = {}) => ({ status: "checked" as const, checkedOn, updatedAt: "x", ...extra });
 function complete(m: StaffMember, sector: Parameters<typeof requiredDocuments>[1]): StaffMember {
   const docs = Object.fromEntries(requiredDocuments(m, sector, TODAY).map((r) => [r.key, checked("2026-10-01")]));
-  return { ...m, documents: docs };
+  return { ...m, documents: docs, profile: { updatedOn: "2026-10-01" } };
 }
 
 describe("HR desk rules: which documents a person needs", () => {

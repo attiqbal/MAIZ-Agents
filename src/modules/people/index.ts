@@ -1,3 +1,4 @@
+import { createHash, randomBytes } from "node:crypto";
 import { newId } from "../../core/ids.js";
 import type { Sink } from "../../core/persistence.js";
 import type { AuditLog } from "../audit/index.js";
@@ -5,14 +6,16 @@ import type { IdentityService } from "../identity/index.js";
 import { addDays, isIsoDate, toIsoDate } from "./dates.js";
 import { ALL_REQUIREMENT_KEYS, SECTORS, requiredDocuments, type Sector } from "./requirements.js";
 import {
-  ALL_CHECKLIST_KEYS, CONTRACT_LABEL, RTW_LABEL, hrSummary, offOn, rtwRetainUntil, staffDetail,
+  ALL_CHECKLIST_KEYS, CONTRACT_LABEL, RTW_LABEL, hrSummary, offOn, rtwRetainUntil, staffDetail, staffStatus,
   type ContractType, type DeskSettings, type DocStatus, type HrSummary, type LeaveKind,
   type PensionStatus, type ReviewKind, type RtwRoute, type StaffDetail, type StaffMember,
 } from "./rules.js";
+import { PeopleError, SECTOR_QUESTIONS, availabilityLines, mergeProfile, readProfile, type DayAvailability, type SectorQuestion, type StaffProfile } from "./profile.js";
 
 export * from "./rules.js";
 export * from "./requirements.js";
 export * from "./dates.js";
+export * from "./profile.js";
 
 /**
  * The HR manager desk: the client's records for its real (human) staff.
@@ -22,7 +25,6 @@ export * from "./dates.js";
  * log, and the platform owner never sees them. The rules that decide which documents a person
  * needs live in ./rules.ts and ./requirements.ts and are shared with the website.
  */
-export class PeopleError extends Error {}
 
 export type PeopleSettings = DeskSettings;
 export const DEFAULT_SETTINGS: PeopleSettings = { sector: "other", leaveYearStartMonth: 1 };
@@ -37,7 +39,40 @@ export interface PeopleOptions {
   /** Takes a person who has left off the rota (future shifts become open). */
   removeFromRota?: (userId: string, m: StaffMember, today: string) => void;
   rotaWeek?: (workspaceId: string, rotaStaffId: string, today: string) => RotaWeek | undefined;
+  /** Gives the rota what it must respect for this person: availability, hours wanted and approved time off. */
+  syncRota?: (m: StaffMember, prefs: RotaPrefs) => void;
+  /** The client's business name, shown on a staff member's form. */
+  businessName?: (workspaceId: string) => string | undefined;
 }
+
+/** What the rota enforces for one person, worked out from their profile and approved leave. */
+export interface RotaPrefs {
+  availability: DayAvailability[];
+  maxShiftHours?: number;
+  maxHoursPerWeek?: number;
+  /** Approved time off from today on. */
+  away: { from: string; to: string }[];
+}
+
+/** What a member of staff sees when they open their form link: their own answers, nothing about anyone else. */
+export interface StaffFormView {
+  businessName: string;
+  firstName: string;
+  jobTitle: string;
+  questions: SectorQuestion[];
+  phone?: string;
+  email?: string;
+  profile: StaffProfile;
+  /** Time off they asked for that is not decided yet. */
+  pending: { from: string; to: string; days: number }[];
+  expiresOn: string;
+}
+
+/** How long a staff form link works. */
+export const FORM_LINK_DAYS = 14;
+/** Undecided time-off requests one person can have open from their form. */
+const MAX_OPEN_REQUESTS = 10;
+const hashToken = (t: string): string => createHash("sha256").update(t).digest("hex");
 
 export interface PeopleView {
   settings: PeopleSettings;
@@ -99,6 +134,23 @@ function oneOf<T extends string>(v: unknown, allowed: readonly T[], what: string
   return v as T;
 }
 
+/** One line on when someone can work, for AI employees. No contact details, notes or skills' expiry. */
+function workLine(p: StaffProfile): string {
+  const parts = availabilityLines(p);
+  if (p.hoursMin !== undefined || p.hoursMax !== undefined) parts.push(`wants ${p.hoursMin ?? 0} to ${p.hoursMax ?? "any"} hours a week`);
+  if (p.prefers?.length) parts.push(`prefers ${p.prefers.join(", ")}`);
+  if (p.avoids?.length) parts.push(`would rather not do ${p.avoids.join(", ")}`);
+  if (p.maxShiftHours) parts.push(`shifts up to ${p.maxShiftHours}h`);
+  return parts.join("; ") || "any time";
+}
+
+/** The record as the website gets it: when the form link was made and expires, never its hash. */
+function withoutLinkHash(m: StaffMember): StaffMember {
+  if (!m.formLink) return m;
+  const { hash: _hash, ...link } = m.formLink;
+  return { ...m, formLink: link };
+}
+
 /** The fields a client may set on a person; everything else (documents, leave, ids) has its own call. */
 function profileFields(b: Input, creating: boolean): Partial<StaffMember> {
   const out: Partial<StaffMember> = {};
@@ -135,6 +187,8 @@ export class PeopleService {
   /** Staff ids per client, so one client's desk never scans everyone else's staff. */
   private byWorkspace = new Map<string, Set<string>>();
   private settingsBy = new Map<string, PeopleSettings>();
+  /** Form link hash -> staff id. */
+  private byLink = new Map<string, string>();
   private sink?: Sink;
 
   constructor(private identity: IdentityService, private audit: AuditLog, private opts: PeopleOptions = {}) {}
@@ -150,6 +204,8 @@ export class PeopleService {
     const ids = this.byWorkspace.get(m.workspaceId) ?? new Set<string>();
     ids.add(m.id);
     this.byWorkspace.set(m.workspaceId, ids);
+    for (const [h, id] of this.byLink) if (id === m.id && h !== m.formLink?.hash) this.byLink.delete(h);
+    if (m.formLink?.hash) this.byLink.set(m.formLink.hash, m.id);
   }
   private inWorkspace(ws: string): StaffMember[] {
     return [...(this.byWorkspace.get(ws) ?? [])].map((id) => this.staff.get(id)).filter((m): m is StaffMember => !!m);
@@ -166,7 +222,18 @@ export class PeopleService {
   private save(next: StaffMember): StaffMember {
     this.put(next);
     this.sink?.staff(next);
+    if (next.rotaStaffId) this.opts.syncRota?.(next, this.rotaPrefs(next));
     return next;
+  }
+  private rotaPrefs(m: StaffMember): RotaPrefs {
+    const today = this.today();
+    const p = m.profile;
+    return {
+      availability: p?.availability ?? [],
+      ...(p?.maxShiftHours ? { maxShiftHours: p.maxShiftHours } : {}),
+      ...(p?.hoursMax ? { maxHoursPerWeek: p.hoursMax } : {}),
+      away: m.leave.filter((l) => l.status === "approved" && l.to >= today).map((l) => ({ from: l.from, to: l.to })).slice(0, 100),
+    };
   }
 
   settings(userId: string, ws: string): PeopleSettings {
@@ -202,7 +269,7 @@ export class PeopleService {
     const today = this.today();
     if (audit) this.log(userId, ws, "people.record_viewed", id);
     const rota = m.rotaStaffId ? this.opts.rotaWeek?.(ws, m.rotaStaffId, today) : undefined;
-    return { ...staffDetail(m, { sector, leaveYearStartMonth }, today), ...(rota ? { rota } : {}) };
+    return { ...staffDetail(withoutLinkHash(m), { sector, leaveYearStartMonth }, today), ...(rota ? { rota } : {}) };
   }
 
   /** Adds a person. `rotaNote` says why they could not also go on the rota, when that happens. */
@@ -351,6 +418,111 @@ export class PeopleService {
     return this.detail(userId, ws, id, false);
   }
 
+  // ---------- what they told us, and their own form link ----------
+
+  /** The owner fills in or corrects someone's availability, preferences, emergency contact and skills. */
+  updateProfile(userId: string, ws: string, id: string, b: Input): StaffDetail {
+    this.identity.require(userId, ws, "people.manage");
+    const cur = this.find(ws, id);
+    const { sector } = this.settingsBy.get(ws) ?? DEFAULT_SETTINGS;
+    const changes = readProfile(b, sector);
+    this.save(this.withEmergencyDoc({ ...cur, profile: mergeProfile(cur.profile, changes, "owner", this.today()), updatedAt: this.stamp() }, `user:${userId}`));
+    this.log(userId, ws, "people.profile_updated", id, { fields: Object.keys(changes) });
+    return this.detail(userId, ws, id, false);
+  }
+
+  /**
+   * Makes a link the person can open to fill in their own details, without an account. It works for
+   * FORM_LINK_DAYS days; making a new one stops the old one. Only a hash is stored.
+   */
+  createFormLink(userId: string, ws: string, id: string): { token: string; expiresOn: string } {
+    this.identity.require(userId, ws, "people.manage");
+    const cur = this.find(ws, id);
+    if (cur.endDate && cur.endDate < this.today()) throw new PeopleError("they have left, so they cannot be sent the form");
+    const token = randomBytes(24).toString("base64url");
+    const expiresOn = addDays(this.today(), FORM_LINK_DAYS);
+    this.save({ ...cur, formLink: { hash: hashToken(token), createdOn: this.today(), expiresOn }, updatedAt: this.stamp() });
+    this.log(userId, ws, "people.form_link_created", id, { expiresOn });
+    return { token, expiresOn };
+  }
+
+  stopFormLink(userId: string, ws: string, id: string): StaffDetail {
+    this.identity.require(userId, ws, "people.manage");
+    const cur = this.find(ws, id);
+    const next = { ...cur, updatedAt: this.stamp() };
+    delete next.formLink;
+    this.save(next);
+    this.log(userId, ws, "people.form_link_stopped", id);
+    return this.detail(userId, ws, id, false);
+  }
+
+  /** The person behind a live form link. Same answer for unknown and expired links. */
+  private byToken(token: unknown): StaffMember {
+    const id = typeof token === "string" && /^[\w-]{20,64}$/.test(token) ? this.byLink.get(hashToken(token)) : undefined;
+    const m = id ? this.staff.get(id) : undefined;
+    if (!m?.formLink || m.formLink.expiresOn < this.today() || (m.endDate && m.endDate < this.today())) throw new PeopleError("this form link has expired or been stopped; ask your manager for a new one");
+    return m;
+  }
+
+  /** What the person sees on their form. */
+  formView(token: unknown): StaffFormView {
+    const m = this.byToken(token);
+    const { sector } = this.settingsBy.get(m.workspaceId) ?? DEFAULT_SETTINGS;
+    return {
+      businessName: this.opts.businessName?.(m.workspaceId) ?? "your employer",
+      firstName: (m.profile?.preferredName ?? m.name).split(" ")[0]!,
+      jobTitle: m.jobTitle,
+      questions: SECTOR_QUESTIONS[sector],
+      ...(m.phone ? { phone: m.phone } : {}),
+      ...(m.email ? { email: m.email } : {}),
+      profile: m.profile ?? {},
+      pending: m.leave.filter((l) => l.status === "requested" && l.to >= this.today()).map((l) => ({ from: l.from, to: l.to, days: l.days })),
+      expiresOn: m.formLink!.expiresOn,
+    };
+  }
+
+  /** The person sends their answers, and optionally asks for time off (which waits for the owner to decide). */
+  submitForm(token: unknown, b: Input): StaffFormView {
+    const cur = this.byToken(token);
+    const ws = cur.workspaceId;
+    const { sector } = this.settingsBy.get(ws) ?? DEFAULT_SETTINGS;
+    const changes = readProfile((b.profile && typeof b.profile === "object" ? b.profile : {}) as Input, sector);
+    const next: StaffMember = { ...cur, profile: mergeProfile(cur.profile, changes, "staff", this.today()), formLink: { ...cur.formLink!, usedOn: this.today() }, updatedAt: this.stamp() };
+    if ("phone" in b) { const phone = text(b.phone, TEXT.phone, "phone"); if (phone) next.phone = phone; else delete next.phone; }
+    if ("email" in b) {
+      const email = text(b.email, TEXT.email, "email");
+      if (email && !EMAIL.test(email)) throw new PeopleError("that email address does not look right");
+      if (email) next.email = email; else delete next.email;
+    }
+    let asked: { days: number } | undefined;
+    if (b.timeOff && typeof b.timeOff === "object") {
+      const t = b.timeOff as Input;
+      const from = date(t.from, "first day off", true)!;
+      const to = date(t.to, "last day off") ?? from;
+      if (from < this.today()) throw new PeopleError("time off has to start today or later");
+      if (to < from) throw new PeopleError("the last day off is before the first");
+      if (to > addDays(from, 366)) throw new PeopleError("ask for at most a year in one go");
+      const days = num(t.days, 0.5, 260, "working days off", true)!;
+      if (Math.round(days * 2) !== days * 2) throw new PeopleError("days must be whole or half days");
+      if (cur.leave.filter((l) => l.status === "requested").length >= MAX_OPEN_REQUESTS) throw new PeopleError("you already have several requests waiting; ask your manager to decide those first");
+      if (cur.leave.length >= MAX_LEAVE) throw new PeopleError("too many leave records; ask your manager");
+      const note = text(t.note, TEXT.note, "note");
+      next.leave = [...cur.leave, { id: newId("leave"), kind: "holiday", from, to, days, status: "requested", ...(note ? { note } : {}) }];
+      asked = { days };
+    }
+    this.save(this.withEmergencyDoc(next, "staff form"));
+    this.audit.record({ workspaceId: ws, actor: `staff:${cur.id}`, action: "people.form_submitted", target: cur.id, data: { fields: Object.keys(changes), ...(asked ? { timeOffDays: asked.days } : {}) } });
+    return this.formView(token);
+  }
+
+  /** An emergency contact given on the form counts as the "emergency contact" record, unless already checked. */
+  private withEmergencyDoc(m: StaffMember, by: string): StaffMember {
+    const p = m.profile;
+    if (!p?.emergencyName || !p.emergencyPhone || m.documents.emergency_contact?.status === "checked") return m;
+    const today = this.today();
+    return { ...m, documents: { ...m.documents, emergency_contact: { status: "checked", checkedOn: today, checkedBy: by, updatedAt: today, note: "From the staff details form" } } };
+  }
+
   /** Deletes a record for good (a data request, or the retention period has passed). Owner only. */
   remove(userId: string, ws: string, id: string): void {
     this.identity.require(userId, ws, "workspace.manage");
@@ -359,6 +531,7 @@ export class PeopleService {
     if (!cur.endDate || cur.endDate >= this.today()) throw new PeopleError("set a leaving date in the past first; records of current staff are kept");
     this.staff.delete(id);
     this.byWorkspace.get(ws)?.delete(id);
+    if (cur.formLink?.hash) this.byLink.delete(cur.formLink.hash);
     this.sink?.staff(cur, true);
     this.log(userId, ws, "people.deleted", id, keepUntil && keepUntil > this.today() ? { retentionWarning: `right-to-work evidence should be kept until ${keepUntil}` } : undefined);
   }
@@ -378,6 +551,7 @@ export class PeopleService {
       `Staff records (HR desk, current, entered by the owner): ${sum.headcount} staff, records ${sum.recordsComplete}% complete, ${sum.expiringSoon} documents expiring within 60 days, ${sum.expired} expired.`,
       ...sum.actions.slice(0, 40).map((a) => `- [${a.severity}] ${a.staffName}: ${a.title}${a.dueOn ? ` (${a.dueOn})` : ""}`),
       ...offOn(staff, today).map((o) => `Off today: ${o.name} (${o.kind}) until ${o.to}`),
+      ...staff.filter((m) => m.profile?.updatedOn && staffStatus(m, today) !== "left").slice(0, 100).map((m) => `When ${m.name} can work: ${workLine(m.profile!)}`),
       "Answer only from these records. Never invent documents, dates or people.",
     ];
     return lines.join("\n");

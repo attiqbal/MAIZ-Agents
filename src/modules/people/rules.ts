@@ -3,6 +3,7 @@
 // Pure functions over plain data, shared by the server (PeopleService) and the website.
 import { addDays, addMonths, daysBetween, leaveYear } from "./dates.js";
 import { requiredDocuments, type Requirement, type Sector } from "./requirements.js";
+import { profileStarted, type StaffProfile } from "./profile.js";
 
 export type ContractType = "full_time" | "part_time" | "zero_hours" | "fixed_term" | "casual" | "apprentice";
 export const CONTRACT_LABEL: Record<ContractType, string> = {
@@ -79,6 +80,10 @@ export interface StaffMember {
   notes?: string;
   /** The same person on the rota, so shifts and the staff record stay one list. */
   rotaStaffId?: string;
+  /** What they told us: availability, preferences, emergency contact, skills. */
+  profile?: StaffProfile;
+  /** Their own form link. Only a hash of the link is kept, never the link itself. */
+  formLink?: { hash?: string; createdOn: string; expiresOn: string; usedOn?: string };
   createdAt: string;
   updatedAt: string;
 }
@@ -247,7 +252,7 @@ export function leaveBalance(m: StaffMember, today: string, yearStartMonth = 1):
 export type Severity = "critical" | "high" | "medium" | "low";
 const SEVERITY_ORDER: Record<Severity, number> = { critical: 0, high: 1, medium: 2, low: 3 };
 
-export type ActionKind = "request" | "check" | "renew" | "approve_leave" | "review" | "checklist";
+export type ActionKind = "request" | "check" | "renew" | "approve_leave" | "review" | "checklist" | "send_form" | "skill";
 export interface HrAction {
   id: string;
   staffId: string;
@@ -314,6 +319,15 @@ export function staffActions(m: StaffMember, sector: Sector, today: string, docs
     if (inDays > 14) continue;
     const name = r.kind === "probation" ? "Probation review" : r.kind === "annual" ? "Yearly review" : "One-to-one";
     out.push({ id: `${m.id}:review:${r.id}`, staffId: m.id, staffName: m.name, severity: inDays < 0 ? "high" : "medium", kind: "review", ref: r.id, title: inDays < 0 ? `${name} overdue` : `${name} due in ${inDays} day${inDays === 1 ? "" : "s"}`, detail: r.kind === "probation" ? "Confirm they passed, extend, or end the probation in writing." : "Hold it and note the outcome.", dueOn: r.dueOn });
+  }
+  for (const sk of m.profile?.skills ?? []) {
+    if (!sk.expiresOn) continue;
+    const left = daysBetween(today, sk.expiresOn);
+    if (left > EXPIRY_WARNING_DAYS) continue;
+    out.push({ id: `${m.id}:skill:${sk.name}`, staffId: m.id, staffName: m.name, severity: left < 0 ? "medium" : "low", kind: "skill", title: left < 0 ? `${sk.name} expired` : `${sk.name} expires in ${left} day${left === 1 ? "" : "s"}`, detail: `${left < 0 ? "Expired" : "Expires"} on ${humanDate(sk.expiresOn)}. Book a refresher if the job needs it.`, dueOn: sk.expiresOn });
+  }
+  if ((status === "starting" || status === "active") && !profileStarted(m.profile)) {
+    out.push({ id: `${m.id}:form`, staffId: m.id, staffName: m.name, severity: "low", kind: "send_form", title: "Availability and contact details not filled in", detail: m.formLink ? `Form link sent. It works until ${humanDate(m.formLink.expiresOn)}.` : "Send them the staff form: when they can work, emergency contact, skills." });
   }
   if (status === "leaving" && m.endDate) {
     const open = leavingChecklist().filter((i) => !m.checklist[i.key]);

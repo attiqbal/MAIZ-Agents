@@ -182,6 +182,10 @@ export function createPlatform(cfg: PlatformConfig) {
       if (!h && !mine.length) return undefined;
       return { weekStart: w.weekStart, shifts: mine.map((s) => ({ date: s.date, start: s.start, end: s.end, hours: s.hours, ...(s.role ? { role: s.role } : {}) })), hours: h?.hours ?? 0, cap: h?.cap ?? 48 };
     },
+    syncRota: (m, prefs) => {
+      try { rota.setLimits(m.workspaceId, m.rotaStaffId!, prefs); } catch (e) { if (!(e instanceof RotaError)) throw e; }
+    },
+    businessName: (ws) => identity.workspaceById(ws)?.name,
   });
   workforce.addContext((ws, templateKey) => people.contextFor(ws, templateKey));
   /** Checkout and orders. What a paid order buys is hired here, from the same templates the store sells. */
@@ -401,6 +405,8 @@ export function createPlatform(cfg: PlatformConfig) {
   const usedLinks = new ExpiringSet(() => now().getTime());
   /** Sign-in emails sent per address and hour, to stop the form being used to spam someone. */
   const sends = new SendLog();
-  return { dashboard, reconciliation, rota, people, payments, batch, email, usedLinks, sends, admin, reviews, prices, specialists, ai, clients, isPlatformOwner, healthy, cfg, now, audit, bus, identity, energy, workforce, ledger, onboarding, router, integrations, slackTokens, saveSlackToken, attachStore };
+  /** Opens and saves per staff form link, so a link cannot be hammered. */
+  const formHits = new SendLog();
+  return { dashboard, reconciliation, rota, people, payments, batch, email, usedLinks, sends, formHits, admin, reviews, prices, specialists, ai, clients, isPlatformOwner, healthy, cfg, now, audit, bus, identity, energy, workforce, ledger, onboarding, router, integrations, slackTokens, saveSlackToken, attachStore };
 }
 export type Platform = ReturnType<typeof createPlatform>;

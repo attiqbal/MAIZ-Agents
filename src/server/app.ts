@@ -40,6 +40,9 @@ function readCookie(header: string | undefined, name: string): string | undefine
   return undefined;
 }
 
+/** Opens or saves of one staff form link per hour. */
+const STAFF_FORM_PER_HOUR = 30;
+
 export interface Req {
   method: string;
   path: string;
@@ -148,6 +151,17 @@ export function createApp(p: Platform) {
       const lines = body().lines;
       if (!Array.isArray(lines) || lines.length > 100) throw new BadRequest("lines must be a list of up to 100 items");
       return json(200, quote(lines, p.prices.catalogue()));
+    }
+
+    // ---- a member of staff filling in their own details from their form link (no account) ----
+    if (method === "POST" && (path === "/api/staff-form/open" || path === "/api/staff-form/save")) {
+      const b = body();
+      const token = typeof b.token === "string" ? b.token.slice(0, 64) : "";
+      const nowMs = p.now().getTime();
+      const key = `staff-form:${path.endsWith("save") ? "save" : "open"}:${token}`;
+      if (p.formHits.recent(key, nowMs).length >= STAFF_FORM_PER_HOUR) return json(429, { error: "too many tries, please wait a while and try again" });
+      p.formHits.record(key, nowMs);
+      return json(200, path.endsWith("save") ? p.people.submitForm(token, b) : p.people.formView(token));
     }
 
     // ---- sign in by email link ----
@@ -497,7 +511,7 @@ export function createApp(p: Platform) {
     return json(404, { error: "not found" });
   }
 
-  /** Only the platform owner gets past the first line. The service checks again, so no route can skip it. */
+  /** The HR desk: owner and admins only (`people.manage`); the service checks it on every call. */
   function peopleRoutes(req: Req, userId: string, ws: string, body: () => any): Res {
     const { method, path } = req;
     const P = p.people;
@@ -511,6 +525,7 @@ export function createApp(p: Platform) {
       if (method === "POST") return json(200, P.update(userId, ws, m[1]!, body()));
       if (method === "DELETE") { P.remove(userId, ws, m[1]!); return json(200, { deleted: true }); }
     }
+    if ((m = new RegExp(`^/api/people/${id}/form-link$`).exec(path)) && method === "DELETE") return json(200, P.stopFormLink(userId, ws, m[1]!));
     if (method !== "POST") return json(404, { error: "not found" });
     if ((m = new RegExp(`^/api/people/${id}/documents/([a-z_]{1,40})$`).exec(path))) return json(200, P.setDocument(userId, ws, m[1]!, m[2]!, body()));
     if ((m = new RegExp(`^/api/people/${id}/checklist/([a-z_]{1,40})$`).exec(path))) return json(200, P.setChecklist(userId, ws, m[1]!, m[2]!, body().done));
@@ -519,6 +534,12 @@ export function createApp(p: Platform) {
     if ((m = new RegExp(`^/api/people/${id}/reviews$`).exec(path))) return json(200, P.addReview(userId, ws, m[1]!, body()));
     if ((m = new RegExp(`^/api/people/${id}/reviews/${id}/done$`).exec(path))) return json(200, P.completeReview(userId, ws, m[1]!, m[2]!, body()));
     if ((m = new RegExp(`^/api/people/${id}/leaving$`).exec(path))) return json(200, P.setLeaving(userId, ws, m[1]!, body().endDate));
+    if ((m = new RegExp(`^/api/people/${id}/profile$`).exec(path))) return json(200, P.updateProfile(userId, ws, m[1]!, body()));
+    if ((m = new RegExp(`^/api/people/${id}/form-link$`).exec(path))) {
+      const { token, expiresOn } = P.createFormLink(userId, ws, m[1]!);
+      // The token rides in the fragment, so it never reaches server logs or another site's Referer header.
+      return json(201, { url: `${(p.cfg.appUrl ?? "").replace(/\/$/, "")}/staff-form.html#t=${token}`, expiresOn });
+    }
     return json(404, { error: "not found" });
   }
 
