@@ -1,6 +1,6 @@
 ---
 name: product-manager
-description: Job description and skills of the MAIZ agents Product manager. Decides what the product should do next and why.
+description: Job description and skills of the MAIZ Agents Product manager. Decides what the product should do next and why.
 ---
 
 <!-- Generated from src/modules/workforce/job-descriptions.ts by `npm run skills`. Edit that file, not this one. -->

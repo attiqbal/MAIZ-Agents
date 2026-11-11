@@ -1,6 +1,6 @@
 ---
 name: email-crm-specialist
-description: Job description and skills of the MAIZ agents Email and CRM specialist. Keeps the customer list clean and sends the right message to the right customers.
+description: Job description and skills of the MAIZ Agents Email and CRM specialist. Keeps the customer list clean and sends the right message to the right customers.
 ---
 
 <!-- Generated from src/modules/workforce/job-descriptions.ts by `npm run skills`. Edit that file, not this one. -->

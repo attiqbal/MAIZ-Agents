@@ -1,6 +1,6 @@
 ---
 name: seo-specialist
-description: Job description and skills of the MAIZ agents SEO specialist. Gets the website found in search.
+description: Job description and skills of the MAIZ Agents SEO specialist. Gets the website found in search.
 ---
 
 <!-- Generated from src/modules/workforce/job-descriptions.ts by `npm run skills`. Edit that file, not this one. -->

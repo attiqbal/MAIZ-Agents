@@ -1,4 +1,4 @@
--- MAIZ agents: shared-database layout (privacy level 1).
+-- MAIZ Agents: shared-database layout (privacy level 1).
 -- Every customer-owned table carries workspace_id and is protected by
 -- row-level security: a connection can only see rows for the workspace it
 -- declared with  SELECT set_config('app.workspace_id', '<uuid>', true).

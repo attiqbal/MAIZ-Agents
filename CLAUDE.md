@@ -1,4 +1,4 @@
-# MAIZ agents: working notes for Claude Code
+# MAIZ Agents: working notes for Claude Code
 
 A store of AI employees for people who know nothing about AI. Backend: TypeScript modular monolith in `src/` (see `docs/ARCHITECTURE.md`). Website: `web/` (Vite + TypeScript, no framework).
 

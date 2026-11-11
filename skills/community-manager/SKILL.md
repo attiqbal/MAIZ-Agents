@@ -1,6 +1,6 @@
 ---
 name: community-manager
-description: Job description and skills of the MAIZ agents Community and reviews manager. Looks after the business's reviews, comments and community so customers feel heard.
+description: Job description and skills of the MAIZ Agents Community and reviews manager. Looks after the business's reviews, comments and community so customers feel heard.
 ---
 
 <!-- Generated from src/modules/workforce/job-descriptions.ts by `npm run skills`. Edit that file, not this one. -->

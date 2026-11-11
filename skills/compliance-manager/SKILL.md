@@ -1,6 +1,6 @@
 ---
 name: compliance-manager
-description: Job description and skills of the MAIZ agents Compliance manager. Look after the business's compliance end to end.
+description: Job description and skills of the MAIZ Agents Compliance manager. Look after the business's compliance end to end.
 ---
 
 <!-- Generated from src/modules/workforce/job-descriptions.ts by `npm run skills`. Edit that file, not this one. -->

@@ -1,6 +1,6 @@
 ---
 name: sales-manager
-description: Job description and skills of the MAIZ agents Sales manager. Builds the sales plan and pipeline and helps close deals.
+description: Job description and skills of the MAIZ Agents Sales manager. Builds the sales plan and pipeline and helps close deals.
 ---
 
 <!-- Generated from src/modules/workforce/job-descriptions.ts by `npm run skills`. Edit that file, not this one. -->

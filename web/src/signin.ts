@@ -24,8 +24,8 @@ async function verify(t: string): Promise<void> {
   }
   setToken(r.data.token);
   try {
-    const profile = JSON.parse(localStorage.getItem("vn.profile") ?? "{}");
-    localStorage.setItem("vn.profile", JSON.stringify({ ...profile, email: r.data.email }));
+    const profile = JSON.parse(localStorage.getItem("maiz.profile") ?? "{}");
+    localStorage.setItem("maiz.profile", JSON.stringify({ ...profile, email: r.data.email }));
   } catch { /* storage unavailable */ }
   // The MAIZ platform owner lands on the quality review queue; clients on their control centre.
   location.replace(r.data.platformOwner ? "/review.html" : r.data.hasOrganisation ? "/app.html" : "/onboarding.html");

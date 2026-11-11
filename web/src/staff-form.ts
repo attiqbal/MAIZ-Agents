@@ -46,7 +46,7 @@ function fail(message: string): void {
 }
 
 function show(v: FormView): void {
-  document.title = `Your details for ${v.businessName} · MAIZ agents`;
+  document.title = `Your details for ${v.businessName} · MAIZ Agents`;
   $("sf-h").textContent = `Hi ${v.firstName}, your details for ${v.businessName}`;
   $("sf-intro").textContent = `This helps ${v.businessName} plan shifts around you and reach someone if anything happens at work. It takes about 5 minutes. The link works until ${fmt(v.expiresOn)}, and you can come back to change your answers.`;
   $("sf-biz-2").textContent = v.businessName;

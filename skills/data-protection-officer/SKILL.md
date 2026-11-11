@@ -1,6 +1,6 @@
 ---
 name: data-protection-officer
-description: Job description and skills of the MAIZ agents Data protection lead. Makes sure personal data is handled lawfully and safely.
+description: Job description and skills of the MAIZ Agents Data protection lead. Makes sure personal data is handled lawfully and safely.
 ---
 
 <!-- Generated from src/modules/workforce/job-descriptions.ts by `npm run skills`. Edit that file, not this one. -->

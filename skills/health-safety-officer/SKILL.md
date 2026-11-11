@@ -1,6 +1,6 @@
 ---
 name: health-safety-officer
-description: Job description and skills of the MAIZ agents Health and safety officer. Keeps staff, customers and visitors safe and the business compliant.
+description: Job description and skills of the MAIZ Agents Health and safety officer. Keeps staff, customers and visitors safe and the business compliant.
 ---
 
 <!-- Generated from src/modules/workforce/job-descriptions.ts by `npm run skills`. Edit that file, not this one. -->

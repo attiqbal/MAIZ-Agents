@@ -1,6 +1,6 @@
 ---
 name: procurement-specialist
-description: Job description and skills of the MAIZ agents Procurement specialist. Gets the best value from suppliers with fair, documented buying.
+description: Job description and skills of the MAIZ Agents Procurement specialist. Gets the best value from suppliers with fair, documented buying.
 ---
 
 <!-- Generated from src/modules/workforce/job-descriptions.ts by `npm run skills`. Edit that file, not this one. -->

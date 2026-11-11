@@ -1,6 +1,6 @@
 ---
 name: credit-controller
-description: Job description and skills of the MAIZ agents Credit controller. Gets customers to pay on time and keeps bad debt low.
+description: Job description and skills of the MAIZ Agents Credit controller. Gets customers to pay on time and keeps bad debt low.
 ---
 
 <!-- Generated from src/modules/workforce/job-descriptions.ts by `npm run skills`. Edit that file, not this one. -->

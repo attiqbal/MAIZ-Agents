@@ -1,6 +1,6 @@
 ---
 name: financial-analyst
-description: Job description and skills of the MAIZ agents Financial analyst. Turns the numbers into forecasts, scenarios and investment decisions.
+description: Job description and skills of the MAIZ Agents Financial analyst. Turns the numbers into forecasts, scenarios and investment decisions.
 ---
 
 <!-- Generated from src/modules/workforce/job-descriptions.ts by `npm run skills`. Edit that file, not this one. -->

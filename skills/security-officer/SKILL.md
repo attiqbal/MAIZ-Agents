@@ -1,6 +1,6 @@
 ---
 name: security-officer
-description: Job description and skills of the MAIZ agents Cybersecurity officer. Protects the business from cyber attacks and data loss.
+description: Job description and skills of the MAIZ Agents Cybersecurity officer. Protects the business from cyber attacks and data loss.
 ---
 
 <!-- Generated from src/modules/workforce/job-descriptions.ts by `npm run skills`. Edit that file, not this one. -->

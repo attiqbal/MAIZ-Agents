@@ -1,6 +1,6 @@
 ---
 name: content-writer
-description: Job description and skills of the MAIZ agents Content writer. Writes blogs, guides and newsletters that bring in and keep customers.
+description: Job description and skills of the MAIZ Agents Content writer. Writes blogs, guides and newsletters that bring in and keep customers.
 ---
 
 <!-- Generated from src/modules/workforce/job-descriptions.ts by `npm run skills`. Edit that file, not this one. -->

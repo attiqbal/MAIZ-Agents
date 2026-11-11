@@ -1,6 +1,6 @@
 ---
 name: video-content-producer
-description: Job description and skills of the MAIZ agents Video and audio producer. Plans and scripts short videos, reels and podcasts that fit the brand.
+description: Job description and skills of the MAIZ Agents Video and audio producer. Plans and scripts short videos, reels and podcasts that fit the brand.
 ---
 
 <!-- Generated from src/modules/workforce/job-descriptions.ts by `npm run skills`. Edit that file, not this one. -->

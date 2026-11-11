@@ -1,6 +1,6 @@
 ---
 name: data-analyst
-description: Job description and skills of the MAIZ agents Data analyst. Turns business data into clear answers and dashboards.
+description: Job description and skills of the MAIZ Agents Data analyst. Turns business data into clear answers and dashboards.
 ---
 
 <!-- Generated from src/modules/workforce/job-descriptions.ts by `npm run skills`. Edit that file, not this one. -->

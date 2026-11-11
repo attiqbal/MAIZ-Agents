@@ -182,7 +182,7 @@ export function createApp(p: Platform) {
       // The link opens a page that posts the token back, so mail scanners that pre-open links cannot use it up.
       await p.email.send({
         to: email,
-        subject: "Your MAIZ agents sign-in link",
+        subject: "Your MAIZ Agents sign-in link",
         text: `Click to sign in. The link works once and expires in 15 minutes.\n\n${base}/signin.html#token=${link}\n\nIf you didn't ask for this, ignore this email.`,
       }).catch(() => undefined);
       // Same answer whether or not the address has an account. In development the website skips the email step.

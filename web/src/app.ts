@@ -14,7 +14,7 @@ const app = $("app");
 
 // Profile from onboarding (falls back to the example business).
 let profile: { biz?: string; email?: string; slack?: boolean; contact?: string } = {};
-try { profile = JSON.parse(localStorage.getItem("vn.profile") ?? "{}"); } catch { /* ignore */ }
+try { profile = JSON.parse(localStorage.getItem("maiz.profile") ?? "{}"); } catch { /* ignore */ }
 const biz = profile.biz || "Kestrel Coffee";
 let orgName = biz;
 const initials = (s: string) => s.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]!.toUpperCase()).join("") || "MA";
@@ -41,7 +41,7 @@ function route(): void {
   });
   app.classList.remove("menu-open"); $("menu-btn").setAttribute("aria-expanded", "false");
   const title = screens.find((x) => x.dataset.screen === valid)?.querySelector("h1")?.textContent ?? "Control centre";
-  document.title = `${valid === "home" ? "Overview" : title} · ${orgName} · MAIZ agents`;
+  document.title = `${valid === "home" ? "Overview" : title} · ${orgName} · MAIZ Agents`;
   window.scrollTo({ top: 0 });
 }
 window.addEventListener("hashchange", route);

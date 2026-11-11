@@ -1,6 +1,6 @@
 ---
 name: ecommerce-manager
-description: Job description and skills of the MAIZ agents E-commerce manager. Runs the online shop and marketplace listings so products are found, priced right and in stock.
+description: Job description and skills of the MAIZ Agents E-commerce manager. Runs the online shop and marketplace listings so products are found, priced right and in stock.
 ---
 
 <!-- Generated from src/modules/workforce/job-descriptions.ts by `npm run skills`. Edit that file, not this one. -->

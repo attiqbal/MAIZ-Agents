@@ -5,7 +5,7 @@
  * `fixedGbp` is what the task would cost alone and is only used to size the pass
  * prices; the pass is what is sold.
  *
- * Prices are draft list prices for the owner of MAIZ agents to confirm.
+ * Prices are draft list prices for the owner of MAIZ Agents to confirm.
  * Pure data, no server imports: the website imports this file too.
  */
 export interface TaskRole {

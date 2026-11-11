@@ -1,6 +1,6 @@
 ---
 name: supply-chain-manager
-description: Job description and skills of the MAIZ agents Supply chain and inventory manager. Keep the right stock in the right place at the right cost, and keep the supply chain legal.
+description: Job description and skills of the MAIZ Agents Supply chain and inventory manager. Keep the right stock in the right place at the right cost, and keep the supply chain legal.
 ---
 
 <!-- Generated from src/modules/workforce/job-descriptions.ts by `npm run skills`. Edit that file, not this one. -->

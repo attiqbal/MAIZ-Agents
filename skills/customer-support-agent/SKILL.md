@@ -1,6 +1,6 @@
 ---
 name: customer-support-agent
-description: Job description and skills of the MAIZ agents Customer support agent. Answers customer questions in the business's voice and hands over when unsure.
+description: Job description and skills of the MAIZ Agents Customer support agent. Answers customer questions in the business's voice and hands over when unsure.
 ---
 
 <!-- Generated from src/modules/workforce/job-descriptions.ts by `npm run skills`. Edit that file, not this one. -->

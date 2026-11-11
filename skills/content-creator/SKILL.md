@@ -1,6 +1,6 @@
 ---
 name: content-creator
-description: Job description and skills of the MAIZ agents Brand and content creator. Creates your brand kit and writes the blogs, product copy, scripts and emails that go with it.
+description: Job description and skills of the MAIZ Agents Brand and content creator. Creates your brand kit and writes the blogs, product copy, scripts and emails that go with it.
 ---
 
 <!-- Generated from src/modules/workforce/job-descriptions.ts by `npm run skills`. Edit that file, not this one. -->

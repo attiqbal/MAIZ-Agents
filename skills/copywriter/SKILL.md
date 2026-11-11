@@ -1,6 +1,6 @@
 ---
 name: copywriter
-description: Job description and skills of the MAIZ agents Copywriter. Writes the words for campaigns, ads, brochures and scripts in the brand's voice.
+description: Job description and skills of the MAIZ Agents Copywriter. Writes the words for campaigns, ads, brochures and scripts in the brand's voice.
 ---
 
 <!-- Generated from src/modules/workforce/job-descriptions.ts by `npm run skills`. Edit that file, not this one. -->

@@ -1,6 +1,6 @@
 # Runbook
 
-How to run MAIZ agents once it is live. Setup is in [DEPLOY.md](DEPLOY.md).
+How to run MAIZ Agents once it is live. Setup is in [DEPLOY.md](DEPLOY.md).
 
 ## Shape
 - One Docker service serves the website (`web/dist`) and the API (`/api/*`) on one address. Built and checked by CI on every pull request; Render deploys `main` automatically.

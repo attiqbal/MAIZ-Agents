@@ -1,6 +1,6 @@
 ---
 name: ux-designer
-description: Job description and skills of the MAIZ agents UX and web designer. Designs pages and screens customers can use easily, on any device.
+description: Job description and skills of the MAIZ Agents UX and web designer. Designs pages and screens customers can use easily, on any device.
 ---
 
 <!-- Generated from src/modules/workforce/job-descriptions.ts by `npm run skills`. Edit that file, not this one. -->

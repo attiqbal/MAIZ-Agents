@@ -1,6 +1,6 @@
 ---
 name: partnerships-manager
-description: Job description and skills of the MAIZ agents Partnerships manager. Finds and looks after resellers, affiliates and partners who bring in customers.
+description: Job description and skills of the MAIZ Agents Partnerships manager. Finds and looks after resellers, affiliates and partners who bring in customers.
 ---
 
 <!-- Generated from src/modules/workforce/job-descriptions.ts by `npm run skills`. Edit that file, not this one. -->

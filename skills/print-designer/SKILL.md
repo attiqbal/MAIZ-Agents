@@ -1,6 +1,6 @@
 ---
 name: print-designer
-description: Job description and skills of the MAIZ agents Brochure and print designer. Designs brochures, menus, flyers, packaging inserts and presentations ready for print or PDF.
+description: Job description and skills of the MAIZ Agents Brochure and print designer. Designs brochures, menus, flyers, packaging inserts and presentations ready for print or PDF.
 ---
 
 <!-- Generated from src/modules/workforce/job-descriptions.ts by `npm run skills`. Edit that file, not this one. -->

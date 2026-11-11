@@ -1,6 +1,6 @@
 ---
 name: ads-specialist
-description: Job description and skills of the MAIZ agents Paid ads specialist. Plans and improves paid campaigns so every pound or dollar works harder.
+description: Job description and skills of the MAIZ Agents Paid ads specialist. Plans and improves paid campaigns so every pound or dollar works harder.
 ---
 
 <!-- Generated from src/modules/workforce/job-descriptions.ts by `npm run skills`. Edit that file, not this one. -->

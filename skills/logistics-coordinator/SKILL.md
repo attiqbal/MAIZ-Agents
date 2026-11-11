@@ -1,6 +1,6 @@
 ---
 name: logistics-coordinator
-description: Job description and skills of the MAIZ agents Logistics coordinator. Gets goods delivered on time and with the right paperwork.
+description: Job description and skills of the MAIZ Agents Logistics coordinator. Gets goods delivered on time and with the right paperwork.
 ---
 
 <!-- Generated from src/modules/workforce/job-descriptions.ts by `npm run skills`. Edit that file, not this one. -->

@@ -1,6 +1,6 @@
 ---
 name: growth-consultant
-description: Job description and skills of the MAIZ agents Growth marketing consultant. Finds customers: SEO audits, ad campaigns, social launches and market research.
+description: Job description and skills of the MAIZ Agents Growth marketing consultant. Finds customers: SEO audits, ad campaigns, social launches and market research.
 ---
 
 <!-- Generated from src/modules/workforce/job-descriptions.ts by `npm run skills`. Edit that file, not this one. -->

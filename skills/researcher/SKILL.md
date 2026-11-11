@@ -1,6 +1,6 @@
 ---
 name: researcher
-description: Job description and skills of the MAIZ agents Researcher. Answers questions with sources, so decisions rest on facts.
+description: Job description and skills of the MAIZ Agents Researcher. Answers questions with sources, so decisions rest on facts.
 ---
 
 <!-- Generated from src/modules/workforce/job-descriptions.ts by `npm run skills`. Edit that file, not this one. -->

@@ -1,6 +1,6 @@
 ---
 name: pricing-analyst
-description: Job description and skills of the MAIZ agents Pricing analyst. Works out what to charge, from costs, competitors and what customers will pay.
+description: Job description and skills of the MAIZ Agents Pricing analyst. Works out what to charge, from costs, competitors and what customers will pay.
 ---
 
 <!-- Generated from src/modules/workforce/job-descriptions.ts by `npm run skills`. Edit that file, not this one. -->

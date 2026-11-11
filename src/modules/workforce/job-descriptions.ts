@@ -986,7 +986,7 @@ export function renderSkillMd(jd: JobDescription): string {
   return [
     "---",
     `name: ${jd.key}`,
-    `description: Job description and skills of the MAIZ agents ${jd.jobTitle}. ${firstSentence}.`,
+    `description: Job description and skills of the MAIZ Agents ${jd.jobTitle}. ${firstSentence}.`,
     "---",
     "",
     "<!-- Generated from src/modules/workforce/job-descriptions.ts by `npm run skills`. Edit that file, not this one. -->",

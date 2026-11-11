@@ -1,6 +1,6 @@
 ---
 name: operations-manager
-description: Job description and skills of the MAIZ agents Operations manager. Runs daily operations and keeps processes, people and suppliers working together.
+description: Job description and skills of the MAIZ Agents Operations manager. Runs daily operations and keeps processes, people and suppliers working together.
 ---
 
 <!-- Generated from src/modules/workforce/job-descriptions.ts by `npm run skills`. Edit that file, not this one. -->

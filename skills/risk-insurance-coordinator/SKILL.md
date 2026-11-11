@@ -1,6 +1,6 @@
 ---
 name: risk-insurance-coordinator
-description: Job description and skills of the MAIZ agents Risk and insurance coordinator. Keeps a simple risk register and makes sure the business is insured for what could really hurt it.
+description: Job description and skills of the MAIZ Agents Risk and insurance coordinator. Keeps a simple risk register and makes sure the business is insured for what could really hurt it.
 ---
 
 <!-- Generated from src/modules/workforce/job-descriptions.ts by `npm run skills`. Edit that file, not this one. -->

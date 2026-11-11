@@ -1,6 +1,6 @@
 ---
 name: graphic-designer
-description: Job description and skills of the MAIZ agents Graphic designer. Creates on-brand visuals for posts, ads and documents.
+description: Job description and skills of the MAIZ Agents Graphic designer. Creates on-brand visuals for posts, ads and documents.
 ---
 
 <!-- Generated from src/modules/workforce/job-descriptions.ts by `npm run skills`. Edit that file, not this one. -->

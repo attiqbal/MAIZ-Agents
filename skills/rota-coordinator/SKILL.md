@@ -1,6 +1,6 @@
 ---
 name: rota-coordinator
-description: Job description and skills of the MAIZ agents Rota and shift coordinator. Builds fair staff rotas that cover demand and respect working-time rules.
+description: Job description and skills of the MAIZ Agents Rota and shift coordinator. Builds fair staff rotas that cover demand and respect working-time rules.
 ---
 
 <!-- Generated from src/modules/workforce/job-descriptions.ts by `npm run skills`. Edit that file, not this one. -->

@@ -9,7 +9,7 @@ import { APPS, COUNTRIES, NEEDS, OTHER_SECTOR, SECTORS, countryFacts, getSector,
 
 const TOTAL = 6;
 const PLAN_STEP = 4;
-const KEY = "vn.profile";
+const KEY = "maiz.profile";
 interface Profile {
   email?: string; biz?: string; sector?: string; sells?: string; country?: string; needs?: string[]; size?: string;
   apps?: string[]; site?: string; addOns?: string[]; slack?: boolean; contact?: "dashboard" | "slack";
@@ -31,7 +31,7 @@ const AVATAR: Record<string, [string, string]> = {
 const HOW: Record<AppHow, string> = { direct: "Connects directly", file: "Upload an export", bridge: "Through Zapier or Make", chat: "One scan" };
 
 // Where the owner is, so a refresh or the browser's Back button keeps their place.
-const STEP_KEY = "vn.obStep";
+const STEP_KEY = "maiz.obStep";
 const RESUMABLE_MAX = 5; // step 6 creates the team; never re-run it on a refresh
 
 function show(n: number, moveFocus = true, fromHistory = false): void {

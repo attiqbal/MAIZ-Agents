@@ -28,7 +28,7 @@ function teamOf(employeeKeys: readonly string[]): EmployeeTemplate[] {
 export function welcomeText(businessName: string, employeeKeys: readonly string[], trialDays: number): string {
   const team = teamOf(employeeKeys);
   return [
-    `Hi, I'm your Admin manager at MAIZ agents. I'll set up ${businessName}'s AI team and keep it running for you.`,
+    `Hi, I'm your Admin manager at MAIZ Agents. I'll set up ${businessName}'s AI team and keep it running for you.`,
     `Your package includes ${team.length} employees, free for your ${trialDays}-day trial:`,
     ...team.map((t) => `• ${t.title}: ${t.summary}\n  Can: ${t.capabilities.join("; ")}.`),
     "Nothing leaves your company without your approval, and your team shares one weekly energy allowance you can see in the control center.",

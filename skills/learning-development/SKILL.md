@@ -1,6 +1,6 @@
 ---
 name: learning-development
-description: Job description and skills of the MAIZ agents Learning and development coordinator. Plans the skills and training the team needs and keeps training records.
+description: Job description and skills of the MAIZ Agents Learning and development coordinator. Plans the skills and training the team needs and keeps training records.
 ---
 
 <!-- Generated from src/modules/workforce/job-descriptions.ts by `npm run skills`. Edit that file, not this one. -->

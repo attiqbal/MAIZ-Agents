@@ -10,7 +10,7 @@ import { toast } from "./common";
 import { api, getToken } from "./api";
 
 const TEAM = ["finance-manager", "marketing-manager", "business-consultant", "hr-manager", "compliance-manager"];
-const KEY = "vn.setup";
+const KEY = "maiz.setup";
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 
@@ -111,7 +111,7 @@ function fillAnswers(form: HTMLFormElement, fields: FormField[], prefill: Prefil
 /** The demo (no API) works the same plan out in the browser from what was typed at signup. */
 function demoPrefill(): Prefill | undefined {
   try {
-    const p = JSON.parse(localStorage.getItem("vn.profile") ?? "{}");
+    const p = JSON.parse(localStorage.getItem("maiz.profile") ?? "{}");
     if (typeof p.biz !== "string" || !p.biz) return undefined;
     return planSignup(readSignupAnswers({ businessName: p.biz, sector: p.sector, needs: p.needs, apps: p.apps, size: p.size, country: p.country, sells: p.sells })).prefill;
   } catch { return undefined; }

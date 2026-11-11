@@ -1,6 +1,6 @@
 ---
 name: bid-writer
-description: Job description and skills of the MAIZ agents Bid and tender writer. Writes winning bids and tender responses on time.
+description: Job description and skills of the MAIZ Agents Bid and tender writer. Writes winning bids and tender responses on time.
 ---
 
 <!-- Generated from src/modules/workforce/job-descriptions.ts by `npm run skills`. Edit that file, not this one. -->

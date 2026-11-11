@@ -1,6 +1,6 @@
 ---
 name: social-media-manager
-description: Job description and skills of the MAIZ agents Social media manager. Runs the social channels day to day and grows the community.
+description: Job description and skills of the MAIZ Agents Social media manager. Runs the social channels day to day and grows the community.
 ---
 
 <!-- Generated from src/modules/workforce/job-descriptions.ts by `npm run skills`. Edit that file, not this one. -->

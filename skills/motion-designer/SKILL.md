@@ -1,6 +1,6 @@
 ---
 name: motion-designer
-description: Job description and skills of the MAIZ agents Motion and animation designer. Makes animated explainers, logo stings and moving social ads.
+description: Job description and skills of the MAIZ Agents Motion and animation designer. Makes animated explainers, logo stings and moving social ads.
 ---
 
 <!-- Generated from src/modules/workforce/job-descriptions.ts by `npm run skills`. Edit that file, not this one. -->

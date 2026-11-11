@@ -7,7 +7,7 @@ const sizes = { 1440: [1440, 900], 375: [375, 812] };
 const shot = (p, name) => p.screenshot({ path: OUT + name });
 async function onboardTo(p, step) {
   await p.goto(B + "/onboarding.html", { waitUntil: "networkidle" });
-  await p.evaluate(() => { sessionStorage.clear(); localStorage.removeItem("vn.profile"); }); await p.goto(B + "/onboarding.html", { waitUntil: "networkidle" });
+  await p.evaluate(() => { sessionStorage.clear(); localStorage.removeItem("maiz.profile"); }); await p.goto(B + "/onboarding.html", { waitUntil: "networkidle" });
   if (step === 1) { await p.click('#sectors [data-v="food-drink"]'); await p.fill("#biz", "Kestrel Coffee"); return; }
   await p.click('#sectors [data-v="food-drink"]'); await p.fill("#biz", "Kestrel Coffee"); await p.selectOption("#country", "GB"); await p.click("#biz-go");
   if (step === 2) return;
@@ -30,11 +30,11 @@ for (const w of [1440, 375]) {
   await p.click('[data-step="5"] [data-next]'); await p.waitForTimeout(900); await shot(p, "state-loading-onboarding-375x812.png");
   await p.waitForSelector("#open-app", { state: "visible", timeout: 9000 }).catch(() => {}); await p.waitForTimeout(800); await shot(p, "state-success-onboarding-375x812.png");
   await p.click("#open-app"); await p.waitForURL(/app\.html/); await p.goto(B + "/app.html#setup", { waitUntil: "networkidle" }); await p.waitForTimeout(800); await shot(p, "setup-prefilled-375x812.png");
-  const token = await p.evaluate(() => localStorage.getItem("vn.token")); const prof = await p.evaluate(() => localStorage.getItem("vn.profile"));
+  const token = await p.evaluate(() => localStorage.getItem("maiz.token")); const prof = await p.evaluate(() => localStorage.getItem("maiz.profile"));
   await ctx.close();
   // Signed-in desktop states with the same client
   const c2 = await ctxFor(1440, 900); const q = await c2.newPage();
-  await q.goto(B + "/signin.html"); await q.evaluate(([t, pr]) => { localStorage.setItem("vn.token", t); if (pr) localStorage.setItem("vn.profile", pr); }, [token, prof]);
+  await q.goto(B + "/signin.html"); await q.evaluate(([t, pr]) => { localStorage.setItem("maiz.token", t); if (pr) localStorage.setItem("maiz.profile", pr); }, [token, prof]);
   for (const [hash, name] of [["home", "state-partial-app"], ["approvals", "state-empty-approvals"], ["setup", "setup-prefilled"], ["apps", "apps-signed-in"], ["settings", "settings-topups"], ["work", "tasks-signoff"]]) {
     await q.goto(B + "/app.html#" + hash, { waitUntil: "networkidle" }); await q.waitForTimeout(700); await shot(q, `${name}-1440x900.png`);
   }

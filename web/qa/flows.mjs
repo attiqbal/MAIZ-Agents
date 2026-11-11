@@ -58,7 +58,7 @@ const mk = async (opts = {}) => { const ctx = await b.newContext({ viewport: { w
   await p.click('[data-step="5"] [data-next]');
   await p.waitForSelector("#open-app", { state: "visible", timeout: 8000 }).catch(() => {});
   await p.waitForTimeout(2500);
-  const token = await p.evaluate(() => localStorage.getItem("vn.token"));
+  const token = await p.evaluate(() => localStorage.getItem("maiz.token"));
   ok("onboarding: account created (login stored)", !!token);
   await p.click("#open-app"); await p.waitForURL(/app\.html/); await p.waitForTimeout(800);
   ok("app (signed in): shows the real business name", (await p.textContent("#org-name")) === "Example Bakery", await p.textContent("#org-name"));
@@ -151,7 +151,7 @@ const mk = async (opts = {}) => { const ctx = await b.newContext({ viewport: { w
   await p.goto(B + "/signin.html"); await p.fill("#si-email", OWNER); await p.click("#si-go"); await p.waitForTimeout(500);
   const log = (await import("node:fs")).readFileSync(process.env.QA_SERVER_LOG ?? "", "utf8");
   const esc = OWNER.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const link = [...log.matchAll(new RegExp(`--- email to ${esc} ---\\nYour MAIZ agents sign-in link[^#]*#token=(\\S+)`, "g"))].at(-1)?.[1];
+  const link = [...log.matchAll(new RegExp(`--- email to ${esc} ---\\nYour MAIZ Agents sign-in link[^#]*#token=(\\S+)`, "g"))].at(-1)?.[1];
   ok("owner review: no dev shortcut for the owner, emailed link required", /Check your email/.test(await p.textContent("#si-h")) && !!link);
   await p.goto("about:blank"); await p.goto(B + "/signin.html#token=" + link); await p.waitForURL(/review\.html/, { timeout: 5000 }).catch(() => {});
   ok("owner review: platform owner lands on the review queue", p.url().includes("/review.html"), p.url());
@@ -183,7 +183,7 @@ const mk = async (opts = {}) => { const ctx = await b.newContext({ viewport: { w
   ok("owner prices: history records the change", (await p.textContent("#pr-history") ?? "").includes("QA price check"));
   await p.context().close();
   const c = await mk();
-  await c.goto(B + "/signin.html"); await c.evaluate((t) => localStorage.setItem("vn.token", t), client.token);
+  await c.goto(B + "/signin.html"); await c.evaluate((t) => localStorage.setItem("maiz.token", t), client.token);
   await c.goto(B + "/review.html"); await c.waitForTimeout(500);
   ok("owner review: a client opening the queue is turned away", /platform owner/.test(await c.textContent("#ow-gate-h")) && (await c.locator(".so-card").count()) === 0);
   await c.context().close();
