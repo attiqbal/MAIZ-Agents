@@ -134,6 +134,13 @@ export interface TeamEnergy {
   refillsAt: string | null;
 }
 
+/** A task's energy set aside while it runs. */
+export interface EnergyHold { workspaceId: string; energy: number; overtime: boolean }
+
+/** Expected energy of a task before a workspace has any history (a typical drafted document). */
+const DEFAULT_TASK_ESTIMATE = 60;
+const RECENT_TASKS = 20;
+
 export type Verdict =
   | { allowed: true; overtime: boolean }
   | { allowed: false; reason: "daily_quota_used" | "weekly_pool_used" | "daily_ceiling_reached" | "overtime_cap_reached" | "monthly_cost_cap_reached" | "trial_ended" };
@@ -159,6 +166,13 @@ export function costMicro(provider: string, inputTokens: number, outputTokens: n
 export class EnergyMeter {
   private plans = new Map<string, EnergyPlan>();
   private usage: UsageRecord[] = [];
+  /**
+   * Energy promised to tasks that are running now, by workspace. A task is checked before it starts but only
+   * pays when it ends, so without this a burst of tasks all pass the same check and overspend the pool.
+   */
+  private held = new Map<string, { pool: number; topUp: number }>();
+  /** Energy of each workspace's last few finished tasks, to estimate what a new one will use. */
+  private recent = new Map<string, number[]>();
   private sink?: Sink;
 
   useSink(sink: Sink): void {
@@ -171,6 +185,7 @@ export class EnergyMeter {
 
   restoreUsage(u: UsageRecord): void {
     this.usage.push(u);
+    this.recent.set(u.workspaceId, [...(this.recent.get(u.workspaceId) ?? []), u.energy].slice(-RECENT_TASKS));
   }
 
   constructor(
@@ -223,13 +238,14 @@ export class EnergyMeter {
     const used = rows.reduce((s, u) => s + u.energy, 0);
     const usedToday = rows.filter((u) => u.day === day).reduce((s, u) => s + u.energy, 0);
     const pool = plan.weeklyTeamEnergy + this.poolBonus(workspaceId, plan);
-    const left = Math.max(0, pool - used);
+    const held = this.held.get(workspaceId)?.pool ?? 0;
+    const left = Math.max(0, pool - used - held);
     const ceiling = plan.dailyTeamCeiling ?? null;
     const refillsAt = plan.expiresAt ? null : new Date(weekStart(this.now()).getTime() + 7 * 86_400_000).toISOString();
     const percentUsed = pool > 0 ? Math.min(100, Math.round((used / pool) * 100)) : 100;
     return {
       pool, used, left, percentUsed, topUpLeft: this.topUpLeft(workspaceId), autoReload: plan.autoReload ?? null,
-      leftToday: ceiling === null ? left : Math.min(left, Math.max(0, ceiling - usedToday)), dailyCeiling: ceiling, refillsAt,
+      leftToday: ceiling === null ? left : Math.min(left, Math.max(0, ceiling - usedToday - held)), dailyCeiling: ceiling, refillsAt,
     };
   }
 
@@ -237,7 +253,7 @@ export class EnergyMeter {
   topUpLeft(workspaceId: string): number {
     const bought = this.planOf(workspaceId).topUpEnergyBought ?? 0;
     const used = this.usage.filter((u) => u.workspaceId === workspaceId && u.overtime).reduce((s, u) => s + u.energy, 0);
-    return Math.max(0, bought - used);
+    return Math.max(0, bought - used - (this.held.get(workspaceId)?.topUp ?? 0));
   }
 
   private charge?: (workspaceId: string, gbp: number, what: string) => boolean;
@@ -318,6 +334,11 @@ export class EnergyMeter {
     if (team) {
       // Shared pool: the daily ceiling and an agent's own cap are safety limits, not something to buy past.
       if (team.dailyCeiling !== null && team.left > 0 && team.leftToday === 0) return { allowed: false, reason: "daily_ceiling_reached" };
+      // Top-up work counts towards the daily ceiling too, so an empty pool does not switch the safety limit off.
+      if (team.dailyCeiling !== null && team.left === 0) {
+        const allToday = mine.filter((u) => u.day === day).reduce((s, u) => s + u.energy, 0) + this.heldTotal(workspaceId);
+        if (allToday >= team.dailyCeiling) return { allowed: false, reason: "daily_ceiling_reached" };
+      }
       const cap = this.agentCap(workspaceId, employeeId);
       // Same count as remainingToday: an agent's cap is measured on pool energy, not on bought top-ups.
       const poolUsedToday = mine.filter((u) => u.employeeId === employeeId && u.day === day && !u.overtime).reduce((s, u) => s + u.energy, 0);
@@ -331,6 +352,43 @@ export class EnergyMeter {
     if (plan.monthlyOvertimeCap === 0) return { allowed: false, reason: team ? "weekly_pool_used" : "daily_quota_used" };
     if (overtimeUsed >= plan.monthlyOvertimeCap) return { allowed: false, reason: "overtime_cap_reached" };
     return { allowed: true, overtime: true };
+  }
+
+  /** What a new task for this workspace may use: the largest of its last few tasks. */
+  estimateFor(workspaceId: string): number {
+    const r = this.recent.get(workspaceId);
+    // The largest recent task, not the average: holding a little too much only delays a task, holding too little overspends.
+    return r?.length ? Math.max(1, ...r) : DEFAULT_TASK_ESTIMATE;
+  }
+
+  private heldTotal(workspaceId: string): number {
+    const h = this.held.get(workspaceId);
+    return h ? h.pool + h.topUp : 0;
+  }
+
+  /**
+   * Sets aside the expected energy of a task that is about to run, so tasks running at the same time cannot all
+   * spend the same energy. Call `release` with the result once the task has been recorded (or failed).
+   */
+  hold(workspaceId: string, verdict: Verdict & { allowed: true }): EnergyHold {
+    const energy = this.estimateFor(workspaceId);
+    const h = this.held.get(workspaceId) ?? { pool: 0, topUp: 0 };
+    this.held.set(workspaceId, verdict.overtime ? { ...h, topUp: h.topUp + energy } : { ...h, pool: h.pool + energy });
+    return { workspaceId, energy, overtime: verdict.overtime };
+  }
+
+  release(hold: EnergyHold): void {
+    const h = this.held.get(hold.workspaceId);
+    if (!h) return;
+    const next = hold.overtime ? { ...h, topUp: Math.max(0, h.topUp - hold.energy) } : { ...h, pool: Math.max(0, h.pool - hold.energy) };
+    if (next.pool === 0 && next.topUp === 0) this.held.delete(hold.workspaceId);
+    else this.held.set(hold.workspaceId, next);
+  }
+
+  /** Energy still available to spend this week: the pool left plus unused top-ups (platform-level, no user check). */
+  spendableOf(workspaceId: string): number {
+    const team = this.teamEnergyOf(workspaceId);
+    return team ? team.left + team.topUpLeft : Number.POSITIVE_INFINITY;
   }
 
   /** Record what a finished piece of work actually cost. */
@@ -349,6 +407,7 @@ export class EnergyMeter {
       overtime,
     };
     this.usage.push(rec);
+    this.recent.set(workspaceId, [...(this.recent.get(workspaceId) ?? []), rec.energy].slice(-RECENT_TASKS));
     this.sink?.usage(rec);
     return rec;
   }
