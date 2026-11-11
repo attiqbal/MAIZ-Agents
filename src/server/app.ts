@@ -20,10 +20,14 @@ import { OVERAGE_RULE } from "../modules/workforce/task-roles.js";
 import { CONSULTANTS, HOW_A_PASS_WORKS, menuOf } from "../modules/workforce/consultants.js";
 import { quote } from "../modules/store/cart.js";
 import { RotaError } from "../modules/rota/index.js";
+import { PeopleError } from "../modules/people/index.js";
 import { PaymentError, WebhookSignatureError, type Order } from "../modules/payments/index.js";
 import type { Platform } from "./platform.js";
 
 const OAUTH_STATE_SECONDS = 600;
+const SESSION_SECONDS = 7 * 86_400;
+const RENEW_AFTER_SECONDS = 86_400;
+const MAX_SESSION_SECONDS = 30 * 86_400;
 const ASK_FAILED_MESSAGE = "Your team could not finish this just now because the AI service is busy. Nothing was charged. Try again in a few minutes.";
 const OAUTH_COOKIE = "maiz_oauth";
 const oauthCookie = (nonce: string, maxAge: number, appUrl?: string): string =>
@@ -93,7 +97,26 @@ export function createApp(p: Platform) {
     return c?.k === "session" ? c : undefined;
   };
   const session = (req: Req): string | undefined => sessionClaims(req)?.u;
-  const issueSession = (email: string) => makeToken(secret, { k: "session", u: userIdFor(email), e: email }, 7 * 86400, p.now().getTime());
+  /** `since` is when the person last signed in with an email link (seconds); renewals keep it. */
+  const issueSession = (email: string, since = Math.floor(p.now().getTime() / 1000)) => {
+    // Never valid past 30 days after the email-link sign-in, however often it is renewed.
+    const ttl = Math.min(SESSION_SECONDS, since + MAX_SESSION_SECONDS - Math.floor(p.now().getTime() / 1000));
+    return makeToken(secret, { k: "session", u: userIdFor(email), e: email, s: since }, ttl, p.now().getTime());
+  };
+  /**
+   * Sliding sessions: a session used more than a day after it was issued comes back renewed in the
+   * x-session-token header, so an active client is not sent back to sign-in every 7 days. Renewal stops
+   * 30 days after the last email-link sign-in, so a stolen token cannot be kept alive for ever.
+   */
+  const renewed = (req: Req, res: Res): Res => {
+    const c = sessionClaims(req);
+    if (!c || res.status >= 400 || typeof c.e !== "string" || typeof c.exp !== "number") return res;
+    const nowS = Math.floor(p.now().getTime() / 1000);
+    const since = typeof c.s === "number" ? c.s : c.exp - SESSION_SECONDS;
+    // Renew once the token has less than 6 days left, and only while the 30-day limit leaves something to give.
+    if (c.exp - nowS > SESSION_SECONDS - RENEW_AFTER_SECONDS || since + MAX_SESSION_SECONDS - nowS <= c.exp - nowS) return res;
+    return { ...res, headers: { ...res.headers, "x-session-token": issueSession(c.e, since) } };
+  };
   const orgOf = (userId: string) => p.identity.workspacesFor(userId)[0];
 
   async function route(req: Req): Promise<Res> {
@@ -132,9 +155,8 @@ export function createApp(p: Platform) {
       const email = String(body().email ?? "").trim().toLowerCase();
       if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email) || email.length > 200) throw new BadRequest("a valid email is required");
       const nowMs = p.now().getTime();
-      const recent = (p.sends.get(email) ?? []).filter((t) => nowMs - t < 3_600_000);
-      if (recent.length >= 5) return json(429, { error: "too many sign-in emails, try again later" });
-      p.sends.set(email, [...recent, nowMs]);
+      if (p.sends.recent(email, nowMs).length >= 5) return json(429, { error: "too many sign-in emails, try again later" });
+      p.sends.record(email, nowMs);
       const link = makeToken(secret, { k: "magic", e: email, n: randomBytes(12).toString("hex") }, 900, nowMs);
       const base = (p.cfg.appUrl ?? "").replace(/\/$/, "");
       // The link opens a page that posts the token back, so mail scanners that pre-open links cannot use it up.
@@ -154,7 +176,7 @@ export function createApp(p: Platform) {
       const c = readToken(secret, String(body().token ?? ""), p.now().getTime());
       if (!c || c.k !== "magic" || typeof c.e !== "string" || typeof c.n !== "string") return json(400, { error: "this sign-in link is invalid or has expired" });
       if (p.usedLinks.has(c.n)) return json(400, { error: "this sign-in link was already used" });
-      p.usedLinks.add(c.n);
+      p.usedLinks.add(c.n, c.exp * 1000);
       return json(200, { token: issueSession(c.e), email: c.e, hasOrganisation: !!orgOf(userIdFor(c.e)), platformOwner: p.isPlatformOwner(userIdFor(c.e)) });
     }
 
@@ -226,7 +248,7 @@ export function createApp(p: Platform) {
       if (!state?.u || state.k !== "slack-install" || typeof state.n !== "string" || !code) return json(400, { error: "invalid or expired install link" });
       // Usable once. The QR flow finishes on a phone, so this link cannot be tied to the browser that started it.
       if (p.usedLinks.has(state.n)) return json(400, { error: "invalid or expired install link" });
-      p.usedLinks.add(state.n);
+      p.usedLinks.add(state.n, state.exp * 1000);
       const res = await (p.cfg.http ?? fetch)("https://slack.com/api/oauth.v2.access", {
         method: "POST",
         headers: { "content-type": "application/x-www-form-urlencoded" },
@@ -253,7 +275,7 @@ export function createApp(p: Platform) {
       if (!state?.u || state.k !== "int-oauth" || typeof state.a !== "string" || typeof state.n !== "string") return json(400, { error: "invalid or expired connect link" });
       // Bound to the browser that started it (cookie) and usable once, so a link sent to someone else cannot attach their account.
       if (readCookie(req.headers["cookie"], OAUTH_COOKIE) !== state.n || p.usedLinks.has(state.n)) return json(400, { error: "invalid or expired connect link" });
-      p.usedLinks.add(state.n);
+      p.usedLinks.add(state.n, state.exp * 1000);
       const org = orgOf(state.u);
       if (!code || !org) return { status: 302, headers: { location: "/app.html#apps" } }; // owner pressed Cancel in the app
       try {
@@ -323,6 +345,9 @@ export function createApp(p: Platform) {
       if (method === "DELETE" && del) { p.rota.removeShift(userId, org.id, del[1]!); return rotaWeek(req.query.get("date") ?? today); }
       return json(404, { error: "not found" });
     }
+
+    // ---- HR manager desk: staff records (owner and admins only; personal data) ----
+    if (path === "/api/people" || path.startsWith("/api/people/")) return peopleRoutes(req, userId, org.id, body);
 
     // ---- buying from the store ----
     if (method === "POST" && path === "/api/checkout") {
@@ -473,6 +498,30 @@ export function createApp(p: Platform) {
   }
 
   /** Only the platform owner gets past the first line. The service checks again, so no route can skip it. */
+  function peopleRoutes(req: Req, userId: string, ws: string, body: () => any): Res {
+    const { method, path } = req;
+    const P = p.people;
+    if (method === "GET" && path === "/api/people") return json(200, P.overview(userId, ws));
+    if (method === "POST" && path === "/api/people") return json(201, P.add(userId, ws, body()));
+    if (method === "POST" && path === "/api/people/settings") return json(200, { settings: P.updateSettings(userId, ws, body()) });
+    const id = "([\\w-]{1,64})";
+    let m: RegExpExecArray | null;
+    if ((m = new RegExp(`^/api/people/${id}$`).exec(path))) {
+      if (method === "GET") return json(200, P.detail(userId, ws, m[1]!));
+      if (method === "POST") return json(200, P.update(userId, ws, m[1]!, body()));
+      if (method === "DELETE") { P.remove(userId, ws, m[1]!); return json(200, { deleted: true }); }
+    }
+    if (method !== "POST") return json(404, { error: "not found" });
+    if ((m = new RegExp(`^/api/people/${id}/documents/([a-z_]{1,40})$`).exec(path))) return json(200, P.setDocument(userId, ws, m[1]!, m[2]!, body()));
+    if ((m = new RegExp(`^/api/people/${id}/checklist/([a-z_]{1,40})$`).exec(path))) return json(200, P.setChecklist(userId, ws, m[1]!, m[2]!, body().done));
+    if ((m = new RegExp(`^/api/people/${id}/leave$`).exec(path))) return json(200, P.addLeave(userId, ws, m[1]!, body()));
+    if ((m = new RegExp(`^/api/people/${id}/leave/${id}/decide$`).exec(path))) return json(200, P.decideLeave(userId, ws, m[1]!, m[2]!, body().approve));
+    if ((m = new RegExp(`^/api/people/${id}/reviews$`).exec(path))) return json(200, P.addReview(userId, ws, m[1]!, body()));
+    if ((m = new RegExp(`^/api/people/${id}/reviews/${id}/done$`).exec(path))) return json(200, P.completeReview(userId, ws, m[1]!, m[2]!, body()));
+    if ((m = new RegExp(`^/api/people/${id}/leaving$`).exec(path))) return json(200, P.setLeaving(userId, ws, m[1]!, body().endDate));
+    return json(404, { error: "not found" });
+  }
+
   async function ownerReviewRoutes(req: Req, userId: string, body: () => any): Promise<Res> {
     if (!p.isPlatformOwner(userId)) return json(403, { error: "only the MAIZ platform owner can see quality review" });
     const { method, path } = req;
@@ -567,9 +616,9 @@ export function createApp(p: Platform) {
 
   return async function handle(req: Req): Promise<Res> {
     try {
-      return await route(req);
+      return renewed(req, await route(req));
     } catch (err) {
-      if (err instanceof BadRequest || err instanceof SetupError || err instanceof SignupError || err instanceof LedgerError || err instanceof ChannelError || err instanceof IntegrationError || err instanceof ReviewError || err instanceof PricingError || err instanceof EnergyError || err instanceof SettingsError || err instanceof BatchError || err instanceof PaymentError || err instanceof RotaError) return json(400, { error: err.message });
+      if (err instanceof BadRequest || err instanceof SetupError || err instanceof SignupError || err instanceof LedgerError || err instanceof ChannelError || err instanceof IntegrationError || err instanceof ReviewError || err instanceof PeopleError || err instanceof PricingError || err instanceof EnergyError || err instanceof SettingsError || err instanceof BatchError || err instanceof PaymentError || err instanceof RotaError) return json(400, { error: err.message });
       if (err instanceof PermissionError) return json(403, { error: "you don't have permission to do that" });
       console.error(`${req.method} ${req.path} failed:`, err);
       return json(500, { error: "something went wrong" });

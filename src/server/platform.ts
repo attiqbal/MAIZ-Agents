@@ -27,10 +27,12 @@ import { MockPaymentProvider, PaymentService, type PaymentProvider } from "../mo
 import { quote } from "../modules/store/cart.js";
 import { ReconciliationService } from "../modules/reconciliation/index.js";
 import { localParts } from "../modules/batch/schedule.js";
-import { RotaService } from "../modules/rota/index.js";
+import { RotaService, RotaError } from "../modules/rota/index.js";
+import { PeopleService } from "../modules/people/index.js";
 
 import { ConsoleEmailSender, type EmailSender } from "./email.js";
 import { userIdFor } from "./identity.js";
+import { ExpiringSet, SendLog } from "./expiring.js";
 
 export interface PlatformConfig {
   anthropicApiKey?: string;
@@ -158,6 +160,30 @@ export function createPlatform(cfg: PlatformConfig) {
   /** Staff and shifts, so rota questions are answered from real records. */
   const rota = new RotaService(identity, audit);
   workforce.addContext((ws, templateKey) => rota.contextFor(ws, templateKey, now().toISOString().slice(0, 10)));
+  /** The HR manager desk: full staff records. A person added here goes on the rota too, so there is one staff list. */
+  const people = new PeopleService(identity, audit, {
+    now,
+    addToRota: (userId, m) => {
+      try {
+        return rota.addStaff(userId, m.workspaceId, { name: m.name, role: m.jobTitle, ...(m.payBasis === "hour" && m.payPence !== undefined && m.payPence <= 100_000 ? { hourlyRateMinor: m.payPence } : {}) }).id;
+      } catch (e) {
+        // Already on the rota under that name, or the rota is full: the record is still kept.
+        if (e instanceof RotaError) return undefined;
+        throw e;
+      }
+    },
+    removeFromRota: (userId, m, today) => {
+      try { rota.deactivate(userId, m.workspaceId, m.rotaStaffId!, today); } catch (e) { if (!(e instanceof RotaError)) throw e; }
+    },
+    rotaWeek: (ws, rotaStaffId, today) => {
+      const w = rota.weekFor(ws, today);
+      const mine = w.shifts.filter((s) => s.staffId === rotaStaffId);
+      const h = w.hoursByPerson.find((x) => x.staffId === rotaStaffId);
+      if (!h && !mine.length) return undefined;
+      return { weekStart: w.weekStart, shifts: mine.map((s) => ({ date: s.date, start: s.start, end: s.end, hours: s.hours, ...(s.role ? { role: s.role } : {}) })), hours: h?.hours ?? 0, cap: h?.cap ?? 48 };
+    },
+  });
+  workforce.addContext((ws, templateKey) => people.contextFor(ws, templateKey));
   /** Checkout and orders. What a paid order buys is hired here, from the same templates the store sells. */
   const payments = new PaymentService(identity, audit, {
     provider: cfg.payments ?? (cfg.allowDevAuth ? new MockPaymentProvider() : undefined),
@@ -359,17 +385,22 @@ export function createPlatform(cfg: PlatformConfig) {
     for (const d of s.aiDays ?? []) spend.restore(d);
     for (const x of s.batchSchedules ?? []) batch.restoreSchedule(x.workspaceId, x.schedule);
     for (const j of s.batchJobs ?? []) batch.restoreJob(j);
+    for (const m of s.staff ?? []) people.restore(m);
+    for (const x of s.peopleSettings ?? []) people.restoreSettings(x.workspaceId, x.settings);
     for (const r of s.batchRuns ?? []) batch.restoreRun(r);
     sink = store;
-    for (const part of [audit, identity, energy, workforce, ledger, router, admin, integrations, reviews, prices, specialists, aiSettings, spend, batch, payments, rota, reconciliation]) part.useSink(store);
+    for (const part of [audit, identity, energy, workforce, ledger, router, admin, integrations, reviews, prices, specialists, aiSettings, spend, batch, payments, rota, reconciliation, people]) part.useSink(store);
   }
 
   const healthy = () => (sink as { healthy?: boolean } | undefined)?.healthy !== false;
 
-  /** Sign-in links already used. In memory: a restart inside the 15-minute life of a link would allow one reuse. */
-  const usedLinks = new Set<string>();
+  /**
+   * One-time links already used, kept only until the link itself expires. In memory: a restart inside the
+   * 15-minute life of a link would allow one reuse.
+   */
+  const usedLinks = new ExpiringSet(() => now().getTime());
   /** Sign-in emails sent per address and hour, to stop the form being used to spam someone. */
-  const sends = new Map<string, number[]>();
-  return { dashboard, reconciliation, rota, payments, batch, email, usedLinks, sends, admin, reviews, prices, specialists, ai, clients, isPlatformOwner, healthy, cfg, now, audit, bus, identity, energy, workforce, ledger, onboarding, router, integrations, slackTokens, saveSlackToken, attachStore };
+  const sends = new SendLog();
+  return { dashboard, reconciliation, rota, people, payments, batch, email, usedLinks, sends, admin, reviews, prices, specialists, ai, clients, isPlatformOwner, healthy, cfg, now, audit, bus, identity, energy, workforce, ledger, onboarding, router, integrations, slackTokens, saveSlackToken, attachStore };
 }
 export type Platform = ReturnType<typeof createPlatform>;

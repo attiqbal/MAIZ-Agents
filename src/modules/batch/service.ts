@@ -277,7 +277,7 @@ export class BatchService implements Intake {
    */
   private async dispatch(trigger: Trigger): Promise<BatchRunRecord | undefined> {
     if (this.running) return undefined;
-    const batch = this.ready();
+    const batch = fairOrder(this.ready());
     if (!batch.length) return undefined;
     this.running = true;
     const started = this.now();
@@ -351,6 +351,19 @@ export class BatchService implements Intake {
     this.jobs.set(job.id, job);
     this.sink?.batchJob(job);
   }
+}
+
+/**
+ * Takes one task from each client in turn (oldest first within a client), so one client with hundreds of tasks
+ * cannot make every other client wait behind all of them.
+ */
+export function fairOrder(jobs: BatchJob[]): BatchJob[] {
+  const byClient = new Map<string, BatchJob[]>();
+  for (const j of [...jobs].sort((a, b) => a.createdAt.localeCompare(b.createdAt))) (byClient.get(j.workspaceId) ?? byClient.set(j.workspaceId, []).get(j.workspaceId)!).push(j);
+  const lanes = [...byClient.values()];
+  const out: BatchJob[] = [];
+  for (let i = 0; out.length < jobs.length; i++) for (const lane of lanes) if (lane[i]) out.push(lane[i]!);
+  return out;
 }
 
 /** Runs fn over items, at most `limit` at once. */

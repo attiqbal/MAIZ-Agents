@@ -9,11 +9,13 @@ export type Permission =
   | "employee.hire"
   | "task.create"
   | "task.read"
-  | "approval.decide";
+  | "approval.decide"
+  /** Read and change the client's staff records (HR manager desk). Personal data: owner and admins only. */
+  | "people.manage";
 
 const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
-  owner: ["workspace.manage", "employee.hire", "task.create", "task.read", "approval.decide"],
-  admin: ["employee.hire", "task.create", "task.read", "approval.decide"],
+  owner: ["workspace.manage", "employee.hire", "task.create", "task.read", "approval.decide", "people.manage"],
+  admin: ["employee.hire", "task.create", "task.read", "approval.decide", "people.manage"],
   member: ["task.create", "task.read"],
   viewer: ["task.read"],
 };

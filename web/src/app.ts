@@ -4,6 +4,8 @@ import { initSetup } from "./setup";
 import { initApps } from "./apps";
 import { initDash } from "./dash";
 import { initRoleDesigner } from "./role-designer";
+import { initPeople, setPeopleBusiness } from "./people";
+import { initDesk, showDesk } from "./desk";
 import { api, getToken, clearSession, type Org } from "./api";
 import { JOB_DESCRIPTIONS, getJobDescription, jdHtml } from "./jd";
 
@@ -29,11 +31,13 @@ if (profile.slack) $("slack-state").textContent = "Slack on";
 // Routing
 const screens = Array.from(document.querySelectorAll<HTMLElement>("[data-screen]"));
 function route(): void {
-  const key = location.hash.slice(1) || "home";
+  // "#desk/finance-manager" opens one employee's dashboard; every other hash is a screen.
+  const [key = "home", sub = ""] = (location.hash.slice(1) || "home").split("/");
   const valid = screens.some((s) => s.dataset.screen === key) ? key : "home";
+  if (valid === "desk") showDesk(sub);
   screens.forEach((s) => s.toggleAttribute("hidden", s.dataset.screen !== valid));
   document.querySelectorAll<HTMLAnchorElement>("[data-nav]").forEach((a) => {
-    if (a.dataset.nav === valid) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current");
+    if (a.dataset.nav === (valid === "desk" ? "team" : valid)) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current");
   });
   app.classList.remove("menu-open"); $("menu-btn").setAttribute("aria-expanded", "false");
   const title = screens.find((x) => x.dataset.screen === valid)?.querySelector("h1")?.textContent ?? "Control centre";
@@ -135,7 +139,13 @@ async function loadOrg(): Promise<void> {
   $("greet").textContent = `${h < 12 ? "Good morning" : h < 18 ? "Good afternoon" : "Good evening"}, ${realOrg.name}`;
   orgName = realOrg.name;
   $("set-biz").textContent = realOrg.name; // Settings shows the signed-in company, not this device's last signup.
+  setPeopleBusiness(realOrg.name);
   app.classList.add("is-live");
+  // A real client never sees the example business's requests, and example-only panels say so.
+  document.querySelectorAll<HTMLElement>("[data-need]").forEach((el) => el.remove());
+  pending.clear();
+  refresh();
+  document.querySelectorAll<HTMLElement>("[data-example] .panel-h").forEach((h) => h.insertAdjacentHTML("beforeend", '<span class="badge badge-dark">Example until your apps are connected</span>'));
   route();
   const quota = realOrg.dailyQuotaPerEmployee;
   const pool = realOrg.teamEnergy;
@@ -153,7 +163,7 @@ async function loadOrg(): Promise<void> {
     const energy = pool
       ? `<div class="e-lab"><span>Uses the team energy</span></div>`
       : `<div><div class="e-lab"><span>Energy</span><span>${e.energyLeft} / ${quota}</span></div>${bar(e.energyLeft, quota)}</div>`;
-    return `<div class="ecard"><div class="who"><span class="av ${cls}">${abbr}</span><div><b>${esc(e.name)}</b><span>Standard</span></div></div><span class="status good"><span class="dot"></span>Ready</span><div class="doing">Waiting for your first request</div>${energy}</div>`;
+    return `<div class="ecard"><div class="who"><span class="av ${cls}">${abbr}</span><div><b><a class="desk-a" href="#desk/${esc(e.templateKey)}">${esc(e.name)}</a></b><span>Standard</span></div></div><span class="status good"><span class="dot"></span>Ready</span><div class="doing">Waiting for your first request</div>${energy}</div>`;
   }).join("");
   if (realOrg.trialEndsAt) toast(`Free trial until ${new Date(realOrg.trialEndsAt).toLocaleDateString("en-GB", { day: "numeric", month: "long" })}`);
 }
@@ -269,16 +279,12 @@ document.addEventListener("keydown", (e) => {
 }
 
 // Skill tuning
-const skills: Record<string, string> = { Standard: "100 · £12.30/mo", Pro: "200 · £21.40/mo", Expert: "400 · £38.00/mo" };
-$("skill").addEventListener("click", (e) => {
-  const b = (e.target as HTMLElement).closest<HTMLButtonElement>(".chip");
-  if (!b) return;
-  $("skill").querySelectorAll(".chip").forEach((c) => c.setAttribute("aria-pressed", String(c === b)));
-  $("skill-out").textContent = skills[b.textContent ?? "Standard"] ?? "";
-});
+
 
 initDash();
 initRoleDesigner();
+initDesk();
+void initPeople(biz);
 refresh();
 initSetup(biz, profile.contact === "slack" ? "slack" : "dashboard");
 initApps();
