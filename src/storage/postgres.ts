@@ -23,6 +23,64 @@ import { join } from "node:path";
 pg.types.setTypeParser(1082, (v) => v);
 pg.types.setTypeParser(20, (v) => Number(v));
 
+/** Connections for client writes; also how many clients are written at the same time. */
+const APP_POOL = 8;
+/** Waits before retrying a write while the database is unreachable: about 15 seconds in all. */
+const RETRY_DELAYS_MS = [250, 500, 1_000, 2_000, 4_000, 8_000];
+
+type BulkTable = "state" | "audit" | "usage";
+/** Rows per multi-row statement (Postgres allows 65,535 parameters in one). */
+const BULK_ROWS = 1_000;
+const BULK_SQL: Record<BulkTable, (values: string) => string> = {
+  // updated_at is the statement's clock plus the row's place in it, so rows load back in the order they were made.
+  state: (v) => `INSERT INTO state_records(workspace_id, kind, id, data, updated_at) VALUES ${v} ON CONFLICT (workspace_id, kind, id) DO UPDATE SET data = EXCLUDED.data, updated_at = EXCLUDED.updated_at`,
+  audit: (v) => `INSERT INTO audit_log(workspace_id, at, actor, action, target, data, event_id) VALUES ${v}`,
+  usage: (v) => `INSERT INTO energy_usage(workspace_id, employee_id, day, provider, input_tokens, output_tokens, cost_micro, energy, overtime) VALUES ${v}`,
+};
+
+/** One multi-row INSERT per busy table, rows in the order they were made. */
+async function writeBulk(c: pg.PoolClient, writes: PendingWrite[]): Promise<void> {
+  for (const table of ["state", "audit", "usage"] as BulkTable[]) {
+    const rows = writes.filter((w) => w.bulk?.table === table).map((w) => w.bulk!.row);
+    for (let at = 0; at < rows.length; at += BULK_ROWS) {
+      const params: unknown[] = [];
+      const values = rows.slice(at, at + BULK_ROWS).map((row, i) => {
+        const ph = row.map((v) => { params.push(v); return `$${params.length}`; });
+        if (table === "state") ph.push(`clock_timestamp() + ${i} * interval '1 microsecond'`);
+        return `(${ph.join(",")})`;
+      });
+      await c.query(BULK_SQL[table](values.join(",")), params);
+    }
+  }
+}
+
+interface PendingWrite {
+  /** Client writes: run inside that client's transaction. */
+  workspaceId?: string;
+  fn?: (c: pg.PoolClient) => Promise<void>;
+  /** Upserts of the same record: only the last one in a round needs writing. */
+  key?: string;
+  /** A plain row for one of the busy tables, sent with others of its kind as one multi-row statement. */
+  bulk?: { table: BulkTable; row: unknown[] };
+  /** Platform writes: run in order on the platform connection, alongside client writes unless a barrier. */
+  run?: () => Promise<void>;
+  barrier?: boolean;
+}
+
+/** Keeps every write, except that of several upserts of the same record only the last is kept (in its place). */
+function latestPerKey(writes: PendingWrite[]): PendingWrite[] {
+  const last = new Map<string, number>();
+  writes.forEach((w, i) => { if (w.key) last.set(w.key, i); });
+  return writes.filter((w, i) => !w.key || last.get(w.key) === i);
+}
+
+/** The database could not be reached or dropped the connection: worth another try. */
+function isConnectionError(e: unknown): boolean {
+  const code = (e as { code?: string } | undefined)?.code ?? "";
+  const msg = e instanceof Error ? e.message : "";
+  return ["ECONNREFUSED", "ECONNRESET", "ETIMEDOUT", "EPIPE", "57P01", "57P02", "57P03", "53300"].includes(code) || code.startsWith("08") || /Connection terminated|connection timeout/i.test(msg);
+}
+
 export interface PgConfig {
   /** Platform role: creates customers and loads everything at start. Bypasses row-level security. */
   adminUrl: string;
@@ -37,12 +95,11 @@ export class PgStore implements Sink {
   private admin: pg.Pool;
   private app: pg.Pool;
   private key: Buffer;
-  private chain: Promise<void> = Promise.resolve();
   lastError?: Error;
 
   constructor(cfg: PgConfig) {
     this.admin = new pg.Pool({ connectionString: cfg.adminUrl, max: 4 });
-    this.app = new pg.Pool({ connectionString: cfg.appUrl, max: 8 });
+    this.app = new pg.Pool({ connectionString: cfg.appUrl, max: APP_POOL });
     this.key = Buffer.from(cfg.tokenKeyHex, "hex");
     if (this.key.length !== 32) throw new Error("TOKEN_KEY must be 32 bytes as 64 hex characters");
   }
@@ -53,7 +110,7 @@ export class PgStore implements Sink {
 
   /** Waits until everything queued so far is written. */
   async flush(): Promise<void> {
-    await this.chain;
+    while (this.active) await this.draining;
   }
 
   async close(): Promise<void> {
@@ -86,41 +143,142 @@ export class PgStore implements Sink {
   }
 
   // ---------- writing ----------
-  private queue(job: () => Promise<void>): void {
-    this.chain = this.chain.then(job).catch((e) => {
-      this.lastError = e instanceof Error ? e : new Error(String(e));
-      console.error("storage write failed:", this.lastError.message);
-    });
+  //
+  // Writes are kept in order and sent in rounds. In one round every client's waiting writes go in one
+  // transaction for that client, and up to APP_POOL clients are written at the same time. A platform write
+  // (a new workspace, a price change) is a barrier: everything queued before it is written first.
+  // One transaction per write, one after another, managed about 850 writes a second on a local database and
+  // fell far behind with network delay (4 round trips a write); a burst of signups left minutes of writes
+  // waiting, which a restart would lose.
+
+  private pending: PendingWrite[] = [];
+  private draining?: Promise<void>;
+
+  /**
+   * A platform write. `key` marks an upsert (only the last of a round is written). `barrier` makes everything
+   * queued before it go first: needed only for a new workspace row, which a client's own writes refer to.
+   */
+  private queue(job: () => Promise<void>, opts: { key?: string; barrier?: boolean } = {}): void {
+    this.push({ run: job, key: opts.key, barrier: opts.barrier });
   }
 
   /** Runs inside one transaction with the workspace declared, so row-level security applies. */
   private scoped(workspaceId: string, fn: (c: pg.PoolClient) => Promise<void>): void {
-    this.queue(async () => {
-      const c = await this.app.connect();
-      try {
-        await c.query("BEGIN");
-        await c.query("SELECT set_config('app.workspace_id', $1, true)", [workspaceId]);
-        await fn(c);
-        await c.query("COMMIT");
-      } catch (e) {
-        await c.query("ROLLBACK").catch(() => undefined);
-        throw e;
-      } finally {
-        c.release();
+    this.push({ workspaceId, fn });
+  }
+
+  private bulk(workspaceId: string, table: BulkTable, row: unknown[], key?: string): void {
+    this.push({ workspaceId, bulk: { table, row }, key });
+  }
+
+  private push(w: PendingWrite): void {
+    this.pending.push(w);
+    if (!this.active) {
+      this.active = true;
+      this.draining = this.drain();
+    }
+  }
+
+  /** True while the drain loop runs; cleared in the same step it sees nothing pending, so no write is stranded. */
+  private active = false;
+
+  private async drain(): Promise<void> {
+    while (this.pending.length) {
+      const round = this.pending;
+      this.pending = [];
+      let segment: PendingWrite[] = [];
+      for (const w of round) {
+        if (w.barrier) {
+          await this.writeSegment(segment);
+          segment = [];
+          await this.attempt(w.run!);
+        } else segment.push(w);
       }
-    });
+      await this.writeSegment(segment);
+    }
+    this.active = false;
+  }
+
+  /** Writes a run of client writes: grouped by client, in order within each client, several clients at once. */
+  private async writeSegment(segment: PendingWrite[]): Promise<void> {
+    if (!segment.length) return;
+    const platform = latestPerKey(segment.filter((w) => w.run));
+    const platformLane = (async () => { for (const w of platform) await this.attempt(w.run!); })();
+    const groups = new Map<string, PendingWrite[]>();
+    for (const w of segment) if (!w.run) (groups.get(w.workspaceId!) ?? groups.set(w.workspaceId!, []).get(w.workspaceId!)!).push(w);
+    const list = [...groups.entries()].map(([ws, writes]) => [ws, latestPerKey(writes)] as const);
+    let next = 0;
+    const worker = async () => {
+      while (next < list.length) {
+        const [ws, writes] = list[next++]!;
+        // All of a client's writes in one transaction; if that fails, each write alone, so one bad row loses only itself.
+        const ok = await this.attempt(() => this.transaction(ws, writes), false);
+        if (!ok) for (const w of writes) await this.attempt(() => this.transaction(ws, [w]));
+      }
+    };
+    await Promise.all([platformLane, ...Array.from({ length: Math.min(APP_POOL, list.length) }, worker)]);
+  }
+
+  private async transaction(workspaceId: string, writes: PendingWrite[]): Promise<void> {
+    const c = await this.app.connect();
+    try {
+      await c.query("BEGIN");
+      await c.query("SELECT set_config('app.workspace_id', $1, true)", [workspaceId]);
+      for (const w of writes) if (w.fn) await w.fn(c);
+      await writeBulk(c, writes);
+    } catch (e) {
+      await c.query("ROLLBACK").catch(() => undefined);
+      c.release();
+      throw e;
+    }
+    try {
+      await c.query("COMMIT");
+    } catch (e) {
+      // The commit may have happened before the connection dropped: never retry it, or rows would be written twice.
+      if (e && typeof e === "object") (e as { afterCommit?: boolean }).afterCommit = true;
+      await c.query("ROLLBACK").catch(() => undefined);
+      throw e;
+    } finally {
+      c.release();
+    }
+  }
+
+  /**
+   * Runs a write, retrying while the database is briefly unreachable (a restart, a dropped connection).
+   * A write that still fails is logged and marks the store unhealthy. Returns false only when the caller should
+   * try the writes one by one (a bad row, with `record` off).
+   */
+  private async attempt(job: () => Promise<void>, record = true): Promise<boolean> {
+    for (let i = 0; ; i++) {
+      try {
+        await job();
+        return true;
+      } catch (e) {
+        if ((e as { afterCommit?: boolean } | undefined)?.afterCommit) {
+          // Unknown whether it was saved: do not write it again. Marked unhealthy so the host restarts and reloads.
+          this.lastError = e instanceof Error ? e : new Error(String(e));
+          console.error("storage commit not confirmed:", this.lastError.message);
+          return true;
+        }
+        const down = isConnectionError(e);
+        if (down && i < RETRY_DELAYS_MS.length) { await new Promise((r) => setTimeout(r, RETRY_DELAYS_MS[i])); continue; }
+        // A bad row is retried alone by the caller; a database that stays unreachable is not, as that would only wait longer.
+        if (!record && !down) return false;
+        this.lastError = e instanceof Error ? e : new Error(String(e));
+        console.error("storage write failed:", this.lastError.message);
+        return !record && down; // true stops the caller retrying row by row against a database that is down
+      }
+    }
+  }
+
+  /** Writes waiting to go to the database (for the health check and the shutdown log). */
+  get backlog(): number {
+    return this.pending.length;
   }
 
   private state(workspaceId: string, kind: string, id: string, data: unknown): void {
     // Captured now, so later changes to the object cannot slip into an earlier write.
-    const json = JSON.stringify(data);
-    this.scoped(workspaceId, async (c) => {
-      await c.query(
-        `INSERT INTO state_records(workspace_id, kind, id, data) VALUES ($1,$2,$3,$4)
-         ON CONFLICT (workspace_id, kind, id) DO UPDATE SET data = EXCLUDED.data, updated_at = now()`,
-        [workspaceId, kind, id, json],
-      );
-    });
+    this.bulk(workspaceId, "state", [workspaceId, kind, id, JSON.stringify(data)], `${kind}\u0000${id}`);
   }
 
   workspace(w: Workspace): void {
@@ -129,7 +287,7 @@ export class PgStore implements Sink {
         "INSERT INTO workspaces(id, name, type, language, base_currency, time_zone, owner_email) VALUES ($1,$2,$3,$4,$5,$6,$7) ON CONFLICT (id) DO NOTHING",
         [w.id, w.name, w.type, w.language, w.baseCurrency, w.timeZone, w.ownerEmail ?? null],
       );
-    });
+    }, { barrier: true });
   }
   membership(workspaceId: string, userId: string, role: Role): void {
     this.scoped(workspaceId, async (c) => {
@@ -198,30 +356,30 @@ export class PgStore implements Sink {
       if (removed) await this.admin.query("DELETE FROM platform_records WHERE kind = 'price_change' AND id = $1", [c.id]);
       else await this.admin.query(
         `INSERT INTO platform_records(kind, id, data) VALUES ('price_change', $1, $2)
-         ON CONFLICT (kind, id) DO UPDATE SET data = EXCLUDED.data, updated_at = now()`,
+         ON CONFLICT (kind, id) DO UPDATE SET data = EXCLUDED.data, updated_at = clock_timestamp()`,
         [c.id, json],
       );
-    });
+    }, { key: `price_change\u0000${c.id}` });
   }
   aiSettings(s: AiRoutingSettings): void {
     const json = JSON.stringify(s);
     this.queue(async () => {
       await this.admin.query(
         `INSERT INTO platform_records(kind, id, data) VALUES ('ai_settings', 'current', $1)
-         ON CONFLICT (kind, id) DO UPDATE SET data = EXCLUDED.data, updated_at = now()`,
+         ON CONFLICT (kind, id) DO UPDATE SET data = EXCLUDED.data, updated_at = clock_timestamp()`,
         [json],
       );
-    });
+    }, { key: "ai_settings" });
   }
   aiDay(d: AiDay): void {
     const json = JSON.stringify(d);
     this.queue(async () => {
       await this.admin.query(
         `INSERT INTO platform_records(kind, id, data) VALUES ('ai_day', $1, $2)
-         ON CONFLICT (kind, id) DO UPDATE SET data = EXCLUDED.data, updated_at = now()`,
+         ON CONFLICT (kind, id) DO UPDATE SET data = EXCLUDED.data, updated_at = clock_timestamp()`,
         [d.day, json],
       );
-    });
+    }, { key: `ai_day\u0000${d.day}` });
   }
   batchJob(j: BatchJob): void {
     this.state(j.workspaceId, "batch_job", j.id, j);
@@ -234,33 +392,27 @@ export class PgStore implements Sink {
     this.queue(async () => {
       await this.admin.query(
         `INSERT INTO platform_records(kind, id, data) VALUES ('batch_run', $1, $2)
-         ON CONFLICT (kind, id) DO UPDATE SET data = EXCLUDED.data, updated_at = now()`,
+         ON CONFLICT (kind, id) DO UPDATE SET data = EXCLUDED.data, updated_at = clock_timestamp()`,
         [r.id, json],
       );
-    });
+    }, { key: `batch_run\u0000${r.id}` });
   }
   entry(e: JournalEntry): void {
     this.scoped(e.workspaceId, async (c) => {
       await c.query("INSERT INTO journal_entries(id, workspace_id, entry_date, memo, source, reverses) VALUES ($1,$2,$3,$4,$5,$6)", [e.id, e.workspaceId, e.date, e.memo, e.source ?? null, e.reverses ?? null]);
-      let n = 0;
-      for (const l of e.lines) await c.query("INSERT INTO journal_lines(entry_id, workspace_id, account, debit, credit, line_no) VALUES ($1,$2,$3,$4,$5,$6)", [e.id, e.workspaceId, l.account, l.debit, l.credit, n++]);
+      // All lines in one statement: one round trip, not one per line.
+      const params = e.lines.flatMap((l, n) => [e.id, e.workspaceId, l.account, l.debit, l.credit, n]);
+      const values = e.lines.map((_, n) => `($${n * 6 + 1},$${n * 6 + 2},$${n * 6 + 3},$${n * 6 + 4},$${n * 6 + 5},$${n * 6 + 6})`).join(",");
+      if (e.lines.length) await c.query(`INSERT INTO journal_lines(entry_id, workspace_id, account, debit, credit, line_no) VALUES ${values}`, params);
     });
   }
   usage(u: UsageRecord): void {
-    this.scoped(u.workspaceId, async (c) => {
-      await c.query(
-        "INSERT INTO energy_usage(workspace_id, employee_id, day, provider, input_tokens, output_tokens, cost_micro, energy, overtime) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)",
-        [u.workspaceId, u.employeeId, u.day, u.provider, u.inputTokens, u.outputTokens, u.costMicro, u.energy, u.overtime],
-      );
-    });
+    this.bulk(u.workspaceId, "usage", [u.workspaceId, u.employeeId, u.day, u.provider, u.inputTokens, u.outputTokens, u.costMicro, u.energy, u.overtime]);
   }
   audit(e: AuditEvent): void {
-    this.scoped(e.workspaceId, async (c) => {
-      await c.query("INSERT INTO audit_log(workspace_id, at, actor, action, target, data, event_id) VALUES ($1,$2,$3,$4,$5,$6,$7)", [e.workspaceId, e.at, e.actor, e.action, e.target ?? null, e.data ? JSON.stringify(e.data) : null, e.id]);
-    });
+    this.bulk(e.workspaceId, "audit", [e.workspaceId, e.at, e.actor, e.action, e.target ?? null, e.data ? JSON.stringify(e.data) : null, e.id]);
   }
 
-  // ---------- reading (platform role, at start-up) ----------
   async load(): Promise<Snapshot> {
     await this.flush();
     const q = async (sql: string) => (await this.admin.query(sql)).rows;

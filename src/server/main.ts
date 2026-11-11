@@ -3,7 +3,7 @@ import { createServer } from "node:http";
 import { join } from "node:path";
 import { createApp } from "./app.js";
 import { checkEnv, integrationAppsFromEnv, platformOwnersFromEnv } from "./config.js";
-import { ResendEmailSender } from "./email.js";
+import { QueuedEmailSender, ResendEmailSender } from "./email.js";
 import { MockPaymentProvider } from "../modules/payments/index.js";
 import { createPlatform } from "./platform.js";
 import { clientIp, limitFor, RateLimiter } from "./rate-limit.js";
@@ -17,9 +17,11 @@ if (problems.length) {
   process.exit(1);
 }
 
+// Queued: sent at Resend's pace with retries, so a burst of sign-ins does not lose emails to its rate limit.
+const mailer = env.RESEND_API_KEY && env.EMAIL_FROM ? new QueuedEmailSender(new ResendEmailSender(env.RESEND_API_KEY, env.EMAIL_FROM)) : undefined;
 const platform = createPlatform({
   appUrl: env.APP_URL ?? "http://localhost:5173",
-  email: env.RESEND_API_KEY && env.EMAIL_FROM ? new ResendEmailSender(env.RESEND_API_KEY, env.EMAIL_FROM) : undefined,
+  email: mailer,
   anthropicApiKey: env.ANTHROPIC_API_KEY,
   anthropicModel: env.ANTHROPIC_MODEL,
   runpod: env.RUNPOD_API_KEY && env.RUNPOD_ENDPOINT_ID ? { apiKey: env.RUNPOD_API_KEY, endpointId: env.RUNPOD_ENDPOINT_ID } : undefined,
@@ -123,6 +125,8 @@ async function shutdown(signal: string) {
   clearInterval(batchTimer);
   server.close();
   try { await store?.close(); } catch (err) { console.error("flush on shutdown failed:", err); }
+  // Give waiting emails (sign-in links, owner alerts) a few seconds to go out.
+  if (mailer) await Promise.race([mailer.idle(), new Promise((r) => setTimeout(r, 5_000))]);
   process.exit(0);
 }
 process.on("SIGTERM", () => void shutdown("SIGTERM"));
