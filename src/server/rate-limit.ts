@@ -30,6 +30,9 @@ export class RateLimiter {
 export function limitFor(method: string, path: string): Limit | undefined {
   if (method !== "POST") return undefined;
   if (path === "/api/slack/events") return undefined; // signed by Slack, and Slack retries on 429
+  if (path === "/api/payments/webhook") return undefined; // signed by the payment provider, which retries on 429
+  // Each checkout creates a payment session at the provider: keep it to a handful of tries per address.
+  if (path === "/api/checkout") return { max: 20, windowMs: 10 * 60_000 };
   if (path === "/api/signin/start" || path === "/api/signup") return { max: 10, windowMs: 10 * 60_000 };
   // Run-now wakes the GPU pod, which is billed per second: keep it to a few presses an hour per address.
   if (path === "/api/queue/run-now" || path === "/api/owner/batch/run-now") return { max: 6, windowMs: 60 * 60_000 };

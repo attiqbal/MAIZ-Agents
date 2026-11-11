@@ -166,6 +166,12 @@ export class Ledger {
     return entry;
   }
 
+  /** Platform-level (no user check): the raw books of one workspace, for the nightly reconciliation. Undefined if never opened. */
+  rawBooks(workspaceId: string): { accounts: Account[]; entries: readonly JournalEntry[] } | undefined {
+    const a = this.accounts.get(workspaceId);
+    return a ? { accounts: [...a.values()], entries: this.entries.get(workspaceId) ?? [] } : undefined;
+  }
+
   /** Entries are never edited or deleted. A mistake is fixed by reversing it. */
   reverse(userId: string, workspaceId: string, entryId: string, date: string): JournalEntry {
     const original = this.entries.get(workspaceId)?.find((e) => e.id === entryId);

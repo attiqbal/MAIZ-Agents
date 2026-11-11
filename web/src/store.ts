@@ -1,7 +1,7 @@
 // The store picker and cart on the employees page. Prices come from /api/store, which reflects the
 // platform owner's Prices page; with no API the launch defaults from the backend's cart module are used.
 // Either way the page prices with the same quote() function as /api/cart/quote.
-import { api } from "./api";
+import { api, getToken } from "./api";
 import { BILLING_INFO, CATALOGUE, KIND_LABEL, MAX_QTY, quote as quoteWith, type Billing, type CartLine, type CatalogueItem } from "../../src/modules/store/cart";
 import { OVERAGE_RULE } from "../../src/modules/workforce/task-roles";
 import { HOW_A_PASS_WORKS } from "../../src/modules/workforce/consultants";
@@ -93,9 +93,19 @@ export function initStore(): void {
     renderCart();
     $("cart-note").textContent = "Removed from your cart.";
   });
-  // Payments are not connected yet: say so plainly instead of pretending to charge.
-  $("cart-checkout").addEventListener("click", () => {
-    $("cart-note").textContent = "Payments open soon. Your cart is saved on this device, and nothing has been charged. Monthly items will renew each month until you cancel; consultant passes are paid once.";
+  // With no payment provider switched on, say so plainly instead of pretending to charge.
+  const PLACEHOLDER = "Payments open soon. Your cart is saved on this device, and nothing has been charged. Monthly items will renew each month until you cancel; consultant passes are paid once.";
+  $("cart-checkout").addEventListener("click", async () => {
+    if (!getToken()) { $("cart-note").textContent = PLACEHOLDER; return; }
+    const btn = $<HTMLButtonElement>("cart-checkout");
+    btn.disabled = true;
+    const r = await api<{ order?: { status: string }; url?: string; error?: string }>("/checkout", { body: { lines: cart } });
+    btn.disabled = cart.length === 0;
+    if (r.status === 400 && /not switched on/.test(r.data?.error ?? "")) { $("cart-note").textContent = PLACEHOLDER; return; }
+    if (!r.ok) { $("cart-note").textContent = r.data?.error ?? "Could not start the payment. Nothing was charged."; return; }
+    if (r.data?.url) { location.assign(r.data.url); return; }
+    if (r.data?.order?.status === "paid") { cart = []; save(cart); renderCart(); $("cart-note").textContent = "Done. Your new employees are on your team."; return; }
+    $("cart-note").textContent = "The payment did not go through. Nothing was charged.";
   });
   $("task-rule").innerHTML = `<h3>How a consultant pass works</h3><ul>${HOW_A_PASS_WORKS.map((x) => `<li>${esc(x)}</li>`).join("")}</ul><h3>If a pass needs more energy</h3><ul>${OVERAGE_RULE.map((x) => `<li>${esc(x)}</li>`).join("")}</ul><p class="jd-note">Prices are list prices in GBP and may change before launch.</p>`;
   cart = load();

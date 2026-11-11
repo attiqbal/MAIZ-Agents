@@ -63,16 +63,16 @@ const dueDate = (inDays: number) => { const d = new Date(); d.setHours(12, 0, 0,
 const dayMonth = (d: Date) => d.toLocaleDateString(undefined, { day: "numeric", month: "short" });
 
 /** One summary tile. With `href` the whole tile is a link to the screen behind the number. */
-function tile(label: string, value: string, note: string, href?: string, tone = ""): string {
+export function tile(label: string, value: string, note: string, href?: string, tone = ""): string {
   const body = `<span class="l">${esc(label)}</span><span class="v">${esc(value)}</span><span class="dl ${tone}">${esc(note)}</span>`;
   return href ? `<a class="tile-kpi" href="${href}">${body}</a>` : `<div class="tile-kpi">${body}</div>`;
 }
-const energyBar = (used: number, allowance: number) => {
+export const energyBar = (used: number, allowance: number) => {
   const left = allowance - used;
   return `<div class="e-cell"><div class="energy${left / allowance < 0.25 ? " low" : ""}"><i style="width:${Math.round((left / allowance) * 100)}%"></i></div><span class="mono">${left} / ${allowance}</span></div>`;
 };
 const who = (e: Employee) => `<span class="who-cell"><span class="av av-sm ${e.cls}" aria-hidden="true">${e.abbr}</span>${esc(e.name)}</span>`;
-const status = (tone: string, text: string) => `<span class="status ${tone === "idle" ? "" : tone}"><span class="dot"></span>${esc(text)}</span>`;
+export const status = (tone: string, text: string) => `<span class="status ${tone === "idle" ? "" : tone}"><span class="dot"></span>${esc(text)}</span>`;
 
 function renderOverview(): void {
   const next = [...DEADLINES].sort((a, b) => a.inDays - b.inDays)[0]!;
@@ -182,6 +182,8 @@ function renderCalendar(): void {
 
 export function initDash(): void {
   renderOverview(); renderTeam(); void initSignOff(); void initQueue(); renderTasks(); renderUsage(); renderCalendar();
+  // Signed in with a running API: replace the example numbers on four screens with the client's own records.
+  void import("./dash-live").then((m) => m.loadLive()).catch(() => undefined);
   $("task-filter").addEventListener("click", (e) => {
     const b = (e.target as HTMLElement).closest<HTMLElement>("[data-who]");
     if (b) { taskFilter = b.dataset.who!; renderTasks(); $("task-filter").querySelector<HTMLElement>(`[data-who="${taskFilter}"]`)?.focus(); }

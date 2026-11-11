@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="en">
 <head>
-<!--@include head title="Prices and packages · MAIZ agents" description="The MAIZ platform owner sets package prices, trial terms, store prices and each agent's daily energy."-->
+<!--@include head title="Prices and packages · MAIZ agents" description="The MAIZ platform owner sets package prices, trial terms, store prices and the team energy pool."-->
 <meta name="robots" content="noindex">
 </head>
 <body>
@@ -13,15 +13,15 @@
         <!--@include owner-nav-->
         <div class="rv-head">
           <div><h1>Prices and packages</h1>
-            <p class="sub">Set what clients pay and how much energy each agent gets. Changes can start now or on a date you choose, apply to new quotes and trials, and every change is kept with what it replaced.</p></div>
+            <p class="sub">Set what clients pay and how much energy each team shares. Changes can start now or on a date you choose, apply to new quotes and trials, and every change is kept with what it replaced.</p></div>
           <span class="badge badge-dark" id="ow-eg" hidden>Example data</span>
         </div>
         <div class="ob-panel" id="ow-gate" hidden aria-live="polite"><h2 id="ow-gate-h" style="font-size:1.25rem;margin:0 0 6px"></h2><p id="ow-gate-p" class="sub" style="margin:0 0 14px"></p><a class="btn btn-primary" id="ow-gate-a" href="/signin.html">Log in</a></div>
         <div id="ow-body">
           <form class="ow-stack" id="pr-form" novalidate>
             <section class="panel" aria-labelledby="pr-gen-h"><div class="panel-h"><h2 id="pr-gen-h">Packages and trial</h2></div><div class="ow-grid" id="pr-general"></div></section>
-            <section class="panel" aria-labelledby="pr-ag-h"><div class="panel-h"><h2 id="pr-ag-h">Daily energy per agent</h2><span class="r">Blank uses the default. Applies to every client from the start date.</span></div>
-              <div class="tbl-wrap" tabindex="0" role="region" aria-label="Daily energy per agent"><table class="tbl" id="pr-agents"></table></div></section>
+            <section class="panel" aria-labelledby="pr-ag-h"><div class="panel-h"><h2 id="pr-ag-h">Daily cap per agent (optional)</h2><span class="r">Blank means the agent just draws from the team pool. Applies to every client from the start date.</span></div>
+              <div class="tbl-wrap" tabindex="0" role="region" aria-label="Daily cap per agent"><table class="tbl" id="pr-agents"></table></div></section>
             <section class="panel" aria-labelledby="pr-it-h"><div class="panel-h"><h2 id="pr-it-h">Store prices</h2><div class="chips r" id="pr-kind" role="group" aria-label="Show store items"></div></div>
               <div class="tbl-wrap" tabindex="0" role="region" aria-label="Store prices"><table class="tbl" id="pr-items"></table></div></section>
             <div class="ow-save" aria-live="polite">

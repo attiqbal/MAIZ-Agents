@@ -3,7 +3,7 @@ import type { Sink } from "../../core/persistence.js";
 import { PermissionError } from "../identity/index.js";
 import { CATALOGUE, MONTHLY_PRICE_GBP, type CatalogueItem } from "../store/cart.js";
 import { EMPLOYEE_TEMPLATES } from "../workforce/templates.js";
-import { PLANS } from "../energy/index.js";
+import { PLANS, type EnergyPlan } from "../energy/index.js";
 
 /**
  * Prices and packages, owned by the MAIZ platform owner. The code holds the launch defaults; the
@@ -22,8 +22,16 @@ export interface GeneralPrices {
   overageGbpPer100Energy: number;
   /** Free trial length for new clients. */
   trialDays: number;
-  /** Energy each employee gets per day when no agent-specific allowance is set. */
-  defaultDailyEnergyPerEmployee: number;
+  /** Energy the whole team shares for the entire free trial. */
+  trialTeamEnergy: number;
+  /** Energy the basic package's team shares each week (refills Monday). */
+  weeklyTeamEnergy: number;
+  /** Most the whole team may use in one day, so a runaway script cannot empty the week at once. */
+  dailyTeamCeiling: number;
+  /** Weekly energy each add-on employee adds to the team pool. */
+  addOnWeeklyEnergy: number;
+  specialistStandardWeeklyEnergy: number;
+  specialistPremiumWeeklyEnergy: number;
 }
 
 export interface ItemSetting {
@@ -40,7 +48,7 @@ export interface PriceChangeSet {
   general?: Partial<GeneralPrices>;
   /** By catalogue key, for example "seo-specialist" or "web-developer:sprint". */
   items?: Record<string, ItemSetting>;
-  /** Daily energy per agent, by employee template key. null clears it back to the default. */
+  /** An agent's own daily cap inside the team pool, by employee template key. null clears it (no cap). */
   agents?: Record<string, number | null>;
 }
 
@@ -59,19 +67,37 @@ export interface PriceChange {
 export interface PriceBookView {
   general: GeneralPrices;
   items: (CatalogueItem & { available: boolean })[];
-  agents: { key: string; title: string; dailyEnergy: number; custom: boolean }[];
+  /** dailyEnergy is null when the agent has no cap of its own and just draws from the team pool. */
+  agents: { key: string; title: string; dailyEnergy: number | null; custom: boolean }[];
 }
 
 export class PricingError extends Error {}
 
+/** Top-up pack sizes in pounds; the energy in each follows the owner's extra-energy price. */
+export const TOP_UP_PACK_GBP = [5, 10, 25] as const;
+
+/**
+ * The energy plan a client gets when they buy the basic package, from the prices in force at the sale.
+ * Payments are not built yet; checkout calls this so the owner's pool settings reach paid clients.
+ */
+export function paidTeamPlan(g: GeneralPrices): EnergyPlan {
+  return { ...PLANS.starter!, weeklyTeamEnergy: g.weeklyTeamEnergy, dailyTeamCeiling: g.dailyTeamCeiling };
+}
+
+/** Launch defaults agreed with the platform owner on 2026-11-11 (£100 starting point, 8,000 energy a week). */
 export const DEFAULT_GENERAL: GeneralPrices = {
-  basicPackageMonthlyGbp: 41,
+  basicPackageMonthlyGbp: 100,
   addOnEmployeeMonthlyGbp: MONTHLY_PRICE_GBP.employee,
   specialistStandardMonthlyGbp: MONTHLY_PRICE_GBP.specialistStandard,
   specialistPremiumMonthlyGbp: MONTHLY_PRICE_GBP.specialistPremium,
   overageGbpPer100Energy: 1,
   trialDays: 7,
-  defaultDailyEnergyPerEmployee: PLANS.trial!.dailyQuotaPerEmployee,
+  trialTeamEnergy: PLANS.trial!.weeklyTeamEnergy!,
+  weeklyTeamEnergy: PLANS.starter!.weeklyTeamEnergy!,
+  dailyTeamCeiling: PLANS.starter!.dailyTeamCeiling!,
+  addOnWeeklyEnergy: 2_000,
+  specialistStandardWeeklyEnergy: 2_000,
+  specialistPremiumWeeklyEnergy: 2_000,
 };
 
 const GENERAL_LIMITS: Record<keyof GeneralPrices, [number, number, boolean]> = {
@@ -82,7 +108,12 @@ const GENERAL_LIMITS: Record<keyof GeneralPrices, [number, number, boolean]> = {
   specialistPremiumMonthlyGbp: [0, 10_000, false],
   overageGbpPer100Energy: [0, 1_000, false],
   trialDays: [0, 60, true],
-  defaultDailyEnergyPerEmployee: [0, 100_000, true],
+  trialTeamEnergy: [0, 1_000_000, true],
+  weeklyTeamEnergy: [0, 1_000_000, true],
+  dailyTeamCeiling: [0, 1_000_000, true],
+  addOnWeeklyEnergy: [0, 1_000_000, true],
+  specialistStandardWeeklyEnergy: [0, 1_000_000, true],
+  specialistPremiumWeeklyEnergy: [0, 1_000_000, true],
 };
 const MAX_PRICE = 100_000;
 const MAX_ENERGY = 10_000_000;
@@ -218,10 +249,24 @@ export class PriceBook {
     return this.items(at).filter((i) => i.available).map(({ available: _a, ...i }) => i);
   }
 
-  /** Daily energy for one agent: its own allowance, or the default. */
-  dailyEnergyFor(templateKey: string, at = this.now()): number {
-    const s = this.stateAt(at);
-    return s.agents[templateKey] ?? s.general.defaultDailyEnergyPerEmployee;
+  /**
+   * Top-up packs a paid client can buy when the week's energy runs out. Priced at the extra-energy rate,
+   * they roll over and never expire (like Macro's credit packs), and nothing is ever charged automatically
+   * unless the client turns auto-reload on with a monthly cap.
+   */
+  topUpPacks(at = this.now()): { gbp: number; energy: number }[] {
+    const rate = this.stateAt(at).general.overageGbpPer100Energy;
+    if (rate <= 0) return [];
+    return TOP_UP_PACK_GBP.map((gbp) => ({ gbp, energy: Math.floor((gbp / rate) * 100) }));
+  }
+
+  /** Weekly energy an employee adds to a paid team pool: add-ons and specialists do; the core team does not. */
+  weeklyEnergyFor(templateKey: string, at = this.now()): number {
+    const item = CATALOGUE.find((i) => i.key === templateKey);
+    const g = this.stateAt(at).general;
+    if (item?.kind === "employee") return g.addOnWeeklyEnergy;
+    if (item?.kind === "specialist") return item.tier === "premium" ? g.specialistPremiumWeeklyEnergy : g.specialistStandardWeeklyEnergy;
+    return 0;
   }
 
   /** An agent's own daily energy, if the platform owner set one. Applies to every client from its start date. */
@@ -238,7 +283,7 @@ export class PriceBook {
     return {
       general: s.general,
       items: CATALOGUE.map((i) => priced(i, s)),
-      agents: EMPLOYEE_TEMPLATES.map((t) => ({ key: t.key, title: t.title, dailyEnergy: s.agents[t.key] ?? s.general.defaultDailyEnergyPerEmployee, custom: s.agents[t.key] !== undefined })),
+      agents: EMPLOYEE_TEMPLATES.map((t) => ({ key: t.key, title: t.title, dailyEnergy: s.agents[t.key] ?? null, custom: s.agents[t.key] !== undefined })),
       history: this.ordered().reverse().map((c) => ({ ...c, upcoming: c.effectiveFrom > iso })),
     };
   }

@@ -1,5 +1,5 @@
 {
-  "contract": "Surface: every MAIZ agents page: landing (/), employees and store, pricing, security, log in, 404, onboarding and all ten control center screens (/app.html). Audience: founders and small-business owners with no AI background. Job: understand what the AI employees do and start a free trial. Primary action: 'Start free trial'. Direction: dark 'aurora over a midnight terminal' chosen by the owner, tokens in web/src/styles.css. Hierarchy: hero headline + live product mockup first, then how it works, employees, control center, Slack, pricing, FAQ. Constraints: WCAG 2.2 AA, no framework, landing JS < 150 kB gz and CSS < 30 kB gz, max two web font families, target viewports 375x812, 768x1024, 1440x900. References: the existing site and the project's AgentQL-style dark reference. Quality review (2026-11-10): /review.html is the MAIZ platform owner's queue (noindex); specialised-task sign-off moved from the client to the platform owner. Owner admin (2026-11-10): /owner-specialists.html, /owner-clients.html and /owner-prices.html join /review.html behind a shared platform-owner menu (all noindex): custom specialists wait for the owner's approval and price, a clients table shows trial, setup, energy, AI cost and what is waiting, and a prices and packages page edits package prices, trial length, store prices and each agent's daily energy now or from a date, with history. AI spend (2026-11-10): /owner-ai.html (noindex, in the same owner menu) shows month spend against a Claude-only baseline, provider and budget meters, per-work and per-day tables, and editable models, pass marks and caps. Checked with axe at 375/768/1440 and by eye on screenshots with mocked data (the QA run itself shows the log-in gate). Batch queue (2026-11-10): /app.html#work gains a 'Waiting for the batch' panel (queued tasks, run now, cancel, closing-time form) and /owner-ai.html gains a batch queue panel, batch settings and batch savings tiles.",
+  "contract": "Surface: every MAIZ agents page: landing (/), employees and store, pricing, security, log in, 404, onboarding and all ten control center screens (/app.html). Audience: founders and small-business owners with no AI background. Job: understand what the AI employees do and start a free trial. Primary action: 'Start free trial'. Direction: dark 'aurora over a midnight terminal' chosen by the owner, tokens in web/src/styles.css. Hierarchy: hero headline + live product mockup first, then how it works, employees, control center, Slack, pricing, FAQ. Constraints: WCAG 2.2 AA, no framework, landing JS < 150 kB gz and CSS < 30 kB gz, max two web font families, target viewports 375x812, 768x1024, 1440x900. References: the existing site and the project's AgentQL-style dark reference. Quality review (2026-11-10): /review.html is the MAIZ platform owner's queue (noindex); specialised-task sign-off moved from the client to the platform owner. Owner admin (2026-11-10): /owner-specialists.html, /owner-clients.html and /owner-prices.html join /review.html behind a shared platform-owner menu (all noindex): custom specialists wait for the owner's approval and price, a clients table shows trial, setup, energy, AI cost and what is waiting, and a prices and packages page edits package prices, trial length, store prices and each agent's daily energy now or from a date, with history. AI spend (2026-11-10): /owner-ai.html (noindex, in the same owner menu) shows month spend against a Claude-only baseline, provider and budget meters, per-work and per-day tables, and editable models, pass marks and caps. Checked with axe at 375/768/1440 and by eye on screenshots with mocked data (the QA run itself shows the log-in gate). Batch queue (2026-11-10): /app.html#work gains a 'Waiting for the batch' panel (queued tasks, run now, cancel, closing-time form) and /owner-ai.html gains a batch queue panel, batch settings and batch savings tiles. Signup (2026-11-11): /onboarding.html now asks by tapping: kind of business (13 sector tiles), what the owner wants help with (10 needs, the sector's usual three pre-ticked with a dashed edge), apps already in use (the sector's usual apps first), then shows the plan built from those answers (who starts today and on what, who stands by, add-on offer, apps and how each connects, what was filled in) and asks for the email last. The plan comes from pure rules shared with the server, no AI call. The setup form in /app.html#setup arrives prefilled, each answer labelled 'From your signup answers' or 'Our guess'. Team energy pool (2026-11-11): Team package £100 a month with 8,000 energy a week shared by the team; extra employee £25 and specialist £35, each +2,000 a week; top-up packs that roll over with auto-reload off by default (Settings); energy shown as a share of the week; a compare-with-hiring calculator on the pricing page.",
   "targetViewports": [
     "375x812",
     "768x1024",
@@ -7,7 +7,7 @@
   ],
   "accessibility": {
     "status": "pass",
-    "evidence": "axe-core 4.10 (wcag2a, wcag2aa, wcag21aa, wcag22aa, best-practice) reports 0 violations on /, /onboarding.html, /app.html, /app.html#setup, /app.html#team and /employees.html at 375, 768 and 1440 (npm run qa). Before this change it reported footer text contrast 3.97:1, skipped heading level in the footer, 79 nodes outside landmarks on the landing page and no main landmark in the app. Keyboard: first Tab focuses a visible 'Skip to content' link that moves focus to main; the mobile menu opens with the button, closes on Escape and returns focus to the button. All links, buttons, inputs and summaries are at least 24x24 px at 375 wide. Form errors use role=alert, aria-invalid and aria-describedby, and move focus to the field. Not covered: a screen-reader pass with VoiceOver or NVDA. Job descriptions (2026-11-10): the employees page had no h1 and the app's Team screen skipped from h2 to h4 and had a scrollable org chart that could not be focused; all three are fixed (h1 eyebrow, heading level passed to the job-description renderer, focusable labelled org-chart region). Job descriptions and blueprint roles are native details/summary elements, so they open with the keyboard. Combined release (2026-11-10): npm run qa now scans 17 pages and screens (every public page plus all ten control center screens) at 375, 768 and 1440: 51 checks, 0 axe violations, 0 overflow, 0 console errors, run against the real server with production headers. Fixed on the way: heading order on the employees and pricing pages (h1 was a small eyebrow), dashboard tables and the task board are focusable scroll regions with labels, direction choices are native radio buttons in a fieldset, locked sign-off buttons say why via aria-describedby. Not covered: a screen-reader pass with VoiceOver or NVDA. Quality review (2026-11-10): npm run qa now also scans /review.html at 375, 768 and 1440 (54 checks, 0 axe violations, 0 overflow, 0 console errors). Direction choices are native radios inside a fieldset with a hidden legend; disabled Approve buttons point to their reason with aria-describedby; every input has a label. Owner admin (2026-11-10): npm run qa scans 21 pages at 375, 768 and 1440 (63 checks, 0 axe violations, 0 overflow, 0 console errors). The three owner pages were also scanned signed in as the owner with live data at 375 and 1440: 0 axe violations, 0 overflow. Prices inputs have visible labels or aria-labels, wide tables sit in focusable labelled scroll regions, filter chips use aria-pressed, the current menu item has aria-current=page. Batch queue (2026-11-10): npm run qa still passes on /app.html#work and /owner-ai.html at 375, 768 and 1440 (0 axe violations, 0 overflow, 0 console errors). Cancel buttons carry the task name in aria-label; the schedule form has visible labels. The signed-in states of the new panels were checked by eye on screenshots with mocked API data at 375 and 1440, not with axe."
+    "evidence": "axe-core 4.10 (wcag2a, wcag2aa, wcag21aa, wcag22aa, best-practice) reports 0 violations on /, /onboarding.html, /app.html, /app.html#setup, /app.html#team and /employees.html at 375, 768 and 1440 (npm run qa). Before this change it reported footer text contrast 3.97:1, skipped heading level in the footer, 79 nodes outside landmarks on the landing page and no main landmark in the app. Keyboard: first Tab focuses a visible 'Skip to content' link that moves focus to main; the mobile menu opens with the button, closes on Escape and returns focus to the button. All links, buttons, inputs and summaries are at least 24x24 px at 375 wide. Form errors use role=alert, aria-invalid and aria-describedby, and move focus to the field. Not covered: a screen-reader pass with VoiceOver or NVDA. Job descriptions (2026-11-10): the employees page had no h1 and the app's Team screen skipped from h2 to h4 and had a scrollable org chart that could not be focused; all three are fixed (h1 eyebrow, heading level passed to the job-description renderer, focusable labelled org-chart region). Job descriptions and blueprint roles are native details/summary elements, so they open with the keyboard. Combined release (2026-11-10): npm run qa now scans 17 pages and screens (every public page plus all ten control center screens) at 375, 768 and 1440: 51 checks, 0 axe violations, 0 overflow, 0 console errors, run against the real server with production headers. Fixed on the way: heading order on the employees and pricing pages (h1 was a small eyebrow), dashboard tables and the task board are focusable scroll regions with labels, direction choices are native radio buttons in a fieldset, locked sign-off buttons say why via aria-describedby. Not covered: a screen-reader pass with VoiceOver or NVDA. Quality review (2026-11-10): npm run qa now also scans /review.html at 375, 768 and 1440 (54 checks, 0 axe violations, 0 overflow, 0 console errors). Direction choices are native radios inside a fieldset with a hidden legend; disabled Approve buttons point to their reason with aria-describedby; every input has a label. Owner admin (2026-11-10): npm run qa scans 21 pages at 375, 768 and 1440 (63 checks, 0 axe violations, 0 overflow, 0 console errors). The three owner pages were also scanned signed in as the owner with live data at 375 and 1440: 0 axe violations, 0 overflow. Prices inputs have visible labels or aria-labels, wide tables sit in focusable labelled scroll regions, filter chips use aria-pressed, the current menu item has aria-current=page. Batch queue (2026-11-10): npm run qa still passes on /app.html#work and /owner-ai.html at 375, 768 and 1440 (0 axe violations, 0 overflow, 0 console errors). Cancel buttons carry the task name in aria-label; the schedule form has visible labels. The signed-in states of the new panels were checked by eye on screenshots with mocked API data at 375 and 1440, not with axe. Signup (2026-11-11): axe-core (wcag2a, wcag2aa, wcag21aa, wcag22aa) reports 0 violations on each of the four signup screens at 375, 768 and 1440, with 'Show more apps' and 'things we filled in' open and the add-on ticked; no horizontal overflow; every button, chip, summary, select and input on those screens is at least 40px tall. Sector tiles and chips are buttons with aria-pressed inside labelled groups; errors use role=alert; the step heading receives focus when the step changes. Not covered: a screen-reader pass."
   },
   "responsive": {
     "status": "pass",
@@ -24,7 +24,7 @@
     },
     "error": {
       "status": "pass",
-      "evidence": "Submitting 'not-an-email' on onboarding step 1 shows 'Enter a valid email address.', marks the input invalid with a red border and moves focus to it (state-error-onboarding-375x812.png). Apps screen: wrong file columns, a full-access Stripe key and a refused OAuth return each show a plain-language message."
+      "evidence": "Submitting 'not-an-email' on the signup plan screen (step 4, where the email is now asked) shows 'Enter a valid email address.', marks the input invalid with a red border and moves focus to it (state-error-onboarding-375x812.png). Apps screen: wrong file columns, a full-access Stripe key and a refused OAuth return each show a plain-language message. Signup step 1 with no sector or name shows 'Pick the kind of business and add its name to continue.'; picking a sixth need shows 'Pick at least one, and no more than five.'"
     },
     "partial": {
       "status": "pass",
@@ -68,7 +68,7 @@
     {
       "viewport": "1440x900",
       "artifact": "store-1440x900.png",
-      "observation": "Store picker (grouped dropdown) with the chosen item, quantity and Add to cart on the left; cart on the right splits Monthly (\u00a358) from One-off tasks (\u00a3249) with Due today \u00a3307 and a Checkout button that says payments open soon. No horizontal overflow, no console errors."
+      "observation": "Store picker (grouped dropdown) with the chosen item, quantity and Add to cart on the left; cart on the right splits Monthly (£58) from One-off tasks (£249) with Due today £307 and a Checkout button that says payments open soon. No horizontal overflow, no console errors."
     },
     {
       "viewport": "375x812",
@@ -78,12 +78,12 @@
     {
       "viewport": "1440x900",
       "artifact": "store-billing-1440x900.png",
-      "observation": "Cart groups items under 'Recurring \u00b7 monthly' and 'One-off \u00b7 task based' headings, each with its own billing note; totals show Recurring, One-off, Due today and From next month. Blueprint roles show a Core \u00b7 included, Recurring or One-off tag and an Add to cart button (core roles say 'Included in every package'). No console errors."
+      "observation": "Cart groups items under 'Recurring · monthly' and 'One-off · task based' headings, each with its own billing note; totals show Recurring, One-off, Due today and From next month. Blueprint roles show a Core · included, Recurring or One-off tag and an Add to cart button (core roles say 'Included in every package'). No console errors."
     },
     {
       "viewport": "1440x900",
       "artifact": "store-consultants-1440.png",
-      "observation": "Picker lists 5 consultants x 2 passes under 'One-off \u00b7 consultants'; opening one shows its passes, merged task menu, how a pass works, overage rule and merged job description; cart shows a 30-day pass (\u00a3349) and a 7-day sprint (\u00a3129) under the One-off heading, Due today \u00a3478. No console errors, no overflow."
+      "observation": "Picker lists 5 consultants x 2 passes under 'One-off · consultants'; opening one shows its passes, merged task menu, how a pass works, overage rule and merged job description; cart shows a 30-day pass (£349) and a 7-day sprint (£129) under the One-off heading, Due today £478. No console errors, no overflow."
     },
     {
       "viewport": "1440x900",
@@ -159,6 +159,71 @@
       "viewport": "375x812",
       "artifact": "owner-prices-375x812.png",
       "observation": "Fields stack one per row; save bar sits in the flow rather than covering the form; wide tables scroll inside labelled regions; no page overflow."
+    },
+    {
+      "viewport": "375x812",
+      "artifact": "signup-1-sector-375x812.png",
+      "observation": "Thirteen sector tiles in two columns with examples, the chosen one highlighted; business name and a country select prefilled from the device; one primary button. At 375 wide nothing overflows and the tiles stay two per row."
+    },
+    {
+      "viewport": "375x812",
+      "artifact": "signup-2-needs-375x812.png",
+      "observation": "Ten need chips, the sector's three ticked, plus the one the tester added; team size chips; Back and Continue."
+    },
+    {
+      "viewport": "375x812",
+      "artifact": "signup-3-apps-375x812.png",
+      "observation": "Six app chips for the sector with two picked, a 'Show more apps' disclosure, optional website field."
+    },
+    {
+      "viewport": "375x812",
+      "artifact": "signup-4-plan-375x812.png",
+      "observation": "Plan headed with the business name: three employees starting today with first job and reason, standby line, dashed add-on offer with a checkbox, apps with a 'Connects directly' tag, a closed '4 things we filled in' disclosure, price after trial, then the email field and 'Start my free week'."
+    },
+    {
+      "viewport": "375x812",
+      "artifact": "setup-prefilled-375x812.png",
+      "observation": "Setup form after signup: goals, customers, financial year and industry already filled, each with 'From your signup answers.' or 'Our guess. Change it if it is wrong.' under it; the count line reads '16 questions, 2 required, 4 already filled in from signup'."
+    },
+    {
+      "viewport": "1440x900",
+      "artifact": "signup-1-sector-1440x900.png",
+      "observation": "Thirteen sector tiles in two columns with examples, the chosen one highlighted; business name and a country select prefilled from the device; one primary button."
+    },
+    {
+      "viewport": "1440x900",
+      "artifact": "signup-2-needs-1440x900.png",
+      "observation": "Ten need chips, the sector's three ticked, plus the one the tester added; team size chips; Back and Continue."
+    },
+    {
+      "viewport": "1440x900",
+      "artifact": "signup-3-apps-1440x900.png",
+      "observation": "Six app chips for the sector with two picked, a 'Show more apps' disclosure, optional website field."
+    },
+    {
+      "viewport": "1440x900",
+      "artifact": "signup-4-plan-1440x900.png",
+      "observation": "Plan headed with the business name: three employees starting today with first job and reason, standby line, dashed add-on offer with a checkbox, apps with a 'Connects directly' tag, a closed '4 things we filled in' disclosure, price after trial, then the email field and 'Start my free week'."
+    },
+    {
+      "viewport": "1440x900",
+      "artifact": "setup-prefilled-1440x900.png",
+      "observation": "Setup form after signup: goals, customers, financial year and industry already filled, each with 'From your signup answers.' or 'Our guess. Change it if it is wrong.' under it; the count line reads '16 questions, 2 required, 4 already filled in from signup'."
+    },
+    {
+      "viewport": "1440x900",
+      "artifact": "pricing-1440x900.png",
+      "observation": "Cards: Team £100 / mo (adds 'One price for the whole team, no per-seat fees'), Extra employee £25, Custom; then the 'Compare with hiring part-time' card with three inputs in a row and three result tiles (£650 hire, £100 package, £6,600 a year at 10 h x £15); no overflow."
+    },
+    {
+      "viewport": "375x812",
+      "artifact": "pricing-375x812.png",
+      "observation": "Cards and the calculator stack to one column; inputs full width with labels above; result tiles stack; FAQ adds 'What happens when the energy runs out?'; no horizontal overflow."
+    },
+    {
+      "viewport": "1440x900",
+      "artifact": "settings-topups-1440x900.png",
+      "observation": "Settings shows an Energy top-ups panel: top-up energy left, auto-reload checkbox (off), pack select, monthly cap with hint, Save button with spacing before the status line saying it cannot charge until payments open."
     }
   ]
 }

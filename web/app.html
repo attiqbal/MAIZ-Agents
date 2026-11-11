@@ -163,7 +163,7 @@
 
     <!-- TEAM -->
     <div class="content" data-screen="team" hidden>
-      <div class="page-h"><div><h1>Team</h1><p>Who is working, what on, and how much energy each employee has left today.</p></div><span class="badge badge-dark eg">Example data</span><a class="btn btn-primary btn-sm" href="/employees.html#store">Hire from the store</a></div>
+      <div class="page-h"><div><h1>Team</h1><p>Who is working, what on, and how much of the team energy is left.</p></div><span class="badge badge-dark eg">Example data</span><a class="btn btn-primary btn-sm" href="/employees.html#store">Hire from the store</a></div>
       <div class="kpis kpis-4" id="team-kpis"></div>
       <section class="panel" aria-labelledby="ts-h"><div class="panel-h"><h2 id="ts-h">Employee status</h2><span class="r">This week</span></div>
         <div class="tbl-wrap" tabindex="0" role="region" aria-label="Employee status table"><table class="tbl" id="team-table"></table></div></section>
@@ -290,14 +290,22 @@
         <div class="ubar ubar-2"><span>Company</span><span id="set-biz" class="mono"></span></div>
         <div class="ubar ubar-2"><span>Email</span><span id="set-email" class="mono"></span></div>
         <div class="ubar ubar-2"><span>Sign out of this device</span><button class="btn btn-sm btn-ghost" data-signout>Sign out</button></div></section>
-      <section class="panel"><div class="panel-h"><h2>Coming next</h2></div><p class="muted">Billing, your spending cap, privacy options and inviting teammates will live here.</p></section>
+      <section class="panel" aria-labelledby="tu-h"><div class="panel-h"><h2 id="tu-h">Energy top-ups</h2><span class="r" id="tu-left">Top-up energy left: 0</span></div>
+        <p class="muted small">When the week's energy runs out, work pauses and nothing is charged. You can buy a top-up pack (£5, £10 or £25). Top-ups roll over and never expire, and the weekly energy is always used first.</p>
+        <form id="tu-form" class="rd-form" novalidate>
+          <label class="ow-check"><input type="checkbox" id="tu-on"> Auto-reload when the team runs out</label>
+          <div class="field"><label for="tu-pack">Pack to buy</label><select class="input" id="tu-pack"><option value="5">£5 for 500 energy</option><option value="10">£10 for 1,000 energy</option><option value="25">£25 for 2,500 energy</option></select></div>
+          <div class="field"><label for="tu-cap">Most to spend in a month (£)</label><input class="input" id="tu-cap" type="number" min="0" step="1" inputmode="numeric" value="25"><span class="hint">Auto-reload stops at this amount until next month.</span></div>
+          <div class="acts"><button class="btn btn-primary btn-sm" type="submit">Save</button><span class="muted small" id="tu-msg" role="status">Off unless you turn it on. Payments open soon; until then a saved setting cannot charge you.</span></div>
+        </form></section>
+      <section class="panel"><div class="panel-h"><h2>Coming next</h2></div><p class="muted">Billing, privacy options and inviting teammates will live here.</p></section>
     </div>
 
     <!-- USAGE -->
     <div class="content" data-screen="usage" hidden>
-      <div class="page-h"><div><h1>Energy and spend</h1><p>Energy is each employee's daily allowance. Redoing a task returns the energy it used.</p></div><span class="badge badge-dark eg">Example data</span></div>
+      <div class="page-h"><div><h1>Energy and spend</h1><p>Energy is your team's weekly allowance, shown as a share of this week's energy. Redoing a task returns the energy it used.</p></div><span class="badge badge-dark eg">Example data</span></div>
       <div class="kpis kpis-4" id="usage-kpis"></div>
-      <section class="panel"><div class="panel-h"><h2>Energy used, last 7 days</h2><span class="r">Daily allowance: 500 across the team</span></div>
+      <section class="panel"><div class="panel-h"><h2>Energy used, last 7 days</h2><span class="r">This week: 62% of the team's energy used</span></div>
         <svg class="bars" viewBox="0 0 700 180" role="img" aria-label="Stacked bars of energy used per day by employee. The table below gives the figures." id="bars"></svg>
         <div class="legend" id="bars-legend"></div></section>
       <section class="panel" aria-labelledby="ue-h"><div class="panel-h"><h2 id="ue-h">By employee</h2><span class="r">Prices apply after the trial</span></div>

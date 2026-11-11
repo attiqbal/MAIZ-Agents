@@ -21,7 +21,13 @@ import { WorkforceService } from "../modules/workforce/index.js";
 import { IntegrationService, defaultRegistry, type OAuthApp } from "../modules/integrations/index.js";
 import { QualityReviewService } from "../modules/review/index.js";
 import { PriceBook } from "../modules/pricing/index.js";
-import { SpecialistReviewService } from "../modules/review/specialists.js";
+import { SpecialistReviewService, type SpecialistRequest } from "../modules/review/specialists.js";
+import { templateFromRole } from "../modules/workforce/templates.js";
+import { MockPaymentProvider, PaymentService, type PaymentProvider } from "../modules/payments/index.js";
+import { quote } from "../modules/store/cart.js";
+import { ReconciliationService } from "../modules/reconciliation/index.js";
+import { localParts } from "../modules/batch/schedule.js";
+import { RotaService } from "../modules/rota/index.js";
 
 import { ConsoleEmailSender, type EmailSender } from "./email.js";
 import { userIdFor } from "./identity.js";
@@ -46,6 +52,11 @@ export interface PlatformConfig {
    * queue and sign off specialised tasks. Clients can never approve their own.
    */
   platformOwners?: readonly string[];
+  /**
+   * Takes payments. Leave out for no charging: checkout is then refused. Development (allowDevAuth) defaults to a
+   * mock provider that charges nobody. A real provider (Stripe) is a class implementing PaymentProvider.
+   */
+  payments?: PaymentProvider;
   now?: () => Date;
   http?: typeof fetch;
 }
@@ -77,9 +88,11 @@ export function createPlatform(cfg: PlatformConfig) {
     const key = workforce.templateOf(employeeId);
     return key ? prices.agentAllowance(key) : undefined;
   });
+  // Add-on employees and specialists add their weekly energy to a paid team pool.
+  energy.setPoolBonusResolver((ws) => workforce.templatesIn(ws).reduce((sum, key) => sum + prices.weeklyEnergyFor(key), 0));
   const onboarding = new OnboardingService(identity, workforce, ledger, energy, audit, now, () => {
     const g = prices.general();
-    return { days: g.trialDays, dailyEnergy: g.defaultDailyEnergyPerEmployee };
+    return { days: g.trialDays, teamEnergy: g.trialTeamEnergy, dailyTeamCeiling: g.dailyTeamCeiling };
   });
   const router = new ChannelRouter(identity, workforce, audit);
   /** Business apps (tills, payroll). Employees get only the app data the owner granted them. */
@@ -114,11 +127,18 @@ export function createPlatform(cfg: PlatformConfig) {
     },
   });
   /** New custom specialists: drafted for the client, checked and priced by the platform owner before training. */
+  /** A custom specialist's template: its approved role and job description, usable only by the client that asked for it. */
+  const customTemplateOf = (r: SpecialistRequest) => ({ ...templateFromRole(r.role, `custom-${r.id}`), jobDescription: r.jobDescription });
   const specialists = new SpecialistReviewService(identity, audit, isPlatformOwner, (tier) => {
     const g = prices.general();
     return tier === "premium" ? g.specialistPremiumMonthlyGbp : g.specialistStandardMonthlyGbp;
   }, {
     now,
+    hire: async (userId, r) => {
+      const t = customTemplateOf(r);
+      workforce.registerCustomTemplate(r.workspaceId, t);
+      return workforce.hire(userId, r.workspaceId, t.key);
+    },
     notifyOwner: async (r, clientName) => {
       for (const to of ownerEmails) {
         await email.send({ to, subject: `New specialist to review: ${r.role.title} for ${clientName}`, text: `${clientName} asked for a new custom specialist, "${r.role.title}". The Admin manager drafted the job description; nothing is trained until you approve it.\n\nReview it:\n${base}/owner-specialists.html#${r.id}` });
@@ -133,6 +153,99 @@ export function createPlatform(cfg: PlatformConfig) {
       await admin.tell(r.workspaceId, text, "/app.html#team");
     },
   });
+
+  let alertOwnersLate: (subject: string, text: string) => Promise<void> = async () => undefined;
+  /** Staff and shifts, so rota questions are answered from real records. */
+  const rota = new RotaService(identity, audit);
+  workforce.addContext((ws, templateKey) => rota.contextFor(ws, templateKey, now().toISOString().slice(0, 10)));
+  /** Checkout and orders. What a paid order buys is hired here, from the same templates the store sells. */
+  const payments = new PaymentService(identity, audit, {
+    provider: cfg.payments ?? (cfg.allowDevAuth ? new MockPaymentProvider() : undefined),
+    quote: (lines) => quote(lines, prices.catalogue()),
+    appUrl: base,
+    customerEmail: (userId) => identity.workspacesFor(userId).map((w) => w.ownerEmail).find(Boolean),
+    now,
+    alert: (subject, text) => alertOwnersLate(subject, text),
+    fulfil: async (order) => {
+      const ids: string[] = [];
+      for (const line of order.lines) {
+        // A consultant line is "consultant:pass"; the employee template is the part before the colon.
+        const templateKey = line.key.split(":")[0]!;
+        for (let i = 0; i < line.qty; i++) ids.push((await workforce.hire(order.userId, order.workspaceId, templateKey)).id);
+      }
+      return ids;
+    },
+  });
+
+  /** Nightly check of every client's books, run once after each client's own midnight (their batch time zone). */
+  const reconciliation = new ReconciliationService({
+    workspaceIds: () => identity.allWorkspaces().map((w) => w.id),
+    localDate: (ws) => {
+      const l = localParts(now(), batch.scheduleOf(ws).timezone);
+      return `${l.y}-${String(l.m).padStart(2, "0")}-${String(l.d).padStart(2, "0")}`;
+    },
+    books: (ws) => ledger.rawBooks(ws),
+    records: (ws) => integrations.recordsOf(ws),
+    orders: (ws) => payments.all().filter((o) => o.workspaceId === ws),
+    now,
+    alert: async (ws, report) => {
+      const name = identity.workspaceById(ws)?.name ?? ws;
+      const errors = report.findings.filter((f) => f.severity === "error");
+      await alertOwnersLate(`Books need a look: ${name}`, `Tonight's check of ${name}'s books found ${errors.length} problem(s):\n\n${errors.map((f) => `- ${f.message}`).join("\n")}\n\nNothing was changed. Details: ${base}/owner-clients.html`);
+    },
+  });
+
+  /**
+   * The client's control center, from real records: each employee's energy, the task board and the week's totals.
+   * Everything is read through the services, so permissions and workspace walls apply.
+   */
+  const dashboard = (userId: string, workspaceId: string) => {
+    const nowDate = now();
+    const weekAgo = new Date(nowDate.getTime() - 7 * 86_400_000).toISOString();
+    const team = workforce.team(userId, workspaceId);
+    const energyDays = energy.recentDays(userId, workspaceId, 7);
+    const done = workforce.tasksSince(userId, workspaceId, weekAgo).filter((t) => t.status === "ready_for_review");
+    const open = batch.openJobsOf(workspaceId);
+    const label = (id: string) => team.find((e) => e.id === id)?.name ?? "Employee";
+    const clip = (t: string, n: number) => (t.length > n ? `${t.slice(0, n - 1)}…` : t);
+    const people = team.map((e) => {
+      const allowance = energy.quotaOf(userId, workspaceId, e.id);
+      const week = energyDays.byEmployee.get(e.id) ?? new Array(7).fill(0);
+      const mine = open.filter((j) => j.employeeId === e.id);
+      const running = mine.find((j) => j.status === "running") ?? mine[0];
+      return {
+        id: e.id, name: e.name, templateKey: e.templateKey, allowance, usedToday: week[6] as number, week,
+        doneWeek: done.filter((t) => t.employeeId === e.id).length,
+        status: running ? "working" : "idle",
+        doing: running ? clip(running.brief, 100) : null,
+      };
+    });
+    const reviewsNeedingYou = reviews.forClient(userId, workspaceId).filter((r) => r.status === "gathering_info" || r.status === "more_info_requested");
+    const inReview = reviews.forClient(userId, workspaceId).filter((r) => r.status === "in_review").length;
+    const tasks = [
+      ...open.filter((j) => j.status === "queued").map((j) => ({ id: j.id, employeeId: j.employeeId, title: clip(j.brief, 80), column: "planned" as const, runsAt: j.runsAt })),
+      ...open.filter((j) => j.status === "running").map((j) => ({ id: j.id, employeeId: j.employeeId, title: clip(j.brief, 80), column: "in_progress" as const })),
+      ...reviewsNeedingYou.map((r) => ({ id: r.id, employeeId: null, title: r.title, column: "waiting" as const, note: "Needs your answers" })),
+      ...done.slice(0, 40).map((t) => ({ id: t.id, employeeId: t.employeeId, title: clip(t.brief, 80), column: "done" as const, energy: t.energyUsed ?? 0, at: t.at })),
+    ];
+    const use = energy.usageOf(workspaceId);
+    const sched = batch.forClient(userId, workspaceId);
+    // The team's shared pool (null on older per-employee plans): what the dashboard shows as the allowance.
+    const teamEnergy = energy.teamEnergy(userId, workspaceId) ?? null;
+    return {
+      asOf: nowDate.toISOString(),
+      team: people,
+      teamEnergy,
+      tasks: tasks.map((t) => ({ ...t, employeeName: t.employeeId ? label(t.employeeId) : null })),
+      totals: {
+        energyToday: use.energyToday,
+        allowanceToday: teamEnergy ? teamEnergy.leftToday + use.energyToday : people.reduce((n, e) => n + e.allowance, 0),
+        energyWeek: people.reduce((n, e) => n + e.week.reduce((a: number, b: number) => a + b, 0), 0), energyMonth: use.energyMonth,
+        queued: sched.queued, waitingOnYou: reviewsNeedingYou.length, inReview, doneWeek: done.length,
+        nextRunLabel: sched.nextRunLabel,
+      },
+    };
+  };
 
   /** The platform owner's AI spend and routing controls. Nothing here is visible to clients. */
   const ai = {
@@ -174,6 +287,8 @@ export function createPlatform(cfg: PlatformConfig) {
         energyMonth: use.energyMonth,
         /** What MAIZ paid model providers this month, in US dollars. */
         aiCostUsdMonth: Math.round(use.costMicroMonth / 10_000) / 100,
+        /** Last nightly check of this client's books: ok, problems found, or not run yet. */
+        books: (() => { const r = reconciliation.latestFor(w.id); return r ? { ok: r.ok, date: r.date, problems: r.findings.filter((f) => f.severity === "error").length, warnings: r.findings.filter((f) => f.severity === "warn").length } : null; })(),
         openReviews: openReviews.get(w.id) ?? 0,
         specialistsToReview: openSpecialists.get(w.id) ?? 0,
       };
@@ -183,7 +298,7 @@ export function createPlatform(cfg: PlatformConfig) {
    * A setup that could not undo itself needs a person. The Admin manager tells the client that MAIZ
    * has been alerted, so this is where the platform owner actually is.
    */
-  const alertOwners = async (subject: string, text: string) => {
+  const alertOwners = alertOwnersLate = async (subject: string, text: string) => {
     for (const to of ownerEmails) await email.send({ to, subject, text }).catch((e) => console.error("owner alert failed:", e));
     if (!ownerEmails.length) console.error(`platform alert (no PLATFORM_OWNER_EMAILS set): ${subject}`);
   };
@@ -232,13 +347,21 @@ export function createPlatform(cfg: PlatformConfig) {
     for (const r of s.reviews ?? []) reviews.restore(r);
     for (const c of s.priceChanges ?? []) prices.restore(c);
     for (const r of s.specialistRequests ?? []) specialists.restore(r);
+    for (const x of s.records ?? []) {
+      if (x.kind === "order") payments.restore(x.data);
+      else if (x.kind === "recon") reconciliation.restore(x.data);
+      else if (x.kind === "task") workforce.restoreTask(x.data);
+      else if (x.kind === "rota_staff") rota.restoreStaff(x.data);
+      else if (x.kind === "rota_shift" && !x.data.removed) rota.restoreShift(x.data);
+    }
+    for (const r of specialists.approved()) workforce.registerCustomTemplate(r.workspaceId, customTemplateOf(r));
     if (s.aiSettings) aiSettings.restore(s.aiSettings);
     for (const d of s.aiDays ?? []) spend.restore(d);
     for (const x of s.batchSchedules ?? []) batch.restoreSchedule(x.workspaceId, x.schedule);
     for (const j of s.batchJobs ?? []) batch.restoreJob(j);
     for (const r of s.batchRuns ?? []) batch.restoreRun(r);
     sink = store;
-    for (const part of [audit, identity, energy, workforce, ledger, router, admin, integrations, reviews, prices, specialists, aiSettings, spend, batch]) part.useSink(store);
+    for (const part of [audit, identity, energy, workforce, ledger, router, admin, integrations, reviews, prices, specialists, aiSettings, spend, batch, payments, rota, reconciliation]) part.useSink(store);
   }
 
   const healthy = () => (sink as { healthy?: boolean } | undefined)?.healthy !== false;
@@ -247,6 +370,6 @@ export function createPlatform(cfg: PlatformConfig) {
   const usedLinks = new Set<string>();
   /** Sign-in emails sent per address and hour, to stop the form being used to spam someone. */
   const sends = new Map<string, number[]>();
-  return { batch, email, usedLinks, sends, admin, reviews, prices, specialists, ai, clients, isPlatformOwner, healthy, cfg, now, audit, bus, identity, energy, workforce, ledger, onboarding, router, integrations, slackTokens, saveSlackToken, attachStore };
+  return { dashboard, reconciliation, rota, payments, batch, email, usedLinks, sends, admin, reviews, prices, specialists, ai, clients, isPlatformOwner, healthy, cfg, now, audit, bus, identity, energy, workforce, ledger, onboarding, router, integrations, slackTokens, saveSlackToken, attachStore };
 }
 export type Platform = ReturnType<typeof createPlatform>;

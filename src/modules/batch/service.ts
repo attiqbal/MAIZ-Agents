@@ -119,6 +119,16 @@ export class BatchService implements Intake {
     return { jobId: job.id, runsAt: runAfter };
   }
 
+  queuedFor(workspaceId: string): number {
+    let n = 0;
+    for (const j of this.jobs.values()) if (j.workspaceId === workspaceId && j.status === "queued") n++;
+    return n;
+  }
+
+  nextRunFor(workspaceId: string): string {
+    return nextRunAt(this.scheduleOf(workspaceId), this.now()).toISOString();
+  }
+
   // ---------- client views and controls ----------
 
   scheduleOf(workspaceId: string): ClientSchedule {
@@ -156,6 +166,14 @@ export class BatchService implements Intake {
       })),
       realTime: REAL_TIME_RULES,
     };
+  }
+
+  /** Waiting and running jobs for one client, for the dashboard's board (the caller already checked permission). */
+  openJobsOf(workspaceId: string): { id: string; employeeId: string; brief: string; status: JobStatus; runsAt?: string }[] {
+    return [...this.jobs.values()]
+      .filter((j) => j.workspaceId === workspaceId && (j.status === "queued" || j.status === "running"))
+      .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
+      .map((j) => ({ id: j.id, employeeId: j.employeeId, brief: clip(j.brief, 120), status: j.status, ...(j.status === "queued" ? { runsAt: j.notBefore && j.notBefore > j.runAfter ? j.notBefore : j.runAfter } : {}) }));
   }
 
   /** Run now: this client's waiting tasks are sent to the pod now (together with anything else already waiting). */

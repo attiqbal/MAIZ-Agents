@@ -55,6 +55,8 @@ describe("rate limits", () => {
   it("is tight on sign-in, off for Slack events and GETs", () => {
     expect(limitFor("POST", "/api/signin/start")?.max).toBe(10);
     expect(limitFor("POST", "/api/slack/events")).toBeUndefined();
+    expect(limitFor("POST", "/api/payments/webhook")).toBeUndefined();
+    expect(limitFor("POST", "/api/checkout")?.max).toBe(20);
     expect(limitFor("GET", "/api/org")).toBeUndefined();
   });
   it("uses the proxy-added address, not one the client forged", () => {

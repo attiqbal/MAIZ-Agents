@@ -58,6 +58,8 @@ export interface SetupStatus {
   contact: ContactChannel;
   form: FormField[];
   runs: SetupRun[];
+  /** Answers worked out at signup, so the owner confirms instead of typing. "guess" ones are labelled on the form. */
+  prefill?: { answers: Answers; source: Record<string, "you" | "guess"> };
 }
 
 interface OrgState {
@@ -149,7 +151,11 @@ export class AdminManager {
   status(userId: string, workspaceId: string): SetupStatus {
     this.identity.require(userId, workspaceId, "task.read");
     const s = this.state(workspaceId);
-    return { state: s.state, contact: s.contact, form: formFor(s.org.blueprint.employees), runs: s.runs.map((r) => structuredClone(r)) };
+    const form = formFor(s.org.blueprint.employees);
+    const signup = s.org.blueprint.signup;
+    // Only answers the form still accepts are offered, so a changed question can never block the owner.
+    const prefill = signup ? { answers: validateAnswers(form, signup.prefill.answers).clean, source: { ...signup.prefill.source } } : undefined;
+    return { state: s.state, contact: s.contact, form, runs: s.runs.map((r) => structuredClone(r)), ...(prefill ? { prefill } : {}) };
   }
 
   /** Dashboard inbox: every Admin manager message, oldest first. */

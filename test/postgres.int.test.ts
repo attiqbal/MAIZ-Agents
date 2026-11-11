@@ -116,6 +116,16 @@ describe.skipIf(!ADMIN || !APP)("postgres persistence", () => {
     expect(madeSp.body).toMatchObject({ request: { status: "in_review" } });
     const req = (madeSp.body as any).request;
     await a.call("POST", `/api/owner/specialists/${req.id}/decide`, { decision: "approved", priceGbp: 22 }, ownerToken);
+    // newer records: a hired custom specialist, a rota, a paid order, a finished task and a books check
+    const hired = (await a.call("POST", `/api/specialists/${req.id}/hire`, undefined, client.token)).body as any;
+    const staff = ((await a.call("POST", "/api/rota/staff", { name: "Mo", hourlyRateMinor: 1000 }, client.token)).body as any).added;
+    await a.call("POST", "/api/rota/shifts", { date: "2026-06-10", start: "08:00", end: "16:00", staffId: staff.id }, client.token);
+    const doomed = ((await a.call("POST", "/api/rota/shifts", { date: "2026-06-11", start: "08:00", end: "16:00" }, client.token)).body as any).shift;
+    await a.call("DELETE", `/api/rota/shifts/${doomed.id}`, undefined, client.token);
+    const item = ((await a.call("GET", "/api/store")).body as any).catalogue.find((i: any) => i.kind === "employee");
+    const order = ((await a.call("POST", "/api/checkout", { lines: [{ key: item.key }] }, client.token)).body as any).order;
+    await a.call("POST", "/api/ask", { text: "Urgent: what is our cash?", employeeId: hired.employeeId, urgent: true }, client.token);
+    await a.call("POST", "/api/owner/reconciliation/run", undefined, ownerToken);
     await a.store.flush();
     await a.store.close();
 
@@ -123,6 +133,14 @@ describe.skipIf(!ADMIN || !APP)("postgres persistence", () => {
     expect(((await b.call("GET", "/api/store")).body as any).prices.addOnEmployeeMonthlyGbp).toBe(14);
     expect(((await b.call("GET", "/api/owner/prices", undefined, ownerToken)).body as any).history.some((h: any) => h.note === "Int test")).toBe(true);
     expect(((await b.call("GET", "/api/specialists", undefined, client.token)).body as any).requests[0]).toMatchObject({ status: "approved", priceGbp: 22 });
+    const team = ((await b.call("GET", "/api/org", undefined, client.token)).body as any).team;
+    expect(team.find((e: any) => e.id === hired.employeeId)).toMatchObject({ name: "Wholesale account coordinator" });
+    const week = (await b.call("GET", "/api/rota/week", undefined, client.token)).body as any;
+    expect(week.shifts).toHaveLength(1); // the removed shift stayed removed
+    expect(week.hoursByPerson[0]).toMatchObject({ name: "Mo", hours: 8, costMinor: 8000 });
+    expect(((await b.call("GET", "/api/orders", undefined, client.token)).body as any).orders[0]).toMatchObject({ id: order.id, status: "paid" });
+    expect(((await b.call("GET", "/api/dashboard", undefined, client.token)).body as any).totals.doneWeek).toBe(1);
+    expect(((await b.call("GET", "/api/owner/reconciliation", undefined, ownerToken)).body as any).reports[0]).toMatchObject({ ok: true });
     const row = ((await b.call("GET", "/api/owner/clients", undefined, ownerToken)).body as any).clients.find((c: any) => c.ownerEmail === email);
     expect(row).toMatchObject({ name: "Bob's Bakery", specialistsToReview: 0 });
     const app = new pg.Client({ connectionString: APP });

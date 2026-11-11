@@ -157,6 +157,28 @@ export class ChannelRouter {
   }
 }
 
+/** Plain words for why work did not start. Says what happens next, so a limit is never a silent stop. */
+export function noEnergyMessage(reason: string | undefined): string {
+  switch (reason) {
+    case "trial_ended":
+      return "Your free trial has ended. Choose a plan to keep your team working.";
+    case "weekly_pool_used":
+      return "The team has used this week's energy. It refills on Monday, or you can add a top-up now.";
+    case "overtime_cap_reached":
+      return "The team has used this week's energy and this month's top-ups. It refills on Monday; contact MAIZ support if you need more sooner.";
+    case "daily_ceiling_reached":
+      return "The team has reached today's safety limit. Work carries on tomorrow from this week's energy.";
+    case "queue_full":
+      return "You already have a lot of work waiting for tonight's batch. Let some of it finish, or mark this one urgent.";
+    case "queue_exceeds_energy":
+      return "The work already waiting for tonight will use the energy the team has left this week. It refills on Monday, or you can add a top-up now.";
+    case "monthly_cost_cap_reached":
+      return "Your account has reached its monthly safety limit. Contact MAIZ support and we'll sort it out.";
+    default:
+      return "I've used up my energy for today. I'll be back tomorrow, or you can add a top-up.";
+  }
+}
+
 function describe(task: TaskResult): string {
   switch (task.status) {
     case "ready_for_review":
@@ -164,9 +186,7 @@ function describe(task: TaskResult): string {
     case "queued":
       return `Got it. This goes in your next batch, which runs at your closing time. I'll tell you when it's filed. Reply "urgent" with it if it can't wait.`;
     case "no_energy":
-      return task.reason === "trial_ended"
-        ? "Your free trial has ended. Choose a plan to keep your team working."
-        : "I've used up my energy for today. I'll be back tomorrow, or you can add overtime.";
+      return noEnergyMessage(task.reason);
     default:
       return "Sorry, I couldn't finish that. Please try again.";
   }

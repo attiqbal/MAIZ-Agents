@@ -41,11 +41,11 @@ describe("prices and packages", () => {
     const book = (await s.call("GET", "/api/owner/prices", undefined, s.owner())).body as any;
     const addOn = book.items.find((i: any) => i.kind === "employee");
     const pass = book.items.find((i: any) => i.kind === "consultant");
-    expect(addOn.priceGbp).toBe(12);
+    expect(addOn.priceGbp).toBe(25);
 
     const r = await s.call("POST", "/api/owner/prices/changes", { general: { addOnEmployeeMonthlyGbp: 15 }, items: { [pass.key]: { priceGbp: 99, energy: 5000 } }, note: "Launch pricing" }, s.owner());
     expect(r.status).toBe(201);
-    expect((r.body as any).change.from).toMatchObject({ "general.addOnEmployeeMonthlyGbp": 12, [`items.${pass.key}.priceGbp`]: pass.priceGbp });
+    expect((r.body as any).change.from).toMatchObject({ "general.addOnEmployeeMonthlyGbp": 25, [`items.${pass.key}.priceGbp`]: pass.priceGbp });
 
     const store = (await s.call("GET", "/api/store")).body as any;
     expect(store.catalogue.find((i: any) => i.key === addOn.key).priceGbp).toBe(15);
@@ -58,9 +58,9 @@ describe("prices and packages", () => {
     const s = setup();
     const r = await s.call("POST", "/api/owner/prices/changes", { general: { basicPackageMonthlyGbp: 49 }, effectiveFrom: "2026-12-01T00:00:00Z" }, s.owner());
     const id = (r.body as any).change.id;
-    expect((r.body as any).general.basicPackageMonthlyGbp).toBe(41);
+    expect((r.body as any).general.basicPackageMonthlyGbp).toBe(100);
     expect((r.body as any).history[0]).toMatchObject({ id, upcoming: true });
-    expect(((await s.call("GET", "/api/store")).body as any).prices.basicPackageMonthlyGbp).toBe(41);
+    expect(((await s.call("GET", "/api/store")).body as any).prices.basicPackageMonthlyGbp).toBe(100);
     s.clock.d = new Date("2026-12-02T00:00:00Z");
     expect(((await s.call("GET", "/api/store")).body as any).prices.basicPackageMonthlyGbp).toBe(49);
     expect((await s.call("DELETE", `/api/owner/prices/changes/${id}`, undefined, s.owner())).status).toBe(400);
@@ -71,18 +71,38 @@ describe("prices and packages", () => {
     expect(((await s.call("GET", "/api/store")).body as any).prices.basicPackageMonthlyGbp).toBe(49);
   });
 
-  it("uses the owner's trial length for new clients and each agent's own daily energy for everyone", async () => {
+  it("uses the owner's trial length and trial energy for new clients, and an agent's own daily cap inside the pool", async () => {
     const s = setup();
-    await s.call("POST", "/api/owner/prices/changes", { general: { trialDays: 14, defaultDailyEnergyPerEmployee: 200 }, agents: { "marketing-manager": 500 } }, s.owner());
+    await s.call("POST", "/api/owner/prices/changes", { general: { trialDays: 14, trialTeamEnergy: 4_000 }, agents: { "marketing-manager": 500 } }, s.owner());
     const r = await s.call("POST", "/api/signup", { email: "bob@bakery.co", businessName: "Bob's Bakery", sells: "Bread", size: "2–10", country: "GB" });
     expect((r.body as any).trialEndsAt).toBe("2026-11-24T09:00:00.000Z");
-    const org = (await s.call("GET", "/api/org", undefined, { authorization: `Bearer ${(r.body as any).token}` })).body as any;
+    const auth = { authorization: `Bearer ${(r.body as any).token}` };
+    const org = (await s.call("GET", "/api/org", undefined, auth)).body as any;
+    expect(org.teamEnergy).toMatchObject({ pool: 4_000, left: 4_000, leftToday: 4_000, refillsAt: null });
     const energy = Object.fromEntries(org.team.map((e: any) => [e.templateKey, e.energyLeft]));
     expect(energy["marketing-manager"]).toBe(500);
-    expect(energy["finance-manager"]).toBe(200);
+    expect(energy["finance-manager"]).toBe(4_000);
     await s.call("POST", "/api/owner/prices/changes", { agents: { "marketing-manager": null } }, s.owner());
-    const again = (await s.call("GET", "/api/org", undefined, { authorization: `Bearer ${(r.body as any).token}` })).body as any;
-    expect(again.team.find((e: any) => e.templateKey === "marketing-manager").energyLeft).toBe(200);
+    const again = (await s.call("GET", "/api/org", undefined, auth)).body as any;
+    expect(again.team.find((e: any) => e.templateKey === "marketing-manager").energyLeft).toBe(4_000);
+  });
+
+  it("shows the team's energy as a percentage with top-up packs, and saves auto-reload only with a valid cap", async () => {
+    const s = setup();
+    const r = await s.call("POST", "/api/signup", { email: "cat@cafe.co", businessName: "Cat Cafe", sells: "Coffee", size: "2–10", country: "GB" });
+    const auth = { authorization: `Bearer ${(r.body as any).token}` };
+    const e = (await s.call("GET", "/api/energy", undefined, auth)).body as any;
+    expect(e.team).toMatchObject({ percentUsed: 0, topUpLeft: 0, autoReload: null });
+    expect(e.packs[0]).toEqual({ gbp: 5, energy: 500 });
+    expect((await s.call("POST", "/api/energy/auto-reload", { enabled: true, packGbp: 10, monthlyCapGbp: 5 }, auth)).status).toBe(400);
+    const ok = await s.call("POST", "/api/energy/auto-reload", { enabled: true, packGbp: 10, monthlyCapGbp: 30 }, auth);
+    expect((ok.body as any).team.autoReload).toEqual({ enabled: true, packGbp: 10, packEnergy: 1_000, monthlyCapGbp: 30 });
+  });
+
+  it("refuses the old per-agent default setting now that the team shares a pool", async () => {
+    const s = setup();
+    const r = await s.call("POST", "/api/owner/prices/changes", { general: { defaultDailyEnergyPerEmployee: 200 } }, s.owner());
+    expect(r.status).toBe(400);
   });
 
   it("hides an item switched off from the store and the cart", async () => {
@@ -103,7 +123,7 @@ describe("custom specialists are reviewed by the platform owner", () => {
     const made = await s.call("POST", "/api/specialists", brief, ann);
     expect(made.status).toBe(201);
     const req = (made.body as any).request;
-    expect(req).toMatchObject({ status: "in_review", statusLabel: "With MAIZ for review", priceGbp: 19 });
+    expect(req).toMatchObject({ status: "in_review", statusLabel: "With MAIZ for review", priceGbp: 35 });
     expect(s.platform.specialists.mayTrain(req.id)).toBe(false);
     await Promise.resolve();
     expect(s.mail.sent.find((m) => m.to === OWNER)?.subject).toBe("New specialist to review: Wholesale account coordinator for Kestrel Coffee");
@@ -127,6 +147,38 @@ describe("custom specialists are reviewed by the platform owner", () => {
     await s.call("POST", `/api/owner/specialists/${id}/decide`, { decision: "changes_requested", message: "Add who the cafes are" }, s.owner());
     const mine = ((await s.call("GET", "/api/specialists", undefined, ann)).body as any).requests[0];
     expect(mine).toMatchObject({ status: "changes_requested", messageToClient: "Add who the cafes are" });
+  });
+});
+
+describe("hiring an approved custom specialist", () => {
+  const brief = { title: "Wholesale account coordinator", purpose: "Look after cafes that buy in bulk", duties: ["Prepare price lists", "Chase repeat orders"] };
+
+  it("can be hired once after approval, becomes a team member, and works from its own job description", async () => {
+    const s = setup();
+    const ann = await s.signUp("ann@kestrel.co", "Kestrel Coffee");
+    const id = ((await s.call("POST", "/api/specialists", brief, ann)).body as any).request.id;
+    expect((await s.call("POST", `/api/specialists/${id}/hire`, undefined, ann)).status).toBe(400); // not approved yet
+    await s.call("POST", `/api/owner/specialists/${id}/decide`, { decision: "approved", priceGbp: 24 }, s.owner());
+    const hired = await s.call("POST", `/api/specialists/${id}/hire`, undefined, ann);
+    expect(hired.status).toBe(201);
+    expect((hired.body as any).request).toMatchObject({ canHire: false });
+    expect((await s.call("POST", `/api/specialists/${id}/hire`, undefined, ann)).status).toBe(400); // only once
+    const org = (await s.call("GET", "/api/org", undefined, ann)).body as any;
+    const member = org.team.find((e: any) => e.id === (hired.body as any).employeeId);
+    expect(member).toMatchObject({ name: "Wholesale account coordinator", blurb: "Wholesale account coordinator" });
+    const answer = await s.call("POST", "/api/ask", { text: "What is the status?", employeeId: member.id, urgent: true }, ann);
+    expect(answer.status).toBe(200);
+  });
+
+  it("is invisible to every other client, and to the one that asked until MAIZ approves", async () => {
+    const s = setup();
+    const ann = await s.signUp("ann@kestrel.co", "Kestrel Coffee");
+    const bob = await s.signUp("bob@northside.co", "Northside Bikes");
+    const id = ((await s.call("POST", "/api/specialists", brief, ann)).body as any).request.id;
+    await s.call("POST", `/api/owner/specialists/${id}/decide`, { decision: "approved" }, s.owner());
+    expect((await s.call("POST", `/api/specialists/${id}/hire`, undefined, bob)).status).toBe(400);
+    const bobWs = s.platform.identity.workspacesFor(userIdFor("bob@northside.co"))[0]!;
+    await expect(s.platform.workforce.hire(userIdFor("bob@northside.co"), bobWs.id, `custom-${id}`)).rejects.toThrow(/unknown employee template/);
   });
 });
 

@@ -18,7 +18,7 @@ function demo(): Row[] {
     const d = draftCustomRole({ title, purpose, duties });
     if (!d.ok) return undefined;
     const at = new Date().toISOString();
-    return { id, clientName, workspaceId: "example", brief: { title, purpose, duties }, role: d.role, jobDescription: d.jobDescription, notes: d.notes, similar: d.similar, priceGbp: d.role.tier === "premium" ? 29 : 19, status: "in_review", submittedAt: at, updatedAt: at, history: [] };
+    return { id, clientName, workspaceId: "example", brief: { title, purpose, duties }, role: d.role, jobDescription: d.jobDescription, notes: d.notes, similar: d.similar, priceGbp: 35, status: "in_review", submittedAt: at, updatedAt: at, history: [] };
   };
   return [
     make("eg-wholesale", "Kestrel Coffee", "Wholesale account coordinator", "Look after the cafes and delis that buy coffee in bulk", ["Prepare monthly price lists for wholesale customers", "Chase repeat orders and late payments", "Keep the wholesale customer list up to date"]),

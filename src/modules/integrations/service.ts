@@ -107,6 +107,11 @@ export class IntegrationService {
     return [...this.connections.values()].filter((c) => c.workspaceId === workspaceId && c.status !== "disconnected").map((c) => ({ ...c, access: [...c.access] }));
   }
 
+  /** Platform-level (no user check): every stored record of one workspace, for the nightly reconciliation. */
+  recordsOf(workspaceId: string): StoredRecord[] {
+    return [...this.records.values()].filter((r) => r.workspaceId === workspaceId);
+  }
+
   pending(userId: string, workspaceId: string): StoredRecord[] {
     this.identity.require(userId, workspaceId, "task.read");
     return [...this.records.values()].filter((r) => r.workspaceId === workspaceId && r.status === "pending").sort((a, b) => a.date.localeCompare(b.date));

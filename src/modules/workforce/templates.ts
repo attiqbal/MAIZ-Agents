@@ -1,5 +1,7 @@
 import { getBlueprint } from "./blueprints.js";
 import { getConsultant, menuOf } from "./consultants.js";
+import type { RoleBlueprint } from "./blueprints.js";
+import type { JobDescription } from "./job-descriptions.js";
 
 /**
  * Employee templates are the products in the future Agent Store. A store
@@ -24,6 +26,8 @@ export interface EmployeeTemplate {
    * organisation gets: it onboards the owner, sets up the team and runs it. It is never sold.
    */
   kind: "employee" | "manager" | "specialist" | "consultant";
+  /** Custom specialists carry their own job description (the one MAIZ approved). Ready-made roles look theirs up by key. */
+  jobDescription?: JobDescription;
 }
 
 export const TEMPLATES: readonly EmployeeTemplate[] = [
@@ -117,9 +121,13 @@ export const EMPLOYEE_TEMPLATES: readonly EmployeeTemplate[] = TEMPLATES.filter(
 export function specialistTemplate(key: string): EmployeeTemplate | undefined {
   const b = getBlueprint(key);
   if (!b || b.role.jd) return undefined;
-  const { role } = b;
+  return templateFromRole(b.role);
+}
+
+/** A specialist template from any role blueprint, including one the Admin manager designed for a client. */
+export function templateFromRole(role: RoleBlueprint, key: string = role.key): EmployeeTemplate {
   return {
-    key: role.key,
+    key,
     title: role.title,
     summary: role.purpose,
     tier: role.tier ?? "standard",
