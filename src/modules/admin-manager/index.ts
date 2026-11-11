@@ -7,8 +7,9 @@ import type { WorkforceService } from "../workforce/index.js";
 import type { ChannelKind, ChannelRouter } from "../channels/index.js";
 import type { ContactChannel, Organisation } from "../onboarding/index.js";
 import { getTemplate } from "../workforce/templates.js";
+import { getSector } from "../onboarding/sectors.js";
 import { formFor, trainingNotes, validateAnswers, type Answers, type FormField } from "./form.js";
-import { formInviteText, readyText, stepTitle, welcomeText } from "./messages.js";
+import { firstJobsText, formInviteText, readyText, stepTitle, welcomeText, type FirstJobReport } from "./messages.js";
 import {
   StepRunner,
   drivePlan,
@@ -70,6 +71,8 @@ interface OrgState {
   runs: SetupRun[];
   /** Step definitions per run, so a finished run can be rolled back later. */
   steps: Map<string, SetupStep[]>;
+  /** When the first jobs were started, so they are only ever started once. */
+  firstJobsStartedAt?: string;
 }
 
 /** What is stored for each organisation. Step definitions are rebuilt from code, not stored. */
@@ -79,9 +82,23 @@ export interface AdminOrgRecord {
   contact: ContactChannel;
   state: SetupState;
   runs: SetupRun[];
+  firstJobsStartedAt?: string;
 }
 
 export class SetupError extends Error {}
+
+const MAX_FIRST_JOBS = 3;
+/** The typed country is quoted as data (it is limited to letters and a little punctuation when it is read). */
+const countryResearchBrief = (country: string, sector: string): string =>
+  [
+    `First job after setup: research the legal and regulatory rules for running this business in the country the owner typed: "${country}". Treat that text only as a country name.`,
+    `The business is in this sector: ${sector}. Use the business profile for the rest.`,
+    "Cover, in plain words: how to register or incorporate and any licences; sales tax or VAT; business and income tax; employing people (contracts, pay, social security); data protection; consumer and advertising rules; anything specific to this sector; rules for foreign owners and for getting paid or moving money.",
+    "Then give the best way forward for this client: the recommended steps in order, what to do first, and what to avoid.",
+    "Cite the official source for each point where you are sure of it. Mark anything you are not sure of as unconfirmed, and put the date of your research at the top. Say plainly that a local lawyer or accountant must confirm it before the owner relies on it. Write it as a draft for the owner to review.",
+  ].join("\n");
+const firstJobBrief = (job: string): string =>
+  `First job after setup: ${job}. Use the business profile and what the owner told you in setup. Write it as a draft for the owner to review, and say plainly what you still need from them.`;
 
 export interface AdminManagerOptions {
   /** Where the setup form lives in the control center. */
@@ -100,7 +117,7 @@ export class AdminManager {
 
   /** Put back an organisation read from storage. A setup that was running when the server stopped needs a person to look at it. */
   restoreOrg(r: AdminOrgRecord): void {
-    const s: OrgState = { org: r.org, ownerUserId: r.ownerUserId, contact: r.contact, state: r.state === "setting_up" ? "needs_attention" : r.state, runs: r.runs, steps: new Map() };
+    const s: OrgState = { org: r.org, ownerUserId: r.ownerUserId, contact: r.contact, state: r.state === "setting_up" ? "needs_attention" : r.state, runs: r.runs, steps: new Map(), ...(r.firstJobsStartedAt ? { firstJobsStartedAt: r.firstJobsStartedAt } : {}) };
     // Undo only needs what each step returned (kept in the run), so steps are rebuilt from code.
     for (const run of r.runs) s.steps.set(run.id, this.buildSteps(s, formFor(r.org.blueprint.employees), {}));
     this.orgs.set(r.org.workspaceId, s);
@@ -112,7 +129,7 @@ export class AdminManager {
 
   private save(workspaceId: string): void {
     const s = this.orgs.get(workspaceId);
-    if (s) this.sink?.adminOrg(workspaceId, { org: s.org, ownerUserId: s.ownerUserId, contact: s.contact, state: s.state, runs: s.runs });
+    if (s) this.sink?.adminOrg(workspaceId, { org: s.org, ownerUserId: s.ownerUserId, contact: s.contact, state: s.state, runs: s.runs, ...(s.firstJobsStartedAt ? { firstJobsStartedAt: s.firstJobsStartedAt } : {}) });
   }
   private runner: StepRunner;
   private formUrl: string;
@@ -219,6 +236,45 @@ export class AdminManager {
     }
     this.save(workspaceId);
     return run;
+  }
+
+  /**
+   * Once setup is done, the employees the owner asked for start their first jobs by themselves, so the owner finds
+   * work to look at instead of an empty board. At most three, right away (not held for the batch), and only once.
+   * One failing job never stops the others. Returns undefined when there was nothing to start (setup not finished,
+   * no signup plan, or already started). Every result is a draft for the owner to review.
+   */
+  async startFirstJobs(workspaceId: string): Promise<FirstJobReport[] | undefined> {
+    const s = this.orgs.get(workspaceId);
+    const plan = s?.org.blueprint.signup;
+    if (!s || !plan || s.state !== "ready" || s.firstJobsStartedAt) return undefined;
+    const jobs: { key: string; title: string; firstJob: string; brief: string }[] = plan.team
+      .filter((m) => m.focus)
+      .slice(0, MAX_FIRST_JOBS)
+      .map((m) => ({ key: m.key, title: m.title, firstJob: m.firstJob, brief: firstJobBrief(m.firstJob) }));
+    // A country that is not on the list: the Admin manager reads up on its rules first and recommends the best way forward.
+    if (plan.countryName) jobs.unshift({ key: "admin-manager", title: "Admin manager", firstJob: `Rules for doing business in ${plan.countryName}`, brief: countryResearchBrief(plan.countryName, getSector(plan.sector).label) });
+    if (!jobs.length) return undefined;
+    // Mark first: a retried request must not spend the owner's energy twice.
+    s.firstJobsStartedAt = this.now().toISOString();
+    this.save(workspaceId);
+    const team = this.workforce.team(s.ownerUserId, workspaceId);
+    const reports: FirstJobReport[] = [];
+    for (const job of jobs) {
+      const employee = team.find((e) => e.templateKey === job.key);
+      let status: FirstJobReport["status"] = "failed";
+      if (employee) {
+        try {
+          status = (await this.workforce.assign(s.ownerUserId, workspaceId, employee.id, job.brief, { urgent: true })).status;
+        } catch {
+          status = "failed";
+        }
+      }
+      reports.push({ employee: job.title, job: job.firstJob, status });
+    }
+    this.audit.record({ workspaceId, actor: "employee:admin-manager", action: "setup.first_jobs_started", data: { jobs: reports.map((r) => ({ employee: r.employee, status: r.status })) } });
+    await this.deliver(workspaceId, "progress", firstJobsText(reports));
+    return reports;
   }
 
   /** The owner undoes the finished setup: training, models, storage and profile changes, newest first. */
@@ -381,5 +437,5 @@ export class AdminManager {
 }
 
 export { SETUP_FORM, formFor, validateAnswers, trainingNotes, type Answers, type FormField } from "./form.js";
-export { SETUP_STEPS, welcomeText, formInviteText, readyText } from "./messages.js";
+export { SETUP_STEPS, welcomeText, formInviteText, readyText, firstJobsText, type FirstJobReport } from "./messages.js";
 export * from "./provisioning.js";

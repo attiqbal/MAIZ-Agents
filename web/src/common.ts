@@ -1,5 +1,5 @@
 // Shared bits: sticky nav behaviour, mobile menu, toast.
-import { getToken } from "./api";
+import { api, getToken } from "./api";
 
 export function initNav(): void {
   // Mark the page we are on, and turn "Log in" into "Open control centre" for a signed-in visitor.
@@ -69,4 +69,18 @@ export function drawPseudoQr(canvas: HTMLCanvasElement, seed: number): void {
   const inFinder = (x: number, y: number) => (x < 8 && y < 8) || (x > n - 9 && y < 8) || (x < 8 && y > n - 9);
   for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) if (!inFinder(x, y) && rnd() > 0.52) ctx.fillRect(x, y, 1, 1);
   finder(0, 0); finder(n - 7, 0); finder(0, n - 7);
+}
+
+/**
+ * "Continue with Google / Microsoft" buttons, shown only for the providers the server has switched on.
+ * They are plain links: the browser goes to the API, which sends it on to the provider and brings it back.
+ */
+export async function showSocialLogin(box: HTMLElement, buttons: HTMLElement): Promise<boolean> {
+  const r = await api<{ providers?: string[] }>("/signin/providers");
+  const names: Record<string, string> = { google: "Continue with Google", microsoft: "Continue with Microsoft" };
+  const on = (r.data?.providers ?? []).filter((k) => names[k]);
+  if (!r.ok || !on.length) return false;
+  buttons.innerHTML = on.map((k) => `<a class="btn btn-ghost" href="/api/signin/oauth/${k}/start">${names[k]}</a>`).join("");
+  box.hidden = false;
+  return true;
 }

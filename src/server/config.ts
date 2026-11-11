@@ -1,4 +1,5 @@
 import { defaultRegistry, type OAuthApp } from "../modules/integrations/index.js";
+import { loginEnvProblems } from "./social-login.js";
 
 /**
  * Start-up checks. The server refuses to start with a setup that would lose data, leak sign-ins or
@@ -21,6 +22,8 @@ export function checkEnv(env: Record<string, string | undefined>): string[] {
     const pair = [`${prefix}_CLIENT_ID`, `${prefix}_CLIENT_SECRET`];
     if (pair.filter((k) => env[k]).length === 1) problems.push(`${pair.join(" and ")} must be set together (or neither)`);
   }
+
+  problems.push(...loginEnvProblems(env));
 
   if (!!env.RUNPOD_API_KEY !== !!env.RUNPOD_ENDPOINT_ID) problems.push("RUNPOD_API_KEY and RUNPOD_ENDPOINT_ID must be set together (or neither)");
   if (env.RUNPOD_ENDPOINT_ID && !/^[a-z0-9]{6,40}$/i.test(env.RUNPOD_ENDPOINT_ID)) problems.push("RUNPOD_ENDPOINT_ID must be the endpoint's id (letters and digits only), not a URL");

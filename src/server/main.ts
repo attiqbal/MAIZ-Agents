@@ -3,6 +3,7 @@ import { createServer } from "node:http";
 import { join } from "node:path";
 import { createApp } from "./app.js";
 import { checkEnv, integrationAppsFromEnv, platformOwnersFromEnv } from "./config.js";
+import { loginAppsFromEnv } from "./social-login.js";
 import { QueuedEmailSender, ResendEmailSender } from "./email.js";
 import { MockPaymentProvider } from "../modules/payments/index.js";
 import { createPlatform } from "./platform.js";
@@ -32,6 +33,7 @@ const platform = createPlatform({
       ? { clientId: env.SLACK_CLIENT_ID, clientSecret: env.SLACK_CLIENT_SECRET, signingSecret: env.SLACK_SIGNING_SECRET, redirectUri: env.SLACK_REDIRECT_URI }
       : undefined,
   integrationApps: integrationAppsFromEnv(env, env.APP_URL ?? "http://localhost:5173"),
+  loginApps: loginAppsFromEnv(env),
   platformOwners: platformOwnersFromEnv(env),
   // No real payment provider exists yet. "mock" (development only) charges nobody; unset means checkout is refused.
   payments: env.PAYMENTS_PROVIDER === "mock" ? new MockPaymentProvider() : undefined,

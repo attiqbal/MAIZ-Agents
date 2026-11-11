@@ -55,6 +55,12 @@ export interface EnergyPlan {
   monthlyCostCapMicro: number;
   /** ISO timestamp after which no work is allowed (end of free trial). */
   expiresAt?: string;
+  /**
+   * Set when a client moves from the free trial to a paid plan: how many usage rows the workspace had then.
+   * Those rows (the trial's) do not count against the paid pool or its daily ceiling, so the client starts
+   * the paid plan with a full pool. They still count towards the hidden cost cap, which is real spend.
+   */
+  paidFromRow?: number;
 }
 
 export interface AutoReload {
@@ -171,6 +177,12 @@ export class EnergyMeter {
   private rowsOf(workspaceId: string): UsageRecord[] {
     return this.usage.get(workspaceId) ?? [];
   }
+  /** Rows that count against the team pool and daily ceiling: everything since the client went paid. */
+  private poolRowsOf(workspaceId: string): UsageRecord[] {
+    const from = this.plans.get(workspaceId)?.paidFromRow;
+    const rows = this.rowsOf(workspaceId);
+    return from ? rows.slice(from) : rows;
+  }
   private addRow(u: UsageRecord): void {
     const rows = this.usage.get(u.workspaceId);
     if (rows) rows.push(u);
@@ -244,7 +256,7 @@ export class EnergyMeter {
     if (plan.weeklyTeamEnergy === undefined) return undefined;
     const from = this.windowStart(plan, workspaceId);
     const day = this.today(workspaceId);
-    const rows = this.rowsOf(workspaceId).filter((u) => !u.overtime && u.day >= from);
+    const rows = this.poolRowsOf(workspaceId).filter((u) => !u.overtime && u.day >= from);
     const used = rows.reduce((s, u) => s + u.energy, 0);
     const usedToday = rows.filter((u) => u.day === day).reduce((s, u) => s + u.energy, 0);
     const pool = plan.weeklyTeamEnergy + this.poolBonus(workspaceId, plan);
@@ -324,6 +336,23 @@ export class EnergyMeter {
     this.audit.record({ workspaceId, actor: `user:${userId}`, action: "energy.plan_set", data: { ...plan } });
   }
 
+  /**
+   * The client moves from the free trial to a paid plan (called when their first paid order is fulfilled).
+   * The paid plan starts with a full pool: what the trial used is not held against it. Returns false, and
+   * changes nothing, when the client is already on a paid plan, so later orders never reset the pool again.
+   * Platform-level, no user check: the payment has already been taken.
+   */
+  switchToPaid(workspaceId: string, paid: EnergyPlan, by: string): boolean {
+    const current = this.planOf(workspaceId);
+    if (!current.expiresAt && current.paidFromRow !== undefined) return false;
+    const rows = this.rowsOf(workspaceId).length;
+    const { expiresAt: _ends, ...rest } = paid;
+    const plan: EnergyPlan = { ...rest, startedAt: this.now().toISOString(), paidFromRow: rows, ...(current.autoReload ? { autoReload: current.autoReload } : {}) };
+    this.savePlan(workspaceId, plan);
+    this.audit.record({ workspaceId, actor: by, action: "energy.switched_to_paid", data: { trialEnergyUsed: this.rowsOf(workspaceId).filter((u) => !u.overtime).reduce((s, u) => s + u.energy, 0), weeklyTeamEnergy: plan.weeklyTeamEnergy ?? null } });
+    return true;
+  }
+
   planOf(workspaceId: string): EnergyPlan {
     return this.plans.get(workspaceId) ?? PLANS.trial!;
   }
@@ -339,19 +368,20 @@ export class EnergyMeter {
     const topUpThisMonth = this.topUpLeft(workspaceId) + monthRows.filter((u) => u.overtime).reduce((s, u) => s + u.energy, 0);
     if (monthRows.reduce((s, u) => s + u.costMicro, 0) >= effectiveCostCapMicro(plan, this.poolBonus(workspaceId, plan), topUpThisMonth))
       return { allowed: false, reason: "monthly_cost_cap_reached" };
-    const usedToday = mine.filter((u) => u.employeeId === employeeId && u.day === day).reduce((s, u) => s + u.energy, 0);
+    const pooled = this.poolRowsOf(workspaceId);
+    const usedToday = pooled.filter((u) => u.employeeId === employeeId && u.day === day).reduce((s, u) => s + u.energy, 0);
     const team = this.teamEnergyOf(workspaceId);
     if (team) {
       // Shared pool: the daily ceiling and an agent's own cap are safety limits, not something to buy past.
       if (team.dailyCeiling !== null && team.left > 0 && team.leftToday === 0) return { allowed: false, reason: "daily_ceiling_reached" };
       // Top-up work counts towards the daily ceiling too, so an empty pool does not switch the safety limit off.
       if (team.dailyCeiling !== null && team.left === 0) {
-        const allToday = mine.filter((u) => u.day === day).reduce((s, u) => s + u.energy, 0) + this.heldTotal(workspaceId);
+        const allToday = pooled.filter((u) => u.day === day).reduce((s, u) => s + u.energy, 0) + this.heldTotal(workspaceId);
         if (allToday >= team.dailyCeiling) return { allowed: false, reason: "daily_ceiling_reached" };
       }
       const cap = this.agentCap(workspaceId, employeeId);
       // Same count as remainingToday: an agent's cap is measured on pool energy, not on bought top-ups.
-      const poolUsedToday = mine.filter((u) => u.employeeId === employeeId && u.day === day && !u.overtime).reduce((s, u) => s + u.energy, 0);
+      const poolUsedToday = pooled.filter((u) => u.employeeId === employeeId && u.day === day && !u.overtime).reduce((s, u) => s + u.energy, 0);
       if (cap !== undefined && poolUsedToday >= cap) return { allowed: false, reason: "daily_quota_used" };
       if (team.left > 0) return { allowed: true, overtime: false };
       // Pool used: bought top-ups carry on the work; auto-reload buys one more pack only if the client said so.
@@ -426,7 +456,7 @@ export class EnergyMeter {
   remainingToday(userId: string, workspaceId: string, employeeId: string): number {
     this.identity.require(userId, workspaceId, "task.read");
     const day = this.today(workspaceId);
-    const used = this.rowsOf(workspaceId).filter((u) => u.employeeId === employeeId && u.day === day && !u.overtime).reduce((s, u) => s + u.energy, 0);
+    const used = this.poolRowsOf(workspaceId).filter((u) => u.employeeId === employeeId && u.day === day && !u.overtime).reduce((s, u) => s + u.energy, 0);
     const team = this.teamEnergyOf(workspaceId);
     if (!team) return Math.max(0, this.dailyQuota(workspaceId, employeeId) - used);
     // With a pool, an employee can use whatever the team has left today, up to its own cap if it has one.

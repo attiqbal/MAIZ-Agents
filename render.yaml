@@ -40,6 +40,15 @@ services:
         sync: false
       - key: RUNPOD_ENDPOINT_ID
         sync: false
+      # Optional: "Continue with Google / Microsoft" on the sign-in and signup pages (see .env.example).
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: MICROSOFT_CLIENT_ID
+        sync: false
+      - key: MICROSOFT_CLIENT_SECRET
+        sync: false
       - key: SLACK_CLIENT_ID
         sync: false
       - key: SLACK_CLIENT_SECRET

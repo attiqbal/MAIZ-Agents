@@ -20,6 +20,11 @@ export interface SignupAnswers {
   size?: SignupSize;
   /** ISO country code, guessed from the browser and shown to the owner. */
   country?: string;
+  /**
+   * The country as the owner typed it, when it is not on the list. Used only when there is no known `country`.
+   * The Admin manager then researches that country's rules for the owner.
+   */
+  countryName?: string;
   /** Optional one line about what the business sells. */
   sells?: string;
   website?: string;
@@ -58,6 +63,8 @@ export interface SignupPlan {
   /** Up to three more that businesses like theirs usually connect. */
   suggestedApps: AppChoice[];
   country?: string;
+  /** A country that is not on the list, as typed by the owner. Set only when `country` is not. */
+  countryName?: string;
   currency?: string;
   prefill: { answers: Record<string, string | number | boolean | string[]>; source: Record<string, PrefillSource> };
 }
@@ -127,6 +134,17 @@ const sizeFrom = (v: unknown): SignupSize | undefined => {
   const word = typeof v === "string" ? v.toLowerCase() : "";
   return Object.hasOwn(SIZE_WORDS, word) ? SIZE_WORDS[word] : undefined;
 };
+/** A typed country name: letters, spaces and a little punctuation, so it can be shown and quoted safely. */
+const COUNTRY_NAME = /^\p{L}[\p{L}\p{M} '()-]{1,59}$/u;
+const MAX_COUNTRY_WORDS = 5;
+export const MAX_COUNTRY_NAME = 60;
+export function cleanCountryName(v: unknown): string | undefined {
+  if (typeof v !== "string") return undefined;
+  // Line breaks and tabs are never part of a name, so they are refused rather than tidied away.
+  if (/[\r\n\t]/.test(v)) return undefined;
+  const name = v.trim().replace(/ {2,}/g, " ");
+  return COUNTRY_NAME.test(name) && name.split(" ").length <= MAX_COUNTRY_WORDS ? name : undefined;
+}
 const text = (v: unknown, max: number): string | undefined => (typeof v === "string" && v.trim() ? v.trim().slice(0, max) : undefined);
 const list = (v: unknown): string[] => (Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : []);
 
@@ -136,13 +154,16 @@ export function readSignupAnswers(body: Record<string, unknown>): SignupAnswers 
   const needKeys = new Set<string>(NEEDS.map((n) => n.key));
   const appKeys = new Set(APPS.map((a) => a.key));
   const country = text(body.country, 2)?.toUpperCase();
+  const hasCode = !!country && /^[A-Z]{2}$/.test(country);
+  const countryName = hasCode ? undefined : cleanCountryName(body.countryName);
   return {
     businessName: text(body.businessName, 120) ?? "",
     sector: resolveSector(text(body.sector, 40), sells),
     needs: [...new Set(list(body.needs).filter((n) => needKeys.has(n)))].slice(0, MAX_NEEDS),
     apps: [...new Set(list(body.apps).filter((a) => appKeys.has(a)))].slice(0, MAX_APPS),
     size: sizeFrom(body.size),
-    ...(country && /^[A-Z]{2}$/.test(country) ? { country } : {}),
+    ...(hasCode ? { country } : {}),
+    ...(countryName ? { countryName } : {}),
     ...(sells ? { sells } : {}),
     ...(text(body.website, 200) ? { website: text(body.website, 200) } : {}),
     addOns: list(body.addOns).filter((k) => k.length <= MAX_KEY_LENGTH).slice(0, MAX_APPS),
@@ -206,7 +227,7 @@ export function planSignup(a: SignupAnswers): SignupPlan {
     later: [...new Set(needs.map((n) => CONSULTANT_FOR_NEED[n]).filter((o): o is PlanOffer => !!o))],
     apps,
     suggestedApps,
-    ...(facts ? { country: facts.code, currency: facts.currency } : {}),
+    ...(facts ? { country: facts.code, currency: facts.currency } : a.countryName ? { countryName: a.countryName } : {}),
     prefill: prefillFor(a, sector.key, needs, picked.length > 0, !!a.sector && a.sector !== OTHER_SECTOR),
   };
 }

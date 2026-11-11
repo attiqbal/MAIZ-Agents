@@ -217,6 +217,31 @@ describe("team energy pool", () => {
     expect(energy.teamEnergyOf(ws)!.left).toBe(0);
   });
 
+  it("switching from the trial to a paid plan starts with a full pool, even on the same day", async () => {
+    const clock = { d: new Date("2026-03-11T10:00:00Z") }; // Wednesday
+    const { wf, energy, ws, emp } = await setup(1_000_000, 0, clock, { ...PLANS.trial!, startedAt: "2026-03-10T09:00:00Z", expiresAt: "2026-03-17T09:00:00Z" });
+    for (const b of ["a", "b", "c"]) await wf.assign("owner", ws, emp, b);
+    expect(energy.teamEnergyOf(ws)).toMatchObject({ left: 0, used: 3_000 });
+    expect(await wf.assign("owner", ws, emp, "d")).toMatchObject({ status: "no_energy" });
+
+    expect(energy.switchToPaid(ws, { ...PAID, expiresAt: "ignored" }, "system:payment")).toBe(true);
+    expect(energy.planOf(ws).expiresAt).toBeUndefined();
+    expect(energy.teamEnergyOf(ws)).toMatchObject({ pool: 8_000, used: 0, left: 8_000, leftToday: 3_000, dailyCeiling: 3_000 });
+    expect((await wf.assign("owner", ws, emp, "e")).status).toBe("ready_for_review");
+    expect(energy.teamEnergyOf(ws)!.used).toBe(1_000);
+
+    // A second paid order does not reset the pool again.
+    expect(energy.switchToPaid(ws, PAID, "system:payment")).toBe(false);
+    expect(energy.teamEnergyOf(ws)!.used).toBe(1_000);
+  });
+
+  it("keeps the trial's real spend in the hidden cost cap after the switch", async () => {
+    const { energy, wf, ws, emp } = await setup(1_000_000, 0, undefined, { ...PLANS.trial!, startedAt: "2026-03-10T09:00:00Z", expiresAt: "2026-03-17T09:00:00Z" });
+    await wf.assign("owner", ws, emp, "a");
+    energy.switchToPaid(ws, PAID, "system:payment");
+    expect(energy.usageOf(ws).costMicroMonth).toBeGreaterThan(0);
+  });
+
   it("holds an agent to its own daily cap only when the platform owner set one", async () => {
     const { wf, energy, ws, emp } = await setup(500_000, 0, undefined, PAID);
     energy.setQuotaResolver(() => 500);

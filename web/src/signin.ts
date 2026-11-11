@@ -1,6 +1,6 @@
 import "./styles.css";
 import { api, clearSession, getToken, setToken } from "./api";
-import { initNav } from "./common";
+import { initNav, showSocialLogin } from "./common";
 
 initNav();
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -46,6 +46,21 @@ $<HTMLFormElement>("si-form").addEventListener("submit", async (e) => {
   $("si-form").hidden = true;
   say("Check your email", `If ${email} has an account, or you are new, a sign-in link is on its way. It works once and expires in 15 minutes.`);
 });
+
+// Google or Microsoft sent the person back without signing them in. Only these fixed messages exist.
+const SOCIAL_ERRORS: Record<string, string> = {
+  cancelled: "You cancelled the sign-in. You can try again, or use your email below.",
+  failed: "That sign-in didn't complete. Please try again, or use your email below.",
+  unverified: "That account's email address isn't verified with the provider, so we can't trust it. Use your email below and we'll send a link.",
+  owner: "Owner accounts sign in with the emailed link only. Use your email below.",
+};
+const socialError = new URLSearchParams(location.search).get("error");
+if (socialError && Object.hasOwn(SOCIAL_ERRORS, socialError)) {
+  history.replaceState(null, "", location.pathname);
+  $("si-err").textContent = SOCIAL_ERRORS[socialError]!;
+  $("si-err").hidden = false;
+}
+if (!token && !getToken()) void showSocialLogin($("social"), $("social-btns"));
 
 $("si-out").addEventListener("click", () => { clearSession(); location.reload(); });
 
