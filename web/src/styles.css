@@ -1090,3 +1090,8 @@ body > main, body > .page-top { flex: none; }
 .social-row .btn { min-height: 44px; }
 .social-or { display: flex; align-items: center; gap: 10px; margin: 2px 0 0; }
 .social-or::before, .social-or::after { content: ""; flex: 1; height: 1px; background: var(--line); }
+.ask-when { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0 0 12px; font-size: 13.5px; color: var(--text-2); }
+.ask-when .chip { min-height: 40px; padding: 0 14px; border: 1px solid var(--line-strong); border-radius: var(--radius-full); background: transparent; color: var(--color-graphite); font: inherit; font-size: 13.5px; cursor: pointer; transition: background-color .15s, border-color .15s; }
+.ask-when .chip[aria-pressed="true"] { background: var(--color-graphite); color: var(--color-canvas-white); border-color: var(--color-graphite); }
+.ask-when .chip:focus-visible { outline: 2px solid var(--color-graphite); outline-offset: 2px; }
+.ask-when-h { color: var(--text-muted); }

@@ -78,7 +78,7 @@ async function busyClient(w: ReturnType<typeof world>, i: number) {
   for (let k = 0; k < 20; k++) await w.call("POST", "/api/finance/entries", { date: "2026-11-16", memo: `Sale ${k}`, lines: [{ account: "1000", debit: 500, credit: 0 }, { account: "4000", debit: 0, credit: 500 }] }, s.auth);
   const emp = ((await w.call("GET", "/api/org", undefined, s.auth)).body as any).team.find((e: any) => e.templateKey === "marketing-manager").id;
   for (let k = 0; k < 5; k++) await w.call("POST", "/api/ask", { employeeId: emp, text: `Write post ${k}`, urgent: true }, s.auth);
-  for (let k = 0; k < 3; k++) await w.call("POST", "/api/ask", { employeeId: emp, text: `Plan campaign ${k}` }, s.auth);
+  for (let k = 0; k < 3; k++) await w.call("POST", "/api/ask", { employeeId: emp, text: `Plan campaign ${k}`, when: "tonight" }, s.auth);
   return { ...s, email };
 }
 

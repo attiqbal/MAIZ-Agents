@@ -131,7 +131,7 @@ describe("routing: RunPod cold starts, outages and the circuit breaker", () => {
     const { ask } = rig({ runpod, claude });
     const r = await ask();
     expect(runpod.calls).toHaveLength(1);
-    expect(runpod.calls[0]!.timeoutMs).toBe(45_000);
+    expect(runpod.calls[0]!.timeoutMs).toBe(20_000);
     expect(r.routing!.route).toBe("fallback");
   });
 

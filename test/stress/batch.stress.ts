@@ -12,7 +12,7 @@ async function clients(w: World, n: number, prefix: string) {
   });
 }
 
-const queueWork = (w: World, c: { auth: Record<string, string>; emp: string }, text: string) => w.call("POST", "/api/ask", { employeeId: c.emp, text }, c.auth);
+const queueWork = (w: World, c: { auth: Record<string, string>; emp: string }, text: string) => w.call("POST", "/api/ask", { employeeId: c.emp, text, when: "tonight" }, c.auth);
 
 describe("the batch queue at scale", () => {
   it("200 clients x 10 tasks run in one closing-time batch; time per task scales to real RunPod speed", async () => {

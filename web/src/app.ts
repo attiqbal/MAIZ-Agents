@@ -154,6 +154,8 @@ async function loadOrg(): Promise<void> {
   // API unreachable (or not set up yet) -> keep the page usable as a demo, and say so.
   if (!r.ok || !r.data) { $("demo-banner").hidden = false; return; }
   realOrg = r.data;
+  $("ask-when").hidden = false;
+  warmUp();
   $("org-name").textContent = realOrg.name;
   $("org-av").textContent = initials(realOrg.name);
   $("greet").textContent = `${h < 12 ? "Good morning" : h < 18 ? "Good afternoon" : "Good evening"}, ${realOrg.name}`;
@@ -223,6 +225,23 @@ $("set-email").textContent = profile.email || "The address you log in with";
 
 // Ask bar: "finance: ..." / "marketing: ..." / "consultant: ..." / "hr: ..." / "compliance: ..." picks the employee; otherwise the consultant answers.
 let asking = false;
+// "When do you need it?": none chosen lets MAIZ decide, otherwise the choice is sent with the next question only.
+let chosenWhen: "now" | "tonight" | undefined;
+document.querySelectorAll<HTMLButtonElement>("#ask-when .chip").forEach((b) => b.addEventListener("click", () => {
+  chosenWhen = chosenWhen === b.dataset.when ? undefined : (b.dataset.when as "now" | "tonight");
+  document.querySelectorAll<HTMLButtonElement>("#ask-when .chip").forEach((x) => x.setAttribute("aria-pressed", String(x.dataset.when === chosenWhen)));
+}));
+function resetWhen(): void { chosenWhen = undefined; document.querySelectorAll("#ask-when .chip").forEach((x) => x.setAttribute("aria-pressed", "false")); }
+
+// Wake the GPU while the person is still typing, so the answer does not start with a cold start. The server also
+// limits this, so calling it often costs nothing; this just keeps us from asking more than every few minutes.
+let lastWarm = 0;
+function warmUp(): void {
+  if (!getToken() || Date.now() - lastWarm < 4 * 60_000) return;
+  lastWarm = Date.now();
+  void api("/warm", { method: "POST", body: {} });
+}
+$("ask-in").addEventListener("focus", warmUp);
 $<HTMLFormElement>("ask").addEventListener("submit", async (e) => {
   e.preventDefault();
   const input = $<HTMLInputElement>("ask-in");
@@ -236,11 +255,12 @@ $<HTMLFormElement>("ask").addEventListener("submit", async (e) => {
   asking = true;
   const stopWorking = startWorking(emp.name);
   const u = /^urgent\s*[:,-]\s*(.+)$/is.exec(m ? m[2]! : text);
-  const r = await api<{ status: string; reason?: string; answer?: string; runsAt?: string; message?: string }>("/ask", { body: { text: u ? u[1] : m ? m[2] : text, employeeId: emp.id, urgent: !!u } });
+  const r = await api<{ status: string; reason?: string; answer?: string; runsAt?: string; message?: string }>("/ask", { body: { text: u ? u[1] : m ? m[2] : text, employeeId: emp.id, urgent: !!u, ...(chosenWhen ? { when: chosenWhen } : {}) } });
   stopWorking();
   asking = false;
   if (!r.ok || !r.data) { showNote(emp.name, "I could not reach your team. Your question is still in the box, so you can send it again.", true); return; }
   input.value = "";
+  resetWhen();
   // The server explains why in plain words (weekly pool, daily limit, full queue, trial ended, AI unavailable).
   if (r.data.status === "no_energy") { showNote(emp.name, r.data.message ?? (r.data.reason === "trial_ended" ? "Your free trial has ended" : "Your team is out of energy for now")); return; }
   if (r.data.status === "queued") { showQueued(emp.name, r.data.runsAt); return; }

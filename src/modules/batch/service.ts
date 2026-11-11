@@ -1,3 +1,4 @@
+import { LatencyLog } from "./latency.js";
 import { zoneForCountry } from "./zones.js";
 import type { Sink } from "../../core/persistence.js";
 import { newId } from "../../core/ids.js";
@@ -100,10 +101,19 @@ export class BatchService implements Intake {
 
   route(workspaceId: string, templateKey: string, brief: string, opts: AssignOptions) {
     const s = this.d.settings.get().batch;
-    const c = classifyWork({ brief, templateKey, urgent: opts.urgent, liveTemplates: s.liveTemplates });
+    const c = classifyWork({ brief, templateKey, urgent: opts.urgent, when: opts.when, liveByDefault: opts.liveByDefault, liveTemplates: s.liveTemplates });
     if (c.mode === "batch" && (!s.enabled || !this.scheduleOf(workspaceId).enabled)) return { mode: "urgent" as const, reason: "batching is switched off" };
     return { ...c, flushAfter: c.mode === "urgent" && s.flushAfterUrgent && !s.liveTemplates.includes(templateKey) };
   }
+
+  liveDefaults() {
+    const { liveDuringTrial, liveFirstTasks } = this.d.settings.get().batch;
+    return { liveDuringTrial, liveFirstTasks };
+  }
+
+  /** How long clients wait, by kind. Shown to the platform owner. */
+  readonly latency = new LatencyLog();
+  record(kind: "instant" | "lookup" | "live", ms: number): void { this.latency.record(kind, ms); }
 
   /** Urgent work just ran on the pod, so send everything that is waiting now, whatever the time. Runs in the background. */
   flush(): void {
@@ -233,6 +243,7 @@ export class BatchService implements Intake {
       settings: this.d.settings.get().batch,
       gpuPlan: this.gpuPlan(queued.length),
       realTime: REAL_TIME_RULES,
+      latency: this.latency.summary(),
     };
   }
 
@@ -337,6 +348,7 @@ export class BatchService implements Intake {
     const at = this.now().toISOString();
     if (task.status === "ready_for_review") {
       this.save({ ...job, status: "done", finishedAt: at, deliverable: task.deliverable, energyUsed: task.energyUsed, attempts: job.attempts + 1, lastError: undefined, notBefore: undefined });
+      this.latency.record("batch_wait", new Date(at).getTime() - new Date(job.createdAt).getTime());
       run.done++; run.actualMicro += task.costMicro ?? 0; run.baselineMicro += task.baselineMicro ?? 0;
       this.d.audit.record({ workspaceId: job.workspaceId, actor: `employee:${job.employeeId}`, action: "batch.filed", target: job.id, data: { runId: run.id } });
       return "done";

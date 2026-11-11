@@ -41,17 +41,18 @@ function demoBatch(): BatchView {
     byClient: [{ id: "a", name: "Kestrel Coffee", queued: 5, nextAt: new Date(Date.now() + 3 * 3_600_000).toISOString() }, { id: "b", name: "Loaf Bakery", queued: 4, nextAt: new Date(Date.now() + 5 * 3_600_000).toISOString() }],
     runs: [1, 2, 3, 4, 5].map(run),
     gpuPlan: { pending: 9, taskSeconds: 30, windowHours: 10, sizeGb: 80, gpus: 1, runHours: 0.01, costUsd: 0.02, current: { gpus: 1, sizeGb: 48, runHours: 0.01, costUsd: 0.01, finishesInWindow: true }, advice: "1 GPU is more than enough for 9 tasks, but your model needs 80 GB cards (you have 48 GB)." },
+    latency: { total: 412, liveShare: 0.38, stats: [{ kind: "instant", count: 96, p50Ms: 3, p95Ms: 11, targetMs: 100, overTarget: false }, { kind: "lookup", count: 71, p50Ms: 1800, p95Ms: 3900, targetMs: 5000, overTarget: false }, { kind: "live", count: 85, p50Ms: 9500, p95Ms: 41000, targetMs: 30000, overTarget: true }, { kind: "batch_wait", count: 160, p50Ms: 21600000, p95Ms: 39600000, targetMs: 43200000, overTarget: false }] },
     realTime: [{ what: "The Admin manager", why: "People wait on it during sign-up" }, { what: "Anything marked urgent", why: "The person chose speed" }, { what: "Quick questions about status or the rota", why: "Answered at once by a cheap Claude model" }],
   };
 }
 function demoSettings(): AiRoutingSettings {
   const p = (o: Partial<PolicySettings> = {}): PolicySettings => ({ primary: "runpod", claudeModel: "claude-haiku-5-5", baselineModel: "claude-haiku-5-5", reviewRate: 0.15, minScore: 7, escalate: true, escalationModel: "claude-sonnet-5-5", fallbackToClaude: true, allowOpenModel: true, cache: true, ...o });
   return {
-    runpod: { enabled: true, model: "Qwen/Qwen3-30B-A3B-Instruct-2507", billing: "seconds", gpuUsdPerSecond: 0.00034, tokenPrice: { inputPer1k: 60, outputPer1k: 250 }, softDeadlineMs: 45000, hardTimeoutMs: 120000, attempts: 2, breakerFailures: 3, breakerCooldownMs: 60000 },
+    runpod: { enabled: true, model: "Qwen/Qwen3-30B-A3B-Instruct-2507", billing: "seconds", gpuUsdPerSecond: 0.00034, tokenPrice: { inputPer1k: 60, outputPer1k: 250 }, softDeadlineMs: 20000, hardTimeoutMs: 120000, attempts: 2, breakerFailures: 3, breakerCooldownMs: 60000 },
     reviewer: { enabled: true, model: "claude-haiku-5-5", maxInputChars: 12000, adaptive: true }, cache: { enabled: true, ttlSeconds: 3600, maxEntries: 500 },
     budgets: { claudeDailyUsd: 15, claudeMonthlyUsd: 200, claudePerWorkspaceMonthlyUsd: 20, runpodMonthlyUsd: 300, whenClaudeCapped: "degrade" }, prices: {},
     policies: { live: p({ primary: "claude", reviewRate: 0, escalate: false, fallbackToClaude: false, allowOpenModel: false }), standard: p(), premium: p({ claudeModel: "claude-sonnet-5-5", baselineModel: "claude-sonnet-5-5", reviewRate: 0.5, minScore: 8 }), "compliance-manager": p({ primary: "claude", reviewRate: 0, escalate: false, fallbackToClaude: false, allowOpenModel: false }) },
-    batch: { enabled: true, sizeTrigger: 20, tokenTrigger: 200_000, maxQueueAgeHours: 24, concurrency: 6, gpuWorkers: 1, gpuSizeGb: 48, windowHours: 10, maxAttempts: 3, retryBackoffMinutes: 15, qaRateMin: 0.3, claudeAfterFailures: true, coldStartSeconds: 40, flushAfterUrgent: true, liveTemplates: ["admin-manager"] },
+    batch: { enabled: true, sizeTrigger: 20, tokenTrigger: 200_000, maxQueueAgeHours: 24, concurrency: 6, gpuWorkers: 1, gpuSizeGb: 48, windowHours: 10, maxAttempts: 3, retryBackoffMinutes: 15, qaRateMin: 0.3, claudeAfterFailures: true, coldStartSeconds: 40, flushAfterUrgent: true, liveDuringTrial: true, liveFirstTasks: 20, liveTemplates: ["admin-manager"] },
   };
 }
 
@@ -61,6 +62,8 @@ interface BatchView {
   runs: { id: string; trigger: string; startedAt: string; jobs: number; done: number; failed: number; retried: number; clients: number; actualMicro: number; baselineMicro: number; savedMicro: number; coldStartSavedMicro: number }[];
   gpuPlan: { pending: number; taskSeconds: number; windowHours: number; sizeGb: number; gpus: number; runHours: number; costUsd: number; current: { gpus: number; sizeGb: number; runHours: number; costUsd: number; finishesInWindow: boolean }; advice: string };
   realTime: { what: string; why: string }[];
+  /** How long clients wait, by kind of request (kept in memory since the last restart). */
+  latency?: { stats: { kind: string; count: number; p50Ms: number | null; p95Ms: number | null; targetMs: number; overTarget: boolean }[]; total: number; liveShare: number | null };
 }
 let batchView: BatchView | null = null;
 const TRIGGER_LABEL: Record<string, string> = { schedule: "Closing time", size: "Enough work gathered", age: "Waited too long", run_now: "Client pressed Run now", owner: "You pressed Run all now", urgent: "After an urgent task" };
@@ -121,6 +124,26 @@ function renderTables(): void {
   $("ai-days").innerHTML = `<thead><tr><th scope="col">Day</th><th scope="col" class="num">Tasks</th><th scope="col" class="num">From cache</th><th scope="col" class="num">Claude covered RunPod</th><th scope="col" class="num">Redone</th><th scope="col" class="num">Spend</th><th scope="col" class="num">Claude-only</th><th scope="col" class="num">Saved</th></tr></thead><tbody>${rows || '<tr><td colspan="8" class="muted">No work yet.</td></tr>'}</tbody>`;
 }
 
+const KIND_LABEL: Record<string, string> = { instant: "Answered from records", lookup: "Quick questions", live: "Live work (RunPod)", batch_wait: "Batched work, queue to filed" };
+/** Human duration: 3 ms, 4.2 s, 6 h. */
+function span(ms: number | null): string {
+  if (ms === null) return "no data yet";
+  if (ms < 1000) return `${ms} ms`;
+  if (ms < 120_000) return `${Math.round(ms / 100) / 10} s`;
+  if (ms < 7_200_000) return `${Math.round(ms / 60_000)} min`;
+  return `${Math.round(ms / 360_000) / 10} h`;
+}
+/** How long clients really wait against the targets, and how much work skips the batch. */
+function speed(l: BatchView["latency"]): string {
+  if (!l) return "";
+  const rows = l.stats.map((x) => `<tr><td class="ow-title"><b>${esc(KIND_LABEL[x.kind] ?? x.kind)}</b></td><td class="num">${x.count.toLocaleString("en-GB")}</td><td class="num">${esc(span(x.p50Ms))}</td><td class="num">${esc(span(x.p95Ms))}</td><td class="num">${esc(span(x.targetMs))}</td><td>${x.p95Ms === null ? "" : x.overTarget ? "Slower than target" : "Within target"}</td></tr>`).join("");
+  const share = l.liveShare === null ? "No model work yet" : `${Math.round(l.liveShare * 100)}% of model-answered work skipped the batch`;
+  const warn = l.liveShare !== null && l.liveShare > 0.4 ? "warn" : "";
+  return `<section class="panel" aria-labelledby="ai-speed-h" style="margin:0 0 16px"><div class="panel-h"><h2 id="ai-speed-h">How fast clients are served</h2></div>
+    <p class="muted" style="margin:0 0 8px">Measured since the last restart. ${esc(share)}${warn ? ". Above about 40% the batch saving is shrinking: check the free-trial and first-tasks settings." : "."}</p>
+    <div class="tbl-wrap" tabindex="0" role="region" aria-label="Waiting time by kind of request, scrolls sideways on small screens"><table class="tbl"><thead><tr><th scope="col">Kind</th><th scope="col" class="num">Count</th><th scope="col" class="num">Typical</th><th scope="col" class="num">Slowest 1 in 20</th><th scope="col" class="num">Target</th><th scope="col">Result</th></tr></thead><tbody>${rows}</tbody></table></div></section>`;
+}
+
 function renderBatch(): void {
   const b = batchView;
   const box = $("ai-batch");
@@ -141,7 +164,7 @@ function renderBatch(): void {
     <p class="muted" style="margin:8px 0 0">Planning figures, not an invoice. Set the GPU count and size under Settings, and make the RunPod endpoint's workers match.</p></section>`;
   const clients = b.byClient.map((c) => `<tr><td class="ow-title"><b>${esc(c.name)}</b></td><td class="num">${c.queued}</td><td>${esc(when(c.nextAt))}</td></tr>`).join("");
   const runs = b.runs.map((r) => `<tr><td>${esc(when(r.startedAt))}</td><td>${esc(TRIGGER_LABEL[r.trigger] ?? r.trigger)}</td><td class="num">${r.jobs}</td><td class="num">${r.done}</td><td class="num">${r.retried}</td><td class="num">${r.failed}</td><td class="num">${r.clients}</td><td class="num">${usd(r.actualMicro)}</td><td class="num">${usd(r.savedMicro)}</td></tr>`).join("");
-  box.innerHTML = `${plan}<div class="kpis">${tiles}</div>
+  box.innerHTML = `${plan}${speed(b.latency)}<div class="kpis">${tiles}</div>
     <div class="tbl-wrap" tabindex="0" role="region" aria-label="Clients with waiting tasks, scrolls sideways on small screens"><table class="tbl"><thead><tr><th scope="col">Client</th><th scope="col" class="num">Waiting</th><th scope="col">Next scheduled run</th></tr></thead><tbody>${clients || '<tr><td colspan="3" class="muted">Nothing is waiting.</td></tr>'}</tbody></table></div>
     <div class="tbl-wrap" tabindex="0" role="region" aria-label="Recent batch runs, scrolls sideways on small screens"><table class="tbl"><thead><tr><th scope="col">Started</th><th scope="col">Why it ran</th><th scope="col" class="num">Tasks</th><th scope="col" class="num">Filed</th><th scope="col" class="num">Retry later</th><th scope="col" class="num">Failed</th><th scope="col" class="num">Clients</th><th scope="col" class="num">Spend</th><th scope="col" class="num">Saved</th></tr></thead><tbody>${runs || '<tr><td colspan="9" class="muted">No batch has run yet.</td></tr>'}</tbody></table></div>
     <h3 style="font-size:1rem;margin:16px 0 6px">Always real-time, never batched</h3>
@@ -176,6 +199,8 @@ const FIELDS: Field[] = [
   { path: "batch.qaRateMin", label: "Claude reads at least this share of batch answers", kind: "number", step: "0.05", hint: "0 to 1. Nobody waits on the answer, so this can be generous" },
   { path: "batch.claudeAfterFailures", label: "Claude finishes a task after the last failed try", kind: "bool", hint: "Off means a pod outage leaves tasks failed, never on Claude" },
   { path: "batch.flushAfterUrgent", label: "Urgent work also clears the queue", kind: "bool", hint: "The pod is warm, so everything waiting runs right after an urgent task, at any time" },
+  { path: "batch.liveDuringTrial", label: "Free-trial clients get answers at once", kind: "bool", hint: "Ordinary work is not held for the evening batch while a client is on a trial" },
+  { path: "batch.liveFirstTasks", label: "Answer a client's first tasks at once", kind: "number", step: "1", hint: "Number of answers per client, whatever their plan. 0 switches it off" },
   { path: "batch.coldStartSeconds", label: "Cold start length (seconds)", kind: "number", step: "1", hint: "Only used to estimate the saving" },
   { path: "budgets.whenClaudeCapped", label: "When Claude is capped", kind: "select", options: [["degrade", "Keep working, unchecked"], ["fail", "Stop Claude-only work"]] },
 ];

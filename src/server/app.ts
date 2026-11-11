@@ -508,10 +508,17 @@ export function createApp(p: Platform) {
       if (text.length > 4000) throw new BadRequest("that is too long");
       const emp = p.workforce.team(userId, org.id).find((e) => e.id === b.employeeId);
       if (!emp) throw new BadRequest("pick one of your employees");
-      const task = await p.workforce.assign(userId, org.id, emp.id, text, { urgent: b.urgent === true });
+      const when = b.when === "now" || b.when === "tonight" ? b.when : undefined;
+      const task = await p.workforce.assign(userId, org.id, emp.id, text, { urgent: b.urgent === true, when });
       // Plain words for anything that did not produce an answer, so the screen never shows a blank reply.
       const message = task.status === "no_energy" ? noEnergyMessage(task.reason) : task.status === "failed" ? ASK_FAILED_MESSAGE : undefined;
       return json(200, { status: task.status, reason: task.reason, answer: task.deliverable, energyUsed: task.energyUsed, jobId: task.jobId, runsAt: task.runsAt, queueReason: task.queueReason, ...(message ? { message } : {}) });
+    }
+
+    // The app calls this when it opens or the ask box is focused, so a sleeping GPU is awake by the time the question is sent.
+    if (method === "POST" && path === "/api/warm") {
+      p.identity.require(userId, org.id, "task.create");
+      return json(202, { status: p.warm() });
     }
 
     // ---- batch queue: work that waits for the client's closing time ----

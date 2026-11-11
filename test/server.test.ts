@@ -148,7 +148,7 @@ describe("ask and finance", () => {
     const r = await call("POST", "/api/ask", { text: "Draft a post", employeeId: org.team[1].id, urgent: true }, auth);
     expect(r.status).toBe(200);
     expect((r.body as any).status).toBe("ready_for_review");
-    const q = await call("POST", "/api/ask", { text: "Draft a post", employeeId: org.team[1].id }, auth);
+    const q = await call("POST", "/api/ask", { text: "Draft a post", employeeId: org.team[1].id, when: "tonight" }, auth);
     expect((q.body as any).status).toBe("queued");
     expect((q.body as any).jobId).toBeTruthy();
     expect((await call("POST", "/api/ask", { text: "", employeeId: org.team[1].id }, auth)).status).toBe(400);
