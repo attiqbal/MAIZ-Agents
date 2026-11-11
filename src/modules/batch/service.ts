@@ -119,6 +119,16 @@ export class BatchService implements Intake {
     return { jobId: job.id, runsAt: runAfter };
   }
 
+  queuedFor(workspaceId: string): number {
+    let n = 0;
+    for (const j of this.jobs.values()) if (j.workspaceId === workspaceId && j.status === "queued") n++;
+    return n;
+  }
+
+  nextRunFor(workspaceId: string): string {
+    return nextRunAt(this.scheduleOf(workspaceId), this.now()).toISOString();
+  }
+
   // ---------- client views and controls ----------
 
   scheduleOf(workspaceId: string): ClientSchedule {

@@ -66,7 +66,14 @@ export interface Intake {
   /** Called after urgent work finished: the pod is warm, so waiting work may as well go now. Must not throw. */
   flush?(): void;
   enqueue(job: { userId: string; workspaceId: string; employeeId: string; brief: string; reason: string; estTokens: number }): { jobId: string; runsAt: string };
+  /** How many of this client's tasks are waiting for a batch. */
+  queuedFor?(workspaceId: string): number;
+  /** When this client's next batch runs. */
+  nextRunFor?(workspaceId: string): string;
 }
+
+/** Most tasks one client may have waiting for a batch, whatever their energy, so one client cannot flood the pod. */
+export const MAX_QUEUED_PER_CLIENT = 200;
 
 interface RunContext {
   /** Routing policy. "live" for quick lookups, else the employee template. */
@@ -234,7 +241,19 @@ export class WorkforceService {
     if (route?.mode === "batch") {
       // Only queue work that could start: a client with no energy left learns that now, not tonight.
       const verdict = this.energy?.check(workspaceId, employeeId) ?? { allowed: true as const, overtime: false };
-      if (verdict.allowed) {
+      const expiresAt = this.energy?.planOf(workspaceId).expiresAt;
+      // A trial that ends before the next batch: do it now, rather than promise work that will not be allowed tonight.
+      const endsFirst = !!expiresAt && !!this.intake?.nextRunFor && this.intake.nextRunFor(workspaceId) > expiresAt;
+      if (verdict.allowed && !endsFirst) {
+        // Only accept what the energy left can plausibly pay for: a client with 10 energy cannot queue 2,000 tasks.
+        const waiting = this.intake?.queuedFor?.(workspaceId) ?? 0;
+        const spendable = this.energy?.spendableOf(workspaceId) ?? Number.POSITIVE_INFINITY;
+        const estimate = this.energy?.estimateFor(workspaceId) ?? 0;
+        if (waiting >= MAX_QUEUED_PER_CLIENT || (waiting > 0 && (waiting + 1) * estimate > spendable)) {
+          const full: TaskResult = { id: newId("task"), workspaceId, employeeId, brief, status: "no_energy", reason: waiting >= MAX_QUEUED_PER_CLIENT ? "queue_full" : "queue_exceeds_energy" };
+          this.audit.record({ workspaceId, actor: `user:${userId}`, action: "task.refused", target: full.id, data: { reason: full.reason, waiting } });
+          return full;
+        }
         const q = this.intake!.enqueue({ userId, workspaceId, employeeId, brief, reason: route.reason, estTokens: Math.ceil((brief.length + 6000) / 4) + 1500 });
         const queued: TaskResult = { id: newId("task"), workspaceId, employeeId, brief, status: "queued", jobId: q.jobId, runsAt: q.runsAt, queueReason: route.reason };
         this.audit.record({ workspaceId, actor: `user:${userId}`, action: "task.queued", target: queued.id, data: { jobId: q.jobId, runsAt: q.runsAt } });
@@ -292,6 +311,8 @@ export class WorkforceService {
     }
     const task: TaskResult = { id: newId("task"), workspaceId, employeeId, brief, status: "ready_for_review" };
     this.audit.record({ workspaceId, actor: `user:${userId}`, action: "task.created", target: task.id });
+    // Set the expected energy aside while the model works, so tasks running at once cannot spend the same energy.
+    const hold = this.energy?.hold(workspaceId, verdict);
     try {
       const result = await this.gateway.complete({
         tier: template.tier,
@@ -315,6 +336,8 @@ export class WorkforceService {
     } catch (err) {
       task.status = "failed";
       task.failure = err instanceof Error ? err.message : String(err);
+    } finally {
+      if (hold) this.energy?.release(hold);
     }
     task.at = new Date().toISOString();
     this.tasks.set(task.id, task);

@@ -168,6 +168,10 @@ export function noEnergyMessage(reason: string | undefined): string {
       return "The team has used this week's energy and this month's top-ups. It refills on Monday; contact MAIZ support if you need more sooner.";
     case "daily_ceiling_reached":
       return "The team has reached today's safety limit. Work carries on tomorrow from this week's energy.";
+    case "queue_full":
+      return "You already have a lot of work waiting for tonight's batch. Let some of it finish, or mark this one urgent.";
+    case "queue_exceeds_energy":
+      return "The work already waiting for tonight will use the energy the team has left this week. It refills on Monday, or you can add a top-up now.";
     case "monthly_cost_cap_reached":
       return "Your account has reached its monthly safety limit. Contact MAIZ support and we'll sort it out.";
     default:
