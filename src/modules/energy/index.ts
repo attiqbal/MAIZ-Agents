@@ -165,7 +165,16 @@ export function costMicro(provider: string, inputTokens: number, outputTokens: n
 
 export class EnergyMeter {
   private plans = new Map<string, EnergyPlan>();
-  private usage: UsageRecord[] = [];
+  /** Usage rows by workspace, so a check reads one client's rows rather than every client's. */
+  private usage = new Map<string, UsageRecord[]>();
+  private rowsOf(workspaceId: string): UsageRecord[] {
+    return this.usage.get(workspaceId) ?? [];
+  }
+  private addRow(u: UsageRecord): void {
+    const rows = this.usage.get(u.workspaceId);
+    if (rows) rows.push(u);
+    else this.usage.set(u.workspaceId, [u]);
+  }
   /**
    * Energy promised to tasks that are running now, by workspace. A task is checked before it starts but only
    * pays when it ends, so without this a burst of tasks all pass the same check and overspend the pool.
@@ -184,7 +193,7 @@ export class EnergyMeter {
   }
 
   restoreUsage(u: UsageRecord): void {
-    this.usage.push(u);
+    this.addRow(u);
     this.recent.set(u.workspaceId, [...(this.recent.get(u.workspaceId) ?? []), u.energy].slice(-RECENT_TASKS));
   }
 
@@ -234,7 +243,7 @@ export class EnergyMeter {
     if (plan.weeklyTeamEnergy === undefined) return undefined;
     const from = this.windowStart(plan);
     const day = this.today();
-    const rows = this.usage.filter((u) => u.workspaceId === workspaceId && !u.overtime && u.day >= from);
+    const rows = this.rowsOf(workspaceId).filter((u) => !u.overtime && u.day >= from);
     const used = rows.reduce((s, u) => s + u.energy, 0);
     const usedToday = rows.filter((u) => u.day === day).reduce((s, u) => s + u.energy, 0);
     const pool = plan.weeklyTeamEnergy + this.poolBonus(workspaceId, plan);
@@ -252,7 +261,7 @@ export class EnergyMeter {
   /** Bought top-up energy not used yet. */
   topUpLeft(workspaceId: string): number {
     const bought = this.planOf(workspaceId).topUpEnergyBought ?? 0;
-    const used = this.usage.filter((u) => u.workspaceId === workspaceId && u.overtime).reduce((s, u) => s + u.energy, 0);
+    const used = this.rowsOf(workspaceId).filter((u) => u.overtime).reduce((s, u) => s + u.energy, 0);
     return Math.max(0, bought - used - (this.held.get(workspaceId)?.topUp ?? 0));
   }
 
@@ -324,7 +333,7 @@ export class EnergyMeter {
     if (plan.expiresAt && this.now().toISOString() > plan.expiresAt) return { allowed: false, reason: "trial_ended" };
     const day = this.today();
     const month = day.slice(0, 7);
-    const mine = this.usage.filter((u) => u.workspaceId === workspaceId);
+    const mine = this.rowsOf(workspaceId);
     const monthRows = mine.filter((u) => u.day.startsWith(month));
     const topUpThisMonth = this.topUpLeft(workspaceId) + monthRows.filter((u) => u.overtime).reduce((s, u) => s + u.energy, 0);
     if (monthRows.reduce((s, u) => s + u.costMicro, 0) >= effectiveCostCapMicro(plan, this.poolBonus(workspaceId, plan), topUpThisMonth))
@@ -406,7 +415,7 @@ export class EnergyMeter {
       energy: Math.ceil(cost / MICRO_PER_ENERGY),
       overtime,
     };
-    this.usage.push(rec);
+    this.addRow(rec);
     this.recent.set(workspaceId, [...(this.recent.get(workspaceId) ?? []), rec.energy].slice(-RECENT_TASKS));
     this.sink?.usage(rec);
     return rec;
@@ -416,7 +425,7 @@ export class EnergyMeter {
   remainingToday(userId: string, workspaceId: string, employeeId: string): number {
     this.identity.require(userId, workspaceId, "task.read");
     const day = this.today();
-    const used = this.usage.filter((u) => u.workspaceId === workspaceId && u.employeeId === employeeId && u.day === day && !u.overtime).reduce((s, u) => s + u.energy, 0);
+    const used = this.rowsOf(workspaceId).filter((u) => u.employeeId === employeeId && u.day === day && !u.overtime).reduce((s, u) => s + u.energy, 0);
     const team = this.teamEnergyOf(workspaceId);
     if (!team) return Math.max(0, this.dailyQuota(workspaceId, employeeId) - used);
     // With a pool, an employee can use whatever the team has left today, up to its own cap if it has one.
@@ -436,8 +445,7 @@ export class EnergyMeter {
     const end = Date.parse(`${this.today()}T00:00:00Z`);
     const labels = Array.from({ length: days }, (_, i) => new Date(end - (days - 1 - i) * 86_400_000).toISOString().slice(0, 10));
     const byEmployee = new Map<string, number[]>();
-    for (const u of this.usage) {
-      if (u.workspaceId !== workspaceId) continue;
+    for (const u of this.rowsOf(workspaceId)) {
       const i = labels.indexOf(u.day);
       if (i < 0) continue;
       const row = byEmployee.get(u.employeeId) ?? byEmployee.set(u.employeeId, new Array(days).fill(0)).get(u.employeeId)!;
@@ -449,7 +457,7 @@ export class EnergyMeter {
   /** What we see: real cost and energy for the month. Admin/owner view. */
   monthSummary(userId: string, workspaceId: string, month = this.today().slice(0, 7)) {
     this.identity.require(userId, workspaceId, "workspace.manage");
-    const rows = this.usage.filter((u) => u.workspaceId === workspaceId && u.day.startsWith(month));
+    const rows = this.rowsOf(workspaceId).filter((u) => u.day.startsWith(month));
     const byEmployee: Record<string, { energy: number; costMicro: number }> = {};
     for (const r of rows) {
       const e = (byEmployee[r.employeeId] ??= { energy: 0, costMicro: 0 });
@@ -467,7 +475,7 @@ export class EnergyMeter {
   /** Platform-level usage for one client (no user check): the platform owner's clients screen. */
   usageOf(workspaceId: string): { energyToday: number; energyMonth: number; costMicroMonth: number } {
     const day = this.today();
-    const rows = this.usage.filter((u) => u.workspaceId === workspaceId && u.day.startsWith(day.slice(0, 7)));
+    const rows = this.rowsOf(workspaceId).filter((u) => u.day.startsWith(day.slice(0, 7)));
     return {
       energyToday: rows.filter((u) => u.day === day).reduce((s, u) => s + u.energy, 0),
       energyMonth: rows.reduce((s, u) => s + u.energy, 0),

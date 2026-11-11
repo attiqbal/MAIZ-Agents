@@ -23,6 +23,9 @@ export async function api<T = any>(path: string, init: { method?: string; body?:
       headers: { "content-type": "application/json", ...(token ? { authorization: `Bearer ${token}` } : {}) },
       body: init.body !== undefined ? JSON.stringify(init.body) : undefined,
     });
+    // The server renews an active login (sliding 7 days, up to 30 days after the last email link).
+    const fresh = res.headers.get("x-session-token");
+    if (fresh && token) setToken(fresh);
     const data = res.headers.get("content-type")?.includes("json") ? await res.json() : undefined;
     // A 401 on a call that carried a login means the session ended.
     if (res.status === 401 && token) onSessionEnded();

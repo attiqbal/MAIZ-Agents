@@ -37,6 +37,29 @@ describe("tokens", () => {
   });
 });
 
+describe("sliding sessions", () => {
+  it("renews an active session after a day, and stops renewing 30 days after the last email sign-in", async () => {
+    const { call, clock, auth } = await signedUp();
+    expect((await call("GET", "/api/org", undefined, auth)).headers?.["x-session-token"]).toBeUndefined(); // fresh: nothing to renew
+    let token = auth.authorization;
+    for (let day = 6; day <= 24; day += 6) {
+      clock.d = new Date(clock.d.getTime() + 6 * 86_400_000);
+      const r = await call("GET", "/api/org", undefined, { authorization: token });
+      expect(r.status).toBe(200);
+      const fresh = r.headers?.["x-session-token"];
+      expect(fresh).toBeTruthy();
+      token = `Bearer ${fresh}`;
+    }
+    clock.d = new Date(clock.d.getTime() + 5 * 86_400_000); // day 29: still signed in, but no renewal past day 30
+    const late = await call("GET", "/api/org", undefined, { authorization: token });
+    expect(late.status).toBe(200);
+    expect(late.headers?.["x-session-token"]).toBeUndefined();
+    clock.d = new Date(clock.d.getTime() + 1.5 * 86_400_000); // day 30.5: the session has ended
+    expect((await call("GET", "/api/org", undefined, { authorization: token })).status).toBe(401);
+    expect((await call("GET", "/api/org", undefined, { authorization: "Bearer nope" })).headers?.["x-session-token"]).toBeUndefined();
+  });
+});
+
 describe("signup and org", () => {
   it("creates an organisation and returns the team with energy left", async () => {
     const { r, call, auth } = await signedUp();

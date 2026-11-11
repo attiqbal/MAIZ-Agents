@@ -32,6 +32,7 @@ import { PeopleService } from "../modules/people/index.js";
 
 import { ConsoleEmailSender, type EmailSender } from "./email.js";
 import { userIdFor } from "./identity.js";
+import { ExpiringSet, SendLog } from "./expiring.js";
 
 export interface PlatformConfig {
   anthropicApiKey?: string;
@@ -393,10 +394,13 @@ export function createPlatform(cfg: PlatformConfig) {
 
   const healthy = () => (sink as { healthy?: boolean } | undefined)?.healthy !== false;
 
-  /** Sign-in links already used. In memory: a restart inside the 15-minute life of a link would allow one reuse. */
-  const usedLinks = new Set<string>();
+  /**
+   * One-time links already used, kept only until the link itself expires. In memory: a restart inside the
+   * 15-minute life of a link would allow one reuse.
+   */
+  const usedLinks = new ExpiringSet(() => now().getTime());
   /** Sign-in emails sent per address and hour, to stop the form being used to spam someone. */
-  const sends = new Map<string, number[]>();
+  const sends = new SendLog();
   return { dashboard, reconciliation, rota, people, payments, batch, email, usedLinks, sends, admin, reviews, prices, specialists, ai, clients, isPlatformOwner, healthy, cfg, now, audit, bus, identity, energy, workforce, ledger, onboarding, router, integrations, slackTokens, saveSlackToken, attachStore };
 }
 export type Platform = ReturnType<typeof createPlatform>;
