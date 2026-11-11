@@ -79,6 +79,7 @@ export default defineConfig({
         signin: resolve(__dirname, "signin.html"),
         staffForm: resolve(__dirname, "staff-form.html"),
         review: resolve(__dirname, "review.html"),
+        ownerDecisions: resolve(__dirname, "owner-decisions.html"),
         ownerSpecialists: resolve(__dirname, "owner-specialists.html"),
         ownerClients: resolve(__dirname, "owner-clients.html"),
         ownerPrices: resolve(__dirname, "owner-prices.html"),

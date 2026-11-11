@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+<!--@include head title="Decisions · MAIZ Agents" description="Everything waiting for the MAIZ platform owner's decision, in one list: quality reviews and new specialists."-->
+<meta name="robots" content="noindex">
+</head>
+<body>
+<div class="page-top">
+  <!--@include owner-header-->
+  <main id="main">
+    <section class="section">
+      <div class="container" style="max-width:1180px">
+        <!--@include owner-nav-->
+        <div class="rv-head">
+          <div><h1>Decisions waiting for you</h1>
+            <p class="sub">Every request that needs your yes, your questions or your price, oldest first. Open one to decide it. You get one email when something is waiting, never one per request.</p></div>
+          <span class="badge badge-dark" id="ow-eg" hidden>Example data</span>
+        </div>
+        <div class="ob-panel" id="ow-gate" hidden aria-live="polite"><h2 id="ow-gate-h" style="font-size:1.25rem;margin:0 0 6px"></h2><p id="ow-gate-p" class="sub" style="margin:0 0 14px"></p><a class="btn btn-primary" id="ow-gate-a" href="/signin.html">Log in</a></div>
+        <div id="ow-body">
+          <div class="kpis" id="dc-kpis"></div>
+          <section class="panel" aria-labelledby="dc-h"><div class="panel-h"><h2 id="dc-h">Open decisions</h2></div>
+            <div class="tbl-wrap" tabindex="0" role="region" aria-label="Open decisions, scrolls sideways on small screens"><table class="tbl" id="dc-table"></table></div></section>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+<!--@include footer-->
+<script type="module" src="/src/owner-decisions.ts"></script>
+</body>
+</html>
