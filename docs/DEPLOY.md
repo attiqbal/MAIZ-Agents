@@ -24,7 +24,7 @@ Create an API key for the workspace that will pay for usage and set a monthly sp
 
 ## 4. Host: Render (render.com)
 1. Sign in with GitHub and choose **New > Blueprint**, then pick this repository. Render reads `render.yaml`: one always-on Docker web service (Starter plan) with a health check on `/api/health`.
-2. Fill in the values it asks for: `SITE_URL` and `APP_URL` (your address, for example `https://maizagents.com`; use the `onrender.com` address until the domain is ready), `DATABASE_URL`, `DATABASE_APP_URL`, `TOKEN_KEY`, `ANTHROPIC_API_KEY`, `RESEND_API_KEY`, `EMAIL_FROM`, `PLATFORM_OWNER_EMAILS` (your own sign-in email: you review and sign off every client's specialised tasks at `/review.html`, approve custom specialists, see every client and set prices from the owner menu), and the Slack values if you use Slack. `SESSION_SECRET` is generated for you.
+2. Fill in the values it asks for: `DATABASE_URL`, `DATABASE_APP_URL`, `TOKEN_KEY`, `ANTHROPIC_API_KEY`, `RESEND_API_KEY`, `EMAIL_FROM`, `RUNPOD_API_KEY` and `RUNPOD_ENDPOINT_ID` (both or neither; see [AI-ROUTING.md](AI-ROUTING.md)), `PLATFORM_OWNER_EMAILS` (your own sign-in email: you review and sign off every client's specialised tasks at `/review.html`, approve custom specialists, see every client and set prices from the owner menu), and the Slack values if you use Slack. `SESSION_SECRET` is generated for you.
 3. Pick the region nearest the Neon database (the blueprint says Frankfurt; change both together).
 4. Deploy. The first start applies the database migrations. Open `/api/health`: it should say `{"ok":true}`.
 5. Keep **one instance**. Sign-in links in use and rate limits are held in memory; see the runbook before scaling out.
@@ -40,8 +40,16 @@ Use your live address (`APP_URL`) as `<API address>`: the website and the API sh
 ## 5b. Business apps (optional)
 Stripe (restricted key), till and payroll file uploads and the Zapier or Make link work with no extra setup. For direct Xero and Square connections, create an app in each developer console, register `<APP_URL>/api/integrations/callback` as the redirect address, and set `XERO_CLIENT_ID`, `XERO_CLIENT_SECRET`, `SQUARE_CLIENT_ID` and `SQUARE_CLIENT_SECRET` in Render. Each pair must be set together or left empty. Details: [INTEGRATIONS.md](INTEGRATIONS.md).
 
-## 6. Domain
-In Render, open the service, **Settings > Custom domains**, add your domain and create the DNS records it shows. Then set `SITE_URL`, `APP_URL` and `SLACK_REDIRECT_URI` to the new address, update the Slack app URLs, and redeploy.
+## 6. Domain (maizagents.com)
+`render.yaml` already sets `SITE_URL`, `APP_URL` and `EMAIL_FROM` for `maizagents.com`. If the domain is spelled differently, change those three values in `render.yaml` (and in Render's Environment tab) together.
+
+1. Render: service **Settings > Custom Domains > Add**: add `maizagents.com` and `www.maizagents.com`. Render shows the DNS records and issues the TLS certificate by itself once they resolve (a few minutes up to an hour).
+2. At the registrar's DNS page add exactly what Render shows. Typically: an `A` record for `@` (the apex) pointing to the IP Render prints, and a `CNAME` for `www` pointing to `<service>.onrender.com`. Remove any parking-page records on `@` and `www`.
+3. Resend: **Domains > Add Domain** `maizagents.com`, then add the SPF (`TXT`), DKIM (`TXT`) and return-path (`MX`/`CNAME`) records it lists. Wait until it says Verified. Until then sign-in emails will not send.
+4. Update `SLACK_REDIRECT_URI` and the Slack app URLs to `https://maizagents.com/...`, then redeploy.
+5. Check: `https://maizagents.com/api/health` returns `{"ok":true}`, the padlock is valid, and a sign-in email arrives.
+
+The batch queue and rate limits live in memory, so keep **one instance** (`numInstances: 1`) when you scale the machine; scale up the plan size, not the instance count.
 
 ## Production checks
 The server refuses to start in production (`NODE_ENV=production`) without `SESSION_SECRET` (32+ characters), `DATABASE_URL`, `DATABASE_APP_URL`, `TOKEN_KEY` (64 hex), `RESEND_API_KEY`, `EMAIL_FROM`, `PLATFORM_OWNER_EMAILS`, an `https://` `APP_URL` and `ANTHROPIC_API_KEY`, refuses half a Slack setup, and refuses if `ALLOW_DEV_AUTH=1`. Each problem is printed in the log.

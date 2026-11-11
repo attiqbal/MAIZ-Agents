@@ -20,7 +20,9 @@ import { BatchService } from "../modules/batch/service.js";
 import { WorkforceService } from "../modules/workforce/index.js";
 import { IntegrationService, defaultRegistry, type OAuthApp } from "../modules/integrations/index.js";
 import { QualityReviewService } from "../modules/review/index.js";
-import { PriceBook } from "../modules/pricing/index.js";
+import { DecisionDigest, openDecisions, type OpenDecision } from "./decisions.js";
+import type { LoginApps } from "./social-login.js";
+import { PriceBook, paidTeamPlan } from "../modules/pricing/index.js";
 import { SpecialistReviewService, type SpecialistRequest } from "../modules/review/specialists.js";
 import { templateFromRole } from "../modules/workforce/templates.js";
 import { MockPaymentProvider, PaymentService, type PaymentProvider } from "../modules/payments/index.js";
@@ -47,6 +49,8 @@ export interface PlatformConfig {
   /** Dev-only sign-in by email, no verification. Must stay off in production. */
   allowDevAuth: boolean;
   slack?: { clientId: string; clientSecret: string; signingSecret: string; redirectUri: string };
+  /** "Continue with Google / Microsoft": the provider apps that are switched on (from environment variables). */
+  loginApps?: LoginApps;
   /** Our OAuth app for each connector that has one (for example square), from environment variables. */
   integrationApps?: Record<string, OAuthApp>;
   /**
@@ -104,6 +108,8 @@ export function createPlatform(cfg: PlatformConfig) {
   const admin = new AdminManager(identity, workforce, audit, bus, new InMemoryStorageProvisioner(), new InMemoryModelProvisioner(), router, { now });
   /** Batch work: compiled during the day, sent to the pod at each client's closing time or when enough has gathered. */
   const batch = new BatchService({ identity, audit, workforce, settings: aiSettings, ledger: spend, isPlatformOwner: (id) => ownerIdSet.has(id), notify: (ws, text, link) => admin.tell(ws, text, link), now });
+  // The weekly refill and "today" follow the client's own clock (the same zone as their batch schedule).
+  energy.setZoneResolver((ws) => batch.scheduleOf(ws).timezone);
   workforce.setIntake(batch);
   workforce.addContext((ws, templateKey, taskType) => batch.contextFor(ws, templateKey, taskType));
   const email = cfg.email ?? new ConsoleEmailSender();
@@ -111,18 +117,30 @@ export function createPlatform(cfg: PlatformConfig) {
   /** Signed-in user ids of the platform owners (the same id the session carries). */
   const ownerEmails = ownerEmailsEarly;
   const isPlatformOwner = (userId: string) => ownerIdSet.has(userId);
-  /** MAIZ quality review: every client's specialised tasks wait here for the platform owner's sign-off. */
-  const reviews = new QualityReviewService(identity, audit, isPlatformOwner, {
-    now,
-    notifyOwner: async (item, clientName) => {
+  /** The platform owner's open decisions, newest problems first. The owner's address is the only way in. */
+  const ownerDecisions = (): OpenDecision[] => {
+    const owner = [...ownerIdSet][0];
+    if (!owner) return [];
+    return openDecisions({ reviews: reviews.queue(owner), specialists: specialists.queue(owner) }, now().getTime());
+  };
+  // One email for any number of waiting decisions, with a button to the page that lists them all.
+  const decisionDigest = new DecisionDigest({
+    now: () => now().getTime(),
+    count: () => ownerDecisions().length,
+    send: async (count) => {
       for (const to of ownerEmails) {
         await email.send({
           to,
-          subject: `Quality review: ${item.proposal.title} for ${clientName}`,
-          text: `${clientName}'s ${item.proposal.employee} has compiled a brief for "${item.proposal.title}" and it is waiting for your sign-off.\n\nApprove a direction or ask for more information:\n${base}/review.html#${item.id}\n\nThe client sees "In quality review" until you decide.`,
+          subject: count === 1 ? "1 decision is waiting for you" : `${count} decisions are waiting for you`,
+          text: `${count === 1 ? "1 request is" : `${count} requests are`} waiting for your decision (quality reviews and new specialists).\n\nSee all of them in one place:\n${base}/owner-decisions.html\n\nYou get at most one of these emails every 30 minutes, however many requests arrive.`,
         });
       }
     },
+  });
+  /** MAIZ quality review: every client's specialised tasks wait here for the platform owner's sign-off. */
+  const reviews = new QualityReviewService(identity, audit, isPlatformOwner, {
+    now,
+    notifyOwner: async () => decisionDigest.poke(),
     notifyClient: async (item) => {
       const chosen = item.proposal.directions?.find((d) => d.key === item.proposal.chosenDirection);
       await admin.tell(item.workspaceId, `"${item.proposal.title}" passed quality review${chosen ? ` (direction: ${chosen.name})` : ""}. Your ${item.proposal.employee} has started the work.${item.noteToClient ? ` Note from MAIZ: ${item.noteToClient}` : ""}`, "/app.html#work");
@@ -141,11 +159,7 @@ export function createPlatform(cfg: PlatformConfig) {
       workforce.registerCustomTemplate(r.workspaceId, t);
       return workforce.hire(userId, r.workspaceId, t.key);
     },
-    notifyOwner: async (r, clientName) => {
-      for (const to of ownerEmails) {
-        await email.send({ to, subject: `New specialist to review: ${r.role.title} for ${clientName}`, text: `${clientName} asked for a new custom specialist, "${r.role.title}". The Admin manager drafted the job description; nothing is trained until you approve it.\n\nReview it:\n${base}/owner-specialists.html#${r.id}` });
-      }
-    },
+    notifyOwner: async () => decisionDigest.poke(),
     notifyClient: async (r) => {
       const text = r.status === "approved"
         ? `MAIZ approved your new specialist "${r.role.title}" at £${r.priceGbp} a month. It is ready to hire.`
@@ -203,6 +217,9 @@ export function createPlatform(cfg: PlatformConfig) {
         const templateKey = line.key.split(":")[0]!;
         for (let i = 0; i < line.qty; i++) ids.push((await workforce.hire(order.userId, order.workspaceId, templateKey)).id);
       }
+      // A recurring line makes the client a paying one: they leave the free trial and start the paid plan with a full
+      // pool (the trial's energy is not held against it). One-off consultant passes alone do not end the trial.
+      if (order.lines.some((l) => l.billing === "monthly")) energy.switchToPaid(order.workspaceId, paidTeamPlan(prices.general()), `user:${order.userId}`);
       return ids;
     },
   });
@@ -407,6 +424,6 @@ export function createPlatform(cfg: PlatformConfig) {
   const sends = new SendLog();
   /** Opens and saves per staff form link, so a link cannot be hammered. */
   const formHits = new SendLog();
-  return { dashboard, reconciliation, rota, people, payments, batch, email, usedLinks, sends, formHits, admin, reviews, prices, specialists, ai, clients, isPlatformOwner, healthy, cfg, now, audit, bus, identity, energy, workforce, ledger, onboarding, router, integrations, slackTokens, saveSlackToken, attachStore };
+  return { ownerDecisions, decisionDigest, dashboard, reconciliation, rota, people, payments, batch, email, usedLinks, sends, formHits, admin, reviews, prices, specialists, ai, clients, isPlatformOwner, healthy, cfg, now, audit, bus, identity, energy, workforce, ledger, onboarding, router, integrations, slackTokens, saveSlackToken, attachStore };
 }
 export type Platform = ReturnType<typeof createPlatform>;

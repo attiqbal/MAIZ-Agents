@@ -4,12 +4,12 @@ const B = process.env.QA_URL ?? "http://localhost:8787";
 const b = await chromium.launch();
 const res = []; const ok = (n, c, d = "") => { res.push([c ? "PASS" : "FAIL", n, d]); };
 const errs = [];
-const mk = async (opts = {}) => { const ctx = await b.newContext({ viewport: { width: 1280, height: 900 }, ...opts }); const p = await ctx.newPage(); p.on("pageerror", e => errs.push(String(e))); p.on("console", m => { if (m.type() === "error" && !(p.url().includes("/signin.html") && m.text().includes("400")) && !(/\/(review|owner-[a-z]+)\.html/.test(p.url()) && m.text().includes("403"))) errs.push(p.url() + " " + m.text()); }); return p; };
+const mk = async (opts = {}) => { const ctx = await b.newContext({ viewport: { width: 1280, height: 900 }, ...opts }); const p = await ctx.newPage(); p.on("pageerror", e => errs.push(String(e))); if (process.env.QA_DEBUG) p.on("response", r => { if (r.status() >= 400) console.log("HTTP", r.status(), r.url()); }); p.on("console", m => { if (m.type() === "error" && !(p.url().includes("/signin.html") && m.text().includes("400")) && !(p.url().includes("/onboarding.html") && m.text().includes("404")) /* signed in, no team yet: /api/org says 404 */ && !(/\/(review|owner-[a-z]+)\.html/.test(p.url()) && m.text().includes("403"))) errs.push(p.url() + " " + m.text()); }); return p; };
 
 // 1. Link check: every internal link and anchor on every page
 {
   const p = await mk(); const seen = new Map();
-  const pages = ["/", "/employees.html", "/pricing.html", "/security.html", "/signin.html", "/onboarding.html", "/app.html", "/review.html", "/owner-specialists.html", "/owner-clients.html", "/owner-prices.html", "/owner-ai.html", "/404.html"];
+  const pages = ["/", "/employees.html", "/pricing.html", "/security.html", "/signin.html", "/onboarding.html", "/app.html", "/review.html", "/owner-decisions.html", "/owner-specialists.html", "/owner-clients.html", "/owner-prices.html", "/owner-ai.html", "/404.html"];
   let broken = [];
   for (const pg of pages) {
     await p.goto(B + pg, { waitUntil: "networkidle" });
@@ -187,6 +187,55 @@ const mk = async (opts = {}) => { const ctx = await b.newContext({ viewport: { w
   await c.goto(B + "/review.html"); await c.waitForTimeout(500);
   ok("owner review: a client opening the queue is turned away", /platform owner/.test(await c.textContent("#ow-gate-h")) && (await c.locator(".so-card").count()) === 0);
   await c.context().close();
+}
+// 8. A country that is not listed, "Continue with" buttons, and first jobs after setup (server needs GOOGLE_CLIENT_ID/SECRET, MICROSOFT_CLIENT_ID/SECRET and APP_URL set to fake values)
+{
+  const p = await mk();
+  const providers = (await (await p.request.get(B + "/api/signin/providers")).json()).providers;
+  ok("sign-in providers endpoint lists the switched-on providers", Array.isArray(providers) && providers.length === 2, JSON.stringify(providers));
+  for (const k of providers) {
+    const r = await p.request.get(B + `/api/signin/oauth/${k}/start`, { maxRedirects: 0 });
+    const loc = r.headers()["location"] ?? "";
+    ok(`continue with ${k}: start sends the browser to the provider with PKCE`, r.status() === 302 && /accounts\.google\.com|login\.microsoftonline\.com/.test(loc) && loc.includes("code_challenge_method=S256") && !/client_secret/.test(loc), loc.slice(0, 60));
+  }
+  await p.goto(B + "/signin.html?error=unverified", { waitUntil: "networkidle" });
+  ok("log in: a failed Google/Microsoft sign-in is explained in plain words and the address bar is cleaned", /isn't verified/.test(await p.textContent("#si-err")) && !p.url().includes("error"));
+  ok("log in: Continue with Google and Microsoft buttons shown", (await p.locator("#social-btns a").count()) === 2 && (await p.getAttribute('#social-btns a:first-child', "href")) === "/api/signin/oauth/google/start");
+  await p.goto(B + "/signin.html?error=<script>", { waitUntil: "networkidle" });
+  ok("log in: an unknown error code shows nothing", !(await p.isVisible("#si-err")));
+
+  await p.evaluate(() => { localStorage.clear(); sessionStorage.clear(); });
+  await p.goto(B + "/onboarding.html", { waitUntil: "networkidle" });
+  await p.click('#sectors [data-v="food-drink"]'); await p.fill("#biz", "Casa Cafe");
+  await p.selectOption("#country", { label: "Somewhere else" });
+  ok("country: Somewhere else asks which country", await p.isVisible("#country-name"));
+  await p.click("#biz-go");
+  ok("country: continuing without the name shows an error and stays", await p.isVisible("#country-name-err") && await p.isVisible('[data-step="1"]'));
+  await p.fill("#country-name", "Brazil<script>"); await p.click("#biz-go");
+  ok("country: a name with odd characters is refused", await p.isVisible("#country-name-err"));
+  await p.fill("#country-name", "Brazil"); await p.click("#biz-go");
+  await p.click("#needs-go"); await p.click("#apps-go");
+  ok("plan: shows the typed country and the Admin manager's research as its first job", (await p.textContent("#plan-facts")).includes("Brazil") && /Read up on the business rules in Brazil/.test(await p.textContent("#plan-facts")));
+  ok("plan: Continue with Google and Microsoft shown above the email box", (await p.locator("#social-btns a").count()) === 2 && await p.isVisible("#email-f"));
+  await p.fill("#email", `ana${Date.now()}@casa-cafe.test`); await p.click("#email-go");
+  await p.waitForSelector('[data-step="5"]:not([hidden])', { timeout: 5000 }).catch(() => {});
+  await p.click('[data-step="5"] [data-next]');
+  await p.waitForSelector("#open-app", { state: "visible", timeout: 8000 }).catch(() => {});
+  const token = await p.evaluate(() => localStorage.getItem("maiz.token"));
+  const auth = { authorization: `Bearer ${token}` };
+  const answers = { goals: "More subscribers and tidy books", customers: "Home coffee drinkers", tone: "Warm and friendly", financialYearStart: "April", salesTaxRegistered: false, marketingChannels: ["Instagram"], staffCount: 3, hiringSoon: true };
+  const setup = await p.request.post(B + "/api/setup", { headers: auth, data: { answers } });
+  ok("setup: form accepted", setup.ok() && (await setup.json()).state === "ready");
+  let note = "";
+  for (let i = 0; i < 40 && !note; i++) {
+    const msgs = (await (await p.request.get(B + "/api/setup", { headers: auth })).json()).messages;
+    note = msgs.find((m) => /first jobs/.test(m.text))?.text ?? "";
+    if (!note) await p.waitForTimeout(250);
+  }
+  ok("first jobs: the Admin manager says which jobs started, with the country research first", /Admin manager: Rules for doing business in Brazil/.test(note), note.slice(0, 160));
+  const tasks = await (await p.request.get(B + "/api/dashboard", { headers: auth })).json();
+  ok("first jobs: results are waiting on the task board", JSON.stringify(tasks).includes("Rules for doing business in Brazil") || /done, ready for you to review/.test(note));
+  await p.context().close();
 }
 // 6. Keyboard
 {

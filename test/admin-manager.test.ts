@@ -16,6 +16,7 @@ import {
   SetupError,
   WorkforceService,
   drivePlan,
+  planSignup,
   formFor,
   modelsFor,
   validateAnswers,
@@ -262,5 +263,79 @@ describe("storage and model plans", () => {
   it("only calls the paid API model when a premium employee needs it", () => {
     expect(modelsFor(["standard"]).map((m) => m.id)).toEqual(["qwen3-embedding-0.6b", "qwen3.6-35b-a3b"]);
     expect(modelsFor(["premium"]).map((m) => m.id)).toContain("claude-sonnet");
+  });
+});
+
+describe("first jobs", () => {
+  const plan = planSignup({ businessName: "Kestrel Coffee", sector: "food-drink", needs: ["know-my-numbers", "staff", "more-customers", "cut-costs"], country: "GB" });
+
+  it("starts what the owner asked for as soon as setup is done: at most three, right away, once", async () => {
+    const { admin, org, ws, wf } = await setup({ plan });
+    await admin.welcome("owner", org);
+    expect(await admin.startFirstJobs(ws)).toBeUndefined(); // not set up yet
+    await admin.submitForm("owner", ws, answers);
+
+    const started = (await admin.startFirstJobs(ws))!;
+    expect(started).toHaveLength(3);
+    expect(started.map((s) => s.employee)).toEqual(plan.team.filter((t) => t.focus).slice(0, 3).map((t) => t.title));
+    expect(started.every((s) => s.status === "ready_for_review")).toBe(true);
+    const done = wf.tasksSince("owner", ws, "1970-01-01T00:00:00Z");
+    expect(done).toHaveLength(3);
+    expect(done[0]!.brief).toContain("draft");
+    const note = admin.messages("owner", ws).at(-1)!;
+    expect(note.text).toContain(plan.team[0]!.firstJob);
+
+    // Calling it again does nothing, so a retried request never spends the energy twice.
+    expect(await admin.startFirstJobs(ws)).toBeUndefined();
+    expect(wf.tasksSince("owner", ws, "1970-01-01T00:00:00Z")).toHaveLength(3);
+  });
+
+  it("does nothing for a signup that had no plan, and survives one job failing", async () => {
+    const plain = await setup();
+    await plain.admin.welcome("owner", plain.org);
+    await plain.admin.submitForm("owner", plain.ws, answers);
+    expect(await plain.admin.startFirstJobs(plain.ws)).toBeUndefined();
+
+    const s = await setup({ plan });
+    await s.admin.welcome("owner", s.org);
+    await s.admin.submitForm("owner", s.ws, answers);
+    const real = s.wf.assign.bind(s.wf);
+    let calls = 0;
+    s.wf.assign = async (...args: Parameters<typeof real>) => {
+      if (calls++ === 0) throw new Error("model host down");
+      return real(...args);
+    };
+    const started = (await s.admin.startFirstJobs(s.ws))!;
+    expect(started.map((x) => x.status)).toEqual(["failed", "ready_for_review", "ready_for_review"]);
+    expect(s.admin.messages("owner", s.ws).at(-1)!.text).toMatch(/could not start/i);
+  });
+
+  it("is remembered across a restart", async () => {
+    const s = await setup({ plan });
+    await s.admin.welcome("owner", s.org);
+    await s.admin.submitForm("owner", s.ws, answers);
+    await s.admin.startFirstJobs(s.ws);
+    const again = new AdminManager(s.identity, s.wf, s.audit, new EventBus(), s.storage, s.models);
+    again.restoreOrg({ org: s.org, ownerUserId: "owner", contact: "dashboard", state: "ready", runs: [], firstJobsStartedAt: "2026-11-11T10:00:00.000Z" });
+    expect(await again.startFirstJobs(s.ws)).toBeUndefined();
+  });
+
+  it("has the Admin manager research the rules of a country that is not on the list, before the other jobs", async () => {
+    const countryPlan = planSignup({ businessName: "Casa Café", sector: "food-drink", needs: ["know-my-numbers"], countryName: "Brazil" });
+    const s = await setup({ plan: countryPlan, country: "Brazil" });
+    await s.admin.welcome("owner", s.org);
+    await s.admin.submitForm("owner", s.ws, answers);
+    const briefs: string[] = [];
+    const real = s.wf.assign.bind(s.wf);
+    s.wf.assign = async (...args: Parameters<typeof real>) => {
+      briefs.push(args[3]);
+      return real(...args);
+    };
+    const started = (await s.admin.startFirstJobs(s.ws))!;
+    expect(started.map((r) => r.employee)).toEqual(["Admin manager", "Finance manager"]);
+    expect(briefs[0]).toContain('"Brazil"');
+    expect(briefs[0]).toMatch(/lawyer or accountant must confirm/);
+    expect(briefs[0]).toMatch(/best way forward/);
+    expect(started[0]!.job).toBe("Rules for doing business in Brazil");
   });
 });

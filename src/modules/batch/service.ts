@@ -6,6 +6,7 @@ import { PermissionError, type IdentityService } from "../identity/index.js";
 import type { SpendLedger } from "../model-gateway/routing/ledger.js";
 import type { RoutingSettingsStore } from "../model-gateway/routing/settings.js";
 import type { AssignOptions, Intake, TaskResult, WorkforceService } from "../workforce/index.js";
+import { measuredTaskSeconds, planGpus, type GpuPlan } from "./gpu-plan.js";
 import { classifyWork, REAL_TIME_RULES } from "./classify.js";
 import { BatchError, DEFAULT_SCHEDULE, formatLocal, mergeSchedule, nextRunAt, type ClientSchedule } from "./schedule.js";
 
@@ -230,8 +231,24 @@ export class BatchService implements Intake {
       byClient: [...byClient.entries()].map(([id, js]) => ({ id, name: this.d.identity.workspaceById(id)?.name ?? id, queued: js.length, nextAt: new Date(Math.min(...js.map((j) => Date.parse(j.runAfter)))).toISOString() })),
       runs: [...this.runs].reverse().slice(0, 30),
       settings: this.d.settings.get().batch,
+      gpuPlan: this.gpuPlan(queued.length),
       realTime: REAL_TIME_RULES,
     };
+  }
+
+  /** The number and size of GPUs the tasks waiting need before morning, next to what is set now. */
+  gpuPlan(pending: number): GpuPlan {
+    const cfg = this.d.settings.get();
+    const b = cfg.batch;
+    return planGpus({
+      pending,
+      taskSeconds: measuredTaskSeconds(this.runs, b.gpuWorkers * b.concurrency),
+      concurrencyPerGpu: b.concurrency,
+      windowHours: b.windowHours,
+      model: cfg.runpod.model,
+      current: { gpus: b.gpuWorkers, sizeGb: b.gpuSizeGb },
+      currentUsdPerSecond: cfg.runpod.gpuUsdPerSecond,
+    });
   }
 
   async runAllNow(userId: string): Promise<BatchRunRecord | undefined> {
@@ -285,7 +302,8 @@ export class BatchService implements Intake {
     try {
       for (const j of batch) this.save({ ...j, status: "running", runId: run.id });
       const finished = new Map<string, { done: number; failed: number }>();
-      await pool(batch, this.d.settings.get().batch.concurrency, async (j) => {
+      const bs = this.d.settings.get().batch;
+      await pool(batch, bs.gpuWorkers * bs.concurrency, async (j) => {
         const outcome = await this.runJob(j.id, run);
         if (outcome) { const c = finished.get(j.workspaceId) ?? { done: 0, failed: 0 }; c[outcome]++; finished.set(j.workspaceId, c); }
       });

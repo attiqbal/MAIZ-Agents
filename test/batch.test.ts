@@ -251,4 +251,19 @@ describe("batch queue end to end", () => {
     expect(view.month.batchRuns).toBe(1);
     expect(view.month.coldStartSavedMicro).toBeGreaterThan(0);
   });
+
+  it("runs the overnight batch on a fixed number of GPUs and shows the owner how many tonight needs", async () => {
+    const s = setup();
+    const c = await s.client();
+    const set = await s.call("POST", "/api/owner/ai/settings", { batch: { gpuWorkers: 3, gpuSizeGb: 80, windowHours: 8 } }, s.owner());
+    expect(set.status).toBe(200);
+    expect((await s.call("POST", "/api/owner/ai/settings", { batch: { gpuSizeGb: 30 } }, s.owner())).status).toBe(400);
+    await s.call("POST", "/api/ask", { employeeId: c.empId, text: "Plan next month's campaign calendar" }, c.auth);
+    const plan = ((await s.call("GET", "/api/owner/batch", undefined, s.owner())).body as any).gpuPlan;
+    expect(plan.current).toMatchObject({ gpus: 3, sizeGb: 80, finishesInWindow: true });
+    expect(plan).toMatchObject({ windowHours: 8, pending: 1 });
+    expect(plan.advice).toMatch(/GPU/);
+  });
+
 });
+

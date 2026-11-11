@@ -13,10 +13,11 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
+      # The public address. Not secret, so it lives here. Change both together if the domain changes.
       - key: SITE_URL        # used at build time for canonical links, sitemap and Open Graph
-        sync: false
+        value: https://maizagents.com
       - key: APP_URL         # same address as SITE_URL, used in sign-in emails
-        sync: false
+        value: https://maizagents.com
       - key: SESSION_SECRET
         generateValue: true
       - key: DATABASE_URL
@@ -29,10 +30,24 @@ services:
         sync: false
       - key: RESEND_API_KEY
         sync: false
-      - key: EMAIL_FROM
-        sync: false
+      - key: EMAIL_FROM      # must be on the domain verified in Resend
+        value: MAIZ Agents <hello@maizagents.com>
       # Your sign-in email as the MAIZ platform owner: you review and sign off specialised tasks.
       - key: PLATFORM_OWNER_EMAILS
+        sync: false
+      # AI workers: RunPod does the heavy lifting, Claude supervises (docs/AI-ROUTING.md). Set both or neither.
+      - key: RUNPOD_API_KEY
+        sync: false
+      - key: RUNPOD_ENDPOINT_ID
+        sync: false
+      # Optional: "Continue with Google / Microsoft" on the sign-in and signup pages (see .env.example).
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: MICROSOFT_CLIENT_ID
+        sync: false
+      - key: MICROSOFT_CLIENT_SECRET
         sync: false
       - key: SLACK_CLIENT_ID
         sync: false
@@ -40,7 +55,7 @@ services:
         sync: false
       - key: SLACK_SIGNING_SECRET
         sync: false
-      - key: SLACK_REDIRECT_URI
+      - key: SLACK_REDIRECT_URI   # https://maizagents.com/api/slack/callback
         sync: false
       # Optional: direct connections to business apps (docs/INTEGRATIONS.md). Leave empty to keep them on file upload.
       - key: XERO_CLIENT_ID

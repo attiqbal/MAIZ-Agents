@@ -2,16 +2,16 @@
 // then the plan built from them, then the email that saves it. The plan comes from the same
 // pure rules the server uses, so what is shown here is what gets set up.
 import "./styles.css";
-import { drawPseudoQr } from "./common";
+import { drawPseudoQr, showSocialLogin } from "./common";
 import { api, getToken, setToken } from "./api";
-import { MAX_NEEDS, planSignup, resolveSector, type SignupPlan, type SignupSize } from "../../src/modules/onboarding/recommend";
+import { MAX_NEEDS, cleanCountryName, planSignup, resolveSector, type SignupPlan, type SignupSize } from "../../src/modules/onboarding/recommend";
 import { APPS, COUNTRIES, NEEDS, OTHER_SECTOR, SECTORS, countryFacts, getSector, type AppHow } from "../../src/modules/onboarding/sectors";
 
 const TOTAL = 6;
 const PLAN_STEP = 4;
 const KEY = "maiz.profile";
 interface Profile {
-  email?: string; biz?: string; sector?: string; sells?: string; country?: string; needs?: string[]; size?: string;
+  email?: string; biz?: string; sector?: string; sells?: string; country?: string; countryName?: string; needs?: string[]; size?: string;
   apps?: string[]; site?: string; addOns?: string[]; slack?: boolean; contact?: "dashboard" | "slack";
 }
 
@@ -92,17 +92,28 @@ single($("sectors"), (b) => {
   save();
 });
 $("sells-f").toggleAttribute("hidden", profile.sector !== OTHER_SECTOR);
-const preferred = profile.country ?? guessCountry();
+const preferred = profile.countryName ? "" : (profile.country ?? guessCountry());
 $("country").innerHTML = `${COUNTRIES.map((c) => `<option value="${c.code}"${c.code === preferred ? " selected" : ""}>${esc(c.name)}</option>`).join("")}<option value=""${preferred ? "" : " selected"}>Somewhere else</option>`;
+// "Somewhere else" asks for the country's name, so the Admin manager can read up on its rules.
+const elsewhere = () => $<HTMLSelectElement>("country").value === "";
+const syncCountryName = () => $("country-name-f").toggleAttribute("hidden", !elsewhere());
+$("country").addEventListener("change", syncCountryName);
+if (profile.countryName) $<HTMLInputElement>("country-name").value = profile.countryName;
+syncCountryName();
 $("biz-go").addEventListener("click", () => {
   const biz = $<HTMLInputElement>("biz").value.trim();
+  const countryName = elsewhere() ? cleanCountryName($<HTMLInputElement>("country-name").value) : undefined;
+  const countryOk = !elsewhere() || !!countryName;
   const ok = !!biz && !!profile.sector;
   $("biz-err").toggleAttribute("hidden", ok);
   $("biz").setAttribute("aria-invalid", String(!biz));
-  if (!ok) { if (!biz) $("biz").focus(); return; }
+  $("country-name-err").toggleAttribute("hidden", countryOk);
+  $("country-name").setAttribute("aria-invalid", String(!countryOk));
+  if (!ok || !countryOk) { if (!biz) $("biz").focus(); else if (!countryOk) $("country-name").focus(); return; }
   profile.biz = biz;
   profile.sells = $<HTMLInputElement>("sells").value.trim() || undefined;
   profile.country = $<HTMLSelectElement>("country").value || undefined;
+  profile.countryName = countryName;
   save(); show(2);
 });
 
@@ -177,7 +188,7 @@ function currentPlan(): SignupPlan | undefined {
   if (!profile.biz) return undefined;
   return planSignup({
     businessName: profile.biz, sector: profile.sector, needs: profile.needs, apps: profile.apps, size: SIZES[profile.size ?? ""],
-    country: profile.country, sells: profile.sells, website: profile.site, addOns: profile.addOns,
+    country: profile.country, countryName: profile.countryName, sells: profile.sells, website: profile.site, addOns: profile.addOns,
   });
 }
 
@@ -207,6 +218,8 @@ function renderPlan(): void {
   const fact = (label: string, value: string, src: string) => `<div class="prow"><span>${label}<span class="src">${src}</span></span><span class="val">${esc(value)}</span></div>`;
   const rows = [
     facts ? fact("Country and currency", `${facts.name} · ${facts.currency}`, "your device") : "",
+    plan.countryName ? fact("Country", plan.countryName, "you told us") : "",
+    plan.countryName ? fact("First job for your Admin manager", `Read up on the business rules in ${plan.countryName} and recommend the best way forward`, "automatic") : "",
     facts ? fact("Financial year starts", facts.yearStart, "our guess") : "",
     plan.prefill.answers.customers ? fact("Customers", String(plan.prefill.answers.customers), "our guess") : "",
     fact("Kind of business", getSector(plan.sector).label, plan.sector === profile.sector ? "you told us" : "our guess"),
@@ -215,6 +228,7 @@ function renderPlan(): void {
   $("plan-facts").innerHTML = rows.join("") + `<p class="hint">You can correct any of these on the setup form. Guesses are always labelled.</p>`;
   const signedIn = !!getToken();
   $("email-f").toggleAttribute("hidden", signedIn);
+  if (signedIn) $("social").setAttribute("hidden", ""); else void showSocialLogin($("social"), $("social-btns"));
   $("email-go").textContent = signedIn ? "Start my team" : "Start my free week";
 }
 $("plan-offers").addEventListener("change", (e) => {
@@ -261,7 +275,7 @@ async function createOrganisation(): Promise<boolean> {
   const r = await api<{ token: string }>("/signup", {
     body: {
       email: profile.email, businessName: profile.biz, sector: profile.sector, sells: profile.sells, needs: profile.needs, apps: profile.apps,
-      addOns: profile.addOns, size: profile.size, country: profile.country, website: profile.site, contact: profile.contact,
+      addOns: profile.addOns, size: profile.size, country: profile.country, countryName: profile.countryName, website: profile.site, contact: profile.contact,
     },
   });
   if (r.ok && r.data?.token) { setToken(r.data.token); return true; }

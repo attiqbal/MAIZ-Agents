@@ -41,6 +41,29 @@ describe("checkout with a mock provider", () => {
     expect(((await s.call("GET", "/api/orders", undefined, ann)).body as any).orders).toHaveLength(1);
   });
 
+  it("ends the trial and starts the paid plan with a full pool when a recurring item is paid for", async () => {
+    const s = setup(new MockPaymentProvider());
+    const ann = await s.signUp("ann@kestrel.co", "Kestrel Coffee");
+    const ws = ((await s.call("GET", "/api/org", undefined, ann)).body as any).id;
+    expect(s.platform.energy.planOf(ws).expiresAt).toBeDefined();
+    const catalogue = ((await s.call("GET", "/api/store")).body as any).catalogue as any[];
+    const pass = catalogue.find((i) => i.billing === "once");
+    const monthly = catalogue.find((i) => i.billing === "monthly");
+
+    // A one-off consultant pass alone does not end the trial.
+    expect((await s.call("POST", "/api/checkout", { lines: [{ key: pass.key }] }, ann)).status).toBe(201);
+    expect(s.platform.energy.planOf(ws).expiresAt).toBeDefined();
+
+    // Pretend the trial pool was used up, then pay for a recurring add-on.
+    s.platform.energy.record(ws, "any", "anthropic", 0, 0, false, 2_900_000);
+    expect(s.platform.energy.teamEnergyOf(ws)!.left).toBeLessThan(200);
+    expect((await s.call("POST", "/api/checkout", { lines: [{ key: monthly.key }] }, ann)).status).toBe(201);
+    expect(s.platform.energy.planOf(ws).expiresAt).toBeUndefined();
+    const pool = s.platform.energy.teamEnergyOf(ws)!;
+    expect(pool).toMatchObject({ used: 0, refillsAt: expect.any(String) });
+    expect(pool.pool).toBeGreaterThanOrEqual(8_000);
+  });
+
   it("refuses empty carts, unknown items, core roles and other clients' orders", async () => {
     const s = setup(new MockPaymentProvider());
     const ann = await s.signUp("ann@kestrel.co", "Kestrel Coffee");

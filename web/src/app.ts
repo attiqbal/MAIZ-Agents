@@ -1,5 +1,6 @@
 import "./styles.css";
 import { toast } from "./common";
+import { startWorking } from "./ask-status";
 import { initSetup } from "./setup";
 import { initApps } from "./apps";
 import { initDash } from "./dash";
@@ -221,6 +222,7 @@ $("set-biz").textContent = biz;
 $("set-email").textContent = profile.email || "The address you log in with";
 
 // Ask bar: "finance: ..." / "marketing: ..." / "consultant: ..." / "hr: ..." / "compliance: ..." picks the employee; otherwise the consultant answers.
+let asking = false;
 $<HTMLFormElement>("ask").addEventListener("submit", async (e) => {
   e.preventDefault();
   const input = $<HTMLInputElement>("ask-in");
@@ -230,15 +232,19 @@ $<HTMLFormElement>("ask").addEventListener("submit", async (e) => {
   const m = /^(finance|marketing|consultant|hr|compliance|supply)\s*[:,-]\s*(.+)$/is.exec(text);
   const key = m ? { finance: "finance-manager", marketing: "marketing-manager", consultant: "business-consultant", hr: "hr-manager", compliance: "compliance-manager", supply: "supply-chain-manager" }[m[1]!.toLowerCase() as "finance"] : "business-consultant";
   const emp = realOrg.team.find((x) => x.templateKey === key) ?? realOrg.team[0]!;
-  toast(`${emp.name} is on it…`);
+  if (asking) { toast("Still working on your last question"); return; }
+  asking = true;
+  const stopWorking = startWorking(emp.name);
   const u = /^urgent\s*[:,-]\s*(.+)$/is.exec(m ? m[2]! : text);
   const r = await api<{ status: string; reason?: string; answer?: string; runsAt?: string; message?: string }>("/ask", { body: { text: u ? u[1] : m ? m[2] : text, employeeId: emp.id, urgent: !!u } });
+  stopWorking();
+  asking = false;
+  if (!r.ok || !r.data) { showNote(emp.name, "I could not reach your team. Your question is still in the box, so you can send it again.", true); return; }
   input.value = "";
-  if (!r.ok || !r.data) { toast("Could not reach your team. Try again."); return; }
   // The server explains why in plain words (weekly pool, daily limit, full queue, trial ended, AI unavailable).
-  if (r.data.status === "no_energy") { toast(r.data.message ?? (r.data.reason === "trial_ended" ? "Your free trial has ended" : "Your team is out of energy for now")); return; }
-  if (r.data.status === "queued") { toast(`Queued with your next batch${r.data.runsAt ? `, runs ${new Date(r.data.runsAt).toLocaleString([], { weekday: "short", hour: "numeric", minute: "2-digit" })}` : ""}. Start with "urgent:" to skip the wait.`); return; }
-  if (r.data.status === "failed" || !r.data.answer) { toast(r.data.message ?? `${emp.name} couldn't answer just now. Try again in a few minutes.`); return; }
+  if (r.data.status === "no_energy") { showNote(emp.name, r.data.message ?? (r.data.reason === "trial_ended" ? "Your free trial has ended" : "Your team is out of energy for now")); return; }
+  if (r.data.status === "queued") { showQueued(emp.name, r.data.runsAt); return; }
+  if (r.data.status === "failed" || !r.data.answer) { showNote(emp.name, r.data.message ?? `${emp.name} couldn't answer just now. Try again in a few minutes.`); return; }
   showAnswer(emp.name, r.data.answer ?? "");
   void loadOrg();
 
@@ -267,13 +273,40 @@ $("tu-form").addEventListener("submit", async (ev) => {
 void loadTopUps();
 });
 
-function showAnswer(who: string, text: string): void {
+function answerBox(): HTMLElement {
   let box = document.getElementById("answer");
   if (!box) {
     box = document.createElement("section");
     box.id = "answer"; box.className = "panel";
     document.querySelector('[data-screen="home"]')?.prepend(box);
   }
+  return box;
+}
+/** A plain note that stays on screen (a toast disappears before most people have read it). */
+function showNote(who: string, text: string, isError = false): void {
+  const box = answerBox();
+  box.setAttribute("role", isError ? "alert" : "status");
+  box.innerHTML = `<div class="panel-h"><h2>${esc(who)}</h2></div><div class="preview">${esc(text)}</div>`;
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+/** Receipt for work that waits for the batch: says when it runs and offers to run it now. */
+function showQueued(who: string, runsAt?: string): void {
+  const when = runsAt ? new Date(runsAt).toLocaleString([], { weekday: "short", hour: "numeric", minute: "2-digit" }) : "your next batch";
+  const box = answerBox();
+  box.setAttribute("role", "status");
+  box.innerHTML = `<div class="panel-h"><h2>${esc(who)} will do this ${runsAt ? "at " + esc(when) : "with your next batch"}</h2><span class="r">Queued</span></div><div class="preview">Batching saves energy. Need it sooner?</div><p><button class="btn btn-sm btn-primary" id="run-now" type="button">Run it now</button></p>`;
+  document.getElementById("run-now")?.addEventListener("click", async (ev) => {
+    const b = ev.currentTarget as HTMLButtonElement;
+    b.disabled = true; b.textContent = "Starting…";
+    const res = await api("/queue/run-now", { method: "POST", body: {} });
+    if (res.ok) showNote(who, "Started. Finished work will arrive in your inbox and on the Tasks screen.");
+    else { b.disabled = false; b.textContent = "Run it now"; toast("Could not start it just now. Try again in a minute."); }
+  });
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+function showAnswer(who: string, text: string): void {
+  const box = answerBox();
+  box.setAttribute("role", "status");
   box.innerHTML = `<div class="panel-h"><h2>${esc(who)} says</h2><span class="r">Draft for you to review</span></div><div class="preview" style="white-space:pre-wrap">${esc(text)}</div>`;
   window.scrollTo({ top: 0, behavior: "smooth" });
 }

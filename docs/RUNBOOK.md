@@ -31,7 +31,8 @@ How to run MAIZ Agents once it is live. Setup is in [DEPLOY.md](DEPLOY.md).
 ## Limits to know before growing
 - **One instance only.** Used sign-in links, the per-email sign-in limit and per-address rate limits are in memory, and the write-behind store assumes a single writer. Moving these into Postgres is the step before running two instances.
 - A restart forgets which sign-in links were used, so a link from the last 15 minutes could be used a second time. Links still expire after 15 minutes.
-- Rate limits: sign-in and sign-up 10 per 10 minutes per address, other POSTs 60 per minute. Change them in `src/server/rate-limit.ts`.
+- Decisions: the platform owner gets at most one "decisions are waiting" email per 30 minutes (`src/server/decisions.ts`), linking to `/owner-decisions.html`.
+- Rate limits: sign-in and sign-up 10 per 10 minutes per address, other POSTs 60 per minute. Tasks (`/api/ask`) have no request limit: energy (the weekly pool, daily ceiling and cost cap) is the limit. The weekly energy refill happens at each client's own Monday 00:00 (their batch time zone). Change them in `src/server/rate-limit.ts`.
 - AI spend: each employee has a daily energy quota and a monthly cost cap (`docs/DEFAULTS.md`). Also set a spend limit on the Anthropic console.
 
 ## Free trial

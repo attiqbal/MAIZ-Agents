@@ -68,8 +68,13 @@ describe("quality review: the platform owner signs off, never the client", () =>
     expect((answered.body as any).task.statusLabel).toBe("In quality review");
     await Promise.resolve();
     const alert = s.mail.sent.find((m) => m.to === OWNER)!;
-    expect(alert.subject).toBe("Quality review: Brand kit for the autumn range for Kestrel Coffee");
-    expect(alert.text).toContain(`https://app.test/review.html#${task.id}`);
+    expect(alert.subject).toBe("1 decision is waiting for you");
+    expect(alert.text).toContain("https://app.test/owner-decisions.html");
+    // The page behind that button lists every open decision, and only the owner can open it.
+    const decisions = (await s.call("GET", "/api/owner/decisions", undefined, s.owner)).body as any;
+    expect(decisions.total).toBe(1);
+    expect(decisions.items[0]).toMatchObject({ kind: "review", title: "Brand kit for the autumn range", clientName: "Kestrel Coffee", link: `/review.html#${task.id}` });
+    expect((await s.call("GET", "/api/owner/decisions", undefined, ann)).status).toBe(403);
 
     // The owner's queue shows the client, the brief, the options and the age.
     s.clock.d = new Date("2026-11-10T12:30:00Z");
@@ -136,7 +141,9 @@ describe("quality review: the platform owner signs off, never the client", () =>
 
     await s.call("POST", `/api/reviews/${id}/answer`, { label: "Which age group buys most?", value: "25 to 45" }, ann);
     await Promise.resolve();
-    expect(s.mail.sent.filter((m) => m.to === OWNER)).toHaveLength(2);
+    // Back in the queue within the half-hour gap: no second email, the first one's page already lists it.
+    expect(s.mail.sent.filter((m) => m.to === OWNER)).toHaveLength(1);
+    expect(((await s.call("GET", "/api/owner/decisions", undefined, s.owner)).body as any).total).toBe(1);
     expect((await s.call("POST", `/api/owner/reviews/${id}/approve`, { direction: "rebrand" }, s.owner)).status).toBe(200);
     expect((await s.call("POST", `/api/reviews/${id}/answer`, { label: "Who you sell to", value: "Changed" }, ann)).status).toBe(400);
   });
