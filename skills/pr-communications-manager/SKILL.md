@@ -1,6 +1,6 @@
 ---
 name: pr-communications-manager
-description: Job description and skills of the MAIZ agents PR and communications manager. Gets the business fair attention in the press and keeps its public statements consistent.
+description: Job description and skills of the MAIZ Agents PR and communications manager. Gets the business fair attention in the press and keeps its public statements consistent.
 ---
 
 <!-- Generated from src/modules/workforce/job-descriptions.ts by `npm run skills`. Edit that file, not this one. -->

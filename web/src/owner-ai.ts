@@ -168,7 +168,7 @@ const FIELDS: Field[] = [
 
 function input(f: { path: string; label: string; kind: Field["kind"]; options?: [string, string][]; step?: string }, v: unknown, bare = false): string {
   const k = `data-p="${esc(f.path)}" data-t="${f.kind}"`; const id = `ai-${f.path.replace(/\W/g, "-")}`;
-  if (f.kind === "bool" && bare) return `<input type="checkbox" aria-label="${esc(f.label)}" style="width:20px;height:20px;accent-color:var(--color-aurora-purple)" ${k}${v ? " checked" : ""}>`;
+  if (f.kind === "bool" && bare) return `<input type="checkbox" aria-label="${esc(f.label)}" style="width:20px;height:20px;accent-color:var(--color-graphite)" ${k}${v ? " checked" : ""}>`;
   if (f.kind === "bool") return `<label class="ow-check"><input type="checkbox" ${k}${v ? " checked" : ""}>${esc(f.label)}</label>`;
   if (f.kind === "select") return `<select class="input" id="${id}" ${k}${bare ? ` aria-label="${esc(f.label)}" style="min-width:130px"` : ""}>${f.options!.map(([o, l]) => `<option value="${esc(o)}"${o === v ? " selected" : ""}>${esc(l)}</option>`).join("")}</select>`;
   if (f.kind === "text") return `<input class="input" id="${id}" type="text" maxlength="120" ${bare ? `aria-label="${esc(f.label)}" style="min-width:190px" ` : ""}${k} value="${esc(String(v ?? ""))}">`;

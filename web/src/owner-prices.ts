@@ -174,17 +174,29 @@ $("pr-history").addEventListener("click", async (e) => {
   if (!r.ok || !r.data) { toast(r.data?.error ?? "Could not call it off. Try again."); return; }
   book = r.data; renderAll(); toast("Called off. Nothing changes on that date.");
 });
+/** Swap a server field key (for example addOnEmployeeMonthlyGbp) for the label the owner sees. */
+function friendlyError(msg: string): string {
+  const out = msg.replace(/\b([a-z]+[A-Z][A-Za-z.]*)\b/g, (key) => {
+    const el = form.querySelector<HTMLElement>(`[data-k="${CSS.escape(key)}"]`);
+    return el?.getAttribute("aria-label") ?? el?.closest("tr, .field")?.querySelector("label, b")?.textContent?.trim() ?? key;
+  });
+  return out.charAt(0).toUpperCase() + out.slice(1);
+}
 form.addEventListener("submit", async (e) => {
   e.preventDefault();
   if (!edits.size) return;
   const dated = $<HTMLSelectElement>("pr-when").value === "date";
   const date = $<HTMLInputElement>("pr-date").value;
   if (dated && !date) { toast("Pick the start date"); $("pr-date").focus(); return; }
+  // Check numbers here, so the owner sees which field is wrong instead of a server key name.
+  const bad = Array.from(form.querySelectorAll<HTMLInputElement>("input[type=number][data-k]")).filter((i) => edits.has(i.dataset.k!)).find((i) => i.value.trim() === "" || !Number.isFinite(Number(i.value)) || Number(i.value) < 0 || Number(i.value) > 10_000);
+  form.querySelectorAll("[aria-invalid]").forEach((i) => i.removeAttribute("aria-invalid"));
+  if (bad) { bad.setAttribute("aria-invalid", "true"); bad.focus(); toast(`${bad.getAttribute("aria-label") ?? "This value"}: enter a number from 0 to 10,000`); return; }
   const body = { ...changeSet(), ...(dated ? { effectiveFrom: `${date}T00:00:00Z` } : {}), note: $<HTMLInputElement>("pr-note").value.trim() };
   if (!live) { toast("Example data: connect the API to save prices."); return; }
   $<HTMLButtonElement>("pr-save").disabled = true;
   const r = await api<Book & { error?: string }>("/owner/prices/changes", { body });
-  if (!r.ok || !r.data) { $<HTMLButtonElement>("pr-save").disabled = false; toast(r.data?.error ? `${r.data.error[0]!.toUpperCase()}${r.data.error.slice(1)}` : "Could not save. Try again."); return; }
+  if (!r.ok || !r.data) { $<HTMLButtonElement>("pr-save").disabled = false; toast(r.data?.error ? friendlyError(r.data.error) : "Could not save. Try again."); return; }
   book = r.data; $<HTMLInputElement>("pr-note").value = "";
   renderAll();
   toast(dated ? `Saved. The change starts on ${date}.` : "Saved. New quotes and trials use these prices now.");

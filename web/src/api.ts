@@ -1,6 +1,18 @@
-// Thin client for the MAIZ agents API. Every call fails soft: when the API is not running,
+// Thin client for the MAIZ Agents API. Every call fails soft: when the API is not running,
 // the pages keep working as a demo.
-const TOKEN_KEY = "vn.token";
+const TOKEN_KEY = "maiz.token";
+
+/** One-time move of browser keys saved under the old "vn." prefix, so people stay signed in after the rename. */
+(function migrateOldKeys(): void {
+  try {
+    for (const name of ["token", "profile", "setup", "obStep"]) {
+      const old = localStorage.getItem("vn." + name);
+      if (old === null) continue;
+      if (localStorage.getItem("maiz." + name) === null) localStorage.setItem("maiz." + name, old);
+      localStorage.removeItem("vn." + name);
+    }
+  } catch { /* storage blocked: nothing to move */ }
+})();
 export const getToken = (): string | null => { try { return localStorage.getItem(TOKEN_KEY); } catch { return null; } };
 export const setToken = (t: string): void => { try { localStorage.setItem(TOKEN_KEY, t); } catch { /* ignore */ } };
 
@@ -23,6 +35,9 @@ export async function api<T = any>(path: string, init: { method?: string; body?:
       headers: { "content-type": "application/json", ...(token ? { authorization: `Bearer ${token}` } : {}) },
       body: init.body !== undefined ? JSON.stringify(init.body) : undefined,
     });
+    // The server renews an active login (sliding 7 days, up to 30 days after the last email link).
+    const fresh = res.headers.get("x-session-token");
+    if (fresh && token) setToken(fresh);
     const data = res.headers.get("content-type")?.includes("json") ? await res.json() : undefined;
     // A 401 on a call that carried a login means the session ended.
     if (res.status === 401 && token) onSessionEnded();

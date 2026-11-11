@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "MAIZ agents website: marketing landing page, onboarding and control center.",
+  "description": "MAIZ Agents website: marketing landing page, onboarding and control center.",
   "scripts": {
     "dev": "vite --host 0.0.0.0",
     "build": "tsc --noEmit && vite build",

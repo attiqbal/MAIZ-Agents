@@ -3,47 +3,49 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Control center · MAIZ agents</title>
+<title>Control centre · MAIZ Agents</title>
 <meta name="robots" content="noindex">
-<meta name="theme-color" content="#0b0c0e">
+<meta name="theme-color" content="#ffffff">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@500;600&family=Inter:wght@300;400;500;600&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400&family=Inter:wght@400;500;600&display=swap">
 </head>
 <body>
+<a class="skip-link" href="#main" id="skip-main">Skip to content</a>
 <div class="app" id="app">
   <aside class="rail" id="rail" aria-label="Sidebar">
-    <a class="logo" href="/"><svg viewBox="0 0 32 32" aria-hidden="true"><defs><linearGradient id="lg" x1="0" x2="1" y1="0" y2="1"><stop offset="0" stop-color="#625fff"/><stop offset="1" stop-color="#ff7dda"/></linearGradient></defs><rect width="32" height="32" rx="8" fill="#0e111b" stroke="#24375a"/><path d="M8 23V10l8 9 8-9v13" fill="none" stroke="url(#lg)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>MAIZ agents</a>
+    <a class="logo" href="/"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M6 0H32V32H0V6A6 6 0 0 1 6 0Z" fill="#202020"/><path d="M8 23V10l8 9 8-9v13" fill="none" stroke="#ffffff" stroke-width="2.6" stroke-linecap="square" stroke-linejoin="miter"/><rect x="22.5" y="5" width="4" height="4" fill="#ff682c"/></svg>MAIZ Agents</a>
     <div class="rail-org"><span class="av av-sm av-me" id="org-av">KC</span><span id="org-name">Kestrel Coffee</span></div>
-    <nav class="rail-nav" aria-label="Control center">
+    <nav class="rail-nav" aria-label="Control centre">
     <a class="ni" href="#home" data-nav="home"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>Overview</a>
     <a class="ni" href="#approvals" data-nav="approvals"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>Approvals<span class="count" id="appr-count">3</span></a>
     <a class="ni" href="#work" data-nav="work"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="5" height="16" rx="1.5"/><rect x="10" y="4" width="5" height="10" rx="1.5"/><rect x="17" y="4" width="4" height="13" rx="1.5"/></svg>Tasks and consultants</a>
     <div class="group" id="g-team">Team</div>
     <a class="ni" href="#team" data-nav="team"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.3 2.7-5.5 6-5.5s6 2.200 6 5.5"/><path d="M16 5.5a3 3 0 010 5.5M18 14.7c1.800.7 3 2.400 3 5.3"/></svg>Team</a>
     <a class="ni" href="#usage" data-nav="usage"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 2L4 14h7l-1 8 9-12h-7z"/></svg>Energy and spend</a>
-    <a class="ni" href="/employees.html#store"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8l2-4h12l2 4M4 8v11h16V8M4 8h16M9 12h6"/></svg>Hire from the store</a>
+    <a class="ni" href="#store" data-nav="store"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8l2-4h12l2 4M4 8v11h16V8M4 8h16M9 12h6"/></svg>Hire from the store</a>
     <div class="group">Business</div>
     <a class="ni" href="#finance" data-nav="finance"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19V9M10 19V5M16 19v-7M22 19H2"/></svg>Finance desk</a>
+    <a class="ni" href="#people" data-nav="people"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="3" width="16" height="18" rx="2.5"/><circle cx="12" cy="10" r="2.6"/><path d="M7.5 17.5c.8-2 2.500-3 4.500-3s3.700 1 4.500 3"/></svg>HR desk<span class="count" id="hr-count" hidden></span></a>
     <a class="ni" href="#compliance" data-nav="compliance"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="5" width="16" height="15" rx="2.5"/><path d="M4 10h16M8 3v4M16 3v4M9 15l2 2 4-4"/></svg>Compliance calendar</a>
     <a class="ni" href="#apps" data-nav="apps"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 7V3M15 7V3M7 7h10v4a5 5 0 01-10 0zM12 16v5"/></svg>Apps<span class="count" id="slack-state">Slack off</span></a>
     <div class="group">Account</div>
     <a class="ni" href="#setup" data-nav="setup"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h16v11H9l-5 4z"/></svg>Setup<span class="count" id="setup-badge">1</span></a>
     <a class="ni" href="#settings" data-nav="settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M18.4 5.6l-2.1 2.100M7.7 16.3l-2.1 2.1"/></svg>Settings</a>
     </nav>
-    <div class="trial"><b>Trial: 5 days left</b><span class="muted">No card needed until day 7</span><div class="energy"><i style="width:29%"></i></div></div>
+    <div class="trial" id="trial-box"><b id="trial-left">Trial: 5 days left</b><span class="muted" id="trial-note">No card needed until day 7</span><div class="energy"><i id="trial-bar" style="width:29%"></i></div></div>
   </aside>
   <div class="scrim" id="scrim"></div>
 
-  <div class="main" role="main" id="main">
+  <div class="main" role="main" id="main" tabindex="-1">
     <div class="topbar">
       <button class="menu-btn" id="menu-btn" aria-label="Open menu"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
       <form class="ask" id="ask"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4-4"/></svg><input id="ask-in" placeholder="Ask your team anything…" aria-label="Ask your team"><span class="kbd hide-sm">/</span></form>
       <div class="right"><a class="status warn hide-sm" href="#approvals"><span class="dot"></span><span id="need-count">3 need you</span></a><a class="badge badge-dark mono hide-sm" href="#usage">Wallet £0.00</a><button class="av av-sm av-me" id="me-av" aria-label="Account and settings" title="Account and settings" style="border:0;cursor:pointer">AI</button></div>
     </div>
 
-    <div id="demo-banner" class="demo-bar" hidden role="status"><span><b>Example business.</b> You are exploring the control center with sample data for Kestrel Coffee.</span><span class="demo-acts"><a class="btn btn-sm btn-primary" href="/onboarding.html">Start free trial</a><a class="btn btn-sm btn-ghost" href="/signin.html">Log in</a></span></div>
+    <div id="demo-banner" class="demo-bar" hidden role="status"><span><b>Example business.</b> You are exploring the control centre with sample data for Kestrel Coffee.</span><span class="demo-acts"><a class="btn btn-sm btn-primary" href="/onboarding.html">Start free trial</a><a class="btn btn-sm btn-ghost" href="/signin.html">Log in</a></span></div>
 
     <!-- HOME -->
     <div class="content" data-screen="home">
@@ -62,22 +64,22 @@
       <section class="panel" aria-labelledby="team-h">
         <div class="panel-h"><h2 id="team-h">Your team right now</h2><a class="r link" href="#team">Open team</a></div>
         <div class="team">
-          <div class="ecard"><div class="who"><span class="av av-tl">AM</span><div><b>Admin manager</b><span>Free</span></div></div><span class="status good live"><span class="dot"></span>Working</span><div class="doing">Waiting for your setup form, then writing your 5 pm briefing</div><div class="e-lab"><span>Uses no energy</span></div></div>
-          <div class="ecard"><div class="who"><span class="av av-fm">FM</span><div><b>Finance manager</b><span>Standard</span></div></div><span class="status warn"><span class="dot"></span>Waiting on you</span><div class="doing">October P&amp;L, needs your VAT answer</div><div><div class="e-lab"><span>Energy</span><span>72 / 100</span></div><div class="energy" style="margin-top:6px"><i style="width:72%"></i></div></div></div>
-          <div class="ecard"><div class="who"><span class="av av-mm">MM</span><div><b>Marketing manager</b><span>Standard</span></div></div><span class="status good live"><span class="dot"></span>Working</span><div class="doing">Drafting the November email to subscribers</div><div><div class="e-lab"><span>Energy</span><span>21 / 100</span></div><div class="energy low" style="margin-top:6px"><i style="width:21%"></i></div></div></div>
-          <div class="ecard"><div class="who"><span class="av av-bc">BC</span><div><b>Business consultant</b><span>Standard</span></div></div><span class="status"><span class="dot"></span>Idle</span><div class="doing">Finished supplier cost check. Next: weekly review on Monday</div><div><div class="e-lab"><span>Energy</span><span>55 / 100</span></div><div class="energy" style="margin-top:6px"><i style="width:55%"></i></div></div></div>
-          <div class="ecard"><div class="who"><span class="av av-hr">HR</span><div><b>HR manager</b><span>Standard</span></div></div><span class="status good live"><span class="dot"></span>Working</span><div class="doing">Drafting your people basics checklist</div><div><div class="e-lab"><span>Energy</span><span>88 / 100</span></div><div class="energy" style="margin-top:6px"><i style="width:88%"></i></div></div></div>
-          <div class="ecard"><div class="who"><span class="av av-cm">CM</span><div><b>Compliance manager</b><span>Pro</span></div></div><span class="status good live"><span class="dot"></span>Working</span><div class="doing">Building your compliance register</div><div><div class="e-lab"><span>Energy</span><span>64 / 100</span></div><div class="energy" style="margin-top:6px"><i style="width:64%"></i></div></div></div>
+          <div class="ecard"><div class="who"><span class="av av-tl">AM</span><div><b><a class="desk-a" href="#desk/admin-manager">Admin manager</a></b><span>Free</span></div></div><span class="status good live"><span class="dot"></span>Working</span><div class="doing">Waiting for your setup form, then writing your 5 pm briefing</div><div class="e-lab"><span>Uses no energy</span></div></div>
+          <div class="ecard"><div class="who"><span class="av av-fm">FM</span><div><b><a class="desk-a" href="#desk/finance-manager">Finance manager</a></b><span>In your team package</span></div></div><span class="status warn"><span class="dot"></span>Waiting on you</span><div class="doing">October P&amp;L, needs your VAT answer</div><div><div class="e-lab"><span>Share of this week's energy</span><span>11%</span></div><div class="energy" style="margin-top:6px"><i style="width:11%"></i></div></div></div>
+          <div class="ecard"><div class="who"><span class="av av-mm">MM</span><div><b><a class="desk-a" href="#desk/marketing-manager">Marketing manager</a></b><span>In your team package</span></div></div><span class="status good live"><span class="dot"></span>Working</span><div class="doing">Drafting the November email to subscribers</div><div><div class="e-lab"><span>Share of this week's energy</span><span>22%</span></div><div class="energy" style="margin-top:6px"><i style="width:22%"></i></div></div></div>
+          <div class="ecard"><div class="who"><span class="av av-bc">BC</span><div><b><a class="desk-a" href="#desk/business-consultant">Business consultant</a></b><span>In your team package</span></div></div><span class="status"><span class="dot"></span>Idle</span><div class="doing">Finished supplier cost check. Next: weekly review on Monday</div><div><div class="e-lab"><span>Share of this week's energy</span><span>14%</span></div><div class="energy" style="margin-top:6px"><i style="width:14%"></i></div></div></div>
+          <div class="ecard"><div class="who"><span class="av av-hr">HR</span><div><b><a class="desk-a" href="#desk/hr-manager">HR manager</a></b><span>In your team package</span></div></div><span class="status good live"><span class="dot"></span>Working</span><div class="doing">Drafting your people basics checklist</div><div><div class="e-lab"><span>Share of this week's energy</span><span>5%</span></div><div class="energy" style="margin-top:6px"><i style="width:5%"></i></div></div></div>
+          <div class="ecard"><div class="who"><span class="av av-cm">CM</span><div><b><a class="desk-a" href="#desk/compliance-manager">Compliance manager</a></b><span>In your team package</span></div></div><span class="status good live"><span class="dot"></span>Working</span><div class="doing">Building your compliance register</div><div><div class="e-lab"><span>Share of this week's energy</span><span>10%</span></div><div class="energy" style="margin-top:6px"><i style="width:10%"></i></div></div></div>
         </div>
       </section>
 
       <div class="grid2">
-        <section class="panel" aria-labelledby="pulse-h">
+        <section class="panel" aria-labelledby="pulse-h" data-example>
           <div class="panel-h"><h2 id="pulse-h">Business pulse</h2><a class="r link" href="#finance">Open Finance desk</a></div>
           <div class="grid3">
-            <div class="kpi"><span class="l">Cash in bank</span><span class="v">£18,420</span><span class="dl">Runway 7.5 months</span><svg class="spark" viewBox="0 0 120 36" preserveAspectRatio="none" aria-hidden="true"><path d="M0 22 L20 20 L40 24 L60 18 L80 16 L100 19 L120 14" fill="none" stroke="#85a6e9" stroke-width="2" vector-effect="non-scaling-stroke"/></svg></div>
-            <div class="kpi"><span class="l">Revenue this month</span><span class="v">£6,210</span><span class="dl up">+9% vs last month</span><svg class="spark" viewBox="0 0 120 36" preserveAspectRatio="none" aria-hidden="true"><path d="M0 28 L20 26 L40 24 L60 25 L80 18 L100 15 L120 10" fill="none" stroke="#4ade9a" stroke-width="2" vector-effect="non-scaling-stroke"/></svg></div>
-            <div class="kpi"><span class="l">Active customers</span><span class="v">412</span><span class="dl up">+23 this month</span><svg class="spark" viewBox="0 0 120 36" preserveAspectRatio="none" aria-hidden="true"><path d="M0 26 L20 25 L40 22 L60 22 L80 19 L100 16 L120 13" fill="none" stroke="#625fff" stroke-width="2" vector-effect="non-scaling-stroke"/></svg></div>
+            <div class="kpi"><span class="l">Cash in bank</span><span class="v">£18,420</span><span class="dl">Runway 7.5 months</span><svg class="spark" viewBox="0 0 120 36" preserveAspectRatio="none" aria-hidden="true"><path d="M0 22 L20 20 L40 24 L60 18 L80 16 L100 19 L120 14" fill="none" stroke="#202020" stroke-width="2" vector-effect="non-scaling-stroke"/></svg></div>
+            <div class="kpi"><span class="l">Revenue this month</span><span class="v">£6,210</span><span class="dl up">+9% vs last month</span><svg class="spark" viewBox="0 0 120 36" preserveAspectRatio="none" aria-hidden="true"><path d="M0 28 L20 26 L40 24 L60 25 L80 18 L100 15 L120 10" fill="none" stroke="#ff682c" stroke-width="2" vector-effect="non-scaling-stroke"/></svg></div>
+            <div class="kpi"><span class="l">Active customers</span><span class="v">412</span><span class="dl up">+23 this month</span><svg class="spark" viewBox="0 0 120 36" preserveAspectRatio="none" aria-hidden="true"><path d="M0 26 L20 25 L40 22 L60 22 L80 19 L100 16 L120 13" fill="none" stroke="#816729" stroke-width="2" vector-effect="non-scaling-stroke"/></svg></div>
           </div>
           <div class="panel-h" style="margin-top:4px"><h2>Activity today</h2><a class="r link" href="#work">Open tasks</a></div>
           <ul class="feed">
@@ -89,16 +91,18 @@
           </ul>
         </section>
         <div class="stack">
-          <section class="panel"><div class="panel-h"><h2>Today's briefing</h2><span class="r">Admin manager · 9:00</span></div>
+          <section class="panel" data-example><div class="panel-h"><h2>Today's briefing</h2><span class="r">Admin manager · 9:00</span></div>
             <ul class="brief"><li>Growth is on track for the 3-month goal.</li><li>Packaging costs jumped. Options are ready.</li><li>October books close once VAT is answered.</li></ul></section>
-          <section class="panel"><div class="panel-h"><h2>Energy today</h2><a class="r link" href="#usage">200 of 500 used</a></div>
-            <div class="ubar"><span>Finance</span><div class="energy"><i style="width:28%"></i></div><span class="mono">28</span></div>
-            <div class="ubar"><span>Marketing</span><div class="energy low"><i style="width:79%"></i></div><span class="mono">79</span></div>
-            <div class="ubar"><span>Consultant</span><div class="energy"><i style="width:45%"></i></div><span class="mono">45</span></div>
-            <div class="ubar"><span>HR</span><div class="energy"><i style="width:12%"></i></div><span class="mono">12</span></div>
-            <div class="ubar"><span>Compliance</span><div class="energy"><i style="width:36%"></i></div><span class="mono">36</span></div>
-            <p class="small muted">Marketing will run low by about 4 pm. Energy refills at midnight, your time.</p></section>
-          <section class="panel"><div class="panel-h"><h2>Coming up</h2><a class="r link" href="#compliance">Compliance calendar</a></div>
+          <section class="panel" data-example><div class="panel-h"><h2>Energy this week</h2><a class="r link" href="#usage">62% of 8,000 used</a></div>
+            <div class="ubar"><span>Finance</span><div class="energy"><i style="width:11%"></i></div><span class="mono">11%</span></div>
+            <div class="ubar"><span>Marketing</span><div class="energy"><i style="width:22%"></i></div><span class="mono">22%</span></div>
+            <div class="ubar"><span>Consultant</span><div class="energy"><i style="width:14%"></i></div><span class="mono">14%</span></div>
+            <div class="ubar"><span>HR</span><div class="energy"><i style="width:5%"></i></div><span class="mono">5%</span></div>
+            <div class="ubar"><span>Compliance</span><div class="energy"><i style="width:10%"></i></div><span class="mono">10%</span></div>
+            <p class="small muted">Shares of the team's weekly energy. It refills on Monday; urgent work is never held back.</p></section>
+          <section class="panel" aria-labelledby="ovp-h"><div class="panel-h"><h2 id="ovp-h">People today</h2><a class="r link" href="#people">Open HR desk</a></div>
+            <div id="ov-people"></div></section>
+          <section class="panel" data-example><div class="panel-h"><h2>Coming up</h2><a class="r link" href="#compliance">Compliance calendar</a></div>
             <ul class="brief" id="ov-next"></ul></section>
         </div>
       </div>
@@ -143,7 +147,7 @@
         </form></section>
       <div class="chips" id="task-filter" role="group" aria-label="Show tasks by employee"></div>
       <div class="kan" id="kan" tabindex="0" role="region" aria-label="Task board, scrolls sideways on small screens"></div>
-      <section class="panel" aria-labelledby="cons-h"><div class="panel-h"><h2 id="cons-h">Consultants on a pass</h2><a class="r link" href="/employees.html#store">Browse consultants</a></div>
+      <section class="panel" aria-labelledby="cons-h"><div class="panel-h"><h2 id="cons-h">Consultants on a pass</h2><a class="r link" href="#store">Browse consultants</a></div>
         <p class="muted small">A consultant joins for 7 or 30 days, paid once, to finish a defined piece of work. None is working for you right now. This is how a pass is tracked once you hire one:</p>
         <div class="tbl-wrap" tabindex="0" role="region" aria-label="Consultant pass preview"><table class="tbl" id="cons-table"></table></div>
         <p class="xs muted">You are told at 80% of the included energy, and nothing extra is charged without your approval.</p></section>
@@ -163,32 +167,26 @@
 
     <!-- TEAM -->
     <div class="content" data-screen="team" hidden>
-      <div class="page-h"><div><h1>Team</h1><p>Who is working, what on, and how much of the team energy is left.</p></div><span class="badge badge-dark eg">Example data</span><a class="btn btn-primary btn-sm" href="/employees.html#store">Hire from the store</a></div>
+      <div class="page-h"><div><h1>Team</h1><p>Who is working, what on, and how much of the team energy is left.</p></div><span class="badge badge-dark eg">Example data</span><a class="btn btn-primary btn-sm" href="#store">Hire from the store</a></div>
       <div class="kpis kpis-4" id="team-kpis"></div>
       <section class="panel" aria-labelledby="ts-h"><div class="panel-h"><h2 id="ts-h">Employee status</h2><span class="r">This week</span></div>
         <div class="tbl-wrap" tabindex="0" role="region" aria-label="Employee status table"><table class="tbl" id="team-table"></table></div></section>
-      <section class="panel"><div class="panel-h"><h2>Org chart</h2><span class="r">Notes show who hands work to whom</span></div>
+      <section class="panel" data-example><div class="panel-h"><h2>Org chart</h2><span class="r">Notes show who hands work to whom</span></div>
         <div class="org" tabindex="0" role="region" aria-label="Org chart, scrolls sideways">
           <div class="onode"><div class="who"><span class="av av-me" id="owner-av">AI</span><div><b id="owner-name">You</b><span class="s">Owner</span></div></div></div>
           <div class="vline"></div>
-          <div class="onode"><div class="who"><span class="av av-tl">AM</span><div><b>Admin manager</b><span class="s">Sets up the team, routes work, daily briefing</span></div></div></div>
+          <div class="onode"><div class="who"><span class="av av-tl">AM</span><div><b><a class="desk-a" href="#desk/admin-manager">Admin manager</a></b><span class="s">Sets up the team, routes work, daily briefing</span></div></div></div>
           <div class="orow">
-            <div class="ocol"><div class="onode"><div class="who"><span class="av av-fm">FM</span><div><b>Finance manager</b><span class="s">Standard · 1 workstream</span></div></div><div class="energy"><i style="width:72%"></i></div><span class="xs muted">receives: cost options</span></div></div>
-            <div class="ocol"><div class="onode"><div class="who"><span class="av av-mm">MM</span><div><b>Marketing manager</b><span class="s">Standard · 2 workstreams</span></div></div><div class="energy low"><i style="width:21%"></i></div><span class="xs muted">receives: spend advice</span></div></div>
-            <div class="ocol"><div class="onode"><div class="who"><span class="av av-bc">BC</span><div><b>Business consultant</b><span class="s">Standard · 1 workstream</span></div></div><div class="energy"><i style="width:55%"></i></div><span class="xs muted">sends to: Finance, Marketing</span></div></div>
-            <div class="ocol"><div class="onode"><div class="who"><span class="av av-hr">HR</span><div><b>HR manager</b><span class="s">Standard · 1 workstream</span></div></div><div class="energy"><i style="width:88%"></i></div><span class="xs muted">receives: hiring budget</span></div></div>
-            <div class="ocol"><div class="onode"><div class="who"><span class="av av-cm">CM</span><div><b>Compliance manager</b><span class="s">Pro · 1 workstream</span></div></div><div class="energy"><i style="width:64%"></i></div><span class="xs muted">reviews: everyone's drafts</span></div></div>
+            <div class="ocol"><div class="onode"><div class="who"><span class="av av-fm">FM</span><div><b><a class="desk-a" href="#desk/finance-manager">Finance manager</a></b><span class="s">1 workstream</span></div></div><div class="energy"><i style="width:72%"></i></div><span class="xs muted">receives: cost options</span></div></div>
+            <div class="ocol"><div class="onode"><div class="who"><span class="av av-mm">MM</span><div><b><a class="desk-a" href="#desk/marketing-manager">Marketing manager</a></b><span class="s">2 workstreams</span></div></div><div class="energy low"><i style="width:21%"></i></div><span class="xs muted">receives: spend advice</span></div></div>
+            <div class="ocol"><div class="onode"><div class="who"><span class="av av-bc">BC</span><div><b><a class="desk-a" href="#desk/business-consultant">Business consultant</a></b><span class="s">1 workstream</span></div></div><div class="energy"><i style="width:55%"></i></div><span class="xs muted">sends to: Finance, Marketing</span></div></div>
+            <div class="ocol"><div class="onode"><div class="who"><span class="av av-hr">HR</span><div><b><a class="desk-a" href="#desk/hr-manager">HR manager</a></b><span class="s">1 workstream</span></div></div><div class="energy"><i style="width:88%"></i></div><span class="xs muted">receives: hiring budget</span></div></div>
+            <div class="ocol"><div class="onode"><div class="who"><span class="av av-cm">CM</span><div><b><a class="desk-a" href="#desk/compliance-manager">Compliance manager</a></b><span class="s">1 workstream</span></div></div><div class="energy"><i style="width:64%"></i></div><span class="xs muted">reviews: everyone's drafts</span></div></div>
             <div class="ocol"><a class="onode add" href="/employees.html#blueprint"><b>+ Add a specialist</b><span class="s">Bookkeeper, SEO specialist, recruiter…</span></a></div>
           </div>
         </div></section>
-      <div class="grid2">
-        <section class="panel"><div class="panel-h"><h2>Marketing manager · this week</h2></div>
-          <div class="grid3"><div class="kpi"><span class="l">Tasks done</span><span class="v">11</span></div><div class="kpi"><span class="l">Accepted first time</span><span class="v">82%</span></div><div class="kpi"><span class="l">Energy used</span><span class="v">344</span></div></div>
-          <p class="small muted">Workstreams: Social posts, Subscriber emails. Ideas brought unasked: 2.</p></section>
-        <section class="panel"><div class="panel-h"><h2>Tune this employee</h2></div>
-          <div class="field"><span class="label">Skill level</span><div class="chips" id="skill"><button class="chip" aria-pressed="true">Standard</button><button class="chip" aria-pressed="false">Pro</button><button class="chip" aria-pressed="false">Expert</button></div></div>
-          <div class="kpi"><span class="l">Daily energy · price after trial</span><span class="v" id="skill-out">100 · £12.30/mo</span></div></section>
-      </div>
+      <section class="panel" aria-labelledby="dl-h"><div class="panel-h"><h2 id="dl-h">Each employee's dashboard</h2><span class="r">Same layout for everyone: what it needs from you, its numbers, its work</span></div>
+        <div class="desk-links"><a class="desk-link" href="#desk/admin-manager"><span class="av av-sm av-tl" aria-hidden="true">AM</span><span><b>Admin manager</b><span class="small muted block">Setup, routing and your daily briefing</span></span></a><a class="desk-link" href="#desk/finance-manager"><span class="av av-sm av-fm" aria-hidden="true">FM</span><span><b>Finance manager</b><span class="small muted block">Cash, profit and bills</span></span></a><a class="desk-link" href="#desk/marketing-manager"><span class="av av-sm av-mm" aria-hidden="true">MM</span><span><b>Marketing manager</b><span class="small muted block">Content calendar and results</span></span></a><a class="desk-link" href="#desk/business-consultant"><span class="av av-sm av-bc" aria-hidden="true">BC</span><span><b>Business consultant</b><span class="small muted block">Savings and growth ideas</span></span></a><a class="desk-link" href="#desk/hr-manager"><span class="av av-sm av-hr" aria-hidden="true">HR</span><span><b>HR manager</b><span class="small muted block">Staff records and the HR desk</span></span></a><a class="desk-link" href="#desk/compliance-manager"><span class="av av-sm av-cm" aria-hidden="true">CM</span><span><b>Compliance manager</b><span class="small muted block">Filings, licences and rules</span></span></a><a class="desk-link" href="#desk/growth-consultant"><span class="av av-sm av-bc" aria-hidden="true">GC</span><span><b>Growth consultant</b><span class="small muted block">On a 7-day pass</span></span></a></div></section>
       <section class="panel" aria-labelledby="rd-h"><div class="panel-h"><h2 id="rd-h">Need a role that isn't here?</h2><a class="r link" href="/employees.html#blueprint">See every ready role</a></div>
         <p class="muted small">Describe the job. Your Admin manager designs a specialist and drafts the job description, then MAIZ checks it and confirms the price. You decide whether to hire it once it is approved. Nothing is trained or charged before that.</p>
         <form class="rd-form" id="rd-form" novalidate>
@@ -283,6 +281,48 @@
       </dialog>
     </div>
 
+    <!-- HR DESK -->
+    <div class="content" data-screen="people" hidden>
+      <div class="page-h"><div><h1>HR desk</h1><p>Every member of your staff, the documents they need and what to do next. Your HR manager keeps watch and tells you before anything runs out.</p></div><span class="badge badge-dark eg">Example data</span><button type="button" class="btn btn-primary btn-sm" id="hr-add-btn">Add a person</button></div>
+      <p class="hr-locked panel" id="hr-locked" hidden>Staff records hold personal details, so only the owner and admins of this business can open the HR desk. Ask the owner for admin access.</p>
+      <div id="hr-body" class="hr-body">
+        <div class="hr-sector small"><span id="hr-sector"></span><div class="chips" id="hr-sector-pick" role="group" aria-label="Choose your sector" hidden></div></div>
+        <div class="kpis kpis-4" id="hr-kpis" aria-label="Staff at a glance"></div>
+        <section class="panel" aria-labelledby="hr-act-h"><div class="panel-h"><h2 id="hr-act-h">What needs doing</h2><span class="r" id="hr-actions-note"></span></div>
+          <ul class="hr-actions" id="hr-actions"></ul>
+          <button type="button" class="btn btn-quiet btn-sm hr-more" id="hr-actions-more" hidden></button></section>
+        <section class="panel" aria-labelledby="hr-staff-h"><div class="panel-h"><h2 id="hr-staff-h">Staff</h2>
+            <div class="r hr-tools"><label class="sr-only" for="hr-search">Search staff</label><input class="input" id="hr-search" type="search" placeholder="Search by name or job" autocomplete="off" maxlength="60"></div></div>
+          <div class="chips" id="hr-filter" role="group" aria-label="Show staff"><button type="button" class="chip" data-filter="all" aria-pressed="true">Everyone</button><button type="button" class="chip" data-filter="attention" aria-pressed="false">Needs attention</button><button type="button" class="chip" data-filter="starting" aria-pressed="false">Starting soon</button><button type="button" class="chip" data-filter="leaving" aria-pressed="false">Leaving and left</button></div>
+          <div class="tbl-wrap" tabindex="0" role="region" aria-label="Staff list"><table class="tbl" id="hr-table"></table></div></section>
+      </div>
+      <dialog class="apps-dialog card hr-dialog" id="hr-person" aria-labelledby="hr-p-name">
+        <div class="hr-p-head"><div><h2 id="hr-p-name">Staff record</h2><p class="small muted" id="hr-p-meta"></p></div><button type="button" class="btn btn-quiet btn-sm" id="hr-p-close">Close</button></div>
+        <div class="hr-tabs" id="hr-tabs" role="tablist" aria-label="Staff record sections"></div>
+        <div class="hr-panel" id="hr-panel" role="tabpanel" tabindex="0"></div>
+      </dialog>
+      <dialog class="apps-dialog card" id="hr-add" aria-labelledby="hr-add-h">
+        <form id="hr-add-form" novalidate>
+          <h2 id="hr-add-h">Add a person</h2>
+          <p class="small muted">Five answers. Your HR manager works out which documents they need and asks for the rest when it is needed.</p>
+          <div class="field"><label for="hr-a-name">Full name</label><input class="input" id="hr-a-name" maxlength="120" autocomplete="off" required></div>
+          <div class="field"><label for="hr-a-job">Job title</label><input class="input" id="hr-a-job" maxlength="120" placeholder="For example: Barista" autocomplete="off" required></div>
+          <div class="field"><label for="hr-a-start">First day</label><input class="input" id="hr-a-start" type="date" required></div>
+          <div class="field"><label for="hr-a-contract">Contract</label><select class="input" id="hr-a-contract"><option value="full_time">Full time</option><option value="part_time">Part time</option><option value="zero_hours">Zero hours</option><option value="fixed_term">Fixed term</option><option value="casual">Casual</option><option value="apprentice">Apprentice</option></select></div>
+          <div class="field"><label for="hr-a-hours">Hours a week</label><input class="input" id="hr-a-hours" type="number" min="0" max="80" step="0.5" value="40" inputmode="decimal" required></div>
+          <p class="small status crit" id="hr-a-err" role="alert"></p>
+          <div class="acts"><button class="btn btn-primary btn-sm" type="submit">Add and see what to collect</button><button class="btn btn-ghost btn-sm" type="button" id="hr-a-cancel">Cancel</button></div>
+        </form>
+      </dialog>
+    </div>
+
+    <!-- ONE EMPLOYEE'S DASHBOARD -->
+    <div class="content" data-screen="desk" hidden>
+      <div class="page-h"><div><h1 id="desk-title">Employee dashboard</h1><p id="desk-sub">What this employee is doing, what it needs from you, and its numbers.</p></div><span class="badge badge-dark eg">Example data</span><a class="btn btn-ghost btn-sm" href="#team">All employees</a></div>
+      <div class="chips" id="desk-pick" role="group" aria-label="Choose an employee"></div>
+      <div id="desk-body" class="desk-body"></div>
+    </div>
+
     <!-- SETTINGS -->
     <div class="content" data-screen="settings" hidden>
       <div class="page-h"><div><h1>Settings</h1><p>Your account and company details.</p></div></div>
@@ -305,7 +345,7 @@
     <div class="content" data-screen="usage" hidden>
       <div class="page-h"><div><h1>Energy and spend</h1><p>Energy is your team's weekly allowance, shown as a share of this week's energy. Redoing a task returns the energy it used.</p></div><span class="badge badge-dark eg">Example data</span></div>
       <div class="kpis kpis-4" id="usage-kpis"></div>
-      <section class="panel"><div class="panel-h"><h2>Energy used, last 7 days</h2><span class="r">This week: 62% of the team's energy used</span></div>
+      <section class="panel"><div class="panel-h"><h2>Energy used, last 7 days</h2><span class="r" id="usage-week-note">This week: 62% of the team's energy used</span></div>
         <svg class="bars" viewBox="0 0 700 180" role="img" aria-label="Stacked bars of energy used per day by employee. The table below gives the figures." id="bars"></svg>
         <div class="legend" id="bars-legend"></div></section>
       <section class="panel" aria-labelledby="ue-h"><div class="panel-h"><h2 id="ue-h">By employee</h2><span class="r">Prices apply after the trial</span></div>
@@ -322,6 +362,24 @@
           <div class="ubar ubar-2"><span>Auto-refill</span><span class="mono">Off</span></div>
           <p class="small muted">Payments are not open yet. Nothing is charged during the trial, and top-ups will only ever come from your wallet, up to your cap.</p></section>
       </div>
+    </div>
+    <div class="content" data-screen="store" hidden>
+      <div class="page-h"><div><h1>Hire from the store</h1><p>Add an employee or a specialist, billed monthly, or a consultant for 7 or 30 days, paid once. Each employee you add tops up the team energy.</p></div></div>
+      <div class="store">
+        <section class="panel store-pick" aria-label="Choose what to add">
+          <label class="label" for="store-pick">What do you want to add?</label>
+          <select id="store-pick" class="input"></select>
+          <div id="store-item" aria-live="polite"></div>
+        </section>
+        <aside class="panel store-cart" aria-labelledby="cart-h">
+          <div class="panel-h"><h2 id="cart-h">Your cart</h2></div>
+          <div id="cart-lines"></div>
+          <dl class="cart-totals" id="cart-totals"></dl>
+          <button class="btn btn-primary" id="cart-checkout" type="button">Checkout</button>
+          <p class="jd-note" id="cart-note" role="status"></p>
+        </aside>
+      </div>
+      <section class="panel task-rule" id="task-rule" aria-label="How consultant passes work"></section>
     </div>
   </div>
 </div>

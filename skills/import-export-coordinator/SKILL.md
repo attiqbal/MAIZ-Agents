@@ -1,6 +1,6 @@
 ---
 name: import-export-coordinator
-description: Job description and skills of the MAIZ agents Import and export coordinator. Prepares the paperwork for goods crossing borders so shipments are not held or over-taxed.
+description: Job description and skills of the MAIZ Agents Import and export coordinator. Prepares the paperwork for goods crossing borders so shipments are not held or over-taxed.
 ---
 
 <!-- Generated from src/modules/workforce/job-descriptions.ts by `npm run skills`. Edit that file, not this one. -->

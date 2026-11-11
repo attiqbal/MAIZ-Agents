@@ -1,6 +1,6 @@
 ---
 name: fundraising-manager
-description: Job description and skills of the MAIZ agents Fundraising and investor relations manager. Prepares the business to raise money and keeps lenders, investors and grant bodies informed.
+description: Job description and skills of the MAIZ Agents Fundraising and investor relations manager. Prepares the business to raise money and keeps lenders, investors and grant bodies informed.
 ---
 
 <!-- Generated from src/modules/workforce/job-descriptions.ts by `npm run skills`. Edit that file, not this one. -->

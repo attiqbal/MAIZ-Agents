@@ -28,8 +28,10 @@ export interface ProviderSim {
   /** Fail only the next n calls, then go back to ok. */
   failNext: number;
   failMode: Mode;
+  /** Fail every n-th call (0 = off) with failMode. */
+  failEvery: number;
 }
-const sim = (): ProviderSim => ({ mode: "ok", latencyMs: 0, calls: 0, failures: 0, reviewScore: 9, failNext: 0, failMode: "http500" });
+const sim = (): ProviderSim => ({ mode: "ok", latencyMs: 0, calls: 0, failures: 0, reviewScore: 9, failNext: 0, failMode: "http500", failEvery: 0 });
 
 const OUT_TEXT = "Here is the finished work for your business. It covers what you asked, step by step, with figures taken from your records and clear next actions for you to approve.";
 
@@ -54,6 +56,7 @@ export function fakeHttp(runpod: ProviderSim, claude: ProviderSim) {
     s.calls++;
     let mode = s.mode;
     if (s.failNext > 0) { s.failNext--; mode = s.failMode; }
+    if (s.failEvery > 0 && s.calls % s.failEvery === 0) mode = s.failMode;
     if (u.endsWith("/health")) return respond(200, { workers: { idle: 1 }, jobs: { inQueue: 0 } });
     if (mode === "hang") { s.failures++; await wait(10 * 60_000, init?.signal); }
     await wait(s.latencyMs, init?.signal);

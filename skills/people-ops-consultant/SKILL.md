@@ -1,6 +1,6 @@
 ---
 name: people-ops-consultant
-description: Job description and skills of the MAIZ agents People, policy and operations consultant. Sets up how the business runs: staff handbook, website legal pages, recruitment, procedures and events.
+description: Job description and skills of the MAIZ Agents People, policy and operations consultant. Sets up how the business runs: staff handbook, website legal pages, recruitment, procedures and events.
 ---
 
 <!-- Generated from src/modules/workforce/job-descriptions.ts by `npm run skills`. Edit that file, not this one. -->

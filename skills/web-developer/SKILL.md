@@ -1,6 +1,6 @@
 ---
 name: web-developer
-description: Job description and skills of the MAIZ agents Web and automation developer. Builds and fixes websites and landing pages, automates repeated work between your tools, and cleans up messy data.
+description: Job description and skills of the MAIZ Agents Web and automation developer. Builds and fixes websites and landing pages, automates repeated work between your tools, and cleans up messy data.
 ---
 
 <!-- Generated from src/modules/workforce/job-descriptions.ts by `npm run skills`. Edit that file, not this one. -->

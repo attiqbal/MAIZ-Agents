@@ -1,4 +1,4 @@
-# MAIZ agents: one container serves the website (web/dist) and the API (/api) on $PORT.
+# MAIZ Agents: one container serves the website (web/dist) and the API (/api) on $PORT.
 # Build:  docker build --build-arg SITE_URL=https://yourdomain.com -t maiz-agents .
 # Run:    docker run --env-file .env -p 8787:8787 maiz-agents
 

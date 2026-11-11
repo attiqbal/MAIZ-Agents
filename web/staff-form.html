@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+<head>
+<!--@include head title="Your details · MAIZ Agents" description="Tell your employer when you can work, your emergency contact and any certificates."-->
+<meta name="robots" content="noindex">
+<meta name="referrer" content="no-referrer">
+</head>
+<body class="sf-page">
+<header class="sf-top"><div class="container"><!--@include logo--></div></header>
+<main id="main">
+  <section class="section">
+    <div class="container sf-wrap">
+      <h1 id="sf-h" tabindex="-1">Your details</h1>
+      <p class="sub" id="sf-intro">Loading your form…</p>
+      <p class="sf-demo" id="sf-demo" hidden><b>Preview.</b> This is how the form looks to a member of staff. Nothing you type here is saved.</p>
+      <div class="ob-panel" id="sf-error" role="alert" hidden></div>
+      <div class="ob-panel sf-done" id="sf-done" tabindex="-1" hidden></div>
+      <form id="sf-form" class="sf-form" novalidate hidden>
+        <div id="sf-fields"></div>
+        <p class="err" id="sf-err" role="alert" hidden></p>
+        <div class="acts"><button type="submit" class="btn btn-primary" id="sf-save">Send my details</button></div>
+        <p class="hint">Only <span id="sf-biz-2">your employer</span> sees this. We never ask for ID, passport or bank details on this form.</p>
+      </form>
+    </div>
+  </section>
+</main>
+<script type="module" src="/src/staff-form.ts"></script>
+</body>
+</html>

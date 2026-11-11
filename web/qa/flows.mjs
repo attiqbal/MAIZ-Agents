@@ -20,7 +20,8 @@ const mk = async (opts = {}) => { const ctx = await b.newContext({ viewport: { w
       if (!seen.has(key)) {
         const r = await p.request.get(u.origin + u.pathname); let good = r.ok();
         if (good && u.hash && !u.pathname.startsWith("/app")) { const html = await r.text(); good = new RegExp(`id="${u.hash.slice(1)}"`).test(html); }
-        if (good && u.hash && u.pathname.startsWith("/app")) { const html = await r.text(); good = new RegExp(`data-screen="${u.hash.slice(1)}"`).test(html); }
+        if (good && u.hash && u.pathname.startsWith("/app") && u.hash !== "#main") { // #main is the skip link target, not a screen
+          const html = await r.text(); good = new RegExp(`data-screen="${u.hash.slice(1).split("/")[0]}"`).test(html); } // #desk/<key> opens one employee's dashboard on the desk screen
         seen.set(key, good);
       }
       if (!seen.get(key)) broken.push(pg + " -> " + h);
@@ -40,6 +41,11 @@ const mk = async (opts = {}) => { const ctx = await b.newContext({ viewport: { w
   await p.click("#biz-go"); ok("onboarding: no sector or name shows error", await p.isVisible("#biz-err"));
   await p.click('#sectors [data-v="food-drink"]'); await p.fill("#biz", "Example Bakery"); await p.selectOption("#country", "GB"); await p.click("#biz-go");
   ok("onboarding: needs are ticked for the sector", (await p.locator('#needs .chip[aria-pressed="true"]').count()) === 3);
+  await p.reload({ waitUntil: "networkidle" });
+  ok("onboarding: a refresh keeps your place (step 2)", await p.isVisible('[data-step="2"]'));
+  await p.goBack({ waitUntil: "networkidle" }).catch(() => {}); await p.waitForTimeout(200);
+  ok("onboarding: browser Back goes to the previous step", await p.isVisible('[data-step="1"]'), p.url());
+  await p.goForward({ waitUntil: "networkidle" }).catch(() => {}); await p.waitForTimeout(200);
   await p.click('#needs [data-v="stock"]'); await p.click("#needs-go");
   ok("onboarding: sector apps offered", await p.isVisible('#apps [data-v="square"]'));
   await p.click('#apps [data-v="square"]'); await p.click("#apps-go");
@@ -52,7 +58,7 @@ const mk = async (opts = {}) => { const ctx = await b.newContext({ viewport: { w
   await p.click('[data-step="5"] [data-next]');
   await p.waitForSelector("#open-app", { state: "visible", timeout: 8000 }).catch(() => {});
   await p.waitForTimeout(2500);
-  const token = await p.evaluate(() => localStorage.getItem("vn.token"));
+  const token = await p.evaluate(() => localStorage.getItem("maiz.token"));
   ok("onboarding: account created (login stored)", !!token);
   await p.click("#open-app"); await p.waitForURL(/app\.html/); await p.waitForTimeout(800);
   ok("app (signed in): shows the real business name", (await p.textContent("#org-name")) === "Example Bakery", await p.textContent("#org-name"));
@@ -61,10 +67,12 @@ const mk = async (opts = {}) => { const ctx = await b.newContext({ viewport: { w
   await p.fill("#ask-in", "finance: what is my runway?"); await p.press("#ask-in", "Enter");
   await p.waitForSelector("#answer", { timeout: 8000 }).catch(() => {});
   ok("app (signed in): ask bar returns an answer", await p.isVisible("#answer"));
-  for (const s of ["approvals", "work", "team", "usage", "finance", "compliance", "apps", "setup", "settings"]) {
+  for (const s of ["approvals", "work", "team", "usage", "store", "finance", "compliance", "apps", "setup", "settings"]) {
     await p.click(`.rail a[data-nav="${s}"]`); await p.waitForTimeout(150);
     ok(`app nav: ${s} screen opens`, await p.isVisible(`[data-screen="${s}"] h1`) && (await p.getAttribute(`.rail a[data-nav="${s}"]`, "aria-current")) === "page");
   }
+  await p.click('.rail a[data-nav="store"]'); await p.waitForTimeout(500);
+  ok("store (signed in): opens inside the control centre with the picker", p.url().includes("app.html#store") && (await p.locator("#store-pick option").count()) > 1);
   await p.click('.rail a[data-nav="apps"]'); await p.waitForTimeout(400);
   ok("apps (signed in): catalogue from API", (await p.locator("#apps-grid .app-card").count()) >= 5);
   await p.click('.rail a[data-nav="settings"]'); await p.click("[data-signout]"); await p.waitForURL(/signin/);
@@ -143,7 +151,7 @@ const mk = async (opts = {}) => { const ctx = await b.newContext({ viewport: { w
   await p.goto(B + "/signin.html"); await p.fill("#si-email", OWNER); await p.click("#si-go"); await p.waitForTimeout(500);
   const log = (await import("node:fs")).readFileSync(process.env.QA_SERVER_LOG ?? "", "utf8");
   const esc = OWNER.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const link = [...log.matchAll(new RegExp(`--- email to ${esc} ---\\nYour MAIZ agents sign-in link[^#]*#token=(\\S+)`, "g"))].at(-1)?.[1];
+  const link = [...log.matchAll(new RegExp(`--- email to ${esc} ---\\nYour MAIZ Agents sign-in link[^#]*#token=(\\S+)`, "g"))].at(-1)?.[1];
   ok("owner review: no dev shortcut for the owner, emailed link required", /Check your email/.test(await p.textContent("#si-h")) && !!link);
   await p.goto("about:blank"); await p.goto(B + "/signin.html#token=" + link); await p.waitForURL(/review\.html/, { timeout: 5000 }).catch(() => {});
   ok("owner review: platform owner lands on the review queue", p.url().includes("/review.html"), p.url());
@@ -175,7 +183,7 @@ const mk = async (opts = {}) => { const ctx = await b.newContext({ viewport: { w
   ok("owner prices: history records the change", (await p.textContent("#pr-history") ?? "").includes("QA price check"));
   await p.context().close();
   const c = await mk();
-  await c.goto(B + "/signin.html"); await c.evaluate((t) => localStorage.setItem("vn.token", t), client.token);
+  await c.goto(B + "/signin.html"); await c.evaluate((t) => localStorage.setItem("maiz.token", t), client.token);
   await c.goto(B + "/review.html"); await c.waitForTimeout(500);
   ok("owner review: a client opening the queue is turned away", /platform owner/.test(await c.textContent("#ow-gate-h")) && (await c.locator(".so-card").count()) === 0);
   await c.context().close();

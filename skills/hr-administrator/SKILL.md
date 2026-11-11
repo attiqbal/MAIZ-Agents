@@ -1,6 +1,6 @@
 ---
 name: hr-administrator
-description: Job description and skills of the MAIZ agents HR administrator. Keeps staff records, contracts and absence tracking accurate and up to date.
+description: Job description and skills of the MAIZ Agents HR administrator. Keeps staff records, contracts and absence tracking accurate and up to date.
 ---
 
 <!-- Generated from src/modules/workforce/job-descriptions.ts by `npm run skills`. Edit that file, not this one. -->

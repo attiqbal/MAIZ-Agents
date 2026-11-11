@@ -1,6 +1,6 @@
 ---
 name: project-manager
-description: Job description and skills of the MAIZ agents Project manager. Delivers projects on time, on budget and to scope.
+description: Job description and skills of the MAIZ Agents Project manager. Delivers projects on time, on budget and to scope.
 ---
 
 <!-- Generated from src/modules/workforce/job-descriptions.ts by `npm run skills`. Edit that file, not this one. -->

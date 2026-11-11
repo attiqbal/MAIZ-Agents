@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "MAIZ agents: a store of AI employees for people who know nothing about AI.",
+  "description": "MAIZ Agents: a store of AI employees for people who know nothing about AI.",
   "scripts": {
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
@@ -14,7 +14,8 @@
     "build": "npm run typecheck && cd web && npm run build",
     "start": "node --import tsx src/server/main.ts",
     "skills": "tsx scripts/build-skills.ts",
-    "stress": "rm -f test/stress/out/report.json && vitest run --config vitest.stress.config.ts"
+    "stress": "rm -f test/stress/out/report.json && vitest run --config vitest.stress.config.ts",
+    "stress:db": "bash db/with-postgres.sh npx vitest run --config vitest.stress.config.ts test/stress/postgres.stress.ts"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

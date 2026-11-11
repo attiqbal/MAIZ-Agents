@@ -1,6 +1,6 @@
 ---
 name: finance-manager
-description: Job description and skills of the MAIZ agents Finance manager. Own the company's books and cash so the owner always knows what the business has, owes, earns and can afford.
+description: Job description and skills of the MAIZ Agents Finance manager. Own the company's books and cash so the owner always knows what the business has, owes, earns and can afford.
 ---
 
 <!-- Generated from src/modules/workforce/job-descriptions.ts by `npm run skills`. Edit that file, not this one. -->

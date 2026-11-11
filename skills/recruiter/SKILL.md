@@ -1,6 +1,6 @@
 ---
 name: recruiter
-description: Job description and skills of the MAIZ agents Recruiter. Fills open roles quickly with the right people.
+description: Job description and skills of the MAIZ Agents Recruiter. Fills open roles quickly with the right people.
 ---
 
 <!-- Generated from src/modules/workforce/job-descriptions.ts by `npm run skills`. Edit that file, not this one. -->

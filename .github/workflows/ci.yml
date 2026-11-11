@@ -41,5 +41,5 @@ jobs:
         run: |
           docker run -d --name app -p 8787:8787 -e NODE_ENV=development maiz-agents
           for i in $(seq 1 30); do curl -fsS localhost:8787/api/health && break; sleep 1; done
-          curl -fsS localhost:8787/ | grep -q "MAIZ agents"
+          curl -fsS localhost:8787/ | grep -q "MAIZ Agents"
           docker logs app

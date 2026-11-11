@@ -1,4 +1,4 @@
-# MAIZ agents
+# MAIZ Agents
 
 A store of AI employees for people who know nothing about AI. Browse, try, hire, and get work done, like shopping online.
 

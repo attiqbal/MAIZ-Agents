@@ -4,6 +4,8 @@ import { initSetup } from "./setup";
 import { initApps } from "./apps";
 import { initDash } from "./dash";
 import { initRoleDesigner } from "./role-designer";
+import { initPeople, setPeopleBusiness } from "./people";
+import { initDesk, showDesk } from "./desk";
 import { api, getToken, clearSession, type Org } from "./api";
 import { JOB_DESCRIPTIONS, getJobDescription, jdHtml } from "./jd";
 
@@ -12,7 +14,7 @@ const app = $("app");
 
 // Profile from onboarding (falls back to the example business).
 let profile: { biz?: string; email?: string; slack?: boolean; contact?: string } = {};
-try { profile = JSON.parse(localStorage.getItem("vn.profile") ?? "{}"); } catch { /* ignore */ }
+try { profile = JSON.parse(localStorage.getItem("maiz.profile") ?? "{}"); } catch { /* ignore */ }
 const biz = profile.biz || "Kestrel Coffee";
 let orgName = biz;
 const initials = (s: string) => s.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]!.toUpperCase()).join("") || "MA";
@@ -29,21 +31,44 @@ if (profile.slack) $("slack-state").textContent = "Slack on";
 // Routing
 const screens = Array.from(document.querySelectorAll<HTMLElement>("[data-screen]"));
 function route(): void {
-  const key = location.hash.slice(1) || "home";
+  // "#desk/finance-manager" opens one employee's dashboard; every other hash is a screen.
+  const [key = "home", sub = ""] = (location.hash.slice(1) || "home").split("/");
   const valid = screens.some((s) => s.dataset.screen === key) ? key : "home";
+  if (valid === "desk") showDesk(sub);
   screens.forEach((s) => s.toggleAttribute("hidden", s.dataset.screen !== valid));
   document.querySelectorAll<HTMLAnchorElement>("[data-nav]").forEach((a) => {
-    if (a.dataset.nav === valid) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current");
+    if (a.dataset.nav === (valid === "desk" ? "team" : valid)) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current");
   });
-  app.classList.remove("menu-open");
-  const title = screens.find((x) => x.dataset.screen === valid)?.querySelector("h1")?.textContent ?? "Control center";
-  document.title = `${valid === "home" ? "Overview" : title} · ${orgName} · MAIZ agents`;
+  app.classList.remove("menu-open"); $("menu-btn").setAttribute("aria-expanded", "false");
+  const title = screens.find((x) => x.dataset.screen === valid)?.querySelector("h1")?.textContent ?? "Control centre";
+  document.title = `${valid === "home" ? "Overview" : title} · ${orgName} · MAIZ Agents`;
   window.scrollTo({ top: 0 });
 }
 window.addEventListener("hashchange", route);
+// The store opens inside the control centre, so hiring never leaves the app. Loaded on first visit.
+let storeReady = false;
+function openStoreIfShown(): void {
+  if (storeReady || location.hash !== "#store") return;
+  storeReady = true;
+  void import("./store").then((m) => m.initStore({ onPaid: () => { void loadOrg(); } }));
+}
+window.addEventListener("hashchange", openStoreIfShown);
+openStoreIfShown();
+// The skip link must not change the hash: the hash picks the screen.
+$("skip-main").addEventListener("click", (e) => { e.preventDefault(); $("main").focus(); });
 
-$("menu-btn").addEventListener("click", () => app.classList.toggle("menu-open"));
-$("scrim").addEventListener("click", () => app.classList.remove("menu-open"));
+// Mobile menu: say whether it is open, move focus in on open, Escape closes and returns focus.
+const menuBtn = $("menu-btn");
+menuBtn.setAttribute("aria-controls", "rail");
+menuBtn.setAttribute("aria-expanded", "false");
+const setMenu = (open: boolean): void => {
+  app.classList.toggle("menu-open", open);
+  menuBtn.setAttribute("aria-expanded", String(open));
+  if (open) document.querySelector<HTMLElement>("#rail a.ni")?.focus();
+};
+menuBtn.addEventListener("click", () => setMenu(!app.classList.contains("menu-open")));
+$("scrim").addEventListener("click", () => setMenu(false));
+document.addEventListener("keydown", (e) => { if (e.key === "Escape" && app.classList.contains("menu-open")) { setMenu(false); menuBtn.focus(); } });
 
 // Toasts
 document.addEventListener("click", (e) => {
@@ -51,6 +76,8 @@ document.addEventListener("click", (e) => {
   if (t) toast(t.dataset.toast ?? "");
 });
 
+// A signed-in client should not glimpse the example count while their own data loads.
+if (getToken()) $("need-count").textContent = "Checking…";
 // Needs-you + approvals share one list of pending items.
 const pending = new Set(["posts", "vat", "pack"]);
 const details: Record<string, { title: string; cost: string; leaves: string; prev: string; why: string; ok: string }> = {
@@ -69,7 +96,11 @@ function refresh(): void {
   $("need-count").textContent = n === 0 ? "All clear" : `${n} need${n === 1 ? "s" : ""} you`;
   const needs = $("needs");
   let clear = needs.querySelector(".all-clear");
-  if (n === 0 && !clear) { clear = document.createElement("p"); clear.className = "all-clear"; clear.textContent = "Nothing needs you right now. Your team is working."; needs.style.display = "block"; needs.appendChild(clear); }
+  // The setup card counts too: never say "nothing needs you" right under it.
+  const setupOpen = !!document.getElementById("setup-need") && !$("setup-need").hidden;
+  $("need-count").textContent = n + (setupOpen ? 1 : 0) === 0 ? "All clear" : `${n + (setupOpen ? 1 : 0)} need${n + (setupOpen ? 1 : 0) === 1 ? "s" : ""} you`;
+  if (setupOpen && clear) { clear.remove(); clear = null; }
+  if (n === 0 && !clear && !setupOpen) { clear = document.createElement("p"); clear.className = "all-clear"; clear.textContent = "Nothing needs you right now. Your team is working."; needs.style.display = "block"; needs.appendChild(clear); }
   if (!pending.has(selected)) selected = [...pending][0] ?? "";
   $("adetail").toggleAttribute("hidden", !selected);
   $("appr-empty").toggleAttribute("hidden", n > 0);
@@ -80,6 +111,9 @@ function refresh(): void {
     $("a-leaves").innerHTML = d.leaves; $("a-prev").innerHTML = d.prev; $("a-why").textContent = d.why; $("a-ok").textContent = d.ok;
   }
 }
+// When the setup form is sent (setup.ts hides its card), recount what needs the owner.
+const setupCard = document.getElementById("setup-need");
+if (setupCard) new MutationObserver(() => refresh()).observe(setupCard, { attributes: true, attributeFilter: ["hidden"] });
 function resolve(id: string, msg: string): void {
   const card = document.querySelector<HTMLElement>(`[data-need="${id}"]`);
   card?.classList.add("gone");
@@ -100,6 +134,16 @@ $("a-edit").addEventListener("click", () => toast("Editing opens in the web edit
 let realOrg: Org | undefined;
 const ROLE: Record<string, [string, string]> = { "finance-manager": ["FM", "av-fm"], "marketing-manager": ["MM", "av-mm"], "business-consultant": ["BC", "av-bc"], "hr-manager": ["HR", "av-hr"], "compliance-manager": ["CM", "av-cm"], "supply-chain-manager": ["SC", "av-sc"], "admin-manager": ["AM", "av-tl"] };
 const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]!);
+/** The sidebar trial box from the real trial end; hidden once the client is on a paid plan. */
+function showTrial(endsAt: string | undefined): void {
+  if (!endsAt) { $("trial-box").hidden = true; return; }
+  const DAY = 86_400_000, TRIAL_DAYS = 7;
+  const left = Math.max(0, Math.ceil((new Date(endsAt).getTime() - Date.now()) / DAY));
+  $("trial-left").textContent = left === 0 ? "Trial ends today" : `Trial: ${left} day${left === 1 ? "" : "s"} left`;
+  $("trial-note").textContent = `Ends ${new Date(endsAt).toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" })}. No card needed until then.`;
+  $("trial-bar").style.width = `${Math.min(100, Math.round(((TRIAL_DAYS - left) / TRIAL_DAYS) * 100))}%`;
+}
+
 async function loadOrg(): Promise<void> {
   // Visitors without a login see the example business: the "Explore the demo" links land here.
   if (!getToken()) { $("demo-banner").hidden = false; return; }
@@ -113,7 +157,15 @@ async function loadOrg(): Promise<void> {
   $("org-av").textContent = initials(realOrg.name);
   $("greet").textContent = `${h < 12 ? "Good morning" : h < 18 ? "Good afternoon" : "Good evening"}, ${realOrg.name}`;
   orgName = realOrg.name;
+  $("set-biz").textContent = realOrg.name; // Settings shows the signed-in company, not this device's last signup.
+  setPeopleBusiness(realOrg.name);
+  showTrial(realOrg.trialEndsAt);
   app.classList.add("is-live");
+  // A real client never sees the example business's requests, and example-only panels say so.
+  document.querySelectorAll<HTMLElement>("[data-need]").forEach((el) => el.remove());
+  pending.clear();
+  refresh();
+  document.querySelectorAll<HTMLElement>("[data-example] .panel-h").forEach((h) => h.insertAdjacentHTML("beforeend", '<span class="badge badge-dark">Example until your apps are connected</span>'));
   route();
   const quota = realOrg.dailyQuotaPerEmployee;
   const pool = realOrg.teamEnergy;
@@ -131,9 +183,9 @@ async function loadOrg(): Promise<void> {
     const energy = pool
       ? `<div class="e-lab"><span>Uses the team energy</span></div>`
       : `<div><div class="e-lab"><span>Energy</span><span>${e.energyLeft} / ${quota}</span></div>${bar(e.energyLeft, quota)}</div>`;
-    return `<div class="ecard"><div class="who"><span class="av ${cls}">${abbr}</span><div><b>${esc(e.name)}</b><span>Standard</span></div></div><span class="status good"><span class="dot"></span>Ready</span><div class="doing">Waiting for your first request</div>${energy}</div>`;
+    return `<div class="ecard"><div class="who"><span class="av ${cls}">${abbr}</span><div><b><a class="desk-a" href="#desk/${esc(e.templateKey)}">${esc(e.name)}</a></b><span>Standard</span></div></div><span class="status good"><span class="dot"></span>Ready</span><div class="doing">Waiting for your first request</div>${energy}</div>`;
   }).join("");
-  if (realOrg.trialEndsAt) toast(`Free trial until ${new Date(realOrg.trialEndsAt).toLocaleDateString()}`);
+  if (realOrg.trialEndsAt) toast(`Free trial until ${new Date(realOrg.trialEndsAt).toLocaleDateString("en-GB", { day: "numeric", month: "long" })}`);
 }
 void loadOrg();
 
@@ -166,7 +218,7 @@ function signOut(): void { clearSession(); location.href = "/signin.html"; }
 document.querySelectorAll("[data-signout]").forEach((b) => b.addEventListener("click", signOut));
 $("me-av").addEventListener("click", () => { location.hash = "#settings"; });
 $("set-biz").textContent = biz;
-$("set-email").textContent = profile.email || "Not set";
+$("set-email").textContent = profile.email || "The address you log in with";
 
 // Ask bar: "finance: ..." / "marketing: ..." / "consultant: ..." / "hr: ..." / "compliance: ..." picks the employee; otherwise the consultant answers.
 $<HTMLFormElement>("ask").addEventListener("submit", async (e) => {
@@ -180,11 +232,13 @@ $<HTMLFormElement>("ask").addEventListener("submit", async (e) => {
   const emp = realOrg.team.find((x) => x.templateKey === key) ?? realOrg.team[0]!;
   toast(`${emp.name} is on it…`);
   const u = /^urgent\s*[:,-]\s*(.+)$/is.exec(m ? m[2]! : text);
-  const r = await api<{ status: string; reason?: string; answer?: string; runsAt?: string }>("/ask", { body: { text: u ? u[1] : m ? m[2] : text, employeeId: emp.id, urgent: !!u } });
+  const r = await api<{ status: string; reason?: string; answer?: string; runsAt?: string; message?: string }>("/ask", { body: { text: u ? u[1] : m ? m[2] : text, employeeId: emp.id, urgent: !!u } });
   input.value = "";
   if (!r.ok || !r.data) { toast("Could not reach your team. Try again."); return; }
-  if (r.data.status === "no_energy") { toast(r.data.reason === "trial_ended" ? "Your free trial has ended" : `${emp.name} has used today's energy`); return; }
+  // The server explains why in plain words (weekly pool, daily limit, full queue, trial ended, AI unavailable).
+  if (r.data.status === "no_energy") { toast(r.data.message ?? (r.data.reason === "trial_ended" ? "Your free trial has ended" : "Your team is out of energy for now")); return; }
   if (r.data.status === "queued") { toast(`Queued with your next batch${r.data.runsAt ? `, runs ${new Date(r.data.runsAt).toLocaleString([], { weekday: "short", hour: "numeric", minute: "2-digit" })}` : ""}. Start with "urgent:" to skip the wait.`); return; }
+  if (r.data.status === "failed" || !r.data.answer) { toast(r.data.message ?? `${emp.name} couldn't answer just now. Try again in a few minutes.`); return; }
   showAnswer(emp.name, r.data.answer ?? "");
   void loadOrg();
 
@@ -245,16 +299,12 @@ document.addEventListener("keydown", (e) => {
 }
 
 // Skill tuning
-const skills: Record<string, string> = { Standard: "100 · £12.30/mo", Pro: "200 · £21.40/mo", Expert: "400 · £38.00/mo" };
-$("skill").addEventListener("click", (e) => {
-  const b = (e.target as HTMLElement).closest<HTMLButtonElement>(".chip");
-  if (!b) return;
-  $("skill").querySelectorAll(".chip").forEach((c) => c.setAttribute("aria-pressed", String(c === b)));
-  $("skill-out").textContent = skills[b.textContent ?? "Standard"] ?? "";
-});
+
 
 initDash();
 initRoleDesigner();
+initDesk();
+void initPeople(biz);
 refresh();
 initSetup(biz, profile.contact === "slack" ? "slack" : "dashboard");
 initApps();

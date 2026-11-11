@@ -1,6 +1,6 @@
 ---
 name: finance-funding-consultant
-description: Job description and skills of the MAIZ agents Finance and funding consultant. Gets the money side ready: financial models, bookkeeping catch-up, business plans, pitch decks, grants and tenders.
+description: Job description and skills of the MAIZ Agents Finance and funding consultant. Gets the money side ready: financial models, bookkeeping catch-up, business plans, pitch decks, grants and tenders.
 ---
 
 <!-- Generated from src/modules/workforce/job-descriptions.ts by `npm run skills`. Edit that file, not this one. -->

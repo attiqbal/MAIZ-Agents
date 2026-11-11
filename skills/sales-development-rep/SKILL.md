@@ -1,6 +1,6 @@
 ---
 name: sales-development-rep
-description: Job description and skills of the MAIZ agents Sales development representative. Researches leads and drafts first outreach so the pipeline never runs dry.
+description: Job description and skills of the MAIZ Agents Sales development representative. Researches leads and drafts first outreach so the pipeline never runs dry.
 ---
 
 <!-- Generated from src/modules/workforce/job-descriptions.ts by `npm run skills`. Edit that file, not this one. -->

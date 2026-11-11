@@ -1,6 +1,6 @@
 ---
 name: management-accountant
-description: Job description and skills of the MAIZ agents Management accountant. Turns the books into monthly management accounts, budgets and cost reports the owner can steer by.
+description: Job description and skills of the MAIZ Agents Management accountant. Turns the books into monthly management accounts, budgets and cost reports the owner can steer by.
 ---
 
 <!-- Generated from src/modules/workforce/job-descriptions.ts by `npm run skills`. Edit that file, not this one. -->

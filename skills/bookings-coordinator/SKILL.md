@@ -1,6 +1,6 @@
 ---
 name: bookings-coordinator
-description: Job description and skills of the MAIZ agents Bookings and appointments coordinator. Keeps the diary full and accurate: bookings, reminders, cancellations and waiting lists.
+description: Job description and skills of the MAIZ Agents Bookings and appointments coordinator. Keeps the diary full and accurate: bookings, reminders, cancellations and waiting lists.
 ---
 
 <!-- Generated from src/modules/workforce/job-descriptions.ts by `npm run skills`. Edit that file, not this one. -->

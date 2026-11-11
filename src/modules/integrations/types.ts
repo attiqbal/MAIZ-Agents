@@ -1,5 +1,5 @@
 /**
- * Integrations connect a customer's business apps (payroll, tills, accounting) to MAIZ agents.
+ * Integrations connect a customer's business apps (payroll, tills, accounting) to MAIZ Agents.
  *
  * Adding an app means writing one Connector object and registering it. Core code never
  * knows about Square, BrightPay or any other app: it only knows the shapes in this file.

@@ -1,6 +1,6 @@
 ---
 name: it-support
-description: Job description and skills of the MAIZ agents IT support specialist. Keeps devices, accounts and software working for everyone.
+description: Job description and skills of the MAIZ Agents IT support specialist. Keeps devices, accounts and software working for everyone.
 ---
 
 <!-- Generated from src/modules/workforce/job-descriptions.ts by `npm run skills`. Edit that file, not this one. -->

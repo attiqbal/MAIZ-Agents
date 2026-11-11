@@ -1,6 +1,6 @@
 ---
 name: image-producer
-description: Job description and skills of the MAIZ agents Photo and image producer. Creates and edits product shots, lifestyle images and illustrations, with AI image tools or from the owner's photos.
+description: Job description and skills of the MAIZ Agents Photo and image producer. Creates and edits product shots, lifestyle images and illustrations, with AI image tools or from the owner's photos.
 ---
 
 <!-- Generated from src/modules/workforce/job-descriptions.ts by `npm run skills`. Edit that file, not this one. -->

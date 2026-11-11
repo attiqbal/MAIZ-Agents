@@ -1,4 +1,4 @@
-# Deploying MAIZ agents
+# Deploying MAIZ Agents
 
 One service runs the website and the API together (`Dockerfile`), with Neon for the database and Resend for sign-in emails.
 The recommended host is **Render** (`render.yaml`). Any host that runs a Docker image works the same way (Fly.io, Railway, a VPS).

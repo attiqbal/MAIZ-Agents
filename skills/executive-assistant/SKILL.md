@@ -1,6 +1,6 @@
 ---
 name: executive-assistant
-description: Job description and skills of the MAIZ agents Executive assistant. Manages the owner's diary, inbox, travel and paperwork so they can focus on the business.
+description: Job description and skills of the MAIZ Agents Executive assistant. Manages the owner's diary, inbox, travel and paperwork so they can focus on the business.
 ---
 
 <!-- Generated from src/modules/workforce/job-descriptions.ts by `npm run skills`. Edit that file, not this one. -->

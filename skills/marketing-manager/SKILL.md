@@ -1,6 +1,6 @@
 ---
 name: marketing-manager
-description: Job description and skills of the MAIZ agents Marketing manager. Grow awareness, leads and sales for the business.
+description: Job description and skills of the MAIZ Agents Marketing manager. Grow awareness, leads and sales for the business.
 ---
 
 <!-- Generated from src/modules/workforce/job-descriptions.ts by `npm run skills`. Edit that file, not this one. -->

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { BatchError, formatLocal, mergeSchedule, nextRunAt, DEFAULT_SCHEDULE } from "../src/modules/batch/schedule.js";
 import { zoneForCountry } from "../src/modules/batch/zones.js";
 import { classifyWork } from "../src/modules/batch/classify.js";
+import { fairOrder, type BatchJob } from "../src/modules/batch/service.js";
 import { createApp, makeToken, type Req } from "../src/server/app.js";
 import { userIdFor } from "../src/server/identity.js";
 import { createPlatform } from "../src/server/platform.js";
@@ -37,6 +38,14 @@ describe("batch schedule", () => {
     expect(() => mergeSchedule(DEFAULT_SCHEDULE, { timezone: "Mars/Base" })).toThrow(BatchError);
     expect(() => mergeSchedule(DEFAULT_SCHEDULE, { closingTime: "25:99" })).toThrow(BatchError);
     expect(formatLocal(at("2026-11-10T18:00:00Z"), "UTC")).toMatch(/18:00|6/);
+  });
+});
+
+describe("batch fairness", () => {
+  it("takes one task from each client in turn, oldest first", () => {
+    const j = (ws: string, n: number) => ({ id: `${ws}${n}`, workspaceId: ws, createdAt: `2026-11-10T09:${String(n).padStart(2, "0")}:00Z` }) as BatchJob;
+    const order = fairOrder([j("a", 1), j("a", 2), j("a", 3), j("b", 4), j("c", 5), j("b", 6)]).map((x) => x.id);
+    expect(order).toEqual(["a1", "b4", "c5", "a2", "b6", "a3"]);
   });
 });
 

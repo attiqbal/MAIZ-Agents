@@ -1,6 +1,6 @@
 ---
 name: customer-success-manager
-description: Job description and skills of the MAIZ agents Customer success manager. Helps customers get value so they renew and recommend the business.
+description: Job description and skills of the MAIZ Agents Customer success manager. Helps customers get value so they renew and recommend the business.
 ---
 
 <!-- Generated from src/modules/workforce/job-descriptions.ts by `npm run skills`. Edit that file, not this one. -->

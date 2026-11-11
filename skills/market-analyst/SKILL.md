@@ -1,6 +1,6 @@
 ---
 name: market-analyst
-description: Job description and skills of the MAIZ agents Market analyst. Sizes markets and tracks competitors and trends.
+description: Job description and skills of the MAIZ Agents Market analyst. Sizes markets and tracks competitors and trends.
 ---
 
 <!-- Generated from src/modules/workforce/job-descriptions.ts by `npm run skills`. Edit that file, not this one. -->

@@ -1,6 +1,6 @@
 ---
 name: payroll-specialist
-description: Job description and skills of the MAIZ agents Payroll specialist. Prepares accurate, on-time payroll and the records and filings payroll law requires.
+description: Job description and skills of the MAIZ Agents Payroll specialist. Prepares accurate, on-time payroll and the records and filings payroll law requires.
 ---
 
 <!-- Generated from src/modules/workforce/job-descriptions.ts by `npm run skills`. Edit that file, not this one. -->

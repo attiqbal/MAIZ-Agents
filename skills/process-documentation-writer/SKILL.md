@@ -1,6 +1,6 @@
 ---
 name: process-documentation-writer
-description: Job description and skills of the MAIZ agents Process and knowledge writer. Writes down how the business works so anyone, human or AI, can do a job the same way.
+description: Job description and skills of the MAIZ Agents Process and knowledge writer. Writes down how the business works so anyone, human or AI, can do a job the same way.
 ---
 
 <!-- Generated from src/modules/workforce/job-descriptions.ts by `npm run skills`. Edit that file, not this one. -->

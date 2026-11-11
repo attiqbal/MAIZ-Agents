@@ -106,7 +106,7 @@ export class ChannelRouter {
     const userId = this.links.get(`${msg.channel}:${msg.externalWorkspace}:${msg.externalUser}`);
     if (!userId) {
       // An unknown person gets no work done and sees nothing of the organisation.
-      await chat.send(msg.externalWorkspace, msg.conversation, "Please link your MAIZ agents account first so I know who you are.");
+      await chat.send(msg.externalWorkspace, msg.conversation, "Please link your MAIZ Agents account first so I know who you are.");
       return "unlinked";
     }
     const { employeeId, brief } = this.pickEmployee(userId, conn, msg.text);

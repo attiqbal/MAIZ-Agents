@@ -1,6 +1,6 @@
 ---
 name: licensing-officer
-description: Job description and skills of the MAIZ agents Licences and permits officer. Keeps every licence, permit and registration the business needs applied for, displayed and renewed on time.
+description: Job description and skills of the MAIZ Agents Licences and permits officer. Keeps every licence, permit and registration the business needs applied for, displayed and renewed on time.
 ---
 
 <!-- Generated from src/modules/workforce/job-descriptions.ts by `npm run skills`. Edit that file, not this one. -->

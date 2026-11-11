@@ -1,6 +1,6 @@
 ---
 name: office-manager
-description: Job description and skills of the MAIZ agents Office manager. Keeps the workplace, suppliers and office paperwork running smoothly.
+description: Job description and skills of the MAIZ Agents Office manager. Keeps the workplace, suppliers and office paperwork running smoothly.
 ---
 
 <!-- Generated from src/modules/workforce/job-descriptions.ts by `npm run skills`. Edit that file, not this one. -->

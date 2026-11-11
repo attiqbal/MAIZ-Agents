@@ -214,7 +214,7 @@ export function initApps(): void {
     void loadApps();
   });
   document.querySelectorAll<HTMLButtonElement>("[data-close-dialog]").forEach((b) => b.addEventListener("click", () => b.closest("dialog")?.close()));
-  $("apps-hook-copy").addEventListener("click", () => { void navigator.clipboard?.writeText($("apps-hook-url").textContent ?? "").then(() => toast("Copied")); });
+  $("apps-hook-copy").addEventListener("click", () => { void (navigator.clipboard?.writeText($("apps-hook-url").textContent ?? "") ?? Promise.reject(new Error("no clipboard"))).then(() => toast("Copied"), () => toast("Couldn't copy. Select the link and copy it by hand.")); });
   if (new URLSearchParams(location.search).get("connect") === "failed") toast("The app did not approve the connection. Try again.");
   void loadApps();
 }

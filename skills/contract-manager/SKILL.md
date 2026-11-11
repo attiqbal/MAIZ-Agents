@@ -1,6 +1,6 @@
 ---
 name: contract-manager
-description: Job description and skills of the MAIZ agents Contract manager. Keeps every contract organised, tracked and reviewed before signing.
+description: Job description and skills of the MAIZ Agents Contract manager. Keeps every contract organised, tracked and reviewed before signing.
 ---
 
 <!-- Generated from src/modules/workforce/job-descriptions.ts by `npm run skills`. Edit that file, not this one. -->

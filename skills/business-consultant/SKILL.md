@@ -1,6 +1,6 @@
 ---
 name: business-consultant
-description: Job description and skills of the MAIZ agents Business consultant. Make the business more efficient and better at decisions.
+description: Job description and skills of the MAIZ Agents Business consultant. Make the business more efficient and better at decisions.
 ---
 
 <!-- Generated from src/modules/workforce/job-descriptions.ts by `npm run skills`. Edit that file, not this one. -->

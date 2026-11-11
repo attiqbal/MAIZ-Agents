@@ -9,7 +9,7 @@ import { APPS, COUNTRIES, NEEDS, OTHER_SECTOR, SECTORS, countryFacts, getSector,
 
 const TOTAL = 6;
 const PLAN_STEP = 4;
-const KEY = "vn.profile";
+const KEY = "maiz.profile";
 interface Profile {
   email?: string; biz?: string; sector?: string; sells?: string; country?: string; needs?: string[]; size?: string;
   apps?: string[]; site?: string; addOns?: string[]; slack?: boolean; contact?: "dashboard" | "slack";
@@ -30,8 +30,16 @@ const AVATAR: Record<string, [string, string]> = {
 };
 const HOW: Record<AppHow, string> = { direct: "Connects directly", file: "Upload an export", bridge: "Through Zapier or Make", chat: "One scan" };
 
-function show(n: number, moveFocus = true): void {
+// Where the owner is, so a refresh or the browser's Back button keeps their place.
+const STEP_KEY = "maiz.obStep";
+const RESUMABLE_MAX = 5; // step 6 creates the team; never re-run it on a refresh
+
+function show(n: number, moveFocus = true, fromHistory = false): void {
+  const prev = current;
   current = Math.min(Math.max(n, 1), TOTAL);
+  try { sessionStorage.setItem(STEP_KEY, String(Math.min(current, RESUMABLE_MAX))); } catch { /* storage unavailable */ }
+  if (!fromHistory && current !== prev) history.pushState({ obStep: current }, "", `#step-${current}`);
+  else if (!fromHistory) history.replaceState({ obStep: current }, "", `#step-${current}`);
   steps.forEach((s) => s.toggleAttribute("hidden", Number(s.dataset.step) !== current));
   document.querySelectorAll("#progress i").forEach((el, i) => el.classList.toggle("on", i < current));
   $("step-label").textContent = `Step ${current} of ${TOTAL}`;
@@ -51,6 +59,12 @@ document.addEventListener("click", (e) => {
   const t = (e.target as HTMLElement).closest<HTMLElement>("[data-next],[data-back]");
   if (!t) return;
   if (t.hasAttribute("data-back")) show(current - 1); else show(current + 1);
+});
+
+window.addEventListener("popstate", (e) => {
+  const step = Number((e.state as { obStep?: number } | null)?.obStep);
+  // Never walk back into the set-up step; Back from there returns to the start of the app.
+  if (step >= 1 && step < 6) show(step, true, true);
 });
 
 /** One-of-many chips: pressing one releases the others. */
@@ -147,7 +161,14 @@ for (const id of ["apps", "apps-more"]) {
 }
 $("apps-go").addEventListener("click", () => {
   profile.apps = [...pressed($("apps")), ...pressed($("apps-more"))];
-  profile.site = $<HTMLInputElement>("site").value.trim() || undefined;
+  const site = $<HTMLInputElement>("site");
+  const raw = site.value.trim();
+  // Optional, but if given it should look like a web address: a dot, no spaces (https:// is added later if missing).
+  const looksLikeUrl = !raw || /^(https?:\/\/)?[^\s/]+\.[^\s/]{2,}(\/\S*)?$/i.test(raw);
+  if (looksLikeUrl) site.removeAttribute("aria-invalid"); else site.setAttribute("aria-invalid", "true");
+  $("site-err").toggleAttribute("hidden", looksLikeUrl);
+  if (!looksLikeUrl) { site.focus(); return; }
+  profile.site = raw || undefined;
   save(); show(PLAN_STEP);
 });
 
@@ -181,7 +202,7 @@ function renderPlan(): void {
   $("plan-apps-h").textContent = plan.apps.length ? "Apps to connect" : "Apps worth connecting";
   $("plan-apps").className = "plan-apps";
   $("plan-apps").innerHTML = apps.map((a) => `<div class="plan-app"><span>${esc(a.name)}</span><span class="how">${HOW[a.how]}</span><span class="ds">${esc(a.gives)}</span></div>`).join("") +
-    `<p class="hint">You connect these from your control center after setup. Skipping is fine: your team can start from what you tell it.</p>`;
+    `<p class="hint">You connect these from your control centre after setup. Skipping is fine: your team can start from what you tell it.</p>`;
   const facts = countryFacts(plan.country);
   const fact = (label: string, value: string, src: string) => `<div class="prow"><span>${label}<span class="src">${src}</span></span><span class="val">${esc(value)}</span></div>`;
   const rows = [
@@ -214,7 +235,7 @@ $("email-go").addEventListener("click", async () => {
   if (!ok) { $("email").focus(); return; }
   profile.email = v; save();
   const r = await api<{ dev?: boolean }>("/signin/start", { body: { email: v } });
-  if (r.status === 429) { $("email-sent").textContent = "Too many emails for this address. Please try again in an hour."; $("email-sent").removeAttribute("hidden"); return; }
+  if (r.status === 429) { $("email-sent").textContent = "Too many sign-in emails from this connection. Please wait 10 minutes and try again."; $("email-sent").removeAttribute("hidden"); return; }
   if (r.ok && !r.data?.dev) {
     $("email-sent").textContent = `We sent a sign-in link to ${v}. Open it on this device and your plan will be waiting. It works once and expires in 15 minutes.`;
     $("email-sent").removeAttribute("hidden");
@@ -228,15 +249,14 @@ $("slack-sim").addEventListener("click", async () => {
   // With the API and a Slack app configured this opens Slack's real install page.
   const r = await api<{ url: string }>("/slack/install");
   if (r.ok && r.data?.url) { window.location.href = r.data.url; return; }
-  profile.slack = true; save();
-  $("slack-ds").textContent = `Connected to ${profile.biz ?? "your"} workspace`;
+  // No live Slack install yet (not signed in, or Slack not set up on the server): say so, never fake a connection.
+  $("slack-ds").textContent = "You can connect Slack from Apps once your team is set up";
   $("slack-sim").setAttribute("hidden", "");
-  $("connect-go").textContent = "Continue";
 });
 single($("contact"), (b) => { profile.contact = b.dataset.v === "slack" ? "slack" : "dashboard"; save(); });
 
 // ---- Step 6: create the organisation ----
-async function createOrganisation(): Promise<void> {
+async function createOrganisation(): Promise<boolean> {
   // Real set-up when the API is running; otherwise the page stays a demo.
   const r = await api<{ token: string }>("/signup", {
     body: {
@@ -244,16 +264,20 @@ async function createOrganisation(): Promise<void> {
       addOns: profile.addOns, size: profile.size, country: profile.country, website: profile.site, contact: profile.contact,
     },
   });
-  if (r.ok && r.data?.token) setToken(r.data.token);
-  else if (r.status === 409) {
+  if (r.ok && r.data?.token) { setToken(r.data.token); return true; }
+  if (r.status === 409) {
     // This email already has a team. Without a login on this device, the owner has to log in to reach it.
-    $("prov-h").textContent = getToken() ? "You already have a team. Open your control center." : "You already have a team. Log in to open it.";
+    $("prov-h").textContent = getToken() ? "You already have a team. Open your control centre." : "You already have a team. Log in to open it.";
     if (!getToken()) { const open = $<HTMLAnchorElement>("open-app"); open.href = "/signin.html"; open.textContent = "Log in"; }
+    return true;
   }
+  if (r.status === 0 || r.status === 404) return true; // no API running: the page is a demo
+  $("prov-h").textContent = r.status === 429 ? "Too many sign-ups from this connection. Wait 10 minutes and try again." : "We couldn't finish setting up your team. Nothing was created and nothing is charged.";
+  return false;
 }
 
 function provision(): void {
-  void createOrganisation();
+  const created = createOrganisation();
   const plan = currentPlan();
   $("prov-h").textContent = `Setting up ${profile.biz ?? "your company"}`;
   if (plan) {
@@ -264,16 +288,33 @@ function provision(): void {
   const items = Array.from(document.querySelectorAll<HTMLElement>("#prov li"));
   items.forEach((li) => li.classList.remove("run", "done"));
   $("open-app").setAttribute("hidden", "");
+  $("prov-retry").setAttribute("hidden", "");
   items.forEach((li, i) => {
     window.setTimeout(() => { li.classList.add("run"); }, i * 700);
-    window.setTimeout(() => { li.classList.remove("run"); li.classList.add("done"); if (i === items.length - 1) $("open-app").removeAttribute("hidden"); }, i * 700 + 650);
+    window.setTimeout(() => { li.classList.remove("run"); li.classList.add("done"); if (i === items.length - 1) void created.then((ok) => { $(ok ? "open-app" : "prov-retry").removeAttribute("hidden"); }); }, i * 700 + 650);
   });
 }
 
+$("prov-retry").addEventListener("click", () => provision());
 if (profile.biz) $<HTMLInputElement>("biz").value = profile.biz;
 if (profile.sells) $<HTMLInputElement>("sells").value = profile.sells;
 if (profile.site) $<HTMLInputElement>("site").value = profile.site;
 if (profile.email) $<HTMLInputElement>("email").value = profile.email;
 if (profile.size) $("size").querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", String(b.textContent === profile.size)));
 // Coming back from the emailed link with a verified session: the plan is waiting, one tap from done.
-show(getToken() && profile.biz ? PLAN_STEP : 1, false);
+// Someone who already has a team goes straight to it. Otherwise resume where they were in this tab,
+// or at the plan when they come back from the emailed link.
+async function start(): Promise<void> {
+  if (getToken()) {
+    const r = await api<{ id: string }>("/org");
+    if (r.ok && r.data?.id) { location.replace("/app.html"); return; }
+  }
+  let resume = 1;
+  try { resume = Number(sessionStorage.getItem(STEP_KEY)) || 1; } catch { /* storage unavailable */ }
+  if (resume > 1 && !profile.sector) resume = 1; // answers were cleared: start again
+  if (getToken() && profile.biz) resume = Math.max(resume, PLAN_STEP);
+  current = 0;
+  history.replaceState({ obStep: resume }, "", `#step-${resume}`);
+  show(resume, false, true);
+}
+void start();

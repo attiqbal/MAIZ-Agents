@@ -1,6 +1,6 @@
 ---
 name: account-manager
-description: Job description and skills of the MAIZ agents Account manager. Keeps existing customers happy and finds ways to grow each account.
+description: Job description and skills of the MAIZ Agents Account manager. Keeps existing customers happy and finds ways to grow each account.
 ---
 
 <!-- Generated from src/modules/workforce/job-descriptions.ts by `npm run skills`. Edit that file, not this one. -->

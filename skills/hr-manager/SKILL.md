@@ -1,6 +1,6 @@
 ---
 name: hr-manager
-description: Job description and skills of the MAIZ agents HR manager. Help the owner hire well, onboard people properly and look after the team fairly and lawfully, with clear documents and a people calendar nobody has to remember.
+description: Job description and skills of the MAIZ Agents HR manager. Help the owner hire well, onboard people properly and look after the team fairly and lawfully, with clear documents and a people calendar nobody has to remember.
 ---
 
 <!-- Generated from src/modules/workforce/job-descriptions.ts by `npm run skills`. Edit that file, not this one. -->

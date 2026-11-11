@@ -1,6 +1,6 @@
 ---
 name: quality-manager
-description: Job description and skills of the MAIZ agents Quality manager. Makes sure products and services meet the standard every time.
+description: Job description and skills of the MAIZ Agents Quality manager. Makes sure products and services meet the standard every time.
 ---
 
 <!-- Generated from src/modules/workforce/job-descriptions.ts by `npm run skills`. Edit that file, not this one. -->

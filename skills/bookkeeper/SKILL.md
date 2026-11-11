@@ -1,6 +1,6 @@
 ---
 name: bookkeeper
-description: Job description and skills of the MAIZ agents Bookkeeper. Records every transaction accurately and keeps the source documents in order for the Finance manager.
+description: Job description and skills of the MAIZ Agents Bookkeeper. Records every transaction accurately and keeps the source documents in order for the Finance manager.
 ---
 
 <!-- Generated from src/modules/workforce/job-descriptions.ts by `npm run skills`. Edit that file, not this one. -->

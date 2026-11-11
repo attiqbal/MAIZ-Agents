@@ -1,6 +1,6 @@
 ---
 name: admin-manager
-description: Job description and skills of the MAIZ agents Admin manager. Run the AI team for the owner like a chief of staff: set it up, route every request to the right specialist, keep work moving and give the owner a short daily briefing so they spend minutes, not hours, managing it.
+description: Job description and skills of the MAIZ Agents Admin manager. Run the AI team for the owner like a chief of staff: set it up, route every request to the right specialist, keep work moving and give the owner a short daily briefing so they spend minutes, not hours, managing it.
 ---
 
 <!-- Generated from src/modules/workforce/job-descriptions.ts by `npm run skills`. Edit that file, not this one. -->

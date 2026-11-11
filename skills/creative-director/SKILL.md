@@ -1,6 +1,6 @@
 ---
 name: creative-director
-description: Job description and skills of the MAIZ agents Creative director. Leads the studio: turns a business goal into a creative idea and keeps every piece of media on brand.
+description: Job description and skills of the MAIZ Agents Creative director. Leads the studio: turns a business goal into a creative idea and keeps every piece of media on brand.
 ---
 
 <!-- Generated from src/modules/workforce/job-descriptions.ts by `npm run skills`. Edit that file, not this one. -->

@@ -1,6 +1,6 @@
 ---
 name: campaign-producer
-description: Job description and skills of the MAIZ agents Campaign producer. Plans and runs a campaign from idea to launch across video, images, print, email and social.
+description: Job description and skills of the MAIZ Agents Campaign producer. Plans and runs a campaign from idea to launch across video, images, print, email and social.
 ---
 
 <!-- Generated from src/modules/workforce/job-descriptions.ts by `npm run skills`. Edit that file, not this one. -->

@@ -48,8 +48,8 @@ function seo(): Plugin {
           acceptedAnswer: { "@type": "Answer", text: decode(a) },
         }));
         const graph = [
-          { "@type": "Organization", "@id": `${SITE_URL}/#org`, name: "MAIZ agents", url: `${SITE_URL}/`, logo: `${SITE_URL}/favicon.svg` },
-          { "@type": "WebSite", "@id": `${SITE_URL}/#site`, name: "MAIZ agents", url: `${SITE_URL}/`, publisher: { "@id": `${SITE_URL}/#org` }, inLanguage: "en" },
+          { "@type": "Organization", "@id": `${SITE_URL}/#org`, name: "MAIZ Agents", url: `${SITE_URL}/`, logo: `${SITE_URL}/favicon.svg` },
+          { "@type": "WebSite", "@id": `${SITE_URL}/#site`, name: "MAIZ Agents", url: `${SITE_URL}/`, publisher: { "@id": `${SITE_URL}/#org` }, inLanguage: "en" },
           ...(faqs.length ? [{ "@type": "FAQPage", "@id": `${SITE_URL}/#faq`, mainEntity: faqs }] : []),
         ];
         const json = JSON.stringify({ "@context": "https://schema.org", "@graph": graph }).replace(/</g, "\\u003c");
@@ -77,6 +77,7 @@ export default defineConfig({
         onboarding: resolve(__dirname, "onboarding.html"),
         app: resolve(__dirname, "app.html"),
         signin: resolve(__dirname, "signin.html"),
+        staffForm: resolve(__dirname, "staff-form.html"),
         review: resolve(__dirname, "review.html"),
         ownerSpecialists: resolve(__dirname, "owner-specialists.html"),
         ownerClients: resolve(__dirname, "owner-clients.html"),

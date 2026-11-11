@@ -7,7 +7,7 @@
  * manager, give it tasks from its menu (task-roles.ts) until the days or the
  * energy run out. Then it leaves the team; you can extend with another pass.
  *
- * Prices are draft list prices in GBP for the owner of MAIZ agents to confirm.
+ * Prices are draft list prices in GBP for the owner of MAIZ Agents to confirm.
  * Pure data, no server imports: the website imports this file too.
  */
 import type { JobDescription } from "./job-descriptions.js";

@@ -1,6 +1,6 @@
 ---
 name: ai-automation-specialist
-description: Job description and skills of the MAIZ agents AI and automation specialist. Finds repeated work in the business and automates it safely with the tools the owner already has.
+description: Job description and skills of the MAIZ Agents AI and automation specialist. Finds repeated work in the business and automates it safely with the tools the owner already has.
 ---
 
 <!-- Generated from src/modules/workforce/job-descriptions.ts by `npm run skills`. Edit that file, not this one. -->

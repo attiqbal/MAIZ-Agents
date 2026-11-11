@@ -1,6 +1,6 @@
 ---
 name: software-engineer
-description: Job description and skills of the MAIZ agents Software engineer. Builds and fixes small tools, websites and automations.
+description: Job description and skills of the MAIZ Agents Software engineer. Builds and fixes small tools, websites and automations.
 ---
 
 <!-- Generated from src/modules/workforce/job-descriptions.ts by `npm run skills`. Edit that file, not this one. -->

@@ -1,6 +1,6 @@
 ---
 name: sustainability-officer
-description: Job description and skills of the MAIZ agents Sustainability officer. Measures the business's environmental footprint and plans practical reductions customers and lenders now ask about.
+description: Job description and skills of the MAIZ Agents Sustainability officer. Measures the business's environmental footprint and plans practical reductions customers and lenders now ask about.
 ---
 
 <!-- Generated from src/modules/workforce/job-descriptions.ts by `npm run skills`. Edit that file, not this one. -->
