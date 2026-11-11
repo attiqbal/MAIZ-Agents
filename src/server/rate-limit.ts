@@ -31,6 +31,9 @@ export function limitFor(method: string, path: string): Limit | undefined {
   if (method !== "POST") return undefined;
   if (path === "/api/slack/events") return undefined; // signed by Slack, and Slack retries on 429
   if (path === "/api/payments/webhook") return undefined; // signed by the payment provider, which retries on 429
+  // Tasks are limited by energy (the team pool, the daily ceiling and the monthly cost cap), not by a request count:
+  // a client who wants to spend a week's energy in an hour may. A refused task costs nothing.
+  if (path === "/api/ask") return undefined;
   // Each checkout creates a payment session at the provider: keep it to a handful of tries per address.
   if (path === "/api/checkout") return { max: 20, windowMs: 10 * 60_000 };
   if (path === "/api/signin/start" || path === "/api/signup") return { max: 10, windowMs: 10 * 60_000 };

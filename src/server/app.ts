@@ -333,6 +333,7 @@ export function createApp(p: Platform) {
         for (const w of p.identity.allWorkspaces()) await p.reconciliation.runOne(w.id);
         return json(200, { reports: p.reconciliation.all().map((r) => ({ ...r, clientName: p.identity.workspaceById(r.workspaceId)?.name ?? r.workspaceId })) });
       }
+      if (method === "GET" && path === "/api/owner/decisions") { const items = p.ownerDecisions(); return json(200, { total: items.length, items }); }
       if (method === "GET" && path === "/api/owner/clients") return json(200, { clients: p.clients(userId) });
       if (method === "GET" && path === "/api/owner/specialists") return json(200, { requests: p.specialists.queue(userId) });
       const d = /^\/api\/owner\/specialists\/([\w-]{1,64})\/decide$/.exec(path);

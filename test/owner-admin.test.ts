@@ -126,7 +126,9 @@ describe("custom specialists are reviewed by the platform owner", () => {
     expect(req).toMatchObject({ status: "in_review", statusLabel: "With MAIZ for review", priceGbp: 35 });
     expect(s.platform.specialists.mayTrain(req.id)).toBe(false);
     await Promise.resolve();
-    expect(s.mail.sent.find((m) => m.to === OWNER)?.subject).toBe("New specialist to review: Wholesale account coordinator for Kestrel Coffee");
+    expect(s.mail.sent.find((m) => m.to === OWNER)?.subject).toBe("1 decision is waiting for you");
+    const open = ((await s.call("GET", "/api/owner/decisions", undefined, s.owner())).body as any).items;
+    expect(open[0]).toMatchObject({ kind: "specialist", title: "Wholesale account coordinator", link: `/owner-specialists.html#${req.id}` });
 
     expect((await s.call("POST", `/api/owner/specialists/${req.id}/decide`, { decision: "approved" }, ann)).status).toBe(403);
     expect((await s.call("POST", `/api/owner/specialists/${req.id}/decide`, { decision: "declined" }, s.owner())).status).toBe(400);

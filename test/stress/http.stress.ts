@@ -72,7 +72,7 @@ describe("the real server under abuse", () => {
     expect(statuses[200]).toBe(2_000);
   });
 
-  it("a signed-in client hammering /api/ask is cut off at 60 a minute", async () => {
+  it("a signed-in client can send tasks as fast as they like: energy is the only limit", async () => {
     const r = await post("/api/signup", { email: "hammer@x.test", businessName: "Hammer" }, { "x-forwarded-for": "7.7.7.7" });
     const { token } = (await r.json()) as any;
     const auth = { authorization: `Bearer ${token}` };
@@ -83,8 +83,8 @@ describe("the real server under abuse", () => {
       const res = await post("/api/ask", { employeeId: emp, text: `What is the status of task ${i}?` }, { ...auth, "x-forwarded-for": "7.7.7.7" });
       statuses[res.status] = (statuses[res.status] ?? 0) + 1;
     });
-    metric("http.ask_rate_limit", { attempts: 150, statuses, note: "limit is per address and path, not per account: the same client from 3 addresses gets 180 a minute" });
-    expect(statuses[429]).toBeGreaterThanOrEqual(89);
+    metric("http.ask_rate_limit", { attempts: 150, statuses, note: "no request limit on /api/ask; the team energy pool, daily ceiling and cost cap stop spending" });
+    expect(statuses[429] ?? 0).toBe(0);
   });
 
   it("refuses a 2 MB body, bad JSON and unknown routes without falling over", async () => {
