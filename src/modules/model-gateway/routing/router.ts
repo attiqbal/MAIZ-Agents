@@ -56,6 +56,9 @@ interface Served { result: CompletionResult; fromRunpod: boolean }
  * on a sample of answers (and on every suspicious one), then a redo on Claude when the score is too low.
  * Claude also takes the work when RunPod cannot. Budget caps are checked before every Claude call.
  */
+/** A worker stays warm for a few minutes after use, so warming more often than this would only cost money. */
+const WARM_EVERY_MS = 4 * 60_000;
+
 export class RoutingGateway implements Completer {
   private cache: ResponseCache;
   private fails = 0;
@@ -78,6 +81,28 @@ export class RoutingGateway implements Completer {
   status(): { runpodConfigured: boolean; claudeConfigured: boolean; breakerOpen: boolean; breakerOpenUntil: string | null; consecutiveFailures: number; cacheEntries: number } {
     const open = this.openUntil > this.now();
     return { runpodConfigured: !!this.d.runpod, claudeConfigured: !!this.d.claude, breakerOpen: open, breakerOpenUntil: open ? new Date(this.openUntil).toISOString() : null, consecutiveFailures: this.fails, cacheEntries: this.cache.size };
+  }
+
+  private warming?: Promise<void>;
+  private warmedAt = 0;
+
+  /**
+   * Starts a sleeping RunPod worker so it is ready by the time the client finishes typing. Costs a few GPU seconds
+   * and only when a client is active. Skipped when RunPod is off, paused, over its cap or tripped, and when a worker
+   * was warmed in the last few minutes. Never throws and never uses Claude.
+   */
+  warm(): "started" | "recent" | "skipped" {
+    const s = this.d.settings.get();
+    const adapter = this.d.runpod;
+    if (!adapter || !s.runpod.enabled || this.openUntil > this.now()) return "skipped";
+    const cap = s.budgets.runpodMonthlyUsd;
+    if (cap !== null && this.d.ledger.runpodMonth() >= cap * USD_TO_MICRO) return "skipped";
+    if (this.warming || this.now() - this.warmedAt < WARM_EVERY_MS) return "recent";
+    this.warmedAt = this.now();
+    this.warming = adapter.complete({ messages: [{ role: "user", content: "ok" }], maxTokens: 1, tier: "standard", model: s.runpod.model, timeoutMs: s.runpod.hardTimeoutMs })
+      .then(() => undefined, () => undefined)
+      .finally(() => { this.warming = undefined; });
+    return "started";
   }
 
   async complete(req: CompletionRequest): Promise<CompletionResult> {

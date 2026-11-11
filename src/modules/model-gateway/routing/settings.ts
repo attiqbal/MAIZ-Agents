@@ -57,6 +57,10 @@ export interface BatchSettings {
   /** Employee templates whose work is never queued (always answered at once). */
   /** After urgent work runs, send everything waiting to the pod too. */
   flushAfterUrgent: boolean;
+  /** Answer ordinary work at once (not in a batch) while a client is on a free trial, so first impressions are quick. */
+  liveDuringTrial: boolean;
+  /** ...and for a client's first this many finished tasks, whatever the plan. 0 switches it off. */
+  liveFirstTasks: number;
   liveTemplates: string[];
 }
 
@@ -117,7 +121,7 @@ export const UNKNOWN_MODEL_PRICE: ModelPrice = { inputPer1k: 4_000, outputPer1k:
 
 export const DEFAULT_BATCH: BatchSettings = {
   enabled: true, sizeTrigger: 20, tokenTrigger: 200_000, maxQueueAgeHours: 24, concurrency: 6, gpuWorkers: 1, gpuSizeGb: 48, windowHours: 10, maxAttempts: 3, retryBackoffMinutes: 15,
-  qaRateMin: 0.3, claudeAfterFailures: true, coldStartSeconds: 40, flushAfterUrgent: true, liveTemplates: ["admin-manager"],
+  qaRateMin: 0.3, claudeAfterFailures: true, coldStartSeconds: 40, flushAfterUrgent: true, liveDuringTrial: true, liveFirstTasks: 20, liveTemplates: ["admin-manager"],
 };
 
 export function defaultSettings(claudeDirectModel: string = HAIKU): AiRoutingSettings {
@@ -132,7 +136,7 @@ export function defaultSettings(claudeDirectModel: string = HAIKU): AiRoutingSet
       billing: "seconds",
       gpuUsdPerSecond: 0.00034,
       tokenPrice: { inputPer1k: 60, outputPer1k: 250 },
-      softDeadlineMs: 45_000,
+      softDeadlineMs: 20_000,
       hardTimeoutMs: 120_000,
       attempts: 2,
       breakerFailures: 3,
@@ -263,6 +267,8 @@ function validBatch(b: Record<string, unknown>): BatchSettings {
     claudeAfterFailures: bool(b.claudeAfterFailures, "Claude after failures"),
     coldStartSeconds: num(b.coldStartSeconds, "cold start seconds", 0, 600),
     flushAfterUrgent: b.flushAfterUrgent === undefined ? true : bool(b.flushAfterUrgent, "flush after urgent"),
+    liveDuringTrial: b.liveDuringTrial === undefined ? true : bool(b.liveDuringTrial, "live during trial"),
+    liveFirstTasks: b.liveFirstTasks === undefined ? 20 : Math.round(num(b.liveFirstTasks, "first tasks answered live", 0, 1_000)),
     liveTemplates: [...list] as string[],
   };
 }

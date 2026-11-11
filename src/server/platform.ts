@@ -9,6 +9,7 @@ import { AnthropicAdapter } from "../modules/model-gateway/adapters/anthropic.js
 import { MockAdapter } from "../modules/model-gateway/adapters/mock.js";
 import { ModelGateway } from "../modules/model-gateway/gateway.js";
 import { RunPodAdapter } from "../modules/model-gateway/adapters/runpod.js";
+import { makeInstantAnswerer } from "./instant-answers.js";
 import { RoutingGateway } from "../modules/model-gateway/routing/router.js";
 import { SpendLedger } from "../modules/model-gateway/routing/ledger.js";
 import { RoutingSettingsStore, defaultSettings } from "../modules/model-gateway/routing/settings.js";
@@ -174,6 +175,8 @@ export function createPlatform(cfg: PlatformConfig) {
   /** Staff and shifts, so rota questions are answered from real records. */
   const rota = new RotaService(identity, audit);
   workforce.addContext((ws, templateKey) => rota.contextFor(ws, templateKey, now().toISOString().slice(0, 10)));
+  /** Short questions the records answer exactly (who is in today, cash, energy left) skip the AI altogether. */
+  workforce.setInstant(makeInstantAnswerer({ rota, ledger, energy, batch, workforce, now }));
   /** The HR manager desk: full staff records. A person added here goes on the rota too, so there is one staff list. */
   const people = new PeopleService(identity, audit, {
     now,
@@ -424,6 +427,8 @@ export function createPlatform(cfg: PlatformConfig) {
   const sends = new SendLog();
   /** Opens and saves per staff form link, so a link cannot be hammered. */
   const formHits = new SendLog();
-  return { ownerDecisions, decisionDigest, dashboard, reconciliation, rota, people, payments, batch, email, usedLinks, sends, formHits, admin, reviews, prices, specialists, ai, clients, isPlatformOwner, healthy, cfg, now, audit, bus, identity, energy, workforce, ledger, onboarding, router, integrations, slackTokens, saveSlackToken, attachStore };
+  /** Starts a sleeping RunPod worker for a client who just opened the app or started typing. */
+  const warm = () => routing?.warm() ?? "skipped";
+  return { warm, ownerDecisions, decisionDigest, dashboard, reconciliation, rota, people, payments, batch, email, usedLinks, sends, formHits, admin, reviews, prices, specialists, ai, clients, isPlatformOwner, healthy, cfg, now, audit, bus, identity, energy, workforce, ledger, onboarding, router, integrations, slackTokens, saveSlackToken, attachStore };
 }
 export type Platform = ReturnType<typeof createPlatform>;

@@ -58,7 +58,14 @@ export interface TaskResult {
 export interface AssignOptions {
   /** The person wants it now: skip the batch queue. */
   urgent?: boolean;
+  /** The ask bar's choice: "now" answers at once, "tonight" waits for the batch. No choice means the platform decides. */
+  when?: "now" | "tonight";
+  /** Set by the workforce, never by callers: a new client whose ordinary work is answered at once. */
+  liveByDefault?: boolean;
 }
+
+/** Answers a short question from the client's own records with no model call. Returns undefined when it does not apply. */
+export type InstantAnswerer = (userId: string, workspaceId: string, brief: string) => string | undefined;
 
 /** How a request is handled. The batch module implements this; the workforce only asks. */
 export interface Intake {
@@ -66,6 +73,10 @@ export interface Intake {
   /** Called after urgent work finished: the pod is warm, so waiting work may as well go now. Must not throw. */
   flush?(): void;
   enqueue(job: { userId: string; workspaceId: string; employeeId: string; brief: string; reason: string; estTokens: number }): { jobId: string; runsAt: string };
+  /** Rules for answering new clients at once. */
+  liveDefaults?(): { liveDuringTrial: boolean; liveFirstTasks: number };
+  /** Records how long an answer took, for the owner's speed page. Must not throw. */
+  record?(kind: "instant" | "lookup" | "live", ms: number): void;
   /** How many of this client's tasks are waiting for a batch. */
   queuedFor?(workspaceId: string): number;
   /** When this client's next batch runs. */
@@ -119,6 +130,23 @@ export class WorkforceService {
 
   restoreTask(t: TaskResult): void {
     this.tasks.set(t.id, t);
+    if (t.status === "ready_for_review") this.noteAnswered(t.workspaceId);
+  }
+
+  /** Answers each client has had, for "new clients get answers at once". */
+  private answered = new Map<string, number>();
+  private noteAnswered(workspaceId: string): void { this.answered.set(workspaceId, (this.answered.get(workspaceId) ?? 0) + 1); }
+  private instant?: InstantAnswerer;
+
+  /** Turns on answers straight from the client's records for short questions (who is in today, cash, energy left...). */
+  setInstant(fn: InstantAnswerer): void { this.instant = fn; }
+
+  /** A free trial, or one of the client's first answers: ordinary work is answered at once instead of waiting for the batch. */
+  private liveByDefault(workspaceId: string): boolean {
+    const d = this.intake?.liveDefaults?.();
+    if (!d) return false;
+    if (d.liveDuringTrial && this.energy?.planOf(workspaceId).expiresAt) return true;
+    return d.liveFirstTasks > 0 && (this.answered.get(workspaceId) ?? 0) < d.liveFirstTasks;
   }
 
   /** Finished tasks for one client since a time, newest first. The board and the week's counts read this. */
@@ -237,7 +265,16 @@ export class WorkforceService {
     if (!employee || employee.workspaceId !== workspaceId) throw new Error("employee not found");
     const template = this.templateFor(employee.templateKey, workspaceId);
     if (!template) throw new Error("employee template missing");
-    const route = this.intake?.route(workspaceId, template.key, brief, opts);
+    const started = Date.now();
+    // Short questions the records can answer: no model, no energy, no wait.
+    const instant = this.instant?.(userId, workspaceId, brief);
+    if (instant !== undefined) {
+      const answer: TaskResult = { id: newId("task"), workspaceId, employeeId, brief, status: "ready_for_review", deliverable: instant, provider: "instant", energyUsed: 0, at: new Date().toISOString() };
+      this.audit.record({ workspaceId, actor: `employee:${employee.id}`, action: "task.instant", target: answer.id });
+      this.intake?.record?.("instant", Date.now() - started);
+      return answer;
+    }
+    const route = this.intake?.route(workspaceId, template.key, brief, { ...opts, liveByDefault: this.liveByDefault(workspaceId) });
     if (route?.mode === "batch") {
       // Only queue work that could start: a client with no energy left learns that now, not tonight.
       const verdict = this.energy?.check(workspaceId, employeeId) ?? { allowed: true as const, overtime: false };
@@ -261,6 +298,7 @@ export class WorkforceService {
       }
     }
     const done = await this.execute(userId, workspaceId, employee, brief, { taskType: route?.mode === "lookup" ? "live" : template.key });
+    if (done.status === "ready_for_review") this.intake?.record?.(route?.mode === "lookup" ? "lookup" : "live", Date.now() - started);
     if (route?.flushAfter && done.status === "ready_for_review") this.intake?.flush?.();
     return done;
   }
@@ -341,6 +379,7 @@ export class WorkforceService {
     }
     task.at = new Date().toISOString();
     this.tasks.set(task.id, task);
+    if (task.status === "ready_for_review") this.noteAnswered(workspaceId);
     this.sink?.record(workspaceId, "task", task.id, task);
     this.audit.record({
       workspaceId,

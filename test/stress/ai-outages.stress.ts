@@ -36,7 +36,7 @@ describe("RunPod and Claude outages", () => {
   it("RunPod hangs (cold start that never finishes): how long the first owners wait before Claude takes over", async () => {
     const w = world();
     const c = await client(w);
-    // The default soft deadline is 45 s. Shortened here to 2 s to keep the test quick; the report scales it.
+    // The default soft deadline is 20 s. Shortened here to 2 s to keep the test quick; the report scales it.
     w.platform.ai.update(uid("owner@maiz.test"), { runpod: { softDeadlineMs: 2_000 } });
     w.runpod.mode = "hang";
     const lat: number[] = [];
@@ -46,7 +46,7 @@ describe("RunPod and Claude outages", () => {
       lat.push(r.ms);
       statuses.push((r.value.body as any).status);
     }
-    metric("ai.runpod_hang", { asks: 5, softDeadlineMsUsed: 2_000, defaultSoftDeadlineMs: 45_000, statuses, latencyMs: lat.map(Math.round), note: "with the default 45 s deadline the first 3 asks each wait ~45 s before Claude answers; after that the breaker skips RunPod for 60 s" });
+    metric("ai.runpod_hang", { asks: 5, softDeadlineMsUsed: 2_000, defaultSoftDeadlineMs: 20_000, statuses, latencyMs: lat.map(Math.round), note: "with the default 20 s deadline the first 3 asks each wait ~20 s before Claude answers; after that the breaker skips RunPod for 60 s" });
     expect(statuses.every((s) => s === "ready_for_review")).toBe(true);
   });
 

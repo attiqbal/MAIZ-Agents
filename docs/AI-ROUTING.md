@@ -10,7 +10,7 @@ covers RunPod when it is down or cold, and keeps regulated work.
 2. **Cache.** An identical request from the same client (same policy, messages, token limit) is answered from memory for $0, for one hour by default. The client id is part of the key, so answers never cross clients. Answers accepted below the pass mark are never cached.
 3. **RunPod.** `https://api.runpod.ai/v2/<endpoint>/openai/v1/chat/completions` with the key from `RUNPOD_API_KEY`.
    - Retries transient errors (429/5xx/network) with backoff, `attempts` times.
-   - **Cold start:** when Claude may cover, the wait is the *soft deadline* (45 s). If RunPod has not answered, the request moves to Claude and is not retried. With no Claude cover it waits the hard timeout (120 s).
+   - **Cold start:** when Claude may cover, the wait is the *soft deadline* (20 s, was 45 s). If RunPod has not answered, the request moves to Claude and is not retried. With no Claude cover it waits the hard timeout (120 s).
    - **Circuit breaker:** 3 failures in a row stop sending work to RunPod for 60 s (all editable). Claude covers in the meantime.
 4. **Claude spot-check.** Claude Haiku scores a sample of answers 1 to 10 (`reviewRate`; standard 15%, premium 50%) and **every suspicious answer** (empty, cut off, looping, unfinished reasoning). The sample rate rises automatically while recent checks keep failing (`adaptive`).
 5. **Redo.** A score below `minScore` (standard 7, premium 8) redoes the work on Claude Sonnet, passing the reviewer's issues as a hint. If Claude is over budget the RunPod answer is kept and counted as *low confidence*.
@@ -39,6 +39,7 @@ Most work does not need an answer this second, and a RunPod GPU that starts once
 | **Lookup** | "what's the status?", "how does the rota look?" | Answered at once by a cheap Claude model (`live` policy, no checks) reading a short digest of the queue and recent filings |
 | **Urgent** | marked urgent (start with `urgent:`), or words like asap, today, before my meeting; the Admin manager always | Normal real-time route (RunPod now) |
 | **Batch** | drafts, reports, bookkeeping, analysis | Queued. The client sees "queued, runs at 6 pm" |
+| **Instant** | who is in today, hours this week, cash and runway, energy left, what is in the queue | Answered from the client's own records by `workforce/instant.ts` and `server/instant-answers.ts`. No model call, no energy, under 100 ms. Anything that mentions another day, asks for writing or analysis, or cannot be answered from the records falls through to the normal route |
 
 **When a batch runs** (`tick()` every minute): at a client's closing time (default 18:00 UTC, set per client with timezone, optional extra runs and skip weekends), early when waiting work reaches `sizeTrigger` tasks or `tokenTrigger` tokens, when anything has waited `maxQueueAgeHours`, or when a client presses Run now (or the owner presses Run all now). Every ready task from every client goes out together, so the GPU starts once. Run now is rate limited per address. **After urgent work completes** (the pod is warm) everything waiting is sent too, at any time of day (`flushAfterUrgent`; lookups and the Admin manager do not trigger it). A **midnight catch-up run** also happens at 00:00 in the business's own time zone, so work queued after closing does not wait for the next evening. The zone defaults from the business's country (`zones.ts`, the main zone of big countries) and the client can change it.
 
@@ -51,6 +52,13 @@ Most work does not need an answer this second, and a RunPod GPU that starts once
 **Limits:** the dispatcher lives in one server process (single instance, as the rest of the in-memory services). Jobs are saved to Postgres and a restart puts running jobs back in the queue. Classification is keyword based and visible: an unusual urgent request may be queued, and the client can always press Run now or write `urgent:`. There is no rota module yet, so "how does the rota look" answers from whatever records exist.
 
 API: `POST /api/ask` (`urgent`), `GET /api/queue`, `POST /api/queue/run-now`, `POST /api/queue/:id/cancel`, `GET|POST /api/batch/schedule`, owner `GET /api/owner/batch`, `POST /api/owner/batch/run-now`. Settings: `batch.*` on the owner AI page.
+
+## Fast by default (added 11 November 2026)
+
+- **Now or Tonight.** The ask bar has two chips. *Now* answers at once, *Tonight* waits for the batch (a quick lookup is still answered at once). `POST /api/ask` takes `when: "now" | "tonight"`; the old `urgent:` prefix still works. No choice means the platform decides.
+- **New clients get answers at once.** With no choice made, ordinary work is answered live while the client is on a free trial (`batch.liveDuringTrial`) and for their first `batch.liveFirstTasks` answers (default 20, 0 switches it off). Both are owner settings. The owner page warns when more than about 40% of model-answered work skips the batch, because that is where the batch saving shrinks.
+- **Pre-warming.** `POST /api/warm` (signed in, `task.create`) sends a one-token request to RunPod so a sleeping worker is awake before the question arrives. It is skipped when RunPod is off, paused, over its cap or tripped, and a worker is not woken more than once every 4 minutes. Claude is never used. The few GPU seconds are not booked to any client.
+- **Speed gauge.** `GET /api/owner/batch` carries `latency`: count, median and slowest 1 in 20 per kind (instant, lookup, live, queue to filed), against targets of 100 ms, 5 s, 30 s and 12 h. Rolling window of 500 in memory, so it starts empty after a restart.
 
 ## Owner controls (`/owner-ai.html`, `GET /api/owner/ai`, `POST /api/owner/ai/settings`, `GET /api/owner/ai/health`)
 

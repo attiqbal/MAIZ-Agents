@@ -20,7 +20,7 @@ async function filledClient(w: World, i: number) {
   await w.call("POST", "/api/finance/entries", { date: "2026-11-16", memo: `${marker} sale`, lines: [{ account: "1000", debit: 999, credit: 0 }, { account: "4000", debit: 0, credit: 999 }] }, a);
   const team = ((await w.call("GET", "/api/org", undefined, a)).body as any).team;
   const emp = team.find((e: any) => e.templateKey === "marketing-manager").id;
-  const job = ((await w.call("POST", "/api/ask", { employeeId: emp, text: `Plan posts about ${marker}` }, a)).body as any).jobId;
+  const job = ((await w.call("POST", "/api/ask", { employeeId: emp, text: `Plan posts about ${marker}`, when: "tonight" }, a)).body as any).jobId;
   const review = ((await w.call("POST", "/api/reviews", { ...BRAND, title: `Brand kit ${marker}` }, a)).body as any).task.id;
   const spec = ((await w.call("POST", "/api/specialists", { ...SPECIALIST, purpose: `${SPECIALIST.purpose} ${marker}` }, a)).body as any).request.id;
   const item = ((await w.call("GET", "/api/store")).body as any).catalogue.find((x: any) => x.kind === "employee");

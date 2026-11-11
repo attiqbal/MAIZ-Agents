@@ -1,11 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { createApp, type Req } from "../src/server/app.js";
+import { userIdFor } from "../src/server/identity.js";
 import { createPlatform } from "../src/server/platform.js";
 import { MemoryEmailSender } from "../src/server/email.js";
 
 function setup() {
   const clock = { d: new Date("2026-11-10T09:00:00Z") };
-  const platform = createPlatform({ sessionSecret: "s3", allowDevAuth: true, email: new MemoryEmailSender(), appUrl: "https://app.test", now: () => clock.d });
+  const platform = createPlatform({ sessionSecret: "s3", allowDevAuth: true, email: new MemoryEmailSender(), appUrl: "https://app.test", platformOwners: ["atif@maiz.test"], now: () => clock.d });
+  platform.ai.update(userIdFor("atif@maiz.test"), { batch: { liveDuringTrial: false, liveFirstTasks: 0 } });
   const handle = createApp(platform);
   const call = (method: string, path: string, body?: unknown, headers: Record<string, string> = {}) =>
     handle({ method, path, query: new URLSearchParams(), headers, rawBody: body === undefined ? "" : JSON.stringify(body) } as Req);

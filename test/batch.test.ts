@@ -79,6 +79,8 @@ describe("batch queue end to end", () => {
       return new Response(JSON.stringify({ content: [{ type: "text", text: "Claude answer: three tasks are queued, the rest are done." }], usage: { input_tokens: 10, output_tokens: 5 }, stop_reason: "end_turn" }));
     }) as unknown as typeof fetch;
     const platform = createPlatform({ sessionSecret: "s3", allowDevAuth: true, appUrl: "https://app.test", platformOwners: [OWNER], now: () => clock.d, http, anthropicApiKey: "ak", runpod: { apiKey: "rk", endpointId: "abc123def456" } });
+    // These tests are about the batch queue, so switch off "new clients get answers at once" (covered in fast-experience.test.ts).
+    platform.ai.update(userIdFor(OWNER), { batch: { liveDuringTrial: false, liveFirstTasks: 0 } });
     const handle = createApp(platform);
     const call = (method: string, path: string, body?: unknown, headers: Record<string, string> = {}) =>
       handle({ method, path, query: new URLSearchParams(), headers, rawBody: body === undefined ? "" : JSON.stringify(body) } as Req);

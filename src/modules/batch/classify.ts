@@ -16,14 +16,31 @@ const QUESTION_START = /^\s*(what|what's|whats|when|who|who's|how many|how much|
 const WORK_VERBS = /\b(write|draft|create|prepare|build|compile|generate|analy[sz]e|reconcile|categori[sz]e|summari[sz]e|plan|design|research|review|audit|forecast|produce|put together|file|post|process|report)\b/i;
 const LOOKUP_MAX_CHARS = 220;
 
-export function classifyWork(input: { brief: string; templateKey: string; urgent?: boolean; liveTemplates: readonly string[] }): Classification {
+export interface ClassifyInput {
+  brief: string;
+  templateKey: string;
+  urgent?: boolean;
+  /** The client's own choice on the ask bar: "now" answers at once, "tonight" waits for the batch. Beats the guesses below. */
+  when?: "now" | "tonight";
+  /** No choice made, and this client is new (free trial or first tasks), so ordinary work is answered at once. */
+  liveByDefault?: boolean;
+  liveTemplates: readonly string[];
+}
+
+/** Work that needs writing or thinking, not a lookup. */
+export const looksLikeWork = (brief: string): boolean => WORK_VERBS.test(brief);
+
+export function classifyWork(input: ClassifyInput): Classification {
   const { brief, templateKey } = input;
   if (input.liveTemplates.includes(templateKey)) return { mode: "urgent", reason: "this employee always answers at once" };
   if (input.urgent) return { mode: "urgent", reason: "marked urgent" };
+  if (input.when === "now") return { mode: "urgent", reason: "you chose to have it now" };
   if (URGENT.test(brief)) return { mode: "urgent", reason: "sounds time-sensitive" };
   if (brief.length <= LOOKUP_MAX_CHARS && (QUESTION_START.test(brief) || brief.trim().endsWith("?")) && !WORK_VERBS.test(brief)) {
     return { mode: "lookup", reason: "a quick question about current records" };
   }
+  if (input.when === "tonight") return { mode: "batch", reason: "you chose tonight's batch" };
+  if (input.liveByDefault) return { mode: "urgent", reason: "new clients get answers at once" };
   return { mode: "batch", reason: "not urgent, so it runs with the next batch" };
 }
 

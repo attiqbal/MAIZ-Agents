@@ -63,7 +63,7 @@ describe("energy pool and caps under load", () => {
     w.clock.d = new Date("2026-11-23T08:00:00Z");
     const auth = w.sessionFor("trial@client.test");
     const queued = [];
-    for (let i = 0; i < 3; i++) queued.push((await w.call("POST", "/api/ask", { employeeId: team[i].id, text: `Write a long marketing plan for spring part ${i}` }, auth)).body as any);
+    for (let i = 0; i < 3; i++) queued.push((await w.call("POST", "/api/ask", { employeeId: team[i].id, text: `Write a long marketing plan for spring part ${i}`, when: "tonight" }, auth)).body as any);
     // The batch runs after closing time, which is after the trial ended at 09:00.
     w.clock.d = new Date("2026-11-23T20:00:00Z");
     await w.platform.batch.tick();
@@ -84,7 +84,7 @@ describe("energy pool and caps under load", () => {
     c.auth = w.sessionFor("flood@client.test");
     let accepted = 0, refused = 0;
     for (let i = 0; i < 2_000; i++) {
-      const r = (await w.call("POST", "/api/ask", { employeeId: c.team[i % c.team.length].id, text: `Write blog post ${i} for the website` }, c.auth)).body as any;
+      const r = (await w.call("POST", "/api/ask", { employeeId: c.team[i % c.team.length].id, text: `Write blog post ${i} for the website`, when: "tonight" }, c.auth)).body as any;
       if (r.status === "queued") accepted++; else refused++;
     }
     w.clock.d = new Date(w.clock.d.getTime() + 13 * 3_600_000);
