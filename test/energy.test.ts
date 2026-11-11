@@ -97,6 +97,23 @@ describe("team energy pool", () => {
     expect(weekStart(new Date("2026-03-16T00:00:00Z")).toISOString()).toBe("2026-03-16T00:00:00.000Z");
   });
 
+  it("refills at the client's own Monday midnight and counts days on the client's clock", async () => {
+    // Auckland is UTC+13 in March (daylight time): its Monday 2026-03-16 00:00 is Sunday 2026-03-15 11:00 UTC.
+    const clock = { d: new Date("2026-03-15T10:00:00Z") }; // Sunday 23:00 in Auckland
+    const { wf, energy, ws, emp } = await setup(500_000, 0, clock, PAID);
+    energy.setZoneResolver(() => "Pacific/Auckland");
+    expect((await wf.assign("owner", ws, emp, "late sunday")).status).toBe("ready_for_review");
+    expect(energy.teamEnergyOf(ws)).toMatchObject({ used: 500, refillsAt: "2026-03-15T11:00:00.000Z" });
+    clock.d = new Date("2026-03-15T11:30:00Z"); // Monday 00:30 in Auckland, still Sunday in London
+    expect(energy.teamEnergyOf(ws)).toMatchObject({ used: 0, left: 8_000, leftToday: 3_000, refillsAt: "2026-03-22T11:00:00.000Z" });
+    // A client in London on the same instant is still in the old week.
+    const london = await setup(500_000, 0, { d: new Date("2026-03-15T10:00:00Z") }, PAID);
+    london.energy.setZoneResolver(() => "Europe/London");
+    await london.wf.assign("owner", london.ws, london.emp, "sunday");
+    london.clock.d = new Date("2026-03-15T11:30:00Z");
+    expect(london.energy.teamEnergyOf(london.ws)).toMatchObject({ used: 500, refillsAt: "2026-03-16T00:00:00.000Z" });
+  });
+
   it("lets one employee use the team's energy beyond the old per-employee daily amount", async () => {
     const { wf, energy, ws, emp } = await setup(500_000, 0, undefined, PAID); // 500 energy per task
     for (const b of ["a", "b", "c"]) expect((await wf.assign("owner", ws, emp, b)).status).toBe("ready_for_review");

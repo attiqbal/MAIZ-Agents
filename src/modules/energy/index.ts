@@ -1,6 +1,7 @@
 import type { Sink } from "../../core/persistence.js";
 import type { AuditLog } from "../audit/index.js";
 import type { IdentityService } from "../identity/index.js";
+import { localParts, localToInstant } from "../batch/schedule.js";
 
 /**
  * Energy is what customers see; cost is what we pay. 1 energy = 1/1000 of a
@@ -130,7 +131,7 @@ export interface TeamEnergy {
   /** Left today under the daily ceiling (never more than `left`). */
   leftToday: number;
   dailyCeiling: number | null;
-  /** When the pool refills: next Monday 00:00 UTC, or null on a trial (it ends instead). */
+  /** When the pool refills: the client's next Monday 00:00, or null on a trial (it ends instead). */
   refillsAt: string | null;
 }
 
@@ -232,17 +233,17 @@ export class EnergyMeter {
   }
 
   /** Start of the current pool window: the trial start, or Monday 00:00 UTC. */
-  private windowStart(plan: EnergyPlan): string {
+  private windowStart(plan: EnergyPlan, workspaceId: string): string {
     if (plan.expiresAt && plan.startedAt) return plan.startedAt.slice(0, 10);
-    return weekStart(this.now()).toISOString().slice(0, 10);
+    return this.weekOf(workspaceId).date;
   }
 
   /** The shared team pool right now, or undefined for a plan without one. Platform-level, no user check. */
   teamEnergyOf(workspaceId: string): TeamEnergy | undefined {
     const plan = this.planOf(workspaceId);
     if (plan.weeklyTeamEnergy === undefined) return undefined;
-    const from = this.windowStart(plan);
-    const day = this.today();
+    const from = this.windowStart(plan, workspaceId);
+    const day = this.today(workspaceId);
     const rows = this.rowsOf(workspaceId).filter((u) => !u.overtime && u.day >= from);
     const used = rows.reduce((s, u) => s + u.energy, 0);
     const usedToday = rows.filter((u) => u.day === day).reduce((s, u) => s + u.energy, 0);
@@ -250,7 +251,7 @@ export class EnergyMeter {
     const held = this.held.get(workspaceId)?.pool ?? 0;
     const left = Math.max(0, pool - used - held);
     const ceiling = plan.dailyTeamCeiling ?? null;
-    const refillsAt = plan.expiresAt ? null : new Date(weekStart(this.now()).getTime() + 7 * 86_400_000).toISOString();
+    const refillsAt = plan.expiresAt ? null : this.nextRefill(workspaceId).toISOString();
     const percentUsed = pool > 0 ? Math.min(100, Math.round((used / pool) * 100)) : 100;
     return {
       pool, used, left, percentUsed, topUpLeft: this.topUpLeft(workspaceId), autoReload: plan.autoReload ?? null,
@@ -296,7 +297,7 @@ export class EnergyMeter {
     const plan = this.planOf(workspaceId);
     const ar = plan.autoReload;
     if (!ar?.enabled || !this.charge || plan.expiresAt) return false;
-    const month = this.today().slice(0, 7);
+    const month = this.today(workspaceId).slice(0, 7);
     const spent = plan.autoReloadSpent?.month === month ? plan.autoReloadSpent.gbp : 0;
     if (spent + ar.packGbp > ar.monthlyCapGbp) return false;
     if (!this.charge(workspaceId, ar.packGbp, `${ar.packEnergy} energy top-up`)) return false;
@@ -331,7 +332,7 @@ export class EnergyMeter {
   check(workspaceId: string, employeeId: string): Verdict {
     const plan = this.planOf(workspaceId);
     if (plan.expiresAt && this.now().toISOString() > plan.expiresAt) return { allowed: false, reason: "trial_ended" };
-    const day = this.today();
+    const day = this.today(workspaceId);
     const month = day.slice(0, 7);
     const mine = this.rowsOf(workspaceId);
     const monthRows = mine.filter((u) => u.day.startsWith(month));
@@ -407,7 +408,7 @@ export class EnergyMeter {
     const rec: UsageRecord = {
       workspaceId,
       employeeId,
-      day: this.today(),
+      day: this.today(workspaceId),
       provider,
       inputTokens,
       outputTokens,
@@ -424,7 +425,7 @@ export class EnergyMeter {
   /** What the customer sees: energy left today for one employee. Can go negative only through overtime. */
   remainingToday(userId: string, workspaceId: string, employeeId: string): number {
     this.identity.require(userId, workspaceId, "task.read");
-    const day = this.today();
+    const day = this.today(workspaceId);
     const used = this.rowsOf(workspaceId).filter((u) => u.employeeId === employeeId && u.day === day && !u.overtime).reduce((s, u) => s + u.energy, 0);
     const team = this.teamEnergyOf(workspaceId);
     if (!team) return Math.max(0, this.dailyQuota(workspaceId, employeeId) - used);
@@ -442,7 +443,7 @@ export class EnergyMeter {
   /** Energy used by each employee on each of the last `days` days, oldest first, today last. */
   recentDays(userId: string, workspaceId: string, days: number): { days: string[]; byEmployee: Map<string, number[]> } {
     this.identity.require(userId, workspaceId, "task.read");
-    const end = Date.parse(`${this.today()}T00:00:00Z`);
+    const end = Date.parse(`${this.today(workspaceId)}T00:00:00Z`);
     const labels = Array.from({ length: days }, (_, i) => new Date(end - (days - 1 - i) * 86_400_000).toISOString().slice(0, 10));
     const byEmployee = new Map<string, number[]>();
     for (const u of this.rowsOf(workspaceId)) {
@@ -455,7 +456,7 @@ export class EnergyMeter {
   }
 
   /** What we see: real cost and energy for the month. Admin/owner view. */
-  monthSummary(userId: string, workspaceId: string, month = this.today().slice(0, 7)) {
+  monthSummary(userId: string, workspaceId: string, month = this.today(workspaceId).slice(0, 7)) {
     this.identity.require(userId, workspaceId, "workspace.manage");
     const rows = this.rowsOf(workspaceId).filter((u) => u.day.startsWith(month));
     const byEmployee: Record<string, { energy: number; costMicro: number }> = {};
@@ -474,7 +475,7 @@ export class EnergyMeter {
 
   /** Platform-level usage for one client (no user check): the platform owner's clients screen. */
   usageOf(workspaceId: string): { energyToday: number; energyMonth: number; costMicroMonth: number } {
-    const day = this.today();
+    const day = this.today(workspaceId);
     const rows = this.rowsOf(workspaceId).filter((u) => u.day.startsWith(day.slice(0, 7)));
     return {
       energyToday: rows.filter((u) => u.day === day).reduce((s, u) => s + u.energy, 0),
@@ -483,7 +484,35 @@ export class EnergyMeter {
     };
   }
 
-  private today(): string {
-    return this.now().toISOString().slice(0, 10);
+  /** The client's own time zone (IANA). UTC until a resolver says otherwise. */
+  private zoneFor?: (workspaceId: string) => string | undefined;
+  setZoneResolver(fn: (workspaceId: string) => string | undefined): void {
+    this.zoneFor = fn;
+  }
+
+  private zone(workspaceId: string): string {
+    const z = this.zoneFor?.(workspaceId) ?? "UTC";
+    try { new Intl.DateTimeFormat("en-GB", { timeZone: z }); return z; } catch { return "UTC"; }
+  }
+
+  /** The client's calendar day, so "today" and "this week" mean their day and their Monday. */
+  private today(workspaceId: string): string {
+    const l = localParts(this.now(), this.zone(workspaceId));
+    return `${l.y}-${String(l.m).padStart(2, "0")}-${String(l.d).padStart(2, "0")}`;
+  }
+
+  /** The client's current Monday: its calendar date, and the instant their Monday 00:00 began. */
+  private weekOf(workspaceId: string): { date: string; startsAt: Date } {
+    const tz = this.zone(workspaceId);
+    const l = localParts(this.now(), tz);
+    const day = new Date(Date.UTC(l.y, l.m - 1, l.d));
+    const monday = new Date(day.getTime() - ((day.getUTCDay() + 6) % 7) * 86_400_000);
+    return { date: monday.toISOString().slice(0, 10), startsAt: localToInstant(tz, monday.getUTCFullYear(), monday.getUTCMonth() + 1, monday.getUTCDate(), 0, 0) };
+  }
+
+  /** When the pool next refills: the client's next Monday 00:00. */
+  private nextRefill(workspaceId: string): Date {
+    const next = new Date(Date.parse(`${this.weekOf(workspaceId).date}T00:00:00Z`) + 7 * 86_400_000);
+    return localToInstant(this.zone(workspaceId), next.getUTCFullYear(), next.getUTCMonth() + 1, next.getUTCDate(), 0, 0);
   }
 }

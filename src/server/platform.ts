@@ -104,6 +104,8 @@ export function createPlatform(cfg: PlatformConfig) {
   const admin = new AdminManager(identity, workforce, audit, bus, new InMemoryStorageProvisioner(), new InMemoryModelProvisioner(), router, { now });
   /** Batch work: compiled during the day, sent to the pod at each client's closing time or when enough has gathered. */
   const batch = new BatchService({ identity, audit, workforce, settings: aiSettings, ledger: spend, isPlatformOwner: (id) => ownerIdSet.has(id), notify: (ws, text, link) => admin.tell(ws, text, link), now });
+  // The weekly refill and "today" follow the client's own clock (the same zone as their batch schedule).
+  energy.setZoneResolver((ws) => batch.scheduleOf(ws).timezone);
   workforce.setIntake(batch);
   workforce.addContext((ws, templateKey, taskType) => batch.contextFor(ws, templateKey, taskType));
   const email = cfg.email ?? new ConsoleEmailSender();
