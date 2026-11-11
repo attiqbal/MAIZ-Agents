@@ -41,6 +41,11 @@ const mk = async (opts = {}) => { const ctx = await b.newContext({ viewport: { w
   await p.click("#biz-go"); ok("onboarding: no sector or name shows error", await p.isVisible("#biz-err"));
   await p.click('#sectors [data-v="food-drink"]'); await p.fill("#biz", "Example Bakery"); await p.selectOption("#country", "GB"); await p.click("#biz-go");
   ok("onboarding: needs are ticked for the sector", (await p.locator('#needs .chip[aria-pressed="true"]').count()) === 3);
+  await p.reload({ waitUntil: "networkidle" });
+  ok("onboarding: a refresh keeps your place (step 2)", await p.isVisible('[data-step="2"]'));
+  await p.goBack({ waitUntil: "networkidle" }).catch(() => {}); await p.waitForTimeout(200);
+  ok("onboarding: browser Back goes to the previous step", await p.isVisible('[data-step="1"]'), p.url());
+  await p.goForward({ waitUntil: "networkidle" }).catch(() => {}); await p.waitForTimeout(200);
   await p.click('#needs [data-v="stock"]'); await p.click("#needs-go");
   ok("onboarding: sector apps offered", await p.isVisible('#apps [data-v="square"]'));
   await p.click('#apps [data-v="square"]'); await p.click("#apps-go");
@@ -62,10 +67,12 @@ const mk = async (opts = {}) => { const ctx = await b.newContext({ viewport: { w
   await p.fill("#ask-in", "finance: what is my runway?"); await p.press("#ask-in", "Enter");
   await p.waitForSelector("#answer", { timeout: 8000 }).catch(() => {});
   ok("app (signed in): ask bar returns an answer", await p.isVisible("#answer"));
-  for (const s of ["approvals", "work", "team", "usage", "finance", "compliance", "apps", "setup", "settings"]) {
+  for (const s of ["approvals", "work", "team", "usage", "store", "finance", "compliance", "apps", "setup", "settings"]) {
     await p.click(`.rail a[data-nav="${s}"]`); await p.waitForTimeout(150);
     ok(`app nav: ${s} screen opens`, await p.isVisible(`[data-screen="${s}"] h1`) && (await p.getAttribute(`.rail a[data-nav="${s}"]`, "aria-current")) === "page");
   }
+  await p.click('.rail a[data-nav="store"]'); await p.waitForTimeout(500);
+  ok("store (signed in): opens inside the control centre with the picker", p.url().includes("app.html#store") && (await p.locator("#store-pick option").count()) > 1);
   await p.click('.rail a[data-nav="apps"]'); await p.waitForTimeout(400);
   ok("apps (signed in): catalogue from API", (await p.locator("#apps-grid .app-card").count()) >= 5);
   await p.click('.rail a[data-nav="settings"]'); await p.click("[data-signout]"); await p.waitForURL(/signin/);

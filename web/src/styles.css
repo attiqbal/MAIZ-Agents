@@ -973,3 +973,9 @@ body > main, body > .page-top { flex: none; }
 .calc-out { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 @media (max-width: 640px) { .calc { padding: 20px; } .calc-in, .calc-out { grid-template-columns: 1fr; } .calc-out > :first-child:nth-last-child(odd) { grid-column: auto; } }
 #tu-form .acts { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+
+/* Org chart on phones: stack the employees under the Admin manager instead of a wide row that opens scrolled. */
+@media (max-width: 640px) {
+  .orow { flex-direction: column; align-items: center; gap: 12px; padding-top: 12px; }
+  .orow::before, .ocol::before { display: none; }
+}

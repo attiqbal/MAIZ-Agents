@@ -41,6 +41,15 @@ function route(): void {
   window.scrollTo({ top: 0 });
 }
 window.addEventListener("hashchange", route);
+// The store opens inside the control centre, so hiring never leaves the app. Loaded on first visit.
+let storeReady = false;
+function openStoreIfShown(): void {
+  if (storeReady || location.hash !== "#store") return;
+  storeReady = true;
+  void import("./store").then((m) => m.initStore({ onPaid: () => { void loadOrg(); } }));
+}
+window.addEventListener("hashchange", openStoreIfShown);
+openStoreIfShown();
 // The skip link must not change the hash: the hash picks the screen.
 $("skip-main").addEventListener("click", (e) => { e.preventDefault(); $("main").focus(); });
 
