@@ -83,7 +83,26 @@ Keep flat file names (no framework router). New pages are added to `vite.config.
 | Industries | `industries/<sector>.html` | **new, generated** | From `onboarding/sectors.ts` (13 sectors); Phase 4 |
 | Sign in / Sign up | `signin.html`, `onboarding.html` | unchanged | `noindex` |
 
-Header navigation (pill nav, from `partials/header.html`): Product (AI employees, Store, Control centre) · How it works · Pricing · Security · Sign in · **Start free trial**. Footer: all pages plus industries.
+### Navigation and sitemap (Atif, 2026-11-12: separate section for everything, secondary menus, properly planned)
+
+The homepage is a **summary with doors**: each section shows one idea and a "Learn more" link to its own page. Nothing is explained in full on the homepage.
+
+**Primary menu (pill nav, with dropdowns on desktop, accordion on mobile):**
+
+| Menu | Opens to (dropdown items) |
+|---|---|
+| **Product** | AI employees · Employee store · Control centre · Slack and apps · Live demo |
+| **How it works** | Overview · Set up in 3 minutes · Approvals and control · Energy explained |
+| **Solutions** | By industry (restaurants, e-commerce, professional services, agencies, small business, property) · By role |
+| **Pricing** | Plans · Team builder · Compare with hiring |
+| **Trust** | Security and privacy · What your team can access |
+| Right side | Log in · **Start free trial** |
+
+**Secondary menu on every inner page** (a sticky sub-nav under the header, sitting in a pill row): the page's own sections as anchors, with the active one highlighted while scrolling (IntersectionObserver). Example on Pricing: Plans · Team builder · Compare · FAQ. On a role page: Overview · What they do · Example work · Cost · Hire. A breadcrumb above the H1 (Product / AI employees / Finance manager).
+
+**Footer** is the full sitemap in four short columns (Product, How it works, Solutions, Company) so nothing needs to live on the homepage.
+
+New or split pages this adds to the table above (all flat files, all added to `vite.config.ts` inputs and `INDEXED_PAGES`): `slack-and-apps.html` (only the integrations that are live), `energy.html` (what energy is, how the weekly pool and top-ups work, moved out of the pricing FAQ), `approvals.html` (the approval and quality-review flow), `faq.html` (the FAQ moves here; the generated JSON-LD moves with it), `industries.html` as an index of the generated sector pages.
 
 ## 5. Design tokens and components
 
@@ -98,6 +117,19 @@ No new tokens file. The existing `:root` in `web/src/styles.css` stays the singl
   - `approval-card`, `status-pill` (queued / working / checking / waiting for you / done)
   - `industry-card`, `faq` (reuse `<details>`; the JSON-LD generator already reads this markup)
 - Rules from `CLAUDE.md` stay: Orange never text or a button fill, Brass for readable accents, no `transition: all`, tabular numbers for figures, 40px+ hit areas, no shadows, no purple gradients, robots, glowing brains or particles.
+
+### Motion and design elements (Atif, 2026-11-12: some animations, design elements, make it proper)
+
+Purposeful, calm, no particles or glowing effects. All motion is CSS first, one small `web/src/motion.ts` for the rest, under 3 kB gz, and every effect has a `prefers-reduced-motion` fallback (shown static, final state).
+
+- **Scroll reveal**: sections fade and rise 16px once as they enter view (IntersectionObserver, 400ms ease-out, staggered 60ms for tiles). Only `opacity` and `transform` animate; never `transition: all`.
+- **Hero**: headline words settle in sequence; the control-centre image drifts in; a slowly looping "needs your approval" chip pulses once. No autoplay video.
+- **Demo stage** (homepage and Control centre page): the scripted sequence in section 6, with typing dots, task cards sliding in and the energy meter filling.
+- **Team tiles**: on hover or focus the tile lifts 4px, the avatar ring fills with the department colour and a one-line role summary appears; keyboard focus does the same.
+- **Number counters** on the pricing and team builder: totals tick to the new value in 200ms (tabular numbers so nothing jumps).
+- **Sticky sub-nav**: slides in after the hero; the active-section pill glides between items.
+- **Dropdown menus**: 150ms fade and 6px slide, closes on Escape and outside click, fully keyboard operable.
+- **Design elements**: a single hand-drawn Ember underline stroke that draws itself under one key word per page; thin line icons from one inline SVG set; department avatar rings (one colour per department, from existing tokens); subtle paper-grain background on the canvas (CSS only, no image); Graphite "stage" bands with a fine grid; and a connected "org chart" diagram (Admin manager at the top, five employees below, lines drawing in on scroll).
 
 ## 6. Homepage specification
 
