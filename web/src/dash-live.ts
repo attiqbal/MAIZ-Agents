@@ -65,8 +65,9 @@ function team(d: Live): void {
       ? tile("Energy left this week", `${100 - d.teamEnergy.percentUsed}%`, `Shared by the whole team. ${refills(d.teamEnergy)}`, "#usage")
       : tile("Energy left today", `${Math.max(0, t.allowanceToday - t.energyToday)} / ${t.allowanceToday}`, "Refills at midnight (UTC)", "#usage"),
   ].join("");
+  $("team-table").classList.add("tbl-stack");
   $("team-table").innerHTML = `<thead><tr><th scope="col">Employee</th><th scope="col">Status</th><th scope="col">Working on</th><th scope="col" class="num">Done this week</th><th scope="col">${d.teamEnergy ? "Share of the week's energy" : "Energy left today"}</th></tr></thead><tbody>` +
-    d.team.map((e) => `<tr><td>${who(e)}</td><td>${status(e.status === "working" ? "good" : "idle", e.status === "working" ? "Working" : "Ready")}</td><td>${esc(e.doing ?? "Waiting for your next request")}</td><td class="num">${e.doneWeek}</td><td>${d.teamEnergy ? share(sum(e.week), d.teamEnergy.pool) : energyBar(e.usedToday, Math.max(e.allowance, 1))}</td></tr>`).join("") + "</tbody>";
+    d.team.map((e) => `<tr><td>${who(e)}</td><td>${status(e.status === "working" ? "good" : "idle", e.status === "working" ? "Working" : "Ready")}</td><td data-label="Working on">${esc(e.doing ?? "Waiting for your next request")}</td><td class="num" data-label="Done this week">${e.doneWeek}</td><td data-label="Energy">${d.teamEnergy ? share(sum(e.week), d.teamEnergy.pool) : energyBar(e.usedToday, Math.max(e.allowance, 1))}</td></tr>`).join("") + "</tbody>";
   hideExampleTag("team");
 }
 

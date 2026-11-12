@@ -111,9 +111,10 @@ function renderTeam(): void {
     tile("Tasks done this week", String(done), `${first}% accepted first time`),
     tile("Energy left this week", `${100 - weekPct}%`, "Shared by the whole team. Refills Monday", "#usage"),
   ].join("");
+  $("team-table").classList.add("tbl-stack");
   $("team-table").innerHTML = `<thead><tr><th scope="col">Employee</th><th scope="col">Status</th><th scope="col">Working on</th><th scope="col" class="num">Done</th><th scope="col" class="num">Accepted first time</th><th scope="col">Share of the week's energy</th></tr></thead><tbody>` +
-    `<tr><td><a class="who-cell desk-a" href="#desk/admin-manager"><span class="av av-sm av-tl" aria-hidden="true">AM</span>Admin manager</a></td><td>${status("good", "Working")}</td><td>Routing requests and writing your daily briefing</td><td class="num">Daily</td><td class="num">–</td><td class="muted">Uses no energy</td></tr>` +
-    EMPLOYEES.map((e) => `<tr><td>${who(e)}</td><td>${status(e.status, e.statusText)}</td><td>${esc(e.doing)}</td><td class="num">${e.done}</td><td class="num">${e.firstTime}%</td><td>${shareBar(shareOf(e))}</td></tr>`).join("") + "</tbody>";
+    `<tr><td><a class="who-cell desk-a" href="#desk/admin-manager"><span class="av av-sm av-tl" aria-hidden="true">AM</span>Admin manager</a></td><td>${status("good", "Working")}</td><td data-label="Working on">Routing requests and writing your daily briefing</td><td class="num" data-label="Done">Daily</td><td class="num" data-label="Accepted first time">–</td><td class="muted" data-label="Energy">Uses no energy</td></tr>` +
+    EMPLOYEES.map((e) => `<tr><td>${who(e)}</td><td>${status(e.status, e.statusText)}</td><td data-label="Working on">${esc(e.doing)}</td><td class="num" data-label="Done">${e.done}</td><td class="num" data-label="Accepted first time">${e.firstTime}%</td><td data-label="Share of the week's energy">${shareBar(shareOf(e))}</td></tr>`).join("") + "</tbody>";
 }
 
 let taskFilter = "all";
