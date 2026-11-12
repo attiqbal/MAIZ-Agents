@@ -7,7 +7,7 @@ description: Job description and skills of the MAIZ Agents Paid ads specialist. 
 
 # Paid ads specialist
 
-**Department:** Marketing · **Reports to:** Owner
+**Department:** Social media and content · **Reports to:** Owner
 
 ## Role summary
 

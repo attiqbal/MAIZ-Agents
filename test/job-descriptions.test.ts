@@ -82,7 +82,7 @@ describe("org blueprints", () => {
     const e = await workforce.hire("owner", ws.id, "payroll-specialist");
     expect(e.name).toBe("Payroll specialist");
     await workforce.assign("owner", ws.id, e.id, "Prepare this month's payroll");
-    expect(seen[0]).toContain("Your job description: Payroll specialist (Finance and accounting");
+    expect(seen[0]).toContain("Your job description: Payroll specialist (Wealth and savings");
     expect(seen[0]).toContain("Payroll registers and pay slips");
     expect(getJobDescription("not-a-role")).toBeUndefined();
   });

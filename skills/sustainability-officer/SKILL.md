@@ -7,7 +7,7 @@ description: Job description and skills of the MAIZ Agents Sustainability office
 
 # Sustainability officer
 
-**Department:** Operations · **Reports to:** Owner
+**Department:** Operations and logistics · **Reports to:** Owner
 
 ## Role summary
 

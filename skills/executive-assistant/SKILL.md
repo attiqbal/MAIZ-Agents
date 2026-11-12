@@ -7,7 +7,7 @@ description: Job description and skills of the MAIZ Agents Executive assistant. 
 
 # Executive assistant
 
-**Department:** Leadership and administration · **Reports to:** Owner
+**Department:** Executive and office support · **Reports to:** Owner
 
 ## Role summary
 

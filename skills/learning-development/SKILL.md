@@ -7,7 +7,7 @@ description: Job description and skills of the MAIZ Agents Learning and developm
 
 # Learning and development coordinator
 
-**Department:** People (HR) · **Reports to:** Owner
+**Department:** Executive and office support · **Reports to:** Owner
 
 ## Role summary
 

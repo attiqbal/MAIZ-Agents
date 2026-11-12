@@ -7,7 +7,7 @@ description: Job description and skills of the MAIZ Agents Project manager. Deli
 
 # Project manager
 
-**Department:** Operations · **Reports to:** Owner
+**Department:** Operations and logistics · **Reports to:** Owner
 
 ## Role summary
 

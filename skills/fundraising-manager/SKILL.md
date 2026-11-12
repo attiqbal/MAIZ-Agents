@@ -7,7 +7,7 @@ description: Job description and skills of the MAIZ Agents Fundraising and inves
 
 # Fundraising and investor relations manager
 
-**Department:** Finance and accounting · **Reports to:** Owner
+**Department:** Fundraising and investor relations · **Reports to:** Owner
 
 ## Role summary
 

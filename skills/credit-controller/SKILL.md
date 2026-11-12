@@ -7,7 +7,7 @@ description: Job description and skills of the MAIZ Agents Credit controller. Ge
 
 # Credit controller
 
-**Department:** Finance and accounting · **Reports to:** Owner
+**Department:** Wealth and savings · **Reports to:** Owner
 
 ## Role summary
 

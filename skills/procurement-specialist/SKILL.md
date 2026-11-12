@@ -7,7 +7,7 @@ description: Job description and skills of the MAIZ Agents Procurement specialis
 
 # Procurement specialist
 
-**Department:** Supply chain and procurement · **Reports to:** Owner
+**Department:** Operations and logistics · **Reports to:** Owner
 
 ## Role summary
 

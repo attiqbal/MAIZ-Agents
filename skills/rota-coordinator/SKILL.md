@@ -7,7 +7,7 @@ description: Job description and skills of the MAIZ Agents Rota and shift coordi
 
 # Rota and shift coordinator
 
-**Department:** People (HR) · **Reports to:** Owner
+**Department:** Operations and logistics · **Reports to:** Owner
 
 ## Role summary
 

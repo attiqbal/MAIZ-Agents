@@ -7,7 +7,7 @@ description: Job description and skills of the MAIZ Agents E-commerce manager. R
 
 # E-commerce manager
 
-**Department:** Sales · **Reports to:** Owner
+**Department:** Sales and business development · **Reports to:** Owner
 
 ## Role summary
 

@@ -7,7 +7,7 @@ description: Job description and skills of the MAIZ Agents Financial analyst. Tu
 
 # Financial analyst
 
-**Department:** Finance and accounting · **Reports to:** Owner
+**Department:** Fundraising and investor relations · **Reports to:** Owner
 
 ## Role summary
 

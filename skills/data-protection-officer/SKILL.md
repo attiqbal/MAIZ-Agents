@@ -7,7 +7,7 @@ description: Job description and skills of the MAIZ Agents Data protection lead.
 
 # Data protection lead
 
-**Department:** Legal, risk and compliance · **Reports to:** Owner
+**Department:** Legal and contracts · **Reports to:** Owner
 
 ## Role summary
 

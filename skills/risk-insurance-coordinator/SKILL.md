@@ -7,7 +7,7 @@ description: Job description and skills of the MAIZ Agents Risk and insurance co
 
 # Risk and insurance coordinator
 
-**Department:** Legal, risk and compliance · **Reports to:** Owner
+**Department:** Legal and contracts · **Reports to:** Owner
 
 ## Role summary
 

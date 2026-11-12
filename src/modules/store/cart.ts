@@ -51,7 +51,7 @@ export interface CatalogueItem {
   energy?: number;
   /** Custom specialists only: which monthly price band applies. */
   tier?: "standard" | "premium";
-  /** Group label for the picker, e.g. "Finance and accounting". */
+  /** Group label for the picker, e.g. "Wealth and savings". */
   group: string;
   summary: string;
 }

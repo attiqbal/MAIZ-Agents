@@ -7,7 +7,7 @@ description: Job description and skills of the MAIZ Agents Contract manager. Kee
 
 # Contract manager
 
-**Department:** Legal, risk and compliance · **Reports to:** Owner
+**Department:** Legal and contracts · **Reports to:** Owner
 
 ## Role summary
 

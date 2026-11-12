@@ -7,7 +7,7 @@ description: Job description and skills of the MAIZ Agents Management accountant
 
 # Management accountant
 
-**Department:** Finance and accounting · **Reports to:** Owner
+**Department:** Wealth and savings · **Reports to:** Owner
 
 ## Role summary
 

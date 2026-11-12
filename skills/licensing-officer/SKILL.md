@@ -7,7 +7,7 @@ description: Job description and skills of the MAIZ Agents Licences and permits 
 
 # Licences and permits officer
 
-**Department:** Legal, risk and compliance · **Reports to:** Owner
+**Department:** Legal and contracts · **Reports to:** Owner
 
 ## Role summary
 

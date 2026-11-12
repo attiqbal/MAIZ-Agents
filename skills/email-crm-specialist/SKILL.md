@@ -7,7 +7,7 @@ description: Job description and skills of the MAIZ Agents Email and CRM special
 
 # Email and CRM specialist
 
-**Department:** Marketing · **Reports to:** Owner
+**Department:** Social media and content · **Reports to:** Owner
 
 ## Role summary
 

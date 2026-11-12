@@ -7,7 +7,7 @@ description: Job description and skills of the MAIZ Agents HR administrator. Kee
 
 # HR administrator
 
-**Department:** People (HR) · **Reports to:** Owner
+**Department:** Executive and office support · **Reports to:** Owner
 
 ## Role summary
 
