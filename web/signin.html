@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="en">
 <head>
-<!--@include head title="Log in · MAIZ Agents" description="Log in to your AI team with a one-time link sent to your email."-->
+<!--@include head title="Log in · MAIZ Agents" description="Log in to your AI team with your email and password, or with Google or Microsoft."-->
 <meta name="robots" content="noindex">
 </head>
 <body>
@@ -9,24 +9,68 @@
   <!--@include header-->
   <main id="main">
     <section class="section">
-      <div class="container" style="max-width:480px">
-        <div class="ob-panel" aria-live="polite">
-          <h1 id="si-h" style="font-size:1.75rem;margin:0 0 6px">Log in</h1>
-          <p id="si-p" class="sub" style="margin:0 0 18px">We will email you a one-time link. No password to remember.</p>
-          <div class="social" id="social" hidden>
-            <div class="social-row" id="social-btns"></div>
-            <p class="small muted social-or">or use your email</p>
+      <div class="container" style="max-width:440px">
+        <div class="ob-panel auth-card" aria-live="polite">
+          <h1 id="si-h" class="auth-h">Log in</h1>
+          <p id="si-p" class="sub auth-sub" hidden></p>
+          <p class="err" id="si-err" role="alert" hidden></p>
+
+          <!-- Log in -->
+          <div id="v-login">
+            <div class="social" id="social" hidden>
+              <div class="social-row" id="social-btns"></div>
+              <p class="small muted social-or">or</p>
+            </div>
+            <form id="login-form" class="auth-form" novalidate>
+              <div class="field"><label for="login-email">Email</label><input class="input" id="login-email" type="email" autocomplete="username" inputmode="email" placeholder="you@business.com" required></div>
+              <div class="field">
+                <div class="auth-label-row"><label for="login-pw">Password</label><a href="#forgot" id="to-forgot">Forgot password?</a></div>
+                <div class="pw"><input class="input" id="login-pw" type="password" autocomplete="current-password" required><button type="button" class="pw-toggle" data-pw-toggle="login-pw" aria-pressed="false">Show</button></div>
+              </div>
+              <button class="btn btn-primary btn-block" type="submit" id="login-go">Log in</button>
+            </form>
+            <p class="hint auth-alt"><button type="button" class="link-btn" id="to-link">Email me a log-in link instead</button></p>
+            <p class="hint auth-alt">New here? <a href="/onboarding.html">Start your free trial</a></p>
           </div>
-          <form id="si-form">
-            <div class="field"><label for="si-email">Work email</label><input class="input" id="si-email" type="email" aria-describedby="si-err" placeholder="you@business.com" autocomplete="email" required></div>
-            <p class="err" id="si-err" role="alert" hidden></p>
-            <button class="btn btn-primary btn-block" type="submit" id="si-go">Email me a link</button>
-          </form>
-          <div id="si-signed" hidden>
+
+          <!-- Email me a link (fallback) -->
+          <div id="v-link" hidden>
+            <form id="link-form" class="auth-form" novalidate>
+              <div class="field"><label for="link-email">Email</label><input class="input" id="link-email" type="email" autocomplete="email" inputmode="email" placeholder="you@business.com" required></div>
+              <button class="btn btn-primary btn-block" type="submit" id="link-go">Email me a link</button>
+            </form>
+            <p class="hint auth-alt"><a href="#login" class="to-login">Back to log in</a></p>
+          </div>
+
+          <!-- Forgot, or first-time password -->
+          <div id="v-forgot" hidden>
+            <form id="forgot-form" class="auth-form" novalidate>
+              <div class="field"><label for="forgot-email">Email</label><input class="input" id="forgot-email" type="email" autocomplete="email" inputmode="email" placeholder="you@business.com" required></div>
+              <button class="btn btn-primary btn-block" type="submit" id="forgot-go">Email me a reset link</button>
+            </form>
+            <p class="hint auth-alt"><a href="#login" class="to-login">Back to log in</a></p>
+          </div>
+
+          <!-- Choose a new password (from the emailed link) -->
+          <div id="v-reset" hidden>
+            <form id="reset-form" class="auth-form" novalidate>
+              <div class="field">
+                <label for="reset-pw">New password</label>
+                <div class="pw"><input class="input" id="reset-pw" type="password" autocomplete="new-password" aria-describedby="reset-hint" required><button type="button" class="pw-toggle" data-pw-toggle="reset-pw" aria-pressed="false">Show</button></div>
+                <span class="hint" id="reset-hint">At least 8 characters. A short sentence works well.</span>
+              </div>
+              <button class="btn btn-primary btn-block" type="submit" id="reset-go">Save password and log in</button>
+            </form>
+          </div>
+
+          <!-- Message only: check your email, or a link that did not work -->
+          <div id="v-note" hidden><p class="hint auth-alt"><a href="#login" class="to-login">Back to log in</a></p></div>
+
+          <!-- Already logged in -->
+          <div id="v-signed" hidden>
             <a class="btn btn-primary btn-block" href="/app.html">Open your control centre</a>
             <button class="btn btn-ghost btn-block" id="si-out" style="margin-top:8px">Log out</button>
           </div>
-          <p class="hint" id="si-note" style="margin-top:14px">New here? <a href="/onboarding.html">Start your free trial</a>.</p>
         </div>
       </div>
     </section>

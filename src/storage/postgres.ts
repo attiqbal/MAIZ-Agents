@@ -386,6 +386,17 @@ export class PgStore implements Sink {
       );
     }, { key: `ai_day\u0000${d.day}` });
   }
+  /** A password hash belongs to no client: platform role only, like price changes. */
+  credential(userId: string, rec: { hash: string; changedAt: string }): void {
+    const json = JSON.stringify(rec);
+    this.queue(async () => {
+      await this.admin.query(
+        `INSERT INTO platform_records(kind, id, data) VALUES ('credential', $1, $2)
+         ON CONFLICT (kind, id) DO UPDATE SET data = EXCLUDED.data, updated_at = clock_timestamp()`,
+        [userId, json],
+      );
+    }, { key: `credential\u0000${userId}` });
+  }
   batchJob(j: BatchJob): void {
     this.state(j.workspaceId, "batch_job", j.id, j);
   }
@@ -468,6 +479,7 @@ export class PgStore implements Sink {
       peopleSettings: of("people_settings").map((s) => ({ workspaceId: s.workspace_id, settings: s.data })),
       batchSchedules: of("batch_schedule").map((s) => ({ workspaceId: s.workspace_id, schedule: s.data })),
       batchRuns: (await q("SELECT data FROM platform_records WHERE kind = 'batch_run' ORDER BY updated_at, id")).map((r) => r.data),
+      credentials: (await q("SELECT id, data FROM platform_records WHERE kind = 'credential'")).map((r) => ({ userId: r.id, ...r.data })),
       aiDays: (await q("SELECT data FROM platform_records WHERE kind = 'ai_day' ORDER BY id")).map((r) => r.data),
     } as Snapshot;
   }

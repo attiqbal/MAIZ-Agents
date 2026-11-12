@@ -43,7 +43,7 @@ npm install && (cd web && npm install)
 npm run dev:api          # API on :8787 (mock AI unless ANTHROPIC_API_KEY is set; dev sign-up on)
 cd web && npm run dev    # website on :5173, proxies /api to the API
 ```
-Sign-in is by email link (Resend). In development with no Resend key the link is printed in the API log, and `npm run dev:api` also turns on a no-check sign-up shortcut that the server refuses in production. Without `DATABASE_URL` data lives in memory and resets on restart; with it (plus `DATABASE_APP_URL` and `TOKEN_KEY`, see `.env.example`) everything is stored in Postgres and the API applies `db/*.sql` on start.
+Sign-in is by email and password, Google or Microsoft, or an emailed link as a fallback (Resend sends the confirmation, reset and link emails). In development with no Resend key the link is printed in the API log, and `npm run dev:api` also turns on a no-check sign-up shortcut that the server refuses in production. Without `DATABASE_URL` data lives in memory and resets on restart; with it (plus `DATABASE_APP_URL` and `TOKEN_KEY`, see `.env.example`) everything is stored in Postgres and the API applies `db/*.sql` on start.
 
 Tests: `npm run check` (fast, no database), `npm run db:test` (customer isolation) and `npm run db:int` (everything survives a restart). The last two start a throwaway local Postgres.
 

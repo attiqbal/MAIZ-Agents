@@ -81,13 +81,21 @@
       <details class="plan-facts"><summary id="plan-facts-h">What we filled in for you</summary><div id="plan-facts"></div></details>
       <p class="small muted">Free for 7 days with 3,000 energy, no card. After that <b class="mono">£150/mo</b> keeps the whole team: five AI employees, your free Admin manager, approvals in the control centre and 8,000 energy a week shared. Anything extra is optional and shown with its price first.</p>
       <div class="social" id="social" hidden>
-        <p class="small muted" id="social-h">Save your team with one tap:</p>
+        <p class="small muted" id="social-h">Create your account with one tap:</p>
         <div class="social-row" id="social-btns"></div>
-        <p class="small muted social-or">or use your email</p>
+        <p class="small muted social-or">or</p>
       </div>
-      <div class="field" id="email-f"><label for="email">Work email, to save your team</label><input class="input" id="email" type="email" aria-describedby="email-err" aria-required="true" placeholder="you@business.com" autocomplete="email"><span class="hint">We email a sign-in link. No password. We only use it to sign you in and to reach you about your team.</span></div>
-      <p class="err" id="email-err" role="alert" hidden>Enter a valid email address.</p>
+      <form class="auth-form" id="email-f" novalidate>
+        <div class="field"><label for="email">Work email</label><input class="input" id="email" type="email" autocomplete="username" inputmode="email" aria-describedby="email-err" aria-required="true" placeholder="you@business.com"></div>
+        <div class="field">
+          <label for="pw">Create a password</label>
+          <div class="pw"><input class="input" id="pw" type="password" autocomplete="new-password" aria-describedby="pw-hint" aria-required="true"><button type="button" class="pw-toggle" data-pw-toggle="pw" aria-pressed="false">Show</button></div>
+          <span class="hint" id="pw-hint">At least 8 characters. We email you a link to confirm your address. We only use your email to log you in and to reach you about your team.</span>
+        </div>
+      </form>
+      <p class="err" id="email-err" role="alert" hidden></p>
       <p class="hint" id="email-sent" hidden role="status"></p>
+      <p class="hint" id="has-account">Already have an account? <a href="/signin.html">Log in</a></p>
       <div class="ob-actions"><button class="btn btn-ghost" data-back>Back</button><button class="btn btn-primary" id="email-go">Start my free week</button></div>
     </div>
   </section>

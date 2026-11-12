@@ -1,5 +1,5 @@
 // Shared bits: sticky nav behaviour, mobile menu, toast.
-import { api, getToken } from "./api";
+import { api, getToken, setToken } from "./api";
 import { initMotion } from "./motion";
 
 export function initNav(): void {
@@ -85,4 +85,38 @@ export async function showSocialLogin(box: HTMLElement, buttons: HTMLElement): P
   buttons.innerHTML = on.map((k) => `<a class="btn btn-ghost" href="/api/signin/oauth/${k}/start">${names[k]}</a>`).join("");
   box.hidden = false;
   return true;
+}
+
+/** "Show / Hide" buttons on password fields (buttons with data-pw-toggle="<input id>"). */
+export function wirePasswordToggles(root: ParentNode = document): void {
+  root.querySelectorAll<HTMLButtonElement>("[data-pw-toggle]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const input = document.getElementById(btn.dataset.pwToggle!) as HTMLInputElement | null;
+      if (!input) return;
+      const show = input.type === "password";
+      input.type = show ? "text" : "password";
+      btn.textContent = show ? "Hide" : "Show";
+      btn.setAttribute("aria-pressed", String(show));
+    });
+  });
+}
+
+export interface SignedIn { token: string; email: string; hasOrganisation: boolean; platformOwner?: boolean }
+
+/** Keeps the session from a successful log-in and sends the person where they belong. */
+export function finishSignIn(r: SignedIn): void {
+  setToken(r.token);
+  try {
+    const profile = JSON.parse(localStorage.getItem("maiz.profile") ?? "{}");
+    localStorage.setItem("maiz.profile", JSON.stringify({ ...profile, email: r.email }));
+  } catch { /* storage unavailable */ }
+  // The MAIZ platform owner lands on the quality review queue; clients on their control centre, or on setup if they have no team yet.
+  location.replace(r.platformOwner ? "/review.html" : r.hasOrganisation ? "/app.html" : "/onboarding.html");
+}
+
+/** Plain-words message for a failed auth call. */
+export function authError(r: { status: number; data?: any }, fallback: string): string {
+  if (r.status === 0) return "We can't reach the service right now. Please try again in a moment.";
+  if (r.status === 429) return r.data?.error ?? "Too many tries. Please wait a few minutes and try again.";
+  return r.data?.error ?? fallback;
 }
