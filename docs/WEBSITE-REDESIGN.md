@@ -104,6 +104,27 @@ The homepage is a **summary with doors**: each section shows one idea and a "Lea
 
 New or split pages this adds to the table above (all flat files, all added to `vite.config.ts` inputs and `INDEXED_PAGES`): `slack-and-apps.html` (only the integrations that are live), `energy.html` (what energy is, how the weekly pool and top-ups work, moved out of the pricing FAQ), `approvals.html` (the approval and quality-review flow), `faq.html` (the FAQ moves here; the generated JSON-LD moves with it), `industries.html` as an index of the generated sector pages.
 
+### Newspaper concept for the public site (Atif, 2026-11-12)
+
+The public site reads like a newspaper: **front page = headlines, inside pages = the detail.**
+
+- **Front page (`index.html`)**: a masthead (logo, date line, "Your AI workforce"), one lead story (the hero headline and demo) and four or five short "headline" blocks in a column grid. Each block is a headline of at most 8 words, a one-line standfirst and a "Read more" link to its inside page. No block carries body copy.
+- **Sections** map to the menu like newspaper sections: *Team* (AI employees, store), *How it works*, *Pricing*, *Solutions* (industries), *Trust*. Every inside page opens like an article: kicker (section name), headline, standfirst, then the detail in clearly separated sub-sections with the sub-nav from above.
+- **Visual language**: strong headline typography (Inter Tight, large, tight tracking), thin rules between columns and sections, small caps kickers, a date/edition line ("Thursday 12 November") generated at load, numbered "inside" teasers ("Inside: pricing, p. 2"). This stays inside the light editorial tokens; no new colours.
+- It must still be scannable on a phone: the column grid collapses to one stacked list of headline blocks.
+
+### Account area (`app.html`): tabs (Atif, 2026-11-12)
+
+Today the signed-in control centre has a left rail with 13 items in no particular order (Home, Approvals, Tasks, Chat, Team, Usage, Store, Finance, People, Compliance, Apps, Setup, Settings). The redesign groups them into three tab groups, in this order:
+
+1. **Dashboard** (first tab): needs-you, team right now, business pulse, energy this week, coming up. Unchanged content, tidied.
+2. **Departments**, one tab per department the client has: *Finance*, *Marketing*, *Business consultant*, *HR (people)*, *Compliance*, *Admin manager*. Each opens that department's desk (the existing `#desk/<key>` and Finance, People, Compliance desks), with its tasks, approvals, numbers, and settings in one place. A hired extra employee or specialist adds its own department tab.
+3. **Services** (a separate group of tabs, each **switchable on/off and connectable**): *Slack and chat apps*, *Accounting* (Xero), *Sales and tills* (Square, CSV), *Payments* (Stripe), *Payroll* (BrightPay export), *Zapier and Make*, *Rota*, *Email and receipts inbox*. Every service tab shows the same three things: a status pill (Off / Connecting / Connected), an on/off toggle, and a Connect button that starts the real flow. Only services that exist show a Connect button; the rest show "Coming soon", never a fake connection (matches `docs/INTEGRATIONS.md`).
+
+Plus utility links in the footer of the rail: Approvals inbox (also a bell badge), Tasks and chat, Store, Usage and energy, Setup, Settings. Mobile: the tab groups become a bottom bar with a "More" sheet. Tabs use real `role="tablist"` semantics with arrow-key navigation and URL hashes that keep working (`#finance`, `#apps` redirect into the new tabs, so existing emailed links such as `/app.html#work` do not break).
+
+Back end: no change needed for the grouping; the on/off toggle reuses the existing connect and disconnect endpoints under `/api/integrations/...` and per-connection employee access.
+
 ## 5. Design tokens and components
 
 No new tokens file. The existing `:root` in `web/src/styles.css` stays the single source (palette, `--text-2`, `--text-muted`, `--accent-text`, `--line`, `--line-strong`, radii, spacing). Additions allowed:
