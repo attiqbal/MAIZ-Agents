@@ -11,7 +11,7 @@ import { chromium } from "playwright";
 const require = createRequire(import.meta.url);
 const axeSource = readFileSync(require.resolve("axe-core/axe.min.js"), "utf8");
 const OUT = join(import.meta.dirname, "out");
-const PAGES = ["/", "/employees.html", "/pricing.html", "/security.html", "/signin.html", "/404.html", "/onboarding.html", "/app.html", "/app.html#approvals", "/app.html#work", "/app.html#team", "/app.html#usage", "/app.html#finance", "/app.html#compliance", "/app.html#apps", "/app.html#setup", "/app.html#settings", "/app.html#people", "/app.html#desk/hr-manager", "/app.html#desk/finance-manager", "/staff-form.html#demo", "/review.html", "/owner-decisions.html", "/owner-specialists.html", "/owner-clients.html", "/owner-prices.html", "/owner-ai.html"];
+const PAGES = ["/", "/how-it-works.html", "/control-centre.html", "/faq.html", "/energy.html", "/industries.html", "/employees.html", "/pricing.html", "/security.html", "/signin.html", "/404.html", "/onboarding.html", "/app.html", "/app.html#approvals", "/app.html#apps/accounting", "/app.html#slack", "/app.html#work", "/app.html#team", "/app.html#usage", "/app.html#finance", "/app.html#compliance", "/app.html#apps", "/app.html#setup", "/app.html#settings", "/app.html#people", "/app.html#desk/hr-manager", "/app.html#desk/finance-manager", "/staff-form.html#demo", "/review.html", "/owner-decisions.html", "/owner-specialists.html", "/owner-clients.html", "/owner-prices.html", "/owner-ai.html"];
 const VIEWPORTS = [[375, 812], [768, 1024], [1440, 900]];
 const AXE_TAGS = ["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa", "best-practice"];
 
@@ -44,6 +44,9 @@ try {
       await page.waitForTimeout(300);
       const overflowPx = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
       const name = `${(path.replace(/^\//, "").replace(/[/#.]/g, "_") || "home")}-${width}`;
+      // Scroll through the page so scroll-reveal sections and the demo stage have run before the full-page shot.
+      await page.evaluate(async () => { for (let y = 0; y < document.body.scrollHeight; y += 400) { window.scrollTo({ top: y, behavior: "instant" }); await new Promise((r) => setTimeout(r, 120)); } window.scrollTo({ top: 0, behavior: "instant" }); });
+      await page.waitForTimeout(6500 * Number(path === "/"));
       await page.screenshot({ path: join(OUT, `${name}.png`), fullPage: true });
       await page.addScriptTag({ content: axeSource });
       const violations = await page.evaluate(async (tags) => {

@@ -84,9 +84,9 @@ export function paidTeamPlan(g: GeneralPrices): EnergyPlan {
   return { ...PLANS.starter!, weeklyTeamEnergy: g.weeklyTeamEnergy, dailyTeamCeiling: g.dailyTeamCeiling };
 }
 
-/** Launch defaults agreed with the platform owner on 2026-11-11 (£100 starting point, 8,000 energy a week). */
+/** Launch defaults agreed with the platform owner on 2026-11-11 (£150 starting point, 8,000 energy a week). */
 export const DEFAULT_GENERAL: GeneralPrices = {
-  basicPackageMonthlyGbp: 100,
+  basicPackageMonthlyGbp: 150,
   addOnEmployeeMonthlyGbp: MONTHLY_PRICE_GBP.employee,
   specialistStandardMonthlyGbp: MONTHLY_PRICE_GBP.specialistStandard,
   specialistPremiumMonthlyGbp: MONTHLY_PRICE_GBP.specialistPremium,

@@ -58,9 +58,9 @@ describe("prices and packages", () => {
     const s = setup();
     const r = await s.call("POST", "/api/owner/prices/changes", { general: { basicPackageMonthlyGbp: 49 }, effectiveFrom: "2026-12-01T00:00:00Z" }, s.owner());
     const id = (r.body as any).change.id;
-    expect((r.body as any).general.basicPackageMonthlyGbp).toBe(100);
+    expect((r.body as any).general.basicPackageMonthlyGbp).toBe(150);
     expect((r.body as any).history[0]).toMatchObject({ id, upcoming: true });
-    expect(((await s.call("GET", "/api/store")).body as any).prices.basicPackageMonthlyGbp).toBe(100);
+    expect(((await s.call("GET", "/api/store")).body as any).prices.basicPackageMonthlyGbp).toBe(150);
     s.clock.d = new Date("2026-12-02T00:00:00Z");
     expect(((await s.call("GET", "/api/store")).body as any).prices.basicPackageMonthlyGbp).toBe(49);
     expect((await s.call("DELETE", `/api/owner/prices/changes/${id}`, undefined, s.owner())).status).toBe(400);

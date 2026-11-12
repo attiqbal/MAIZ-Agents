@@ -23,11 +23,11 @@ const EMPLOYEES: Employee[] = [
   { key: "hr", name: "HR manager", short: "HR", abbr: "HR", cls: "av-hr", color: "#4d4d4d", skill: "Standard", allowance: DAILY, used: 12, week: [18, 22, 35, 14, 0, 0, 12], status: "good", statusText: "Working", doing: "Drafting your people basics checklist", done: 4, firstTime: 100, price: 12.3 },
   { key: "cm", name: "Compliance manager", short: "Compliance", abbr: "CM", cls: "av-cm", color: "#828282", skill: "Pro", allowance: DAILY, used: 36, week: [30, 44, 52, 38, 10, 8, 36], status: "good", statusText: "Working", doing: "Building your compliance register", done: 5, firstTime: 80, price: 21.4 },
 ];
-// The decided plan: one £100 team package with 8,000 energy a week shared by the whole team, at most 3,000
+// The decided plan: one £150 team package with 8,000 energy a week shared by the whole team, at most 3,000
 // in a day. The example's daily figures are scaled into that pool so every screen shows the same week.
 const WEEK_POOL = 8_000;
 const DAILY_CEILING = 3_000;
-const PACKAGE_GBP = 100;
+const PACKAGE_GBP = 150;
 const SCALE = 3.61;
 const weekUsedOf = (e: Employee) => Math.round(e.week.reduce((a, b) => a + b, 0) * SCALE);
 const todayOf = (e: Employee) => Math.round(e.used * SCALE);

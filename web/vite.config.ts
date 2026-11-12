@@ -25,7 +25,7 @@ function partials(): Plugin {
 const SITE_URL = (process.env.SITE_URL ?? "http://localhost:5173").replace(/\/+$/, "");
 
 /** Public, indexable pages. App and onboarding pages are noindex and stay out of the sitemap. */
-const INDEXED_PAGES = ["/", "/employees.html", "/pricing.html", "/security.html"];
+const INDEXED_PAGES = ["/", "/employees.html", "/how-it-works.html", "/control-centre.html", "/pricing.html", "/security.html", "/faq.html", "/energy.html", "/industries.html"];
 
 const decode = (s: string) =>
   s.replace(/<[^>]+>/g, "").replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&amp;/g, "&").replace(/\s+/g, " ").trim();
@@ -41,16 +41,19 @@ function seo(): Plugin {
       order: "pre",
       handler(html, ctx) {
         let out = html.replaceAll("%SITE_URL%", SITE_URL);
-        if (!ctx.filename.endsWith("/index.html")) return out;
+        if (!ctx.filename.endsWith("/index.html") && !ctx.filename.endsWith("/faq.html")) return out;
         const faqs = [...out.matchAll(/<details><summary>([\s\S]*?)<\/summary><p>([\s\S]*?)<\/p><\/details>/g)].map(([, q = "", a = ""]) => ({
           "@type": "Question",
           name: decode(q),
           acceptedAnswer: { "@type": "Answer", text: decode(a) },
         }));
+        const isHome = ctx.filename.endsWith("/index.html");
         const graph = [
+          ...(isHome ? [
           { "@type": "Organization", "@id": `${SITE_URL}/#org`, name: "MAIZ Agents", url: `${SITE_URL}/`, logo: `${SITE_URL}/favicon.svg` },
           { "@type": "WebSite", "@id": `${SITE_URL}/#site`, name: "MAIZ Agents", url: `${SITE_URL}/`, publisher: { "@id": `${SITE_URL}/#org` }, inLanguage: "en" },
-          ...(faqs.length ? [{ "@type": "FAQPage", "@id": `${SITE_URL}/#faq`, mainEntity: faqs }] : []),
+          ] : []),
+          ...(faqs.length ? [{ "@type": "FAQPage", "@id": `${SITE_URL}/faq.html#faq`, mainEntity: faqs }] : []),
         ];
         const json = JSON.stringify({ "@context": "https://schema.org", "@graph": graph }).replace(/</g, "\\u003c");
         return out.replace("</head>", `<script type="application/ld+json">${json}</script>\n</head>`);
@@ -87,6 +90,11 @@ export default defineConfig({
         employees: resolve(__dirname, "employees.html"),
         pricing: resolve(__dirname, "pricing.html"),
         security: resolve(__dirname, "security.html"),
+        howItWorks: resolve(__dirname, "how-it-works.html"),
+        controlCentre: resolve(__dirname, "control-centre.html"),
+        faq: resolve(__dirname, "faq.html"),
+        energy: resolve(__dirname, "energy.html"),
+        industries: resolve(__dirname, "industries.html"),
         notFound: resolve(__dirname, "404.html"),
       },
     },

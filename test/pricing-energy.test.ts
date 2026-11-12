@@ -4,9 +4,9 @@ import { noEnergyMessage } from "../src/modules/channels/index.js";
 import { CATALOGUE } from "../src/modules/store/cart.js";
 
 describe("launch prices and team energy", () => {
-  it("starts at £100 a month with 8,000 energy a week shared by the team, extra employees £25 and specialists £35, each with 2,000 more", () => {
+  it("starts at £150 a month with 8,000 energy a week shared by the team, extra employees £25 and specialists £35, each with 2,000 more", () => {
     expect(DEFAULT_GENERAL).toMatchObject({ addOnEmployeeMonthlyGbp: 25, addOnWeeklyEnergy: 2_000, specialistStandardMonthlyGbp: 35, specialistPremiumMonthlyGbp: 35 });
-    expect(DEFAULT_GENERAL).toMatchObject({ basicPackageMonthlyGbp: 100, weeklyTeamEnergy: 8_000, dailyTeamCeiling: 3_000, trialTeamEnergy: 3_000 });
+    expect(DEFAULT_GENERAL).toMatchObject({ basicPackageMonthlyGbp: 150, weeklyTeamEnergy: 8_000, dailyTeamCeiling: 3_000, trialTeamEnergy: 3_000 });
   });
 
   it("adds weekly energy for add-ons and specialists, none for the core team", () => {

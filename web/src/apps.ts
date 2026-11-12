@@ -49,7 +49,7 @@ export async function loadApps(): Promise<void> {
   const r = getToken() ? await api<AppsData>("/integrations") : { ok: false, data: undefined };
   live = r.ok && !!r.data;
   data = live ? r.data! : DEMO;
-  render();
+  setAppsView(view);
 }
 
 const kpi = (label: string, value: string, note: string) => `<div class="tile-kpi"><span class="l">${label}</span><span class="v">${esc(value)}</span><span class="dl">${esc(note)}</span></div>`;
@@ -217,4 +217,46 @@ export function initApps(): void {
   $("apps-hook-copy").addEventListener("click", () => { void (navigator.clipboard?.writeText($("apps-hook-url").textContent ?? "") ?? Promise.reject(new Error("no clipboard"))).then(() => toast("Copied"), () => toast("Couldn't copy. Select the link and copy it by hand.")); });
   if (new URLSearchParams(location.search).get("connect") === "failed") toast("The app did not approve the connection. Try again.");
   void loadApps();
+}
+
+
+/** Each service has its own tab: #apps/accounting, #apps/till, #apps/payments, #apps/payroll, #apps/bridge. */
+const VIEWS: Record<string, { title: string; intro: string }> = {
+  accounting: { title: "Accounting", intro: "Connect Xero or QuickBooks so your Finance manager works from real numbers." },
+  till: { title: "Tills and sales", intro: "Connect Square or upload your till's export. Sales flow to your Finance manager." },
+  payments: { title: "Payments", intro: "Connect Stripe or your online shop to see card payments, refunds and fees." },
+  payroll: { title: "Payroll", intro: "Upload your payroll summary after each pay run. Totals only, nothing personal." },
+  bridge: { title: "Zapier and Make", intro: "Send data from thousands of other apps through a private link." },
+};
+let view = "";
+export function setAppsView(sub: string): void {
+  view = sub;
+  const v = VIEWS[sub];
+  filter = v ? sub : "all";
+  $("apps-h1").textContent = v?.title ?? "Services";
+  $("apps-intro").textContent = v?.intro ?? "Connect your till, payroll and accounts. Your team only reads them, and you choose who sees what.";
+  const chip = $("svc-status");
+  chip.hidden = !v;
+  if (v) {
+    const keys = new Set(data.catalogue.filter((c) => GROUP[c.category] === sub).map((c) => c.key));
+    const on = data.connections.some((c) => keys.has(c.connectorKey) && c.status !== "error");
+    chip.className = `status ${on ? "good" : ""}`;
+    $("svc-status-t").textContent = on ? "On" : "Off";
+  }
+  render();
+}
+
+/** Slack tab: shows whether Slack is on and starts the real install when the owner presses Connect. */
+export function initSlackTab(on: boolean): void {
+  $("slack-status").className = `status ${on ? "good" : ""}`;
+  $("slack-status-t").textContent = on ? "On" : "Off";
+  $("slack-note").textContent = on ? "Connected" : "Not connected";
+  const btn = $<HTMLButtonElement>("slack-connect");
+  btn.textContent = on ? "Reconnect Slack" : "Connect Slack";
+  btn.onclick = async () => {
+    if (!getToken()) { toast("Log in to connect Slack (demo)"); return; }
+    const r = await api<{ url?: string }>("/slack/install");
+    if (r.ok && r.data?.url) { window.location.href = r.data.url; return; }
+    toast("Slack is not set up on this server yet");
+  };
 }

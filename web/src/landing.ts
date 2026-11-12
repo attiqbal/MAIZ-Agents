@@ -1,6 +1,8 @@
 import "./styles.css";
 import { initNav } from "./common";
 initNav();
+import { initDemoStage } from "./demo-stage";
+initDemoStage();
 
 // Pricing page: show today's prices as set by MAIZ (the HTML holds the launch prices as a fallback).
 const priced = document.querySelectorAll<HTMLElement>("[data-price]");
@@ -24,7 +26,7 @@ if (calc) {
   const gbp0 = (v: number) => `£${Math.round(v).toLocaleString("en-GB")}`;
   const WEEKS_PER_MONTH = 52 / 12;
   const update = () => {
-    const pkg = Number((calc.querySelector<HTMLElement>("[data-price]")?.textContent ?? "").replace(/[^\d.]/g, "")) || 100;
+    const pkg = Number((calc.querySelector<HTMLElement>("[data-price]")?.textContent ?? "").replace(/[^\d.]/g, "")) || 150;
     const r = Math.max(0, Number(rate.value) || 0);
     const h = Math.min(60, Math.max(0, Number(hours.value) || 0));
     const hire = r * h * WEEKS_PER_MONTH;
