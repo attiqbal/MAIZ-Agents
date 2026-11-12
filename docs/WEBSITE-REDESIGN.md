@@ -52,6 +52,20 @@ What the plan actually needs is available without Next.js:
 5. **Analytics (GA4 in the plan).** The CSP blocks third-party scripts and `connect-src` is `'self'`, and GA4 needs a UK cookie consent banner. Recommendation: Phase 5, choose a privacy-friendly tool (or PostHog) and extend the CSP deliberately; no tracking before that.
 6. **"Live demo without registration".** `/app.html` already shows an example business to signed-out visitors (the "Explore the demo" link). The new "interactive demo" is a scripted, clearly labelled simulation on the homepage, not a second backend.
 
+## 3a. Less text: copy and density rules (Atif, 2026-11-12: "like reading an essay, make it simple and less busy")
+
+Today `index.html` has about 250 lines of prose-heavy cards (every employee card has a paragraph, three bullets and a "first deliverable"). The redesign must cut this hard. These rules apply to every page and are checked in review:
+
+- **One idea per screen.** A section is a headline of at most 8 words, one line of support (at most 20 words), and one visual. No section has more than one paragraph.
+- **Employee tile on the homepage: name, five-word job, one icon.** Nothing else. Responsibilities, deliverables and energy move to the profile page behind a "See job description" link.
+- **At most 3 bullets, 6 words each**, only where a list beats a sentence. No bullet under a card that already has a paragraph.
+- **Show, don't tell.** Prefer the demo stage, a real screenshot or a number over describing the product in words.
+- **Homepage target: 6 sections** (hero, team tiles, demo stage, control centre, pricing teaser, final CTA). The 3-step "how it works", the long FAQ, security detail and industries each live on their own page or are linked, not stacked on the homepage. Cut the homepage to roughly a third of its current word count.
+- **Pricing page: three cards and one line each**, then the team builder. Move the energy explanation and long FAQ answers behind `<details>` and keep each answer to two sentences.
+- **Whitespace over dividers.** Larger section spacing, fewer cards and badges, one primary button per screen.
+- **Plain words, no jargon**; the audience is small-business owners who know nothing about AI. Keep honesty notes (draft prices, simulated demo) as one short line, not a paragraph.
+- QA addition: record the word count per page in `web/qa/evidence/evidence.json` and fail review if the homepage exceeds about 350 visible words.
+
 ## 4. Page structure and navigation
 
 Keep flat file names (no framework router). New pages are added to `vite.config.ts` inputs and `INDEXED_PAGES`.
@@ -158,7 +172,7 @@ Finish gate for every phase (from `CLAUDE.md`): `cd web && npm run build && npm 
 ## 11. Decisions needed from Atif
 
 1. **Approve upgrading the existing site instead of a new Next.js site** (recommended), or ask for the separate site anyway.
-2. **Visual direction**: keep the light editorial style with Graphite "product stage" bands (recommended), or switch to the plan's lime/charcoal look (which replaces the 2026-11-11 decision).
+2. **Visual direction**: ~~keep the light editorial style with Graphite "product stage" bands, or switch to the plan's lime/charcoal look~~ **Decided by Atif 2026-11-12 (reply "B"): keep the light style with Graphite bands.** Still open: the plan to build, and the other items below.
 3. **Typeface**: keep Inter Tight + Inter (recommended) or Manrope.
 4. **Analytics**: which tool, and whether to add a cookie banner in Phase 5.
 5. **Employee identity**: initials/illustrated avatars (recommended) or commissioned portraits.
