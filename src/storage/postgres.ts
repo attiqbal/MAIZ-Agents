@@ -1,6 +1,6 @@
 import { createCipheriv, createDecipheriv, randomBytes } from "node:crypto";
 import pg from "pg";
-import { GENERIC_KINDS, type GenericKind, type Sink, type Snapshot } from "../core/persistence.js";
+import { GENERIC_KINDS, type GenericKind, type PromoKind, type Sink, type Snapshot } from "../core/persistence.js";
 import type { AuditEvent } from "../modules/audit/index.js";
 import type { Connection } from "../modules/channels/index.js";
 import type { EnergyPlan, UsageRecord } from "../modules/energy/index.js";
@@ -397,6 +397,17 @@ export class PgStore implements Sink {
       );
     }, { key: `credential\u0000${userId}` });
   }
+  /** Coupons and affiliate records belong to no client: platform role only. Stored as promo_<kind>. */
+  promo(kind: PromoKind, id: string, data: unknown): void {
+    const json = JSON.stringify(data);
+    this.queue(async () => {
+      await this.admin.query(
+        `INSERT INTO platform_records(kind, id, data) VALUES ($1, $2, $3)
+         ON CONFLICT (kind, id) DO UPDATE SET data = EXCLUDED.data, updated_at = clock_timestamp()`,
+        [`promo_${kind}`, id, json],
+      );
+    }, { key: `promo_${kind}\u0000${id}` });
+  }
   batchJob(j: BatchJob): void {
     this.state(j.workspaceId, "batch_job", j.id, j);
   }
@@ -480,6 +491,7 @@ export class PgStore implements Sink {
       batchSchedules: of("batch_schedule").map((s) => ({ workspaceId: s.workspace_id, schedule: s.data })),
       batchRuns: (await q("SELECT data FROM platform_records WHERE kind = 'batch_run' ORDER BY updated_at, id")).map((r) => r.data),
       credentials: (await q("SELECT id, data FROM platform_records WHERE kind = 'credential'")).map((r) => ({ userId: r.id, ...r.data })),
+      promoRecords: (await q("SELECT kind, id, data FROM platform_records WHERE kind LIKE 'promo\\_%' ORDER BY updated_at, id")).map((r) => ({ kind: String(r.kind).slice(6) as PromoKind, id: r.id, data: r.data })),
       aiDays: (await q("SELECT data FROM platform_records WHERE kind = 'ai_day' ORDER BY id")).map((r) => r.data),
     } as Snapshot;
   }

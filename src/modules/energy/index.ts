@@ -75,6 +75,7 @@ export interface AutoReload {
 export class EnergyError extends Error {}
 
 const MAX_TOP_UP_ENERGY = 1_000_000;
+const MAX_TRIAL_EXTENSION_DAYS = 90;
 const MAX_AUTO_RELOAD_CAP_GBP = 10_000;
 
 /** Checks auto-reload settings from a client. Off is always allowed; on needs a pack and a cap. */
@@ -295,6 +296,42 @@ export class EnergyMeter {
     if (plan.weeklyTeamEnergy === undefined || plan.expiresAt) throw new EnergyError("top-ups are for paid team plans");
     this.savePlan(workspaceId, { ...plan, topUpEnergyBought: (plan.topUpEnergyBought ?? 0) + energy });
     this.audit.record({ workspaceId, actor: by, action: "energy.top_up", data: { energy, gbp } });
+  }
+
+  /** True while the client is on the free trial (it has an end date). */
+  onTrial(workspaceId: string): boolean {
+    return this.planOf(workspaceId).expiresAt !== undefined;
+  }
+
+  /**
+   * A coupon gives a trial more days: counted from the later of today and the current end, so an ended trial
+   * restarts for the days given. The trial's energy stays the same. Platform-level, no user check.
+   */
+  extendTrial(workspaceId: string, days: number, by: string): string {
+    const plan = this.planOf(workspaceId);
+    if (!plan.expiresAt) throw new EnergyError("only a free trial can be extended");
+    if (!Number.isInteger(days) || days <= 0 || days > MAX_TRIAL_EXTENSION_DAYS) throw new EnergyError("trial extension is not valid");
+    const from = Math.max(this.now().getTime(), Date.parse(plan.expiresAt));
+    const expiresAt = new Date(from + days * 86_400_000).toISOString();
+    this.savePlan(workspaceId, { ...plan, expiresAt });
+    this.audit.record({ workspaceId, actor: by, action: "energy.trial_extended", data: { days, expiresAt } });
+    return expiresAt;
+  }
+
+  /**
+   * A coupon gives free energy. On the trial it raises the trial's shared pool (and the daily limit with it);
+   * on a paid plan it is added like a bought top-up, so it rolls over and never expires. Platform-level, no user check.
+   */
+  grantEnergy(workspaceId: string, energy: number, by: string): void {
+    if (!Number.isInteger(energy) || energy <= 0 || energy > MAX_TOP_UP_ENERGY) throw new EnergyError("energy credit is not valid");
+    const plan = this.planOf(workspaceId);
+    if (plan.weeklyTeamEnergy === undefined) throw new EnergyError("this plan has no shared energy pool");
+    if (plan.expiresAt) {
+      this.savePlan(workspaceId, { ...plan, weeklyTeamEnergy: plan.weeklyTeamEnergy + energy, dailyTeamCeiling: (plan.dailyTeamCeiling ?? plan.weeklyTeamEnergy) + energy });
+    } else {
+      this.savePlan(workspaceId, { ...plan, topUpEnergyBought: (plan.topUpEnergyBought ?? 0) + energy });
+    }
+    this.audit.record({ workspaceId, actor: by, action: "energy.credit_granted", data: { energy, trial: !!plan.expiresAt } });
   }
 
   /** The client turns auto-reload on or off. Only an owner or admin can, as it spends money. */

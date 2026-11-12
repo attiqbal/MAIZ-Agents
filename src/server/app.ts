@@ -7,10 +7,11 @@ import { LedgerError } from "../modules/ledger/index.js";
 import { IntegrationError } from "../modules/integrations/index.js";
 import { ReviewError } from "../modules/review/index.js";
 import { PricingError } from "../modules/pricing/index.js";
+import { DEFAULT_COMMISSION, DEFAULT_HOLD_DAYS, PromoError, describeCommission } from "../modules/promotions/index.js";
 import { EnergyError, parseAutoReload } from "../modules/energy/index.js";
 import { BatchError } from "../modules/batch/schedule.js";
 import { SettingsError } from "../modules/model-gateway/routing/settings.js";
-import { brandFrom, signInLinkEmail } from "./email-templates.js";
+import { affiliatePaidEmail, affiliateWelcomeEmail, brandFrom, couponGiftEmail, signInLinkEmail } from "./email-templates.js";
 import { SignupError, type SignupChoices } from "../modules/onboarding/index.js";
 import { planSignup, readSignupAnswers } from "../modules/onboarding/recommend.js";
 import { OTHER_SECTOR, getSector } from "../modules/onboarding/sectors.js";
@@ -56,6 +57,14 @@ function readCookie(header: string | undefined, name: string): string | undefine
   }
   return undefined;
 }
+
+/** The referral cookie: set by /r/<code>, read at signup. Over https it uses the __Host- prefix like the login cookie. */
+const refCookieName = (appUrl?: string): string => (appUrl?.startsWith("https://") ? "__Host-maiz_ref" : "maiz_ref");
+const REF_COOKIE_DAYS = 30;
+const refCookie = (value: string, maxAge: number, appUrl?: string): string =>
+  `${refCookieName(appUrl)}=${value}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${maxAge}${appUrl?.startsWith("https://") ? "; Secure" : ""}`;
+/** Wrong coupon codes allowed per person in 15 minutes. */
+const CODE_TRIES = 8;
 
 /** Opens or saves of one staff form link per hour. */
 const STAFF_FORM_PER_HOUR = 30;
@@ -215,7 +224,7 @@ export function createApp(p: Platform) {
       if (!c || c.k !== "magic" || typeof c.e !== "string" || typeof c.n !== "string") return json(400, { error: "this sign-in link is invalid or has expired" });
       if (p.usedLinks.has(c.n)) return json(400, { error: "this sign-in link was already used" });
       p.usedLinks.add(c.n, c.exp * 1000);
-      return json(200, { token: issueSession(c.e), email: c.e, hasOrganisation: !!orgOf(userIdFor(c.e)), platformOwner: p.isPlatformOwner(userIdFor(c.e)) });
+      return json(200, { token: issueSession(c.e), email: c.e, hasOrganisation: !!orgOf(userIdFor(c.e)), platformOwner: p.isPlatformOwner(userIdFor(c.e)), affiliate: !!p.affiliates.dashboardFor(c.e) });
     }
 
     // ---- email and password: sign up, log in, forgot password ----
@@ -260,6 +269,32 @@ export function createApp(p: Platform) {
       return { status: 302, headers: { location: `/signin.html#token=${link}`, "set-cookie": loginCookie("", 0, p.cfg.appUrl), "cache-control": "no-store" } };
     }
 
+    // ---- referral link: counts the visit, remembers the affiliate for 30 days, and sends the visitor to the front page ----
+    const ref = /^\/r\/([a-zA-Z0-9-]{1,40})$/.exec(path);
+    if (method === "GET" && ref) {
+      const a = p.affiliates.byCode(ref[1]);
+      const headers: Record<string, string> = { location: "/", "cache-control": "no-store" };
+      // One click per visitor per hour: the cookie's presence stops a refresh from counting again.
+      const had = readCookie(req.headers["cookie"], refCookieName(p.cfg.appUrl));
+      if (a?.enabled) {
+        if (had !== a.code) p.affiliates.trackClick(a.code);
+        headers["set-cookie"] = refCookie(a.code, REF_COOKIE_DAYS * 86_400, p.cfg.appUrl);
+      }
+      return { status: 302, headers };
+    }
+
+    // ---- coupons: anyone may ask what a code gives (rate limited, wrong tries counted) ----
+    if (method === "POST" && path === "/api/coupons/check") {
+      const b = body();
+      const claims = sessionClaims(req);
+      const email = typeof claims?.e === "string" ? claims.e : typeof b.email === "string" ? b.email : undefined;
+      const mine = claims ? orgOf(claims.u) : undefined;
+      const ctx = { ...(email ? { email } : {}), ...(mine ? { workspaceId: mine.id } : {}) };
+      // Signed in: wrong tries count against the person. Anonymous: only the per-address limit applies, so a made-up email cannot reset or poison a counter.
+      if (claims) return codeAttempt(`u:${claims.u}`, () => json(200, p.coupons.check(b.code, ctx)));
+      try { return json(200, p.coupons.check(b.code, ctx)); } catch (e) { if (e instanceof PromoError) return json(400, { error: e.message }); throw e; }
+    }
+
     // ---- sign up: needs a verified email (or the development shortcut) ----
     if (method === "POST" && path === "/api/signup") {
       const b = body();
@@ -291,9 +326,12 @@ export function createApp(p: Platform) {
         plan,
       };
       const org = await p.onboarding.signUp(userId, choices);
+      // A referral cookie counts unless it is the affiliate's own address; a bad coupon never stops the signup.
+      p.affiliates.attribute(org.workspaceId, email, choices.businessName, readCookie(req.headers["cookie"], refCookieName(p.cfg.appUrl)));
+      const coupon = typeof b.coupon === "string" && b.coupon.trim() ? redeemAtSignup(userId, org.workspaceId, email, b.coupon) : undefined;
       await p.admin.welcome(userId, org);
       const token = issueSession(email);
-      return json(201, { token, workspaceId: org.workspaceId, blueprint: org.blueprint, trialEndsAt: org.trialEndsAt });
+      return json(201, { token, workspaceId: org.workspaceId, blueprint: org.blueprint, trialEndsAt: p.energy.planOf(org.workspaceId).expiresAt ?? org.trialEndsAt, ...(coupon ? { coupon } : {}) });
     }
 
     // ---- payment provider webhooks: public, authenticated by the provider's signature over the exact bytes ----
@@ -381,6 +419,7 @@ export function createApp(p: Platform) {
     if (path === "/api/owner/reviews" || path.startsWith("/api/owner/reviews/")) return ownerReviewRoutes(req, userId, body);
     if (path === "/api/owner/ai" || path.startsWith("/api/owner/ai/")) return ownerAiRoutes(req, userId, body);
     if (path === "/api/owner/prices" || path.startsWith("/api/owner/prices/")) return ownerPriceRoutes(req, userId, body);
+    if (path.startsWith("/api/owner/coupons") || path.startsWith("/api/owner/affiliates") || path === "/api/owner/promotions") return ownerPromoRoutes(req, userId, body);
     if (path.startsWith("/api/owner/")) {
       if (!p.isPlatformOwner(userId)) return json(403, { error: "only the MAIZ platform owner can see this" });
       if (method === "GET" && path === "/api/owner/batch") return json(200, p.batch.ownerView(userId));
@@ -406,8 +445,22 @@ export function createApp(p: Platform) {
     }
     if (method === "GET" && path === "/api/me") return json(200, { platformOwner: p.isPlatformOwner(userId), hasOrganisation: !!orgOf(userId) });
 
+    // ---- affiliate: whoever logs in with an affiliate's email sees their own results ----
+    if (method === "GET" && path === "/api/affiliate/me") return json(200, { affiliate: affiliateView(sessionClaims(req)?.e) });
+
     const org = orgOf(userId);
     if (!org) return json(404, { error: "no organisation yet" });
+
+    // ---- coupons on the account page ----
+    if (method === "GET" && path === "/api/coupons") return json(200, { used: p.coupons.forClient(org.id).map((r) => ({ code: r.code, at: r.at, applied: r.applied })) });
+    if (method === "POST" && path === "/api/coupons/redeem") {
+      p.identity.require(userId, org.id, "workspace.manage");
+      const email = String(sessionClaims(req)?.e ?? "");
+      return codeAttempt(`u:${userId}`, () => {
+        const r = p.coupons.redeem(userId, org.id, email, body().code);
+        return json(200, { applied: r.applied, trialEndsAt: p.energy.planOf(org.id).expiresAt ?? null, team: p.energy.teamEnergy(userId, org.id) ?? null });
+      });
+    }
 
     if (method === "GET" && path === "/api/dashboard") return json(200, p.dashboard(userId, org.id));
 
@@ -677,6 +730,93 @@ export function createApp(p: Platform) {
     return json(404, { error: "not found" });
   }
 
+  /** Counts a wrong code against the person, and stops the guessing after a few tries. */
+  function codeAttempt(key: string, run: () => Res): Res {
+    const t = p.now().getTime();
+    if (p.codeFails.recent(key, t).length >= CODE_TRIES) return json(429, { error: "Too many wrong codes. Wait 15 minutes and try again." });
+    try {
+      return run();
+    } catch (e) {
+      if (!(e instanceof PromoError)) throw e;
+      p.codeFails.record(key, t);
+      return json(400, { error: e.message });
+    }
+  }
+
+  /** A code typed at signup: tried once, and the answer comes back with the new account. */
+  function redeemAtSignup(userId: string, workspaceId: string, email: string, code: string): { ok: boolean; message: string } {
+    const key = `u:${userId}`;
+    const t = p.now().getTime();
+    if (p.codeFails.recent(key, t).length >= CODE_TRIES) return { ok: false, message: "Too many wrong codes. Try again later in Settings." };
+    try {
+      return { ok: true, message: `Code applied: ${p.coupons.redeem(userId, workspaceId, email, code).applied}.` };
+    } catch (e) {
+      if (!(e instanceof PromoError)) throw e;
+      p.codeFails.record(key, t);
+      return { ok: false, message: `${e.message} Your team was created; you can try another code in Settings.` };
+    }
+  }
+
+  const referralLink = (code: string) => `${(p.cfg.appUrl ?? "").replace(/\/$/, "")}/r/${code}`;
+
+  /** What an affiliate sees of their own results: counts and money, never the referred clients' names. */
+  function affiliateView(email: unknown) {
+    const d = typeof email === "string" ? p.affiliates.dashboardFor(email) : undefined;
+    if (!d) return null;
+    const t = p.now().toISOString();
+    return {
+      name: d.name, code: d.code, link: referralLink(d.code), enabled: d.enabled, commission: d.commission, commissionText: describeCommission(d.commission), holdDays: d.holdDays, stats: d.stats,
+      referrals: d.referrals.map((r) => ({ at: r.at, paying: r.paying, earnedGbp: r.earnedGbp })),
+      commissions: d.accruals.map((a) => ({ at: a.at, amountGbp: a.amountGbp, status: a.payoutId ? "paid" : a.payableFrom <= t ? "payable" : "pending", payableFrom: a.payableFrom })),
+      payouts: d.payouts.map((x) => ({ at: x.at, amountGbp: x.amountGbp, reference: x.reference ?? null })),
+    };
+  }
+
+  /** Coupons and affiliates: the platform owner only (the services check again). */
+  async function ownerPromoRoutes(req: Req, userId: string, body: () => any): Promise<Res> {
+    if (!p.isPlatformOwner(userId)) return json(403, { error: "only the MAIZ platform owner can manage coupons and affiliates" });
+    const { method, path } = req;
+    const base = (p.cfg.appUrl ?? "").replace(/\/$/, "");
+    const overview = () => ({
+      coupons: p.coupons.list(userId),
+      affiliates: p.affiliates.list(userId).map((a) => ({ ...a, link: referralLink(a.code), commissionText: describeCommission(a.commission) })),
+      defaults: { commission: DEFAULT_COMMISSION, holdDays: DEFAULT_HOLD_DAYS },
+    });
+    if (method === "GET" && path === "/api/owner/promotions") return json(200, overview());
+    if (method === "POST" && path === "/api/owner/coupons") { const c = p.coupons.create(userId, body()); return json(201, { coupon: c, ...overview() }); }
+    const cEnable = /^\/api\/owner\/coupons\/([\w-]{1,64})\/enabled$/.exec(path);
+    if (method === "POST" && cEnable) { p.coupons.setEnabled(userId, cEnable[1]!, body().enabled === true); return json(200, overview()); }
+    const cHist = /^\/api\/owner\/coupons\/([\w-]{1,64})\/redemptions$/.exec(path);
+    if (method === "GET" && cHist) return json(200, { redemptions: p.coupons.redemptionsOf(userId, cHist[1]!) });
+    const cSend = /^\/api\/owner\/coupons\/([\w-]{1,64})\/send$/.exec(path);
+    if (method === "POST" && cSend) {
+      const to = String(body().to ?? "").trim().toLowerCase();
+      if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(to)) throw new BadRequest("enter a valid email address");
+      const c = p.coupons.list(userId).find((x) => x.id === cSend[1]);
+      if (!c) return json(404, { error: "coupon not found" });
+      await p.email.send({ to, ...couponGiftEmail(c.code, c.summary, `${base}/onboarding.html`, brandFrom(p.cfg)) });
+      return json(200, { sent: true });
+    }
+    if (method === "POST" && path === "/api/owner/affiliates") {
+      const a = p.affiliates.create(userId, body());
+      // Best effort: the affiliate exists whether or not the email goes out.
+      await p.email.send({ to: a.email, ...affiliateWelcomeEmail(a.name, referralLink(a.code), `${base}/affiliate.html`, describeCommission(a.commission), brandFrom(p.cfg)) }).catch((e) => console.error("affiliate email failed:", e));
+      return json(201, { affiliate: a, ...overview() });
+    }
+    const aEnable = /^\/api\/owner\/affiliates\/([\w-]{1,64})\/enabled$/.exec(path);
+    if (method === "POST" && aEnable) { p.affiliates.setEnabled(userId, aEnable[1]!, body().enabled === true); return json(200, overview()); }
+    const aPaid = /^\/api\/owner\/affiliates\/([\w-]{1,64})\/payout$/.exec(path);
+    if (method === "POST" && aPaid) {
+      const a = p.affiliates.detailFor(userId, aPaid[1]!);
+      const payout = p.affiliates.markPaid(userId, a.id, body().reference);
+      await p.email.send({ to: a.email, ...affiliatePaidEmail(a.name, `£${payout.amountGbp.toFixed(2)}`, payout.reference, `${base}/affiliate.html`, brandFrom(p.cfg)) }).catch((e) => console.error("affiliate email failed:", e));
+      return json(200, { payout, ...overview() });
+    }
+    const aOne = /^\/api\/owner\/affiliates\/([\w-]{1,64})$/.exec(path);
+    if (method === "GET" && aOne) return json(200, { affiliate: p.affiliates.detailFor(userId, aOne[1]!) });
+    return json(404, { error: "not found" });
+  }
+
   /** Prices and packages: the platform owner only. */
   async function ownerPriceRoutes(req: Req, userId: string, body: () => any): Promise<Res> {
     if (!p.isPlatformOwner(userId)) return json(403, { error: "only the MAIZ platform owner can change prices" });
@@ -770,7 +910,7 @@ export function createApp(p: Platform) {
     try {
       return renewed(req, await route(req));
     } catch (err) {
-      if (err instanceof BadRequest || err instanceof SetupError || err instanceof SignupError || err instanceof LedgerError || err instanceof ChannelError || err instanceof IntegrationError || err instanceof ReviewError || err instanceof PeopleError || err instanceof PricingError || err instanceof EnergyError || err instanceof SettingsError || err instanceof BatchError || err instanceof PaymentError || err instanceof RotaError) return json(400, { error: err.message });
+      if (err instanceof BadRequest || err instanceof SetupError || err instanceof SignupError || err instanceof LedgerError || err instanceof ChannelError || err instanceof IntegrationError || err instanceof ReviewError || err instanceof PeopleError || err instanceof PricingError || err instanceof PromoError || err instanceof EnergyError || err instanceof SettingsError || err instanceof BatchError || err instanceof PaymentError || err instanceof RotaError) return json(400, { error: err.message });
       if (err instanceof PermissionError) return json(403, { error: "you don't have permission to do that" });
       console.error(`${req.method} ${req.path} failed:`, err);
       return json(500, { error: "something went wrong" });

@@ -71,7 +71,7 @@ const server = createServer(async (incoming, out) => {
   try {
     const url = new URL(incoming.url ?? "/", "http://localhost");
     const method = incoming.method ?? "GET";
-    if (!url.pathname.startsWith("/api/")) {
+    if (!url.pathname.startsWith("/api/") && !url.pathname.startsWith("/r/")) {
       if (!site || (method !== "GET" && method !== "HEAD")) { out.writeHead(404, API_HEADERS).end(); return; }
       const f = site(url.pathname);
       out.writeHead(f.status, f.headers).end(method === "HEAD" ? undefined : f.body);

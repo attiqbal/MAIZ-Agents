@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+<!--@include head title="Coupons and affiliates · MAIZ Agents" description="The MAIZ platform owner creates discount and free-usage coupons and runs the affiliate programme."-->
+<meta name="robots" content="noindex">
+</head>
+<body>
+<div class="page-top">
+  <!--@include owner-header-->
+  <main id="main">
+    <section class="section">
+      <div class="container" style="max-width:1180px">
+        <!--@include owner-nav-->
+        <div class="rv-head">
+          <div><h1>Coupons and affiliates</h1>
+            <p class="sub">Give people free trial days, free energy or a discount with a code, and pay partners who bring you clients. Nothing is paid out automatically.</p></div>
+          <span class="badge badge-dark" id="ow-eg" hidden>Example data</span>
+        </div>
+        <div class="ob-panel" id="ow-gate" hidden aria-live="polite"><h2 id="ow-gate-h" style="font-size:1.25rem;margin:0 0 6px"></h2><p id="ow-gate-p" class="sub" style="margin:0 0 14px"></p><a class="btn btn-primary" id="ow-gate-a" href="/signin.html">Log in</a></div>
+        <div id="ow-body">
+          <div class="ow-stack">
+            <div class="learn"><b>What works today.</b>Trial days and free energy apply the moment a client uses the code. Percent, pound and free-month discounts are saved on the client's account and will come off the bill when payments open; nothing is charged yet, so nothing is discounted yet. Commission starts counting with a referred client's first payment.</div>
+
+            <section class="panel" aria-labelledby="cp-h"><div class="panel-h"><h2 id="cp-h">Coupons</h2><span class="r" id="cp-count"></span></div>
+              <form class="ow-stack" id="cp-form" novalidate>
+                <div class="ow-grid">
+                  <div class="field"><label for="cp-code">Code</label><input class="input" id="cp-code" maxlength="32" autocomplete="off" spellcheck="false" placeholder="WELCOME-30"><span class="hint">Letters, numbers and dashes. Clients can type it in any case.</span></div>
+                  <div class="field"><label for="cp-kind">It gives</label><select class="input" id="cp-kind">
+                    <option value="trial_days">More free trial days</option><option value="energy_credit">Free energy</option><option value="percent_off">Percent off the bill</option><option value="fixed_off">Pounds off the bill</option><option value="free_months">Free months</option></select></div>
+                  <div class="field"><label for="cp-value" id="cp-value-l">Days</label><input class="input" id="cp-value" type="number" min="1" step="1" inputmode="decimal"><span class="hint" id="cp-value-h"></span></div>
+                  <div class="field" id="cp-dur-f" hidden><label for="cp-dur">For how long</label><select class="input" id="cp-dur"><option value="once">The first bill only</option><option value="months">A number of months</option><option value="forever">For as long as they stay</option></select></div>
+                  <div class="field" id="cp-months-f" hidden><label for="cp-months">Months</label><input class="input" id="cp-months" type="number" min="1" max="36" step="1" inputmode="numeric" value="3"></div>
+                  <div class="field"><label for="cp-max">Most uses in total (optional)</label><input class="input" id="cp-max" type="number" min="1" step="1" inputmode="numeric" placeholder="No limit"></div>
+                  <div class="field"><label for="cp-exp">Stops working on (optional)</label><input class="input" id="cp-exp" type="date"></div>
+                  <div class="field"><label for="cp-plan">Who can use it</label><select class="input" id="cp-plan"><option value="">Anyone</option><option value="trial">Only clients on the free trial</option><option value="paid">Only paying clients</option></select></div>
+                  <div class="field"><label for="cp-email">Only this email (optional)</label><input class="input" id="cp-email" type="email" autocomplete="off" placeholder="friend@business.com"></div>
+                  <div class="field"><label for="cp-note">Note for you (optional)</label><input class="input" id="cp-note" maxlength="300" placeholder="Who or what this is for"></div>
+                </div>
+                <div class="acts"><button class="btn btn-primary" type="submit">Create coupon</button><span class="muted small" id="cp-msg" role="status"></span></div>
+              </form>
+              <div class="field" style="max-width:360px;margin-top:16px"><label for="cp-send-to">Email a code to</label><input class="input" id="cp-send-to" type="email" autocomplete="off" placeholder="friend@business.com"><span class="hint">Type an address here, then press “Email it” on the coupon's row.</span></div>
+              <div class="tbl-wrap" tabindex="0" role="region" aria-label="Coupons, scrolls sideways on small screens"><table class="tbl" id="cp-table"></table></div>
+            </section>
+            <section class="panel" id="cp-hist-panel" aria-labelledby="cp-hist-h" hidden><div class="panel-h"><h2 id="cp-hist-h">Uses of this code</h2><button type="button" class="btn btn-quiet btn-sm r" id="cp-hist-close">Close</button></div>
+              <div class="tbl-wrap" tabindex="0" role="region" aria-label="Uses of this code"><table class="tbl" id="cp-hist"></table></div></section>
+
+            <section class="panel" aria-labelledby="af-h"><div class="panel-h"><h2 id="af-h">Affiliates</h2><span class="r" id="af-count"></span></div>
+              <p class="muted small">Each affiliate gets a link like <span class="mono">/r/their-code</span>. Anyone who signs up within 30 days of opening it counts as theirs. They log in with their email to see clicks, signups and earnings. You pay them yourself, then press Mark as paid.</p>
+              <form class="ow-stack" id="af-form" novalidate>
+                <div class="ow-grid">
+                  <div class="field"><label for="af-name">Name</label><input class="input" id="af-name" maxlength="80" autocomplete="off"></div>
+                  <div class="field"><label for="af-email">Their email (they log in with it)</label><input class="input" id="af-email" type="email" autocomplete="off"></div>
+                  <div class="field"><label for="af-code">Referral code (optional)</label><input class="input" id="af-code" maxlength="24" autocomplete="off" spellcheck="false" placeholder="Made from their name"></div>
+                  <div class="field"><label for="af-kind">Commission is</label><select class="input" id="af-kind"><option value="percent">A percent of each payment</option><option value="fixed">A fixed amount per payment</option></select></div>
+                  <div class="field"><label for="af-value" id="af-value-l">Percent</label><input class="input" id="af-value" type="number" min="1" step="0.01" inputmode="decimal" value="20"></div>
+                  <div class="field"><label for="af-months">For how many payments</label><input class="input" id="af-months" type="number" min="1" max="60" step="1" inputmode="numeric" value="12"><span class="hint">One payment a month, so 12 means the first year.</span></div>
+                  <div class="field"><label for="af-hold">Wait before paying (days)</label><input class="input" id="af-hold" type="number" min="0" max="180" step="1" inputmode="numeric" value="30"><span class="hint">Covers refunds before you pay out.</span></div>
+                </div>
+                <div class="acts"><button class="btn btn-primary" type="submit">Add affiliate and email their link</button><span class="muted small" id="af-msg" role="status"></span></div>
+              </form>
+              <div class="tbl-wrap" tabindex="0" role="region" aria-label="Affiliates, scrolls sideways on small screens"><table class="tbl" id="af-table"></table></div>
+            </section>
+            <section class="panel" aria-labelledby="terms-h"><div class="panel-h"><h2 id="terms-h">Still to decide</h2></div>
+              <ul class="ow-list"><li>The written affiliate terms (what counts as a valid referral, what is not allowed, when you can end the arrangement). None are written yet and the pages do not show any.</li>
+                <li>How you pay (bank transfer, PayPal and so on) and the smallest amount you will pay out.</li>
+                <li>Whether the default commission of 20% for 12 payments, held for 30 days, is right.</li></ul></section>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+<!--@include footer-->
+<script type="module" src="/src/owner-promotions.ts"></script>
+</body>
+</html>
