@@ -1,0 +1,14 @@
+# Standby database on Oracle: a live copy of Hetzner's Postgres, kept current over WireGuard. Not public.
+# First run: replica/bootstrap.sh. Promote after a Hetzner failure: replica/promote.sh.
+name: maiz-replica
+services:
+  db:
+    image: postgres:16-bookworm
+    restart: unless-stopped
+    command: postgres -c hot_standby=on
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - replica_data:/var/lib/postgresql/data
+volumes:
+  replica_data:

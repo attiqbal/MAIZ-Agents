@@ -5,5 +5,6 @@ Compose stack for one server: Caddy (HTTPS), the app, Postgres. See [docs/INTERI
 - `compose.yml`, `Caddyfile`: the stack. Only ports 80/443 are published.
 - `.env.example`: copy to `.env`, fill in (git-ignored).
 - `initdb/`: creates the `app_user` role with its password on first start.
+- `replica/`: live standby database on Oracle (bootstrap and promote scripts).
 - `backup.sh`: encrypted `pg_dump`, copied to a second server by rsync. Run nightly from cron.
 - `restore.sh <file>`: restore a backup (destructive, asks for confirmation).

@@ -9,6 +9,13 @@ services:
     environment:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set in deploy/.env}
       APP_USER_PASSWORD: ${APP_USER_PASSWORD:?set in deploy/.env}
+      REPLICA_PASSWORD: ${REPLICA_PASSWORD:?set in deploy/.env}
+    # Streams every commit to the standby on Oracle over WireGuard. Only the WireGuard address is published.
+    command: >
+      postgres -c wal_level=replica -c max_wal_senders=5 -c max_replication_slots=5
+      -c wal_keep_size=2GB -c synchronous_standby_names='${SYNC_STANDBY:-}'
+    ports:
+      - "${WG_ADDR:-10.10.0.1}:5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
       - ./initdb:/docker-entrypoint-initdb.d:ro
