@@ -1648,3 +1648,11 @@ h1, .sec-head h2, .final h2, .stage-band h2, .article-head h1, .sec-title, .bent
 @media (max-width: 520px) { .addons { grid-template-columns: 1fr; gap: 10px; } .addon { padding: 16px 18px; border-radius: 22px; gap: 4px; } .addon p { display: none; } .addon-foot { padding-top: 6px; } }
 @media (prefers-reduced-motion: reduce) { .addon, .addon:hover { transition: none; transform: none; } }
 .home { overflow-x: clip; }
+
+/* Solutions page: one section per kind of business, built from the signup sector data. */
+.sector-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr)); gap: 20px; margin-top: 40px; }
+.sector-card { background: #fff; border-radius: 40px; padding: 32px; scroll-margin-top: 120px; }
+.sector-card h2 { font-family: var(--font-display); font-variation-settings: var(--soft); font-size: clamp(24px, 3vw, 32px); line-height: 1.1; letter-spacing: -0.02em; margin: 0 0 8px; }
+.sector-ex { color: var(--text-muted); margin: 0 0 16px; }
+.sector-jobs { margin: 12px 0 20px; padding-left: 20px; display: grid; gap: 10px; }
+.sector-lead { color: var(--accent-text); }
