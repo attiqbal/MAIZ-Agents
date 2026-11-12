@@ -25,6 +25,17 @@ export interface CompletionRequest {
   allowClaudeFallback?: boolean;
   /** Gives up on the provider after this many milliseconds (throws a `timeout` ProviderError). */
   timeoutMs?: number;
+  /**
+   * Live answers: the adapter sends the words as they arrive. The full result is still returned at the end, and it
+   * is the authoritative answer (a quality check may replace what was streamed).
+   */
+  stream?: TextStream;
+}
+
+/** Receives an answer as it is written. `reset` means "forget what you were sent": the answer is starting again. */
+export interface TextStream {
+  text(delta: string): void;
+  reset(): void;
 }
 
 export interface CompletionResult {

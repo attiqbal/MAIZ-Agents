@@ -21,6 +21,7 @@
     <a class="ni" href="#home" data-nav="home"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>Overview</a>
     <a class="ni" href="#approvals" data-nav="approvals"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>Approvals<span class="count" id="appr-count">3</span></a>
     <a class="ni" href="#work" data-nav="work"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="5" height="16" rx="1.5"/><rect x="10" y="4" width="5" height="10" rx="1.5"/><rect x="17" y="4" width="4" height="13" rx="1.5"/></svg>Tasks and consultants</a>
+    <a class="ni" href="#chat" data-nav="chat"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h16v11H9l-5 4z"/><path d="M8 9.5h8M8 12.5h5"/></svg>Conversations</a>
     <div class="group" id="g-team">Team</div>
     <a class="ni" href="#team" data-nav="team"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.3 2.7-5.5 6-5.5s6 2.200 6 5.5"/><path d="M16 5.5a3 3 0 010 5.5M18 14.7c1.800.7 3 2.400 3 5.3"/></svg>Team</a>
     <a class="ni" href="#usage" data-nav="usage"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 2L4 14h7l-1 8 9-12h-7z"/></svg>Energy and spend</a>
@@ -42,7 +43,7 @@
     <div class="topbar">
       <button class="menu-btn" id="menu-btn" aria-label="Open menu"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
       <form class="ask" id="ask"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4-4"/></svg><input id="ask-in" placeholder="Ask your team anything…" aria-label="Ask your team"><span class="kbd hide-sm">/</span></form>
-      <div class="right"><a class="status warn hide-sm" href="#approvals"><span class="dot"></span><span id="need-count">3 need you</span></a><a class="badge badge-dark mono hide-sm" href="#usage">Wallet £0.00</a><button class="av av-sm av-me" id="me-av" aria-label="Account and settings" title="Account and settings" style="border:0;cursor:pointer">AI</button></div>
+      <div class="right"><div id="bell-wrap" class="bell-wrap"><button type="button" class="bell-btn" id="bell-btn" aria-label="Notifications" aria-expanded="false" aria-controls="bell-panel" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 17V11a6 6 0 0112 0v6l1.5 2h-15zM10 21h4"/></svg><span class="bell-count" id="bell-count" hidden>0</span></button><div class="bell-panel" id="bell-panel" role="region" aria-label="Notifications" hidden><div class="panel-h"><h2>Notifications</h2></div><ul class="bell-list" id="bell-list"></ul></div></div><a class="status warn hide-sm" href="#approvals"><span class="dot"></span><span id="need-count">3 need you</span></a><a class="badge badge-dark mono hide-sm" href="#usage">Wallet £0.00</a><button class="av av-sm av-me" id="me-av" aria-label="Account and settings" title="Account and settings" style="border:0;cursor:pointer">AI</button></div>
     </div>
 
     <div id="ask-when" class="ask-when" role="group" aria-label="When do you need your next answer?" hidden><span class="ask-when-l">When do you need it?</span><button type="button" class="chip" data-when="now" aria-pressed="false">Now</button><button type="button" class="chip" data-when="tonight" aria-pressed="false">Tonight, uses less energy</button><span class="ask-when-h">Not chosen: we decide. New accounts get answers at once.</span></div>
@@ -55,6 +56,10 @@
     <div class="content" data-screen="home">
       <div class="page-h"><div><h1 id="greet">Good afternoon</h1><p>What needs you, how your team is doing, and how the business is doing.</p></div><span class="badge badge-dark eg">Example data</span></div>
       <div class="kpis" id="ov-kpis" aria-label="Today at a glance"></div>
+      <section class="panel" id="suggest" aria-labelledby="suggest-h" hidden>
+        <div class="panel-h"><h2 id="suggest-h">Suggested for you</h2><span class="r">From your records, no energy used</span></div>
+        <div class="needs" id="suggest-list"></div>
+      </section>
       <section class="panel" aria-labelledby="needs-h">
         <div class="panel-h"><h2 id="needs-h">Needs you</h2><span class="r">Usually under 2 minutes a day</span></div>
         <div class="needs" id="needs">
@@ -325,6 +330,24 @@
       <div class="page-h"><div><h1 id="desk-title">Employee dashboard</h1><p id="desk-sub">What this employee is doing, what it needs from you, and its numbers.</p></div><span class="badge badge-dark eg">Example data</span><a class="btn btn-ghost btn-sm" href="#team">All employees</a></div>
       <div class="chips" id="desk-pick" role="group" aria-label="Choose an employee"></div>
       <div id="desk-body" class="desk-body"></div>
+    </div>
+
+    <!-- CONVERSATIONS -->
+    <div class="content" data-screen="chat" hidden>
+      <div class="page-h"><div><h1 id="chat-title">Conversations</h1><p>Each employee remembers what you talked about, so you can follow up.</p></div></div>
+      <p id="chat-empty" class="small muted" hidden>Log in to talk with your team.</p>
+      <div id="chat-body" hidden>
+        <div class="chips" id="chat-pick" role="group" aria-label="Choose an employee"></div>
+        <section class="panel chat" aria-label="Conversation">
+          <div class="chat-thread" id="chat-thread" role="log" aria-live="polite" aria-busy="false" tabindex="0"></div>
+          <form id="chat-form" class="chat-form">
+            <label class="sr-only" for="chat-in">Your message</label>
+            <textarea id="chat-in" class="input" rows="2" maxlength="4000" placeholder="Ask, or follow up on the last answer…"></textarea>
+            <button class="btn btn-primary" id="chat-send" type="submit">Send</button>
+          </form>
+          <p><button type="button" class="btn btn-sm btn-ghost" id="chat-clear" hidden>Clear this conversation</button></p>
+        </section>
+      </div>
     </div>
 
     <!-- SETTINGS -->
