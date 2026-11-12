@@ -1,0 +1,49 @@
+# Self-hosted MAIZ Agents on one small server (Hetzner): Caddy (HTTPS) -> app -> Postgres.
+# Nothing but ports 80 and 443 is published. Postgres is never reachable from outside the compose network.
+# Setup: deploy/README.md. Run from the repo root:  docker compose -f deploy/compose.yml --env-file deploy/.env up -d --build
+name: maiz
+services:
+  db:
+    image: postgres:16-bookworm
+    restart: unless-stopped
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set in deploy/.env}
+      APP_USER_PASSWORD: ${APP_USER_PASSWORD:?set in deploy/.env}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./initdb:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+    shm_size: 128mb
+  app:
+    build:
+      context: ..
+      args:
+        SITE_URL: ${APP_URL:?set in deploy/.env}
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    env_file: .env
+    environment:
+      NODE_ENV: production
+      PORT: "8787"
+      DATABASE_URL: postgres://postgres:${POSTGRES_PASSWORD}@db:5432/postgres
+      DATABASE_APP_URL: postgres://app_user:${APP_USER_PASSWORD}@db:5432/postgres
+    mem_limit: 2g
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    depends_on: [app]
+    ports: ["80:80", "443:443"]
+    environment:
+      DOMAIN: ${DOMAIN:?set in deploy/.env}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+volumes:
+  pgdata:
+  caddy_data:
