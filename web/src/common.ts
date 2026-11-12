@@ -1,7 +1,9 @@
 // Shared bits: sticky nav behaviour, mobile menu, toast.
 import { api, getToken } from "./api";
+import { initMotion } from "./motion";
 
 export function initNav(): void {
+  initMotion();
   // Mark the page we are on, and turn "Log in" into "Open control centre" for a signed-in visitor.
   const here = location.pathname.replace(/\/index\.html$/, "/");
   document.querySelectorAll<HTMLAnchorElement>(".nav-links a, .mobile-menu a").forEach((a) => {
