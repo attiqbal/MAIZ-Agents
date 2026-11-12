@@ -3,6 +3,7 @@ import { passwordProblem } from "../modules/credentials/index.js";
 import { userIdFor } from "./identity.js";
 import type { Platform } from "./platform.js";
 import type { Req, Res } from "./app.js";
+import { accountExistsEmail, brandFrom, confirmEmailEmail, passwordResetEmail, type Mail } from "./email-templates.js";
 
 /** What the password routes borrow from the app: token signing and sessions live there. */
 export interface AuthContext {
@@ -42,8 +43,9 @@ export async function passwordRoutes(req: Req, c: AuthContext): Promise<Res | un
   if (method !== "POST" || !path.startsWith("/api/auth/")) return undefined;
   const nowMs = p.now().getTime();
   const base = (p.cfg.appUrl ?? "").replace(/\/$/, "");
+  const brand = brandFrom(p.cfg);
   const signedIn = (email: string) => json(200, { token: c.issueSession(email), email, hasOrganisation: !!c.orgOf(userIdFor(email)), platformOwner: false });
-  const send = (to: string, subject: string, text: string) => p.email.send({ to, subject, text }).catch((e) => console.error("auth email failed:", e));
+  const send = (to: string, mail: Omit<Mail, "to">) => p.email.send({ to, ...mail }).catch((e) => console.error("auth email failed:", e));
 
   // ---- create an account: the password is held until the emailed link proves the address ----
   if (path === "/api/auth/register") {
@@ -61,12 +63,12 @@ export async function passwordRoutes(req: Req, c: AuthContext): Promise<Res | un
     // An address that already has a password or a team gets the same answer; it is told by email, and uses "Forgot password" to set one.
     if (p.credentials.has(userId) || c.orgOf(userId)) {
       await p.credentials.hold(userId, String(b.password), 1, bind); // same work as a new address, so timing does not tell them apart
-      await send(email, "You already have a MAIZ Agents account", `Someone (hopefully you) tried to create a MAIZ Agents account with this email address, but you already have one.\n\nLog in: ${base}/signin.html\nForgot your password? ${base}/signin.html#forgot\n\nIf this wasn't you, you can ignore this email.`);
+      await send(email, accountExistsEmail(`${base}/signin.html`, `${base}/signin.html#forgot`, brand));
       return json(200, { ok: true, bind, dev: p.cfg.allowDevAuth || undefined });
     }
     const nonce = await p.credentials.hold(userId, String(b.password), CONFIRM_SECONDS, bind);
     const link = c.makeToken({ k: "register", e: email, n: nonce }, CONFIRM_SECONDS);
-    await send(email, "Confirm your email for MAIZ Agents", `Confirm your email address to finish creating your account. The link works once and expires in 1 hour.\n\n${base}/signin.html#confirm=${link}\n\nIf you didn't ask for this, ignore this email and no account is made.`);
+    await send(email, confirmEmailEmail(`${base}/signin.html#confirm=${link}`, brand));
     return json(200, { ok: true, bind, ...(p.cfg.allowDevAuth ? { dev: true, devLink: link } : {}) });
   }
   if (path === "/api/auth/confirm") {
@@ -101,7 +103,7 @@ export async function passwordRoutes(req: Req, c: AuthContext): Promise<Res | un
     p.resets.record(email, nowMs);
     const link = c.makeToken({ k: "reset", e: email, n: randomBytes(12).toString("hex") }, RESET_SECONDS);
     if (!p.isPlatformOwner(userIdFor(email))) {
-      await send(email, "Set a new MAIZ Agents password", `Use this link to choose a password. It works once and expires in 30 minutes.\n\n${base}/signin.html#reset=${link}\n\nIf you didn't ask for this, ignore this email. Your password stays as it is.`);
+      await send(email, passwordResetEmail(`${base}/signin.html#reset=${link}`, brand));
     }
     const devLink = p.cfg.allowDevAuth && !p.isPlatformOwner(userIdFor(email)) ? { devLink: link } : {};
     return json(200, { ok: true, ...(p.cfg.allowDevAuth ? { dev: true, ...devLink } : {}) });
