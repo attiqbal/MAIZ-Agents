@@ -1,13 +1,13 @@
 // Scripted, simulated walkthrough: a request becomes finished work that waits for the owner's approval.
 // Nothing here talks to the server. All text is set with textContent.
-interface Step { who: string; av: string; brass?: boolean; text: string; pill: string; state: "live" | "done" | ""; }
+interface Step { who: string; av: string; cls: string; text: string; pill: string; state: "live" | "done" | ""; }
 
 const STEPS: Step[] = [
-  { who: "You", av: "YOU", text: "Prepare a marketing campaign for our Christmas promotion.", pill: "Request", state: "" },
-  { who: "Admin manager", av: "AM", brass: true, text: "On it. I'm bringing in Marketing and Compliance.", pill: "Delegated", state: "done" },
-  { who: "Marketing manager", av: "MM", text: "Drafting a three-week content calendar and three posts.", pill: "Working", state: "live" },
-  { who: "Compliance manager", av: "CM", text: "Checking the wording against advertising rules.", pill: "Checking", state: "live" },
-  { who: "Quality check", av: "QC", text: "Passed. The campaign is ready for you.", pill: "Done", state: "done" },
+  { who: "You", av: "YOU", cls: "av-me", text: "Prepare a marketing campaign for our Christmas promotion.", pill: "Request", state: "" },
+  { who: "Admin manager", av: "AM", cls: "av-tl", text: "On it. I'm bringing in Marketing and Compliance.", pill: "Delegated", state: "done" },
+  { who: "Marketing manager", av: "MM", cls: "av-mm", text: "Drafting a three-week content calendar and three posts.", pill: "Working", state: "live" },
+  { who: "Compliance manager", av: "CM", cls: "av-cm", text: "Checking the wording against advertising rules.", pill: "Checking", state: "live" },
+  { who: "Quality check", av: "QC", cls: "av-bc", text: "Passed. The campaign is ready for you.", pill: "Done", state: "done" },
 ];
 const STEP_MS = 1300;
 
@@ -23,7 +23,7 @@ export function initDemoStage(): void {
   const row = (s: Step): HTMLLIElement => {
     const li = document.createElement("li");
     const av = document.createElement("span");
-    av.className = "av" + (s.brass ? " brass" : "");
+    av.className = `av ${s.cls}`;
     av.textContent = s.av;
     av.setAttribute("aria-hidden", "true");
     const body = document.createElement("div");
@@ -50,7 +50,7 @@ export function initDemoStage(): void {
   approve.querySelectorAll("button").forEach((btn) => btn.addEventListener("click", () => {
     approve.hidden = true;
     const approved = btn.dataset.act === "approve";
-    feed.append(row({ who: "You", av: "YOU", text: approved ? "Approved. Ready to publish." : "Redo, please make it shorter.", pill: approved ? "Approved" : "Redo", state: "done" }));
+    feed.append(row({ who: "You", av: "YOU", cls: "av-me", text: approved ? "Approved. Ready to publish." : "Redo, please make it shorter.", pill: approved ? "Approved" : "Redo", state: "done" }));
   }));
   replay.addEventListener("click", () => play(false));
 
