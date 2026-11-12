@@ -1,5 +1,6 @@
 import { resolve } from "node:path";
 import { readFileSync } from "node:fs";
+import { createHash } from "node:crypto";
 import { defineConfig, type Plugin } from "vite";
 import { NEEDS, SECTORS, OTHER_SECTOR } from "../src/modules/onboarding/sectors";
 
@@ -66,7 +67,10 @@ const INDEXED_PAGES = ["/", "/employees.html", "/how-it-works.html", "/control-c
 const GOOGLE_VERIFY = (process.env.GOOGLE_SITE_VERIFICATION ?? "").replace(/[^\w-]/g, "");
 const BING_VERIFY = (process.env.BING_SITE_VERIFICATION ?? "").replace(/[^\w-]/g, "");
 const BUILT = new Date().toISOString().slice(0, 10);
-const OG_IMAGE = `${SITE_URL}/og.png`;
+// The version in the link changes whenever og.png changes, so WhatsApp, LinkedIn, Slack and others fetch the new
+// picture instead of showing the one they cached before.
+const OG_VERSION = createHash("sha256").update(readFileSync(resolve(__dirname, "public", "og.png"))).digest("hex").slice(0, 8);
+const OG_IMAGE = `${SITE_URL}/og.png?v=${OG_VERSION}`;
 const OG_ALT = "MAIZ Agents: hire a team, not another tool. Six illustrated AI employees, £150 a month for the whole team, 7 days free.";
 
 const decode = (s: string) =>
