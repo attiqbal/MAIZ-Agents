@@ -2,7 +2,7 @@ import "./styles.css";
 import { initNav } from "./common";
 import { getJobDescription, jdHtml } from "./jd";
 import { CUSTOM_SPECIALIST, DEPARTMENTS } from "../../src/modules/workforce/blueprints";
-import { BILLING_INFO, getItem, isCoreRole } from "../../src/modules/store/cart";
+import { getItem, isCoreRole } from "../../src/modules/store/cart";
 
 initNav();
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
@@ -17,22 +17,36 @@ document.querySelectorAll<HTMLElement>("[data-jd]").forEach((card) => {
   card.append(d);
 });
 
-// Org blueprint: every department and role. Opening a role shows its job description.
+// Add-on roles: one compact card per role that is not in the package, filterable by department.
+// Package roles are already on the cards above, so they are left out here.
 const bp = document.getElementById("org-blueprint");
+const bpFilter = document.getElementById("bp-filter");
 if (bp) {
-  // Every role is either in the package, an optional monthly add-on or an optional one-off task. Non-core roles go to the cart.
-  const roleHtml = (key: string, title: string) => {
-    const jd = getJobDescription(key);
+  const card = (dept: string, key: string, title: string, purpose: string) => {
     const item = getItem(key);
-    const tag = isCoreRole(key) ? `<span class="bp-tag bp-ready">In your package</span>` : item ? `<span class="bill-tag bill-${item.billing}">${item.billing === "monthly" ? "Optional add-on" : "Optional one-off"}</span>` : "";
-    const buy = item
-      ? `<div class="bp-buy"><span class="store-price" data-price-key="${esc(key)}">${item.billing === "monthly" ? `£${item.priceGbp} / month` : `£${item.priceGbp} once`}</span><button class="btn btn-primary btn-sm" type="button" data-add="${esc(key)}">Add to cart</button><span class="jd-note">${esc(BILLING_INFO[item.billing].note)}</span></div>`
-      : `<p class="jd-note">Already in your package. Nothing to add.</p>`;
-    return `<details class="jd bp-role"><summary><span>${esc(title)}</span>${tag}</summary>${buy}${jd ? jdHtml(jd) : ""}</details>`;
+    const price = item ? (item.billing === "monthly" ? `£${item.priceGbp} / month` : `£${item.priceGbp} once`) : "Priced for you";
+    const action = item
+      ? `<button class="btn btn-primary btn-sm" type="button" data-add="${esc(key)}">Add to cart</button>`
+      : `<a class="btn btn-ghost btn-sm" href="/app.html#store">Ask for it</a>`;
+    return `<article class="addon"><span class="addon-dept">${esc(dept)}</span><h3>${esc(title)}</h3><p>${esc(purpose)}</p><div class="addon-foot"><span class="store-price" data-price-key="${esc(key)}">${price}</span>${action}</div></article>`;
   };
-  bp.innerHTML =
-    DEPARTMENTS.map((d) => `<article class="card bp-dept"><h3>${esc(d.name)}</h3><p class="desc">${esc(d.mission)}</p><div class="bp-roles">${d.roles.map((r) => roleHtml(r.key, r.title)).join("")}</div></article>`).join("") +
-    `<article class="card card-hi bp-dept bp-custom"><h3>${esc(CUSTOM_SPECIALIST.title)}</h3><p class="desc">${esc(CUSTOM_SPECIALIST.summary)}</p><ol>${CUSTOM_SPECIALIST.steps.map((s) => `<li>${esc(s)}</li>`).join("")}</ol></article>`;
+  bp.innerHTML = DEPARTMENTS.map((d) => {
+    const roles = d.roles.filter((r) => !isCoreRole(r.key));
+    if (!roles.length) return "";
+    return `<div class="addon-group" data-dept="${esc(d.key)}">${roles.map((r) => card(d.name, r.key, r.title, r.purpose)).join("")}</div>`;
+  }).join("") +
+    `<div class="addon-group" data-dept="custom"><article class="addon addon-custom"><span class="addon-dept">Not listed?</span><h3>${esc(CUSTOM_SPECIALIST.title)}</h3><p>Describe the job. Your Admin manager designs it, MAIZ checks it and sets the price, then you decide.</p><div class="addon-foot"><a class="btn btn-ghost btn-sm" href="/app.html#store">Describe a role</a></div></article></div>`;
+  if (bpFilter) {
+    const depts = DEPARTMENTS.filter((d) => d.roles.some((r) => !isCoreRole(r.key)));
+    bpFilter.innerHTML = [`<button type="button" class="chip" data-f="all" aria-pressed="true">All</button>`, ...depts.map((d) => `<button type="button" class="chip" data-f="${esc(d.key)}" aria-pressed="false">${esc(d.name)}</button>`)].join("");
+    bpFilter.addEventListener("click", (e) => {
+      const b = (e.target as HTMLElement).closest<HTMLButtonElement>("[data-f]");
+      if (!b) return;
+      const f = b.dataset.f ?? "all";
+      bpFilter.querySelectorAll("[data-f]").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
+      bp.querySelectorAll<HTMLElement>(".addon-group").forEach((g) => { g.hidden = f !== "all" && g.dataset.dept !== f && g.dataset.dept !== "custom"; });
+    });
+  }
 }
 
 bp?.addEventListener("click", (e) => {

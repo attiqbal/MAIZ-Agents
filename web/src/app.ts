@@ -160,9 +160,15 @@ function showTrial(endsAt: string | undefined): void {
   $("trial-bar").style.width = `${Math.min(100, Math.round(((TRIAL_DAYS - left) / TRIAL_DAYS) * 100))}%`;
 }
 
+const LOCAL_PREVIEW = ["localhost", "127.0.0.1"].includes(location.hostname);
+
 async function loadOrg(): Promise<void> {
-  // Visitors without a login see the example business: the "Explore the demo" links land here.
-  if (!getToken()) { $("demo-banner").hidden = false; return; }
+  // The control centre is for signed-in customers only; there is no public demo. Logged-out visitors
+  // go to the log-in page. Only local development and the QA run (localhost) keep the example business.
+  if (!getToken()) {
+    if (!LOCAL_PREVIEW) { location.replace("/signin.html"); return; }
+    $("demo-banner").hidden = false; return;
+  }
   const r = await api<Org>("/org");
   // Guard: this device's login has expired -> log-in page.
   if (r.status === 401) { clearSession(); location.replace("/signin.html"); return; }

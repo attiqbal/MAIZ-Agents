@@ -230,3 +230,7 @@ Finish gate for every phase (from `CLAUDE.md`): `cd web && npm run build && npm 
 4. **Analytics**: which tool, and whether to add a cookie banner in Phase 5.
 5. **Employee identity**: initials/illustrated avatars (recommended) or commissioned portraits.
 6. Confirm the headline pair: "Hire a team. Not another tool." and "Build your company. Hire your AI workforce. Stay in control."
+
+## Update 2026-11-12: no public demo
+
+The owner removed the live demo. The homepage demo band and every "Live demo" / "Explore the demo" link are gone. Outside localhost, `/app.html` sends logged-out visitors to the log-in page; the example business (Kestrel Coffee) remains only for local development and the QA run. Headlines now use Fraunces with Inter for text. On the Employees page, the full org blueprint is replaced by add-on role cards.
