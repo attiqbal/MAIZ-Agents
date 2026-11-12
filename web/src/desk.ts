@@ -4,6 +4,7 @@
 import { DESK, type DeskEmployee, type DeskRow } from "./desk-data";
 import { peopleSnapshot } from "./people";
 import { toast } from "./common";
+import { deptFor } from "./dept";
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
@@ -11,7 +12,7 @@ const tag = (tone: string, text: string) => `<span class="status ${tone}"><span 
 const SEV_TONE = { critical: "crit", high: "warn", medium: "info", low: "" } as const;
 
 /** The HR manager's numbers and main panel come from the HR desk itself, so the two never disagree. */
-function withHr(e: DeskEmployee): DeskEmployee {
+export function withHr(e: DeskEmployee): DeskEmployee {
   if (e.key !== "hr-manager") return e;
   const v = peopleSnapshot();
   if (!v) return e;
@@ -22,7 +23,7 @@ function withHr(e: DeskEmployee): DeskEmployee {
     ...e,
     status: urgent.length ? "warn" : "good",
     statusText: urgent.length ? "Waiting on you" : "Working",
-    needs: urgent.slice(0, 3).map((a) => ({ title: `${a.staffName}: ${a.title}`, detail: a.detail, action: "Open HR desk", href: "#people" })),
+    needs: urgent.slice(0, 3).map((a) => ({ title: `${a.staffName}: ${a.title}`, detail: a.detail, action: "Open staff records", href: "#people" })),
     kpis: [
       { label: "Staff", value: String(s.headcount), note: `${s.starting} starting, ${s.leaving} leaving`, source: "You told us" },
       { label: "Records complete", value: `${s.recordsComplete}%`, note: "Required documents in date", source: "You told us", ...(s.recordsComplete < 80 ? { tone: "warn" as const } : {}) },
@@ -36,8 +37,9 @@ function withHr(e: DeskEmployee): DeskEmployee {
 function render(key: string): void {
   const base = DESK.find((d) => d.key === key) ?? DESK[0]!;
   const e = withHr(base);
-  $("desk-title").textContent = e.name;
-  $("desk-sub").textContent = e.purpose;
+  const dept = deptFor(`desk/${e.key}`);
+  $("desk-title").textContent = dept ? `${dept.name} overview` : e.name;
+  $("desk-sub").textContent = dept ? `What needs you, the key numbers, and what your ${e.name} is working on.` : e.purpose;
   $("desk-pick").innerHTML = DESK.map((d) => `<a class="chip" href="#desk/${d.key}"${d.key === e.key ? ' aria-current="page"' : ""}>${esc(d.name)}</a>`).join("");
   const statusTone = e.status === "idle" ? "" : e.status;
   const needs = e.needs.length

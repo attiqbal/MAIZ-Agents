@@ -11,6 +11,7 @@ import { initDash } from "./dash";
 import { initRoleDesigner } from "./role-designer";
 import { initPeople, setPeopleBusiness } from "./people";
 import { initDesk, showDesk } from "./desk";
+import { renderDeptBar } from "./dept";
 import { api, getToken, clearSession, type Org } from "./api";
 import { JOB_DESCRIPTIONS, getJobDescription, jdHtml } from "./jd";
 
@@ -44,12 +45,19 @@ function route(): void {
   if (valid === "apps") void import("./apps").then((m) => m.setAppsView(sub));
   if (valid === "slack") void import("./apps").then((m) => m.initSlackTab(Boolean(profile.slack)));
   screens.forEach((s) => s.toggleAttribute("hidden", s.dataset.screen !== valid));
-  document.querySelectorAll<HTMLAnchorElement>("[data-nav]").forEach((a) => {
-    if (a.dataset.nav === (valid === "desk" ? `desk/${sub}` : valid === "apps" && sub ? `apps/${sub}` : valid)) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current");
+  const here = valid === "desk" ? `desk/${sub}` : valid === "apps" && sub ? `apps/${sub}` : valid;
+  // Inside a department, the rail marks the department for every one of its tabs.
+  const dept = renderDeptBar(here);
+  const links = Array.from(document.querySelectorAll<HTMLAnchorElement>("[data-nav]"));
+  const exact = links.some((a) => a.dataset.nav === here);
+  links.forEach((a) => {
+    const on = exact ? a.dataset.nav === here : dept !== undefined && a.dataset.dept === dept.key;
+    if (on) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current");
   });
   app.classList.remove("menu-open"); $("menu-btn").setAttribute("aria-expanded", "false");
   const title = screens.find((x) => x.dataset.screen === valid)?.querySelector("h1")?.textContent ?? "Control centre";
   document.title = `${valid === "home" ? "Overview" : title} · ${orgName} · MAIZ Agents`;
+  if (dept && valid !== "desk") document.title = `${dept.name}: ${title} · ${orgName} · MAIZ Agents`;
   window.scrollTo({ top: 0 });
 }
 window.addEventListener("hashchange", route);
@@ -152,9 +160,15 @@ function showTrial(endsAt: string | undefined): void {
   $("trial-bar").style.width = `${Math.min(100, Math.round(((TRIAL_DAYS - left) / TRIAL_DAYS) * 100))}%`;
 }
 
+const LOCAL_PREVIEW = ["localhost", "127.0.0.1"].includes(location.hostname);
+
 async function loadOrg(): Promise<void> {
-  // Visitors without a login see the example business: the "Explore the demo" links land here.
-  if (!getToken()) { $("demo-banner").hidden = false; return; }
+  // The control centre is for signed-in customers only; there is no public demo. Logged-out visitors
+  // go to the log-in page. Only local development and the QA run (localhost) keep the example business.
+  if (!getToken()) {
+    if (!LOCAL_PREVIEW) { location.replace("/signin.html"); return; }
+    $("demo-banner").hidden = false; return;
+  }
   const r = await api<Org>("/org");
   // Guard: this device's login has expired -> log-in page.
   if (r.status === 401) { clearSession(); location.replace("/signin.html"); return; }

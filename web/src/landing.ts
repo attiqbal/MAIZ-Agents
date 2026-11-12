@@ -1,8 +1,6 @@
 import "./styles.css";
 import { initNav } from "./common";
 initNav();
-import { initDemoStage } from "./demo-stage";
-initDemoStage();
 
 // Pricing page: show today's prices as set by MAIZ (the HTML holds the launch prices as a fallback).
 const priced = document.querySelectorAll<HTMLElement>("[data-price]");

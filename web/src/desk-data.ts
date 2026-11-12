@@ -61,7 +61,7 @@ export const DESK: DeskEmployee[] = [
       { label: "Bills due in 14 days", value: "£1,260", note: "4 bills", source: "Verified" },
       { label: "October profit", value: "£1,940", note: "Not closed yet", source: "Estimate" },
     ],
-    main: { title: "Profit and loss · October", link: { href: "#finance", label: "Open Finance desk" }, rows: [
+    main: { title: "Profit and loss · October", link: { href: "#finance", label: "Open books and cash" }, rows: [
       { label: "Sales", value: "£6,210" }, { label: "Cost of coffee and milk", value: "−£2,080" }, { label: "Staff costs", value: "−£1,560" },
       { label: "Rent and bills", value: "−£630" }, { label: "Profit before tax", value: "£1,940", note: "Waiting for your VAT answer", tone: "warn" },
     ] },
@@ -121,11 +121,11 @@ export const DESK: DeskEmployee[] = [
     purpose: "Keeps every staff record complete and in date, chases documents, works out holiday and reminds you before anything runs out.",
     needs: [],
     kpis: [],
-    main: { title: "From your HR desk", link: { href: "#people", label: "Open HR desk" }, rows: [] },
+    main: { title: "From your staff records", link: { href: "#people", label: "Open staff records" }, rows: [] },
     working: [{ title: "People basics checklist", note: "12 energy so far", pct: 45 }],
     done: [{ title: "Holiday policy draft", note: "Accepted, 9 energy" }],
     coming: [{ when: "Each Monday", title: "Staff records check and reminders" }, { when: "Before each payroll", title: "Starters, leavers and hours for payroll" }],
-    sees: ["Your HR desk (staff records)", "The rota", "BrightPay payroll files you upload"],
+    sees: ["Your staff records", "The rota", "BrightPay payroll files you upload"],
     ask: ["What documents is anyone missing?", "How much holiday does Tom have left?", "Draft a contract for a new barista"],
   },
   {
@@ -144,7 +144,7 @@ export const DESK: DeskEmployee[] = [
       { label: "VAT return", value: "Due in 27 days", tone: "info" },
       { label: "Confirmation statement", value: "Ready to file", tone: "good" },
       { label: "Data protection fee", value: "Renews in 58 days", tone: "info" },
-    ], note: "Staff documents (right to work, food hygiene certificates) are tracked on the HR desk." },
+    ], note: "Staff documents (right to work, food hygiene certificates) are tracked in HR staff records." },
     working: [{ title: "Compliance register", note: "36 energy so far", pct: 70 }],
     done: [{ title: "Allergen labelling check", note: "Accepted" }],
     coming: [{ when: "In 12 days", title: "Insurance renewal" }, { when: "In 41 days", title: "Confirmation statement" }],

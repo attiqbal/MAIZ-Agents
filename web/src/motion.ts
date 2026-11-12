@@ -49,16 +49,25 @@ export function initReveal(): void {
 /** Highlights the sub-nav link of the section that is on screen. */
 export function initSubnav(): void {
   const links = [...document.querySelectorAll<HTMLAnchorElement>(".subnav a[href^='#']")];
-  if (!links.length || !("IntersectionObserver" in window)) return;
-  const byId = new Map(links.map((a) => [a.hash.slice(1), a]));
-  const io = new IntersectionObserver((entries) => {
-    entries.forEach((en) => {
-      if (!en.isIntersecting) return;
-      links.forEach((a) => a.classList.remove("active"));
-      byId.get(en.target.id)?.classList.add("active");
-    });
-  }, { rootMargin: "-30% 0px -60% 0px" });
-  byId.forEach((_a, id) => { const s = document.getElementById(id); if (s) io.observe(s); });
+  const pairs = links
+    .map((a) => ({ a, el: document.getElementById(a.hash.slice(1)) }))
+    .filter((p): p is { a: HTMLAnchorElement; el: HTMLElement } => p.el !== null);
+  if (!pairs.length) return;
+  // The active link is the last section whose top has passed a line a third of the way down the
+  // screen. Above the first section nothing is marked, so the page top never shows a stale state.
+  let queued = false;
+  const update = (): void => {
+    queued = false;
+    const line = window.innerHeight * 0.33;
+    let current: HTMLAnchorElement | undefined;
+    for (const p of pairs) if (p.el.getBoundingClientRect().top <= line) current = p.a;
+    for (const p of pairs) {
+      p.a.classList.toggle("active", p.a === current);
+      if (p.a === current) p.a.setAttribute("aria-current", "location"); else p.a.removeAttribute("aria-current");
+    }
+  };
+  window.addEventListener("scroll", () => { if (!queued) { queued = true; requestAnimationFrame(update); } }, { passive: true });
+  update();
 }
 
 export function initEditionDate(): void {
