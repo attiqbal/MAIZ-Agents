@@ -18,22 +18,31 @@
     <a class="logo" href="/"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M6 0H32V32H0V6A6 6 0 0 1 6 0Z" fill="#202020"/><path d="M8 23V10l8 9 8-9v13" fill="none" stroke="#ffffff" stroke-width="2.6" stroke-linecap="square" stroke-linejoin="miter"/><rect x="22.5" y="5" width="4" height="4" fill="#ff682c"/></svg>MAIZ Agents</a>
     <div class="rail-org"><span class="av av-sm av-me" id="org-av">KC</span><span id="org-name">Kestrel Coffee</span></div>
     <nav class="rail-nav" aria-label="Control centre">
+    <div class="group">Dashboard</div>
     <a class="ni" href="#home" data-nav="home"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>Overview</a>
     <a class="ni" href="#approvals" data-nav="approvals"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>Approvals<span class="count" id="appr-count">3</span></a>
-    <a class="ni" href="#work" data-nav="work"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="5" height="16" rx="1.5"/><rect x="10" y="4" width="5" height="10" rx="1.5"/><rect x="17" y="4" width="4" height="13" rx="1.5"/></svg>Tasks and consultants</a>
+    <a class="ni" href="#work" data-nav="work"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="5" height="16" rx="1.5"/><rect x="10" y="4" width="5" height="10" rx="1.5"/></svg>Tasks</a>
     <a class="ni" href="#chat" data-nav="chat"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h16v11H9l-5 4z"/><path d="M8 9.5h8M8 12.5h5"/></svg>Conversations</a>
-    <div class="group" id="g-team">Team</div>
-    <a class="ni" href="#team" data-nav="team"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.3 2.7-5.5 6-5.5s6 2.200 6 5.5"/><path d="M16 5.5a3 3 0 010 5.5M18 14.7c1.800.7 3 2.400 3 5.3"/></svg>Team</a>
+    <div class="group" id="g-team">Departments</div>
+    <a class="ni" href="#desk/admin-manager" data-nav="desk/admin-manager"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="3.2"/><path d="M5 20c0-3.3 3.1-5.500 7-5.500s7 2.200 7 5.500"/></svg>Admin manager</a>
+    <a class="ni" href="#finance" data-nav="finance"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19V9M10 19V5M16 19v-7M22 19H2"/></svg>Finance</a>
+    <a class="ni" href="#desk/marketing-manager" data-nav="desk/marketing-manager"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="3.2"/><path d="M5 20c0-3.3 3.1-5.500 7-5.500s7 2.200 7 5.500"/></svg>Marketing</a>
+    <a class="ni" href="#desk/business-consultant" data-nav="desk/business-consultant"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="3.2"/><path d="M5 20c0-3.3 3.1-5.500 7-5.500s7 2.200 7 5.500"/></svg>Business consultant</a>
+    <a class="ni" href="#people" data-nav="people"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.3 2.7-5.5 6-5.5s6 2.200 6 5.500"/></svg>HR<span class="count" id="hr-count" hidden></span></a>
+    <a class="ni" href="#compliance" data-nav="compliance"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="5" width="16" height="15" rx="2.5"/><path d="M4 10h16M8 3v4M16 3v4M9 15l2 2 4-4"/></svg>Compliance</a>
+    <a class="ni" href="#team" data-nav="team"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.3 2.7-5.5 6-5.5s6 2.200 6 5.500"/></svg>Whole team</a>
+    <div class="group">Services</div>
+    <a class="ni" href="#slack" data-nav="slack"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h16v11H9l-5 4z"/><path d="M8 9.5h8M8 12.5h5"/></svg>Slack and chat<span class="count" id="slack-state">Off</span></a>
+    <a class="ni" href="#apps/accounting" data-nav="apps/accounting"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19V9M10 19V5M16 19v-7M22 19H2"/></svg>Accounting</a>
+    <a class="ni" href="#apps/till" data-nav="apps/till"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="6" width="18" height="12" rx="2"/><path d="M3 10h18"/></svg>Tills and sales</a>
+    <a class="ni" href="#apps/payments" data-nav="apps/payments"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="6" width="18" height="12" rx="2"/><path d="M3 10h18"/></svg>Payments</a>
+    <a class="ni" href="#apps/payroll" data-nav="apps/payroll"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.3 2.7-5.5 6-5.5s6 2.200 6 5.500"/></svg>Payroll</a>
+    <a class="ni" href="#apps/bridge" data-nav="apps/bridge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 7V3M15 7V3M7 7h10v4a5 5 0 01-10 0zM12 16v5"/></svg>Zapier and Make</a>
+    <div class="group">Account</div>
     <a class="ni" href="#usage" data-nav="usage"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 2L4 14h7l-1 8 9-12h-7z"/></svg>Energy and spend</a>
     <a class="ni" href="#store" data-nav="store"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8l2-4h12l2 4M4 8v11h16V8M4 8h16M9 12h6"/></svg>Hire from the store</a>
-    <div class="group">Business</div>
-    <a class="ni" href="#finance" data-nav="finance"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19V9M10 19V5M16 19v-7M22 19H2"/></svg>Finance desk</a>
-    <a class="ni" href="#people" data-nav="people"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="3" width="16" height="18" rx="2.5"/><circle cx="12" cy="10" r="2.6"/><path d="M7.5 17.5c.8-2 2.500-3 4.500-3s3.700 1 4.500 3"/></svg>HR desk<span class="count" id="hr-count" hidden></span></a>
-    <a class="ni" href="#compliance" data-nav="compliance"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="5" width="16" height="15" rx="2.5"/><path d="M4 10h16M8 3v4M16 3v4M9 15l2 2 4-4"/></svg>Compliance calendar</a>
-    <a class="ni" href="#apps" data-nav="apps"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 7V3M15 7V3M7 7h10v4a5 5 0 01-10 0zM12 16v5"/></svg>Apps<span class="count" id="slack-state">Slack off</span></a>
-    <div class="group">Account</div>
-    <a class="ni" href="#setup" data-nav="setup"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h16v11H9l-5 4z"/></svg>Setup<span class="count" id="setup-badge">1</span></a>
-    <a class="ni" href="#settings" data-nav="settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M18.4 5.6l-2.1 2.100M7.7 16.3l-2.1 2.1"/></svg>Settings</a>
+    <a class="ni" href="#setup" data-nav="setup"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h16v11H9l-5 4z"/><path d="M8 9.5h8M8 12.5h5"/></svg>Setup<span class="count" id="setup-badge">1</span></a>
+    <a class="ni" href="#settings" data-nav="settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3"/></svg>Settings</a>
     </nav>
     <div class="trial" id="trial-box"><b id="trial-left">Trial: 5 days left</b><span class="muted" id="trial-note">No card needed until day 7</span><div class="energy"><i id="trial-bar" style="width:29%"></i></div></div>
   </aside>
@@ -249,8 +258,17 @@
     </div>
 
     <!-- APPS -->
+    <div class="content" data-screen="slack" hidden>
+      <div class="page-h"><div><h1>Slack and chat</h1><p>Message your team and approve work with a button, right where you already chat.</p></div><span class="status" id="slack-status"><span class="dot"></span><span id="slack-status-t">Off</span></span></div>
+      <section class="panel">
+        <div class="panel-h"><h2>Slack</h2><span class="r" id="slack-note">Not connected</span></div>
+        <p class="small muted">Connect once, then message the Admin manager, mention a role to go direct, and approve with a button. Teams and WhatsApp are coming soon.</p>
+        <div class="acts"><button type="button" class="btn btn-primary" id="slack-connect">Connect Slack</button></div>
+      </section>
+    </div>
+
     <div class="content" data-screen="apps" hidden>
-      <div class="page-h"><div><h1>Apps</h1><p>Connect Slack, your till, payroll and accounts. Your team only reads them, and you choose who sees what.</p></div></div>
+      <div class="page-h"><div><h1 id="apps-h1">Services</h1><p id="apps-intro">Connect your till, payroll and accounts. Your team only reads them, and you choose who sees what.</p></div><span class="status" id="svc-status" hidden><span class="dot"></span><span id="svc-status-t"></span></span></div>
       <div class="kpis kpis-4" id="apps-kpis"></div>
       <section class="panel" id="apps-pending-panel" hidden><div class="panel-h"><h2>Waiting to go into your books</h2><span class="r" id="apps-pending-count"></span></div>
         <div id="apps-pending"></div>

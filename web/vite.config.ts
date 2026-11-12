@@ -25,7 +25,7 @@ function partials(): Plugin {
 const SITE_URL = (process.env.SITE_URL ?? "http://localhost:5173").replace(/\/+$/, "");
 
 /** Public, indexable pages. App and onboarding pages are noindex and stay out of the sitemap. */
-const INDEXED_PAGES = ["/", "/employees.html", "/how-it-works.html", "/control-centre.html", "/pricing.html", "/security.html", "/faq.html"];
+const INDEXED_PAGES = ["/", "/employees.html", "/how-it-works.html", "/control-centre.html", "/pricing.html", "/security.html", "/faq.html", "/energy.html", "/industries.html"];
 
 const decode = (s: string) =>
   s.replace(/<[^>]+>/g, "").replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&amp;/g, "&").replace(/\s+/g, " ").trim();
@@ -93,6 +93,8 @@ export default defineConfig({
         howItWorks: resolve(__dirname, "how-it-works.html"),
         controlCentre: resolve(__dirname, "control-centre.html"),
         faq: resolve(__dirname, "faq.html"),
+        energy: resolve(__dirname, "energy.html"),
+        industries: resolve(__dirname, "industries.html"),
         notFound: resolve(__dirname, "404.html"),
       },
     },

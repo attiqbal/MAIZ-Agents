@@ -12,7 +12,7 @@ describe("a 50-staff, 500-customers-a-day business", () => {
     const signed = await w.signUp("boss@bigcafe.test", "Big Cafe", { size: "11-50" });
     let auth = signed.auth;
     const workspaceId = signed.workspaceId;
-    // A paying client on the £100 team package (the trial would end after 7 days of this month).
+    // A paying client on the £150 team package (the trial would end after 7 days of this month).
     w.platform.energy.setPlan(uid("boss@bigcafe.test"), workspaceId, { ...PLANS.starter! });
 
     // 50 staff on the rota, each with an hourly rate.

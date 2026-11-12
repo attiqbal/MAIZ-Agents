@@ -43,7 +43,7 @@ What the plan actually needs is available without Next.js:
    - Do not add lime. Introducing a second accent breaks "one orange ember". If Atif wants green, it must replace Ember everywhere, as a separate decision.
    - Keep Inter Tight + Inter. Manrope would be a third family and break the two-family limit.
    - Rounded cards vs the owner's square buttons and asymmetric cards: keep the owner's shapes.
-3. **Sample prices in the plan must match pricing.** The plan's example "Finance Manager, £25/month, 2,000 energy, Available to hire" is wrong for this product. Finance is one of the five employees included in the **£100/month Team package (8,000 energy a week shared)**. Only **extra employees (£25/month, +2,000 energy/week)** and **specialists (£35/month, +2,000 energy/week)** are sold separately. The store cards must show store roles (not the five core ones) and read every price from `/api/store`, never from hard-coded text. Prices on the page stay labelled "draft list prices" until payments open.
+3. **Sample prices in the plan must match pricing.** The plan's example "Finance Manager, £25/month, 2,000 energy, Available to hire" is wrong for this product. Finance is one of the five employees included in the **£150/month Team package (8,000 energy a week shared)**. Only **extra employees (£25/month, +2,000 energy/week)** and **specialists (£35/month, +2,000 energy/week)** are sold separately. The store cards must show store roles (not the five core ones) and read every price from `/api/store`, never from hard-coded text. Prices on the page stay labelled "draft list prices" until payments open.
 4. **Claims that must stay honest.** Only claim what exists today:
    - Slack (live), Xero and Square (live, read only); other apps are CSV upload or via Zapier/Make (see `docs/INTEGRATIONS.md`). Show no logos for apps that are not live.
    - Security: use the existing `security.html` split of "In place today" and "Still to come". No SOC 2, ISO, encryption-at-rest or "enterprise-grade" claims; there has been no outside audit. Per-customer databases and prompt-injection defences are "still to come".
@@ -163,7 +163,7 @@ Sections, in order:
 3. **Demo stage** (Graphite band): the scripted walkthrough below.
 4. **One command centre**: three real screenshots (needs-you, team, business health), the "does anything need me, is my team working, how is the business" framing already on the page.
 5. **You approve, your team executes**: approval flow (nothing leaves without the owner; quality review; redo returns energy). Only describe behaviour that exists.
-6. **Pricing teaser**: the three real cards (Team £100, extra employee £25, specialist £35) read from `/api/store`, plus the "draft prices" note.
+6. **Pricing teaser**: the three real cards (Team £150, extra employee £25, specialist £35) read from `/api/store`, plus the "draft prices" note.
 7. **Industries** (Phase 4) and **FAQ** (existing, drives JSON-LD).
 8. **Final CTA** band.
 
@@ -183,7 +183,7 @@ Implementation: one `web/src/demo-stage.ts` module (about 150 lines), a data arr
 
 | Feature | Plan | Build |
 |---|---|---|
-| Interactive team builder | yes | `pricing.html`; checkboxes for extra employees and specialists, total = £100 + £25 per extra + £35 per specialist, weekly energy = 8,000 + 2,000 per add-on. Constants come from `/api/store`, never hard-coded |
+| Interactive team builder | yes | `pricing.html`; checkboxes for extra employees and specialists, total = £150 + £25 per extra + £35 per specialist, weekly energy = 8,000 + 2,000 per add-on. Constants come from `/api/store`, never hard-coded |
 | ROI calculator | yes | Already exists (hire vs team package). Keep, label "estimate, not a guarantee" |
 | Live demo | yes | `/app.html` demo plus the homepage stage |
 | Industry pages | yes | Phase 4, generated from `sectors.ts` |

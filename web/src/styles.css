@@ -1247,3 +1247,4 @@ body > main, body > .page-top { flex: none; }
   .edition span:nth-child(3) { display: none; }
 }
 @media (prefers-reduced-motion: reduce) { .rv-pre { opacity: 1; transform: none; } .stage-feed li { animation: none; } }
+.page-top > main > .section:first-child { padding-top: 112px; }

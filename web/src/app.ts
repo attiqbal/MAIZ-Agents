@@ -30,7 +30,7 @@ $("owner-name").textContent = owner;
 $("me-av").textContent = $("owner-av").textContent = initials(owner);
 const h = new Date().getHours();
 $("greet").textContent = `${h < 12 ? "Good morning" : h < 18 ? "Good afternoon" : "Good evening"}, ${biz}`;
-if (profile.slack) $("slack-state").textContent = "Slack on";
+$("slack-state").textContent = profile.slack ? "On" : "Off";
 
 
 // Routing
@@ -41,9 +41,11 @@ function route(): void {
   const valid = screens.some((s) => s.dataset.screen === key) ? key : "home";
   if (valid === "desk") showDesk(sub);
   if (valid === "chat") void showChat(sub);
+  if (valid === "apps") void import("./apps").then((m) => m.setAppsView(sub));
+  if (valid === "slack") void import("./apps").then((m) => m.initSlackTab(Boolean(profile.slack)));
   screens.forEach((s) => s.toggleAttribute("hidden", s.dataset.screen !== valid));
   document.querySelectorAll<HTMLAnchorElement>("[data-nav]").forEach((a) => {
-    if (a.dataset.nav === (valid === "desk" ? "team" : valid)) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current");
+    if (a.dataset.nav === (valid === "desk" ? `desk/${sub}` : valid === "apps" && sub ? `apps/${sub}` : valid)) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current");
   });
   app.classList.remove("menu-open"); $("menu-btn").setAttribute("aria-expanded", "false");
   const title = screens.find((x) => x.dataset.screen === valid)?.querySelector("h1")?.textContent ?? "Control centre";
