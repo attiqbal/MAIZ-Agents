@@ -1,5 +1,19 @@
 # Interim hosting until funded
 
+> **Status (2026-11-12): the Oracle replica, WireGuard tunnel and Oracle backups are paused by decision.** Until they are back, the off-server copy is a nightly encrypted dump sent to Cloudflare R2 (next section). Everything about Oracle below is kept for when it is resumed.
+
+## Stop-gap: off-server backup without Oracle
+
+Risk if nothing is done: all data lives on one Hetzner disk. A deleted server, a failed disk or a bad command loses every customer's records and cannot be undone. Do this before the first real customer.
+
+1. **Hetzner server backups** (one click in Hetzner Cloud: server > Backups, about 20% of the server price, roughly £2/month). Whole-server snapshots, kept by Hetzner.
+2. **Nightly encrypted dump to Cloudflare R2** (a different company from Hetzner; the first 10 GB is free, then about $0.015/GB/month, no download fees). You already have a Cloudflare account. Create a bucket `maiz-backups` and an **R2 API token limited to that bucket** (Object Read and Write). Install `rclone`, run `rclone config` to add an S3 remote named `r2` (provider Cloudflare), then add a cron job: `BACKUP_PASSPHRASE_FILE=/root/.maiz-backup-pass BACKUP_REMOTE=rclone:r2:maiz-backups /opt/maiz/deploy/backup.sh`. Dumps are encrypted before they leave the server, kept 14 days locally and 30 days remotely.
+3. **Test a restore** with `deploy/restore.sh` on a throwaway copy before the first customer.
+
+Alternative if you prefer one provider bill: a Hetzner Storage Box (about €3.50/month, 1 TB) works with the same script over rsync/SSH. It is a separate system from the server, but the same company and account.
+
+Data loss in this setup: up to 24 hours (since the last dump). Run the cron every 6 hours to cut that to 6, which costs almost nothing. This does not meet "no data loss"; the Oracle replica was the part that did, and it is paused.
+
 Goal: run MAIZ Agents for the first pilot customers at the cost of one small server, without a rewrite, and move to a proper server later without pain.
 
 ## Recommendation
