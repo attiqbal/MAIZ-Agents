@@ -1,6 +1,6 @@
 # Interim hosting until funded
 
-Goal: run MAIZ Agents for the first pilot customers at close to zero extra cost, without a rewrite, and move to a proper server later without pain.
+Goal: run MAIZ Agents for the first pilot customers at the cost of one small server, without a rewrite, and move to a proper server later without pain.
 
 ## Recommendation
 
@@ -24,13 +24,14 @@ Not used yet: Redis, Celery/Dramatiq, WireGuard, OCR workers. The app keeps its 
 
 | Item | Cost |
 |---|---|
-| Hetzner, Oracle (already owned) | £0 extra |
+| Hetzner (4 cores, 8 GB, 80 GB SSD) | about £10 |
+| Oracle (already owned) | £0 extra |
 | Domain | about £1/month (£10 to £15/year) |
 | Resend, Caddy, uptime monitor, Cloudflare DNS | £0 |
 | RunPod, Anthropic | usage only; set a spend limit in each console |
-| **Fixed total** | **about £1/month** |
+| **Fixed total** | **about £11/month** |
 
-Lowest-effort fallback if you would rather not run a server: Render Starter (about $7/month) plus Neon free (`render.yaml` and `docs/GO-LIVE.md` already cover it). The trade-off is a few pounds a month against being your own system administrator. Neon free also has a short point-in-time restore window.
+Lowest-effort fallback if you would rather not run a server: Render Starter (about $7/month) plus Neon free (`render.yaml` and `docs/GO-LIVE.md` already cover it). Render is about the same price as the Hetzner server (£10), so the Hetzner route mainly buys more headroom and control; the cost of it is being your own system administrator. Neon free also has a short point-in-time restore window.
 
 ## Honest risks
 
@@ -39,6 +40,10 @@ Lowest-effort fallback if you would rather not run a server: Render Starter (abo
 - You patch the server. Turn on automatic security updates (`unattended-upgrades`), key-only SSH, and a firewall that allows only 22 (your IP), 80 and 443.
 - `TOKEN_KEY` encrypts Slack and business-app connections. Store a copy in a password manager. Without it a restore works but customers must reconnect their apps.
 
+## Disk budget (80 GB)
+
+OS and Docker images about 10 GB, the database a few hundred MB for a pilot, and local backups kept 14 days (a few hundred MB each at most). That leaves well over 50 GB free. Watch it with `df -h`; prune old images with `docker image prune -f` after deploys. Oracle only holds the encrypted dumps.
+
 ## Setup (about an hour, done by you on the server)
 
 Files are in `deploy/`. Nothing here has been run on your servers.
@@ -46,7 +51,7 @@ Files are in `deploy/`. Nothing here has been run on your servers.
 1. Hetzner: install Docker, open ports 22, 80, 443 only. Point `maizagents.com` and `www` DNS at the server IP.
 2. `cp deploy/.env.example deploy/.env` and fill it in, adding the production variables listed in `render.yaml` that you use. Generate secrets with `openssl rand -hex 32`.
 3. `docker compose -f deploy/compose.yml --env-file deploy/.env up -d --build`, then open `https://maizagents.com/api/health`.
-4. Oracle: create a `backup` user with a directory `/srv/maiz-backups`; add the Hetzner server's SSH public key. Put a backup passphrase in `/root/.maiz-backup-pass` (mode 600) on Hetzner and keep a copy in your password manager.
+4. Oracle: run `uname -m` to confirm x86_64, then create a `backup` user with a directory `/srv/maiz-backups`; add the Hetzner server's SSH public key. Put a backup passphrase in `/root/.maiz-backup-pass` (mode 600) on Hetzner and keep a copy in your password manager.
 5. Hetzner cron, nightly: `BACKUP_PASSPHRASE_FILE=/root/.maiz-backup-pass BACKUP_REMOTE=backup@<oracle-ip>:/srv/maiz-backups /opt/maiz/deploy/backup.sh`
 6. **Test a restore on Oracle before the first customer** (`deploy/restore.sh`). An untested backup is not a backup.
 7. Add the uptime monitor on `/api/health`.
@@ -68,6 +73,6 @@ The compose file is the same shape as the eventual server. Steps: take a final b
 
 ## Decisions for you
 
-1. Hetzner self-host (recommended, about £1/month) or Render + Neon (about $7/month, less admin)?
+1. Hetzner self-host (chosen: about £10/month for the server) or Render + Neon (about $7/month, less admin)? Proceeding on Hetzner.
 2. Is a day of possible data loss acceptable for the pilot? If not, backups every 6 hours (a one-line cron change).
-3. Please confirm the Oracle machine's architecture (x86 or ARM). The images are multi-architecture, so it should work either way.
+3. Oracle is believed to be x86 (AMD). Confirm with `uname -m` (`x86_64` expected). The images are multi-architecture, so ARM would also work.
