@@ -20,14 +20,14 @@ document.querySelectorAll<HTMLElement>("[data-jd]").forEach((card) => {
 // Org blueprint: every department and role. Opening a role shows its job description.
 const bp = document.getElementById("org-blueprint");
 if (bp) {
-  // Every role is either core (included), recurring (monthly) or a one-off task. Non-core roles go to the cart.
+  // Every role is either in the package, an optional monthly add-on or an optional one-off task. Non-core roles go to the cart.
   const roleHtml = (key: string, title: string) => {
     const jd = getJobDescription(key);
     const item = getItem(key);
-    const tag = isCoreRole(key) ? `<span class="bp-tag bp-ready">Core · included</span>` : item ? `<span class="bill-tag bill-${item.billing}">${BILLING_INFO[item.billing].label}</span>` : "";
+    const tag = isCoreRole(key) ? `<span class="bp-tag bp-ready">In your package</span>` : item ? `<span class="bill-tag bill-${item.billing}">${item.billing === "monthly" ? "Optional add-on" : "Optional one-off"}</span>` : "";
     const buy = item
       ? `<div class="bp-buy"><span class="store-price" data-price-key="${esc(key)}">${item.billing === "monthly" ? `£${item.priceGbp} / month` : `£${item.priceGbp} once`}</span><button class="btn btn-primary btn-sm" type="button" data-add="${esc(key)}">Add to cart</button><span class="jd-note">${esc(BILLING_INFO[item.billing].note)}</span></div>`
-      : `<p class="jd-note">Included in every package. Nothing to add.</p>`;
+      : `<p class="jd-note">Already in your package. Nothing to add.</p>`;
     return `<details class="jd bp-role"><summary><span>${esc(title)}</span>${tag}</summary>${buy}${jd ? jdHtml(jd) : ""}</details>`;
   };
   bp.innerHTML =

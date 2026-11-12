@@ -1248,3 +1248,11 @@ body > main, body > .page-top { flex: none; }
 }
 @media (prefers-reduced-motion: reduce) { .rv-pre { opacity: 1; transform: none; } .stage-feed li { animation: none; } }
 .page-top > main > .section:first-child { padding-top: 112px; }
+
+.included { margin-top: 48px; }
+.included h2 { margin-bottom: 8px; }
+.inc-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin: 24px 0 16px; }
+.inc-grid h3 { font-size: 17px; margin-bottom: 6px; }
+.inc-grid p { color: var(--text-2); font-size: 15px; }
+.included-line { color: var(--text); }
+@media (max-width: 960px) { .inc-grid { grid-template-columns: 1fr; } }
