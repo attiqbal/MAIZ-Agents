@@ -30,6 +30,8 @@ services:
       context: ..
       args:
         SITE_URL: ${APP_URL:?set in deploy/.env}
+        GOOGLE_SITE_VERIFICATION: ${GOOGLE_SITE_VERIFICATION:-}
+        BING_SITE_VERIFICATION: ${BING_SITE_VERIFICATION:-}
     restart: unless-stopped
     depends_on:
       db:

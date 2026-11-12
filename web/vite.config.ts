@@ -1,6 +1,7 @@
 import { resolve } from "node:path";
 import { readFileSync } from "node:fs";
 import { defineConfig, type Plugin } from "vite";
+import { NEEDS, SECTORS, OTHER_SECTOR } from "../src/modules/onboarding/sectors";
 
 /**
  * Shared page pieces (head, header, footer, logo) live once in web/partials and are pasted in at build time,
@@ -20,6 +21,39 @@ function partials(): Plugin {
   return { name: "partials", transformIndexHtml: { order: "pre", handler: (html) => expand(html) } };
 }
 
+
+/**
+ * The Solutions page says, for every kind of business, which jobs the team starts with. It is built from the
+ * same sector data signup uses (../src/modules/onboarding/sectors), so the page and signup never disagree.
+ * Usage in a page:  <!--@sectors-->
+ */
+const EMPLOYEE_TITLE: Record<string, string> = {
+  "admin-manager": "Admin manager", "finance-manager": "Finance manager", "marketing-manager": "Marketing manager",
+  "business-consultant": "Business consultant", "hr-manager": "HR manager", "compliance-manager": "Compliance manager",
+  "supply-chain-manager": "Supply chain manager (add-on)",
+};
+const escHtml = (s: string) => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
+// How each sector reads in a heading ("AI employees for ...").
+const SECTOR_PHRASE: Record<string, string> = {
+  "food-drink": "cafés, restaurants and bars", shop: "shops and retailers", "online-store": "online stores",
+  services: "professional services firms", trades: "trades and construction", "health-beauty": "salons, clinics and gyms",
+  tech: "software and tech companies", creative: "creative and media businesses", "education-care": "education and care providers",
+  property: "property and hospitality", "making-moving": "manufacturers, wholesalers and couriers", charity: "charities and community groups",
+};
+function sectorsHtml(): string {
+  const list = SECTORS.filter((s) => s.key !== OTHER_SECTOR);
+  const chips = list.map((s) => `<a class="team-chip" href="#${s.key}"><b>${escHtml(s.label)}</b><span class="s">${escHtml(s.examples)}</span></a>`).join("");
+  const sections = list.map((s) => {
+    const jobs = s.needs.map((k) => NEEDS.find((n) => n.key === k)).filter((n) => n !== undefined).map((n) =>
+      `<li><b>${escHtml(n.label)}.</b> ${escHtml(n.firstJob)}. <span class="sector-lead">Led by your ${escHtml(EMPLOYEE_TITLE[n.lead] ?? n.lead)}.</span></li>`).join("");
+    return `<section class="sector-card" id="${s.key}" aria-labelledby="${s.key}-h"><h2 id="${s.key}-h">AI employees for ${escHtml(SECTOR_PHRASE[s.key] ?? s.label.toLowerCase())}</h2><p class="sector-ex">${escHtml(s.examples)}</p><p>What owners in this sector usually ask for first, and the first job your team does for each:</p><ul class="sector-jobs">${jobs}</ul><p><a class="btn btn-ghost" href="/onboarding.html">Start your free week</a></p></section>`;
+  }).join("");
+  return `<div class="team-strip" style="grid-template-columns:repeat(auto-fill,minmax(220px,1fr))">${chips}</div><div class="sector-list">${sections}</div>`;
+}
+function industries(): Plugin {
+  return { name: "maiz-sectors", transformIndexHtml: { order: "pre", handler: (html) => html.replace("<!--@sectors-->", sectorsHtml) } };
+}
+
 // Public origin of the site, used for canonical links, Open Graph tags, the sitemap and robots.txt.
 // Set SITE_URL when building for the real domain (the Dockerfile and Render blueprint pass it in).
 const SITE_URL = (process.env.SITE_URL ?? "http://localhost:5173").replace(/\/+$/, "");
@@ -27,12 +61,78 @@ const SITE_URL = (process.env.SITE_URL ?? "http://localhost:5173").replace(/\/+$
 /** Public, indexable pages. App and onboarding pages are noindex and stay out of the sitemap. */
 const INDEXED_PAGES = ["/", "/employees.html", "/how-it-works.html", "/control-centre.html", "/pricing.html", "/security.html", "/faq.html", "/energy.html", "/industries.html"];
 
+// Optional search-engine verification codes, set at build time (Google Search Console, Bing Webmaster Tools).
+// DNS verification needs neither; these are for the "HTML tag" method.
+const GOOGLE_VERIFY = (process.env.GOOGLE_SITE_VERIFICATION ?? "").replace(/[^\w-]/g, "");
+const BING_VERIFY = (process.env.BING_SITE_VERIFICATION ?? "").replace(/[^\w-]/g, "");
+const BUILT = new Date().toISOString().slice(0, 10);
+const OG_IMAGE = `${SITE_URL}/og.png`;
+const OG_ALT = "MAIZ Agents: hire a team, not another tool. Six illustrated AI employees, £150 a month for the whole team, 7 days free.";
+
 const decode = (s: string) =>
   s.replace(/<[^>]+>/g, "").replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&amp;/g, "&").replace(/\s+/g, " ").trim();
+const attr = (s: string) => s.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
+const pick = (html: string, re: RegExp) => decode(html.match(re)?.[1] ?? "");
+
+/** Open Graph and X (Twitter) card tags, built from the page's own title, description and canonical link. */
+function socialTags(html: string): string {
+  const title = pick(html, /<title>([\s\S]*?)<\/title>/);
+  const desc = pick(html, /<meta name="description" content="([^"]*)"/);
+  const url = html.match(/<link rel="canonical" href="([^"]+)"/)?.[1] ?? `${SITE_URL}/`;
+  const ogTitle = title.replace(/\s*·\s*MAIZ Agents$/, "");
+  return [
+    `<meta property="og:type" content="website">`,
+    `<meta property="og:site_name" content="MAIZ Agents">`,
+    `<meta property="og:locale" content="en_GB">`,
+    `<meta property="og:title" content="${attr(ogTitle)}">`,
+    `<meta property="og:description" content="${attr(desc)}">`,
+    `<meta property="og:url" content="${attr(url)}">`,
+    `<meta property="og:image" content="${OG_IMAGE}">`,
+    `<meta property="og:image:width" content="1200">`,
+    `<meta property="og:image:height" content="630">`,
+    `<meta property="og:image:alt" content="${attr(OG_ALT)}">`,
+    `<meta name="twitter:card" content="summary_large_image">`,
+    `<meta name="twitter:title" content="${attr(ogTitle)}">`,
+    `<meta name="twitter:description" content="${attr(desc)}">`,
+    `<meta name="twitter:image" content="${OG_IMAGE}">`,
+    `<meta name="twitter:image:alt" content="${attr(OG_ALT)}">`,
+  ].join("\n");
+}
+
+/** BreadcrumbList from the visible breadcrumb line (<p class="crumbs"><a href="/">Front page</a> / Name</p>). */
+function breadcrumbs(html: string, url: string): object | undefined {
+  const m = html.match(/<p class="crumbs">([\s\S]*?)<\/p>/);
+  if (!m) return undefined;
+  const last = decode(m[1]!.split("/").pop() ?? "");
+  return {
+    "@type": "BreadcrumbList",
+    itemListElement: [
+      { "@type": "ListItem", position: 1, name: "Home", item: `${SITE_URL}/` },
+      { "@type": "ListItem", position: 2, name: last, item: url },
+    ],
+  };
+}
+
+const ORG = {
+  "@type": "Organization", "@id": `${SITE_URL}/#org`, name: "MAIZ Agents", url: `${SITE_URL}/`,
+  logo: { "@type": "ImageObject", url: `${SITE_URL}/logo.png`, width: 512, height: 512 },
+  description: "AI employees for small businesses: a Finance, Marketing, HR and Compliance manager and a Business consultant, run by a free Admin manager. You approve before anything goes out.",
+};
+/** The Team package, exactly as the pricing page shows it. Keep in step with src/modules/pricing. */
+const TEAM_OFFER = {
+  "@type": "Product", "@id": `${SITE_URL}/pricing.html#team`, name: "MAIZ Agents Team package", brand: { "@id": `${SITE_URL}/#org` },
+  description: "Five AI employees (Finance, Marketing, Business consultant, HR and Compliance) and a free Admin manager, with 8,000 energy a week shared by the team. 7-day free trial, no card.",
+  image: OG_IMAGE,
+  offers: {
+    "@type": "Offer", url: `${SITE_URL}/pricing.html`, price: "150", priceCurrency: "GBP", availability: "https://schema.org/InStock",
+    priceSpecification: { "@type": "UnitPriceSpecification", price: "150", priceCurrency: "GBP", unitText: "MONTH", referenceQuantity: { "@type": "QuantitativeValue", value: 1, unitCode: "MON" } },
+  },
+};
 
 /**
- * SEO plugin (ECC `seo` skill): fills %SITE_URL%, adds JSON-LD built from what the page actually shows
- * (the FAQ schema is generated from the FAQ markup, so the two cannot drift), and emits robots.txt and sitemap.xml.
+ * SEO plugin (ECC `seo` skill): fills %SITE_URL%, adds social preview tags and JSON-LD built from what each page
+ * actually shows (the FAQ schema comes from the FAQ markup and breadcrumbs from the breadcrumb line, so they cannot
+ * drift), and emits robots.txt, sitemap.xml and llms.txt.
  */
 function seo(): Plugin {
   return {
@@ -41,35 +141,85 @@ function seo(): Plugin {
       order: "pre",
       handler(html, ctx) {
         let out = html.replaceAll("%SITE_URL%", SITE_URL);
-        if (!ctx.filename.endsWith("/index.html") && !ctx.filename.endsWith("/faq.html")) return out;
-        const faqs = [...out.matchAll(/<details><summary>([\s\S]*?)<\/summary><p>([\s\S]*?)<\/p><\/details>/g)].map(([, q = "", a = ""]) => ({
-          "@type": "Question",
-          name: decode(q),
-          acceptedAnswer: { "@type": "Answer", text: decode(a) },
-        }));
-        const isHome = ctx.filename.endsWith("/index.html");
+        const page = "/" + (ctx.filename.split("/").pop() ?? "");
+        const path = page === "/index.html" ? "/" : page;
+        if (!INDEXED_PAGES.includes(path)) return out;
+        const url = `${SITE_URL}${path}`;
+        const isHome = path === "/";
+        const faqs = path === "/faq.html"
+          ? [...out.matchAll(/<details><summary>([\s\S]*?)<\/summary><p>([\s\S]*?)<\/p><\/details>/g)].map(([, q = "", a = ""]) => ({
+              "@type": "Question", name: decode(q), acceptedAnswer: { "@type": "Answer", text: decode(a) },
+            }))
+          : [];
+        const crumbs = breadcrumbs(out, url);
         const graph = [
-          ...(isHome ? [
-          { "@type": "Organization", "@id": `${SITE_URL}/#org`, name: "MAIZ Agents", url: `${SITE_URL}/`, logo: `${SITE_URL}/favicon.svg` },
-          { "@type": "WebSite", "@id": `${SITE_URL}/#site`, name: "MAIZ Agents", url: `${SITE_URL}/`, publisher: { "@id": `${SITE_URL}/#org` }, inLanguage: "en" },
-          ] : []),
-          ...(faqs.length ? [{ "@type": "FAQPage", "@id": `${SITE_URL}/faq.html#faq`, mainEntity: faqs }] : []),
+          ...(isHome ? [ORG, { "@type": "WebSite", "@id": `${SITE_URL}/#site`, name: "MAIZ Agents", url: `${SITE_URL}/`, publisher: { "@id": `${SITE_URL}/#org` }, inLanguage: "en-GB" }] : []),
+          { "@type": "WebPage", "@id": `${url}#page`, url, name: pick(out, /<title>([\s\S]*?)<\/title>/), description: pick(out, /<meta name="description" content="([^"]*)"/), isPartOf: { "@id": `${SITE_URL}/#site` }, inLanguage: "en-GB", primaryImageOfPage: OG_IMAGE },
+          ...(path === "/pricing.html" || isHome ? [TEAM_OFFER] : []),
+          ...(faqs.length ? [{ "@type": "FAQPage", "@id": `${url}#faq`, mainEntity: faqs }] : []),
+          ...(crumbs ? [crumbs] : []),
         ];
         const json = JSON.stringify({ "@context": "https://schema.org", "@graph": graph }).replace(/</g, "\\u003c");
-        return out.replace("</head>", `<script type="application/ld+json">${json}</script>\n</head>`);
+        const verify = [
+          GOOGLE_VERIFY && isHome ? `<meta name="google-site-verification" content="${GOOGLE_VERIFY}">` : "",
+          BING_VERIFY && isHome ? `<meta name="msvalidate.01" content="${BING_VERIFY}">` : "",
+        ].filter(Boolean).join("\n");
+        const robots = `<meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1">`;
+        return out.replace("</head>", `${robots}\n${socialTags(out)}\n${verify ? verify + "\n" : ""}<script type="application/ld+json">${json}</script>\n</head>`);
       },
     },
     generateBundle() {
-      this.emitFile({ type: "asset", fileName: "robots.txt", source: `User-agent: *\nAllow: /\n\n# App and onboarding pages are noindex via meta tag; they stay crawlable so the tag is seen.\nSitemap: ${SITE_URL}/sitemap.xml\n` });
-      const urls = INDEXED_PAGES.map((p) => `  <url><loc>${SITE_URL}${p}</loc></url>`).join("\n");
+      // Search engines and AI answer engines are welcome on the public pages. The API is private.
+      const bots = ["Googlebot", "Bingbot", "Google-Extended", "GPTBot", "OAI-SearchBot", "ChatGPT-User", "ClaudeBot", "Claude-SearchBot", "Claude-User", "PerplexityBot", "Perplexity-User", "Applebot", "Applebot-Extended", "DuckDuckBot", "CCBot"];
+      const robotsTxt = [
+        ...bots.map((b) => `User-agent: ${b}\nAllow: /\nDisallow: /api/\n`),
+        `User-agent: *\nAllow: /\nDisallow: /api/\n`,
+        `# App, onboarding and owner pages carry a noindex meta tag; they stay crawlable so the tag is seen.`,
+        `Sitemap: ${SITE_URL}/sitemap.xml`,
+        ``,
+      ].join("\n");
+      this.emitFile({ type: "asset", fileName: "robots.txt", source: robotsTxt });
+      const urls = INDEXED_PAGES.map((p) => `  <url><loc>${SITE_URL}${p}</loc><lastmod>${BUILT}</lastmod><priority>${p === "/" ? "1.0" : p === "/pricing.html" || p === "/employees.html" ? "0.9" : "0.7"}</priority></url>`).join("\n");
       this.emitFile({ type: "asset", fileName: "sitemap.xml", source: `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls}\n</urlset>\n` });
+      this.emitFile({ type: "asset", fileName: "llms.txt", source: llmsTxt() });
     },
   };
 }
 
+/** A plain summary for AI assistants and answer engines (llmstxt.org format). Keep it factual. */
+function llmsTxt(): string {
+  const u = (p: string) => `${SITE_URL}${p}`;
+  return `# MAIZ Agents
+
+> MAIZ Agents gives a small business a team of AI employees: a Finance manager, Marketing manager, Business consultant, HR manager and Compliance manager, run by a free Admin manager. They draft the work; the owner approves before anything is sent, published or paid. Built for owners with no AI knowledge. English only, available worldwide, prices in GBP.
+
+## Key facts
+
+- Team package: £150 a month for the whole team (five employees plus the free Admin manager), with 8,000 energy a week shared by the team. No per-seat fees.
+- Free trial: 7 days, 3,000 energy, no card needed.
+- Optional add-ons: an extra ready-made employee £25 a month, a specialist £35 a month (each adds 2,000 energy a week), and consultant passes for 7 or 30 days.
+- Energy is the team's weekly allowance. Each task shows its energy cost before it starts; redoing a task returns its energy. It refills every Monday.
+- Control: nothing leaves the business without the owner's approval. Finance figures come from tested accounting code, not AI guesses; estimates are labelled.
+- Works in Slack and in the MAIZ control centre (web). Accounting connections such as Xero and Square are coming soon.
+- Security: each business's data is kept apart at the database level, sign-in uses one-time email links, and every action is written to an audit trail. No outside security audit or certification yet.
+
+## Pages
+
+- [Home](${u("/")}): what MAIZ Agents is, in one page.
+- [AI employees](${u("/employees.html")}): the six employees, their job descriptions and the add-on roles.
+- [How it works](${u("/how-it-works.html")}): set up in about three minutes, Slack, approvals.
+- [Control centre](${u("/control-centre.html")}): the screen where the owner approves work and sees energy.
+- [Pricing](${u("/pricing.html")}): the £150 Team package, add-ons and a compare-with-hiring calculator.
+- [Energy explained](${u("/energy.html")}): how the weekly allowance works.
+- [Solutions by industry](${u("/industries.html")}): what the team does for each kind of business.
+- [Security and privacy](${u("/security.html")}): what is in place today and what is still to come.
+- [FAQs](${u("/faq.html")}): short answers to common questions.
+`;
+}
+
 // Multi-page static site: landing, onboarding flow and the control center.
 export default defineConfig({
-  plugins: [partials(), seo()],
+  plugins: [partials(), industries(), seo()],
   // In development the website talks to the API started with `npm run dev:api` in the repo root.
   // The setup form and Admin manager messages are imported from the backend's pure modules (../src).
   server: { proxy: { "/api": "http://localhost:8787" }, fs: { allow: [".."] } },
