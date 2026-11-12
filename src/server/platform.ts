@@ -36,6 +36,7 @@ import { ConversationService } from "../modules/conversations/index.js";
 import { NotificationService } from "../modules/notifications/index.js";
 
 import { ConsoleEmailSender, type EmailSender } from "./email.js";
+import { brandFrom, decisionsWaitingEmail, ownerAlertEmail } from "./email-templates.js";
 import { userIdFor } from "./identity.js";
 import { ExpiringSet, SendLog } from "./expiring.js";
 import { CredentialStore } from "../modules/credentials/index.js";
@@ -50,6 +51,8 @@ export interface PlatformConfig {
   email?: EmailSender;
   /** Public address of the website, used in sign-in links. */
   appUrl?: string;
+  /** Help address shown in email footers. Left out of the footer when not set. */
+  supportEmail?: string;
   /** Dev-only sign-in by email, no verification. Must stay off in production. */
   allowDevAuth: boolean;
   slack?: { clientId: string; clientSecret: string; signingSecret: string; redirectUri: string };
@@ -149,11 +152,7 @@ export function createPlatform(cfg: PlatformConfig) {
     count: () => ownerDecisions().length,
     send: async (count) => {
       for (const to of ownerEmails) {
-        await email.send({
-          to,
-          subject: count === 1 ? "1 decision is waiting for you" : `${count} decisions are waiting for you`,
-          text: `${count === 1 ? "1 request is" : `${count} requests are`} waiting for your decision (quality reviews and new specialists).\n\nSee all of them in one place:\n${base}/owner-decisions.html\n\nYou get at most one of these emails every 30 minutes, however many requests arrive.`,
-        });
+        await email.send({ to, ...decisionsWaitingEmail(count, `${base}/owner-decisions.html`, brandFrom(cfg)) });
       }
     },
   });
@@ -368,7 +367,7 @@ export function createPlatform(cfg: PlatformConfig) {
    * has been alerted, so this is where the platform owner actually is.
    */
   const alertOwners = alertOwnersLate = async (subject: string, text: string) => {
-    for (const to of ownerEmails) await email.send({ to, subject, text }).catch((e) => console.error("owner alert failed:", e));
+    for (const to of ownerEmails) await email.send({ to, ...ownerAlertEmail(subject, text, brandFrom(cfg)) }).catch((e) => console.error("owner alert failed:", e));
     if (!ownerEmails.length) console.error(`platform alert (no PLATFORM_OWNER_EMAILS set): ${subject}`);
   };
   for (const type of ["setup.failed", "setup.rolled_back"]) {

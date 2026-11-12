@@ -10,6 +10,7 @@ import { PricingError } from "../modules/pricing/index.js";
 import { EnergyError, parseAutoReload } from "../modules/energy/index.js";
 import { BatchError } from "../modules/batch/schedule.js";
 import { SettingsError } from "../modules/model-gateway/routing/settings.js";
+import { brandFrom, signInLinkEmail } from "./email-templates.js";
 import { SignupError, type SignupChoices } from "../modules/onboarding/index.js";
 import { planSignup, readSignupAnswers } from "../modules/onboarding/recommend.js";
 import { OTHER_SECTOR, getSector } from "../modules/onboarding/sectors.js";
@@ -201,11 +202,7 @@ export function createApp(p: Platform) {
       const link = makeToken(secret, { k: "magic", e: email, n: randomBytes(12).toString("hex") }, 900, nowMs);
       const base = (p.cfg.appUrl ?? "").replace(/\/$/, "");
       // The link opens a page that posts the token back, so mail scanners that pre-open links cannot use it up.
-      await p.email.send({
-        to: email,
-        subject: "Your MAIZ Agents sign-in link",
-        text: `Click to sign in. The link works once and expires in 15 minutes.\n\n${base}/signin.html#token=${link}\n\nIf you didn't ask for this, ignore this email.`,
-      }).catch(() => undefined);
+      await p.email.send({ to: email, ...signInLinkEmail(`${base}/signin.html#token=${link}`, brandFrom(p.cfg)) }).catch(() => undefined);
       // Same answer whether or not the address has an account. In development the website skips the email step.
       // Development only: the link comes back in the reply so a tester can sign in without email. Never for a
       // platform owner: an owner session can approve every client's work, so it always needs the emailed link

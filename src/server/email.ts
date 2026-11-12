@@ -1,10 +1,12 @@
+import type { Mail } from "./email-templates.js";
+
 /** Sends one email. Real delivery is Resend over HTTPS; development just prints the message. */
 export interface EmailSender {
-  send(mail: { to: string; subject: string; text: string }): Promise<void>;
+  send(mail: Mail): Promise<void>;
 }
 
 export class ConsoleEmailSender implements EmailSender {
-  async send(mail: { to: string; subject: string; text: string }): Promise<void> {
+  async send(mail: Mail): Promise<void> {
     console.log(`\n--- email to ${mail.to} ---\n${mail.subject}\n${mail.text}\n---`);
   }
 }
@@ -27,12 +29,12 @@ export class ResendEmailSender implements EmailSender {
     private from: string,
     private http: typeof fetch = fetch,
   ) {}
-  async send(mail: { to: string; subject: string; text: string }): Promise<void> {
+  async send(mail: Mail): Promise<void> {
     const res = await this.http("https://api.resend.com/emails", {
       method: "POST",
       signal: AbortSignal.timeout(SEND_TIMEOUT_MS),
       headers: { "content-type": "application/json", authorization: `Bearer ${this.apiKey}` },
-      body: JSON.stringify({ from: this.from, to: [mail.to], subject: mail.subject, text: mail.text }),
+      body: JSON.stringify({ from: this.from, to: [mail.to], subject: mail.subject, text: mail.text, ...(mail.html ? { html: mail.html } : {}) }),
     });
     if (!res.ok) throw new EmailProviderError(res.status);
   }
@@ -40,8 +42,8 @@ export class ResendEmailSender implements EmailSender {
 
 /** Collects emails for tests. */
 export class MemoryEmailSender implements EmailSender {
-  sent: { to: string; subject: string; text: string }[] = [];
-  async send(mail: { to: string; subject: string; text: string }): Promise<void> {
+  sent: Mail[] = [];
+  async send(mail: Mail): Promise<void> {
     this.sent.push(mail);
   }
 }
@@ -63,7 +65,7 @@ export interface QueueOptions {
  * 50 sign-ins used to lose 48 emails to Resend's rate limit with nobody told.
  */
 export class QueuedEmailSender implements EmailSender {
-  private queue: { to: string; subject: string; text: string }[] = [];
+  private queue: Mail[] = [];
   private draining?: Promise<void>;
   /** True while the drain loop runs. Cleared in the same step the loop sees an empty queue, so no message is stranded. */
   private active = false;
@@ -76,7 +78,7 @@ export class QueuedEmailSender implements EmailSender {
     this.sleep = opts.sleep ?? ((ms) => new Promise((r) => setTimeout(r, ms)));
   }
 
-  async send(mail: { to: string; subject: string; text: string }): Promise<void> {
+  async send(mail: Mail): Promise<void> {
     if (this.queue.length >= this.o.maxQueued) {
       const old = this.queue.shift();
       this.stats.dropped++;
