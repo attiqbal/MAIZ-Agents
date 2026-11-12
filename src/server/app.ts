@@ -26,6 +26,7 @@ import type { Platform } from "./platform.js";
 import { suggestionsFor } from "./suggestions.js";
 import type { Reply } from "../modules/conversations/index.js";
 import type { TaskResult } from "../modules/workforce/index.js";
+import { passwordRoutes } from "./password-auth.js";
 import { LOGIN_PROVIDERS, attemptSecrets, authorizeUrl, completeLogin, isLoginProvider, loginRedirectUri } from "./social-login.js";
 
 const OAUTH_STATE_SECONDS = 600;
@@ -116,7 +117,10 @@ export function createApp(p: Platform) {
     const h = req.headers["authorization"];
     const t = h?.startsWith("Bearer ") ? h.slice(7) : undefined;
     const c = readToken(secret, t, p.now().getTime());
-    return c?.k === "session" ? c : undefined;
+    if (c?.k !== "session") return undefined;
+    // A password reset or change ends every session started before it.
+    const changed = typeof c.e === "string" ? p.credentials.changedAtSeconds(userIdFor(c.e)) : undefined;
+    return changed !== undefined && (typeof c.s !== "number" || c.s < changed) ? undefined : c;
   };
   const session = (req: Req): string | undefined => sessionClaims(req)?.u;
   /** `since` is when the person last signed in with an email link (seconds); renewals keep it. */
@@ -216,6 +220,10 @@ export function createApp(p: Platform) {
       p.usedLinks.add(c.n, c.exp * 1000);
       return json(200, { token: issueSession(c.e), email: c.e, hasOrganisation: !!orgOf(userIdFor(c.e)), platformOwner: p.isPlatformOwner(userIdFor(c.e)) });
     }
+
+    // ---- email and password: sign up, log in, forgot password ----
+    const authed = await passwordRoutes(req, { p, makeToken: (claims, ttl) => makeToken(secret, claims, ttl, p.now().getTime()), readToken: (t) => readToken(secret, t, p.now().getTime()), issueSession: (e) => issueSession(e), sessionClaims, orgOf, body });
+    if (authed) return authed;
 
     // ---- sign in with Google or Microsoft: proves an email, then hands over the same one-time link as email sign-in ----
     if (method === "GET" && path === "/api/signin/providers") {

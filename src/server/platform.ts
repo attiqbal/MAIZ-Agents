@@ -38,6 +38,7 @@ import { NotificationService } from "../modules/notifications/index.js";
 import { ConsoleEmailSender, type EmailSender } from "./email.js";
 import { userIdFor } from "./identity.js";
 import { ExpiringSet, SendLog } from "./expiring.js";
+import { CredentialStore } from "../modules/credentials/index.js";
 
 export interface PlatformConfig {
   anthropicApiKey?: string;
@@ -432,8 +433,9 @@ export function createPlatform(cfg: PlatformConfig) {
     for (const m of s.staff ?? []) people.restore(m);
     for (const x of s.peopleSettings ?? []) people.restoreSettings(x.workspaceId, x.settings);
     for (const r of s.batchRuns ?? []) batch.restoreRun(r);
+    for (const c of s.credentials ?? []) credentials.restore(c.userId, c);
     sink = store;
-    for (const part of [audit, identity, energy, workforce, ledger, router, admin, integrations, reviews, prices, specialists, aiSettings, spend, batch, payments, rota, reconciliation, people, conversations, notices]) part.useSink(store);
+    for (const part of [audit, identity, energy, workforce, ledger, router, admin, integrations, reviews, prices, specialists, aiSettings, spend, batch, payments, rota, reconciliation, people, conversations, notices, credentials]) part.useSink(store);
   }
 
   const healthy = () => (sink as { healthy?: boolean } | undefined)?.healthy !== false;
@@ -445,10 +447,14 @@ export function createPlatform(cfg: PlatformConfig) {
   const usedLinks = new ExpiringSet(() => now().getTime());
   /** Sign-in emails sent per address and hour, to stop the form being used to spam someone. */
   const sends = new SendLog();
+  /** Failed password tries per address, and password-reset emails per address. */
+  const loginFails = new SendLog(15 * 60_000);
+  const resets = new SendLog();
+  const credentials = new CredentialStore(() => now().getTime());
   /** Opens and saves per staff form link, so a link cannot be hammered. */
   const formHits = new SendLog();
   /** Starts a sleeping RunPod worker for a client who just opened the app or started typing. */
   const warm = () => routing?.warm() ?? "skipped";
-  return { conversations, notices, warm, ownerDecisions, decisionDigest, dashboard, reconciliation, rota, people, payments, batch, email, usedLinks, sends, formHits, admin, reviews, prices, specialists, ai, clients, isPlatformOwner, healthy, cfg, now, audit, bus, identity, energy, workforce, ledger, onboarding, router, integrations, slackTokens, saveSlackToken, attachStore };
+  return { conversations, notices, warm, ownerDecisions, decisionDigest, dashboard, reconciliation, rota, people, payments, batch, email, usedLinks, sends, loginFails, resets, credentials, formHits, admin, reviews, prices, specialists, ai, clients, isPlatformOwner, healthy, cfg, now, audit, bus, identity, energy, workforce, ledger, onboarding, router, integrations, slackTokens, saveSlackToken, attachStore };
 }
 export type Platform = ReturnType<typeof createPlatform>;

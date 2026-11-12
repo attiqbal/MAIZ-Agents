@@ -1656,3 +1656,17 @@ h1, .sec-head h2, .final h2, .stage-band h2, .article-head h1, .sec-title, .bent
 .sector-ex { color: var(--text-muted); margin: 0 0 16px; }
 .sector-jobs { margin: 12px 0 20px; padding-left: 20px; display: grid; gap: 10px; }
 .sector-lead { color: var(--accent-text); }
+
+/* ---------- Log in and create account ---------- */
+.auth-card { gap: 14px; }
+.auth-h { font-size: 1.75rem; margin: 0; }
+.auth-sub { margin: 0; }
+.auth-form { display: grid; gap: 14px; }
+.auth-label-row { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+.auth-label-row a, .auth-alt a, .link-btn { font-size: 13px; color: var(--accent-text); text-decoration: underline; text-underline-offset: 3px; display: inline-flex; align-items: center; min-height: 40px; }
+.auth-alt { margin: 0; text-align: center; }
+.link-btn { background: none; border: 0; padding: 0; font: inherit; font-size: 13px; cursor: pointer; }
+.pw { position: relative; }
+.pw .input { padding-right: 76px; }
+.pw-toggle { position: absolute; right: 4px; top: 50%; transform: translateY(-50%); min-height: 40px; min-width: 56px; border: 0; background: none; font: inherit; font-size: 13px; font-weight: 500; color: var(--color-graphite); cursor: pointer; border-radius: var(--radius-sm); }
+.pw-toggle:focus-visible, .link-btn:focus-visible { outline: 2px solid var(--color-graphite); outline-offset: 2px; }

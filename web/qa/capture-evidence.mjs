@@ -25,7 +25,7 @@ for (const w of [1440, 375]) {
 {
   const ctx = await ctxFor(375, 812); const p = await ctx.newPage();
   await p.goto(B + "/onboarding.html", { waitUntil: "networkidle" }); await p.evaluate(() => sessionStorage.clear()); await p.reload({ waitUntil: "networkidle" }); await p.click("#biz-go"); await p.waitForTimeout(200); await shot(p, "state-error-onboarding-375x812.png");
-  await onboardTo(p, 4); await p.fill("#email", `cap${Date.now()}@kestrel.test`); await p.click("#email-go");
+  await onboardTo(p, 4); await p.fill("#email", `cap${Date.now()}@kestrel.test`); await p.fill("#pw", "correct horse battery"); await p.click("#email-go");
   await p.waitForSelector('[data-step="5"]:not([hidden])', { timeout: 5000 }).catch(() => {});
   await p.click('[data-step="5"] [data-next]'); await p.waitForTimeout(900); await shot(p, "state-loading-onboarding-375x812.png");
   await p.waitForSelector("#open-app", { state: "visible", timeout: 9000 }).catch(() => {}); await p.waitForTimeout(800); await shot(p, "state-success-onboarding-375x812.png");

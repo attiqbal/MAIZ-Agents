@@ -52,7 +52,7 @@ const mk = async (opts = {}) => { const ctx = await b.newContext({ viewport: { w
   ok("onboarding: plan leads with the Finance manager", (await p.textContent("#plan-focus .team-row b")) === "Finance manager", await p.textContent("#plan-focus"));
   ok("onboarding: plan offers the stock manager and lists Square", await p.isVisible('[data-addon="supply-chain-manager"]') && (await p.textContent("#plan-apps")).includes("Square"));
   await p.click("#email-go"); ok("onboarding: invalid email shows error", await p.isVisible("#email-err"));
-  await p.fill("#email", `owner${Date.now()}@example-bakery.test`); await p.click("#email-go");
+  await p.fill("#email", `owner${Date.now()}@example-bakery.test`); await p.fill("#pw", "short"); await p.click("#email-go"); ok("onboarding: short password explained", /at least 8/.test(await p.textContent("#email-err"))); await p.fill("#pw", "correct horse battery"); await p.click("#email-go");
   await p.waitForSelector('[data-step="5"]:not([hidden])', { timeout: 5000 }).catch(() => {});
   ok("onboarding: reached step 5", await p.isVisible('[data-step="5"]'));
   await p.click('[data-step="5"] [data-next]');
@@ -135,8 +135,25 @@ const mk = async (opts = {}) => { const ctx = await b.newContext({ viewport: { w
 // 5. Sign-in page and mobile menu
 {
   const p = await mk();
-  await p.goto(B + "/signin.html"); await p.fill("#si-email", "someone@example.test"); await p.click("#si-go"); await p.waitForURL(/onboarding|signin/, { timeout: 5000 }).catch(() => {}); await p.waitForTimeout(400);
+  await p.goto(B + "/signin.html"); await p.click("#to-link"); await p.fill("#link-email", "someone@example.test"); await p.click("#link-go"); await p.waitForURL(/onboarding|signin/, { timeout: 5000 }).catch(() => {}); await p.waitForTimeout(400);
   ok("sign in (dev API): new email signs straight in and goes to onboarding", p.url().includes("/onboarding.html"), p.url());
+  // email and password: sign up in onboarding is covered above; here, log in, wrong password, forgot password
+  const pwEmail = `pw${Date.now()}@example.test`;
+  const reg = await (await p.request.post(B + "/api/auth/register", { data: { email: pwEmail, password: "correct horse battery" } })).json();
+  await p.request.post(B + "/api/auth/confirm", { data: { token: reg.devLink, bind: reg.bind } });
+  await p.goto("about:blank"); await p.goto(B + "/signin.html");
+  await p.fill("#login-email", pwEmail); await p.fill("#login-pw", "wrong password here"); await p.click("#login-go");
+  await p.waitForSelector("#si-err:not([hidden])", { timeout: 5000 }).catch(() => {});
+  ok("log in: wrong password explained without saying which part was wrong", /Incorrect email or password/.test(await p.textContent("#si-err")) && p.url().includes("/signin.html"));
+  await p.click("[data-pw-toggle=login-pw]"); ok("log in: Show reveals the password", (await p.getAttribute("#login-pw", "type")) === "text");
+  await p.fill("#login-pw", "correct horse battery"); await p.click("#login-go"); await p.waitForURL(/onboarding|app\.html/, { timeout: 5000 }).catch(() => {});
+  ok("log in: right password signs in", /onboarding|app\.html/.test(p.url()), p.url());
+  await p.goto("about:blank"); await p.evaluate(() => 0).catch(() => {}); await p.goto(B + "/signin.html"); await p.evaluate(() => localStorage.clear()); await p.goto(B + "/signin.html#forgot");
+  ok("log in: Forgot password opens its own form", await p.isVisible("#forgot-form"));
+  await p.fill("#forgot-email", pwEmail); await p.click("#forgot-go");
+  await p.waitForSelector("#reset-form:not([hidden])", { timeout: 5000 }).catch(() => {});
+  await p.fill("#reset-pw", "a new long phrase"); await p.click("#reset-go"); await p.waitForURL(/onboarding|app\.html/, { timeout: 5000 }).catch(() => {});
+  ok("log in: reset link sets a new password and signs in", /onboarding|app\.html/.test(p.url()), p.url());
   await p.goto("about:blank"); await p.goto(B + "/signin.html#token=bogus"); await p.waitForFunction(() => /didn't work/.test(document.getElementById("si-h")?.textContent ?? ""), null, { timeout: 5000 }).catch(() => {});
   ok("sign in: bad link explained, token removed from address bar", /didn't work/.test(await p.textContent("#si-h")) && !p.url().includes("token"));
   await p.context().close();
@@ -158,7 +175,7 @@ const mk = async (opts = {}) => { const ctx = await b.newContext({ viewport: { w
   ok("owner review: client task enters quality review", made.task?.status === "in_review", JSON.stringify(made).slice(0, 120));
   ok("owner review: client cannot approve", (await post(`/owner/reviews/${made.task?.id}/approve`, { direction: "lean" }, client.token)).status() === 403);
   // The owner never gets a dev shortcut: read the emailed link from the API log (ConsoleEmailSender prints it).
-  await p.goto(B + "/signin.html"); await p.fill("#si-email", OWNER); await p.click("#si-go"); await p.waitForTimeout(500);
+  await p.goto(B + "/signin.html"); await p.click("#to-link"); await p.fill("#link-email", OWNER); await p.click("#link-go"); await p.waitForTimeout(500);
   const log = (await import("node:fs")).readFileSync(process.env.QA_SERVER_LOG ?? "", "utf8");
   const esc = OWNER.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const link = [...log.matchAll(new RegExp(`--- email to ${esc} ---\\nYour MAIZ Agents sign-in link[^#]*#token=(\\S+)`, "g"))].at(-1)?.[1];
@@ -227,7 +244,7 @@ const mk = async (opts = {}) => { const ctx = await b.newContext({ viewport: { w
   await p.click("#needs-go"); await p.click("#apps-go");
   ok("plan: shows the typed country and the Admin manager's research as its first job", (await p.textContent("#plan-facts")).includes("Brazil") && /Read up on the business rules in Brazil/.test(await p.textContent("#plan-facts")));
   ok("plan: Continue with Google and Microsoft shown above the email box", (await p.locator("#social-btns a").count()) === 2 && await p.isVisible("#email-f"));
-  await p.fill("#email", `ana${Date.now()}@casa-cafe.test`); await p.click("#email-go");
+  await p.fill("#email", `ana${Date.now()}@casa-cafe.test`); await p.fill("#pw", "correct horse battery"); await p.click("#email-go");
   await p.waitForSelector('[data-step="5"]:not([hidden])', { timeout: 5000 }).catch(() => {});
   await p.click('[data-step="5"] [data-next]');
   await p.waitForSelector("#open-app", { state: "visible", timeout: 8000 }).catch(() => {});

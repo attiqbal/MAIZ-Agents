@@ -53,6 +53,11 @@ export class SendLog {
     }
   }
 
+  /** Forgets everything recorded for `key`. */
+  clear(key: string): void {
+    this.sends.delete(key);
+  }
+
   get size(): number {
     return this.sends.size;
   }

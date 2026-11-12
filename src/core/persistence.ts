@@ -62,6 +62,8 @@ export interface Sink {
   staff(m: StaffMember, removed?: boolean): void;
   /** A client's HR desk settings (sector, leave year). */
   peopleSettings(workspaceId: string, s: PeopleSettings): void;
+  /** Platform-level: a person's password hash (never the password), keyed by user id. */
+  credential(userId: string, rec: { hash: string; changedAt: string }): void;
 }
 
 /** Kinds stored through Sink.record. The database accepts any kind; this list is what load() hands back. */
@@ -100,4 +102,5 @@ export interface Snapshot {
   peopleSettings?: { workspaceId: string; settings: PeopleSettings }[];
   batchRuns?: BatchRunRecord[];
   records?: GenericRecord[];
+  credentials?: { userId: string; hash: string; changedAt: string }[];
 }

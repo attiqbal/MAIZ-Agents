@@ -2,11 +2,12 @@
 // then the plan built from them, then the email that saves it. The plan comes from the same
 // pure rules the server uses, so what is shown here is what gets set up.
 import "./styles.css";
-import { drawPseudoQr, showSocialLogin } from "./common";
+import { drawPseudoQr, showSocialLogin, wirePasswordToggles } from "./common";
 import { api, getToken, setToken } from "./api";
 import { MAX_NEEDS, cleanCountryName, planSignup, resolveSector, type SignupPlan, type SignupSize } from "../../src/modules/onboarding/recommend";
 import { APPS, COUNTRIES, NEEDS, OTHER_SECTOR, SECTORS, countryFacts, getSector, type AppHow } from "../../src/modules/onboarding/sectors";
 
+wirePasswordToggles();
 const TOTAL = 6;
 const PLAN_STEP = 4;
 const KEY = "maiz.profile";
@@ -228,6 +229,7 @@ function renderPlan(): void {
   $("plan-facts").innerHTML = rows.join("") + `<p class="hint">You can correct any of these on the setup form. Guesses are always labelled.</p>`;
   const signedIn = !!getToken();
   $("email-f").toggleAttribute("hidden", signedIn);
+  $("has-account").toggleAttribute("hidden", signedIn);
   if (signedIn) $("social").setAttribute("hidden", ""); else void showSocialLogin($("social"), $("social-btns"));
   $("email-go").textContent = signedIn ? "Start my team" : "Start my free week";
 }
@@ -239,19 +241,38 @@ $("plan-offers").addEventListener("change", (e) => {
   save(); renderPlan();
 });
 
-// A real sign-in link by email. Without the API (demo) or with dev sign-in on, this step just moves on.
+// Create the account with an email and password. The address is confirmed by an emailed link before the password counts.
+// Without the API (demo) or with dev sign-in on, this step just moves on.
+const EMAIL = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
+function emailProblem(message: string, field: "email" | "pw" = "email"): void {
+  $("email-err").textContent = message;
+  $("email-err").toggleAttribute("hidden", !message);
+  $("email").setAttribute("aria-invalid", String(!!message && field === "email"));
+  $("pw").setAttribute("aria-invalid", String(!!message && field === "pw"));
+  if (message) $(field).focus();
+}
+$("email-f").addEventListener("submit", (e) => { e.preventDefault(); $("email-go").click(); });
 $("email-go").addEventListener("click", async () => {
   if (getToken()) { show(5); return; }
   const v = $<HTMLInputElement>("email").value.trim();
-  const ok = /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v);
-  $("email-err").toggleAttribute("hidden", ok);
-  $("email").setAttribute("aria-invalid", String(!ok));
-  if (!ok) { $("email").focus(); return; }
+  const pw = $<HTMLInputElement>("pw").value;
+  emailProblem("");
+  if (!EMAIL.test(v)) { emailProblem("Enter a valid email address."); return; }
+  if (pw.length < 8) { emailProblem("Use at least 8 characters for your password.", "pw"); return; }
   profile.email = v; save();
-  const r = await api<{ dev?: boolean }>("/signin/start", { body: { email: v } });
-  if (r.status === 429) { $("email-sent").textContent = "Too many sign-in emails from this connection. Please wait 10 minutes and try again."; $("email-sent").removeAttribute("hidden"); return; }
+  $("email-go").setAttribute("disabled", "");
+  const r = await api<{ dev?: boolean; bind?: string; devLink?: string; error?: string; field?: "email" | "pw" | "password" }>("/auth/register", { body: { email: v, password: pw } });
+  $("email-go").removeAttribute("disabled");
+  if (r.status === 429) { emailProblem(r.data?.error ?? "Too many tries. Please wait a few minutes and try again."); return; }
+  if (r.status === 400 || r.status === 403) { emailProblem(r.data?.error ?? "Check your email and password.", r.data?.field === "password" ? "pw" : "email"); return; }
+  // The link only works in this browser: it proves the person who signed up is the person who opens the email.
+  try { if (r.data?.bind) localStorage.setItem("maiz.bind", r.data.bind); } catch { /* storage unavailable */ }
+  if (r.data?.devLink) {
+    const c = await api<{ token: string }>("/auth/confirm", { body: { token: r.data.devLink, bind: r.data.bind } });
+    if (c.ok && c.data?.token) { setToken(c.data.token); show(5); return; }
+  }
   if (r.ok && !r.data?.dev) {
-    $("email-sent").textContent = `We sent a sign-in link to ${v}. Open it on this device and your plan will be waiting. It works once and expires in 15 minutes.`;
+    $("email-sent").textContent = `We sent a confirmation link to ${v}. Open it on this device and your plan will be waiting. It works once and expires in 1 hour.`;
     $("email-sent").removeAttribute("hidden");
     return;
   }
