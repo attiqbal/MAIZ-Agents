@@ -385,6 +385,13 @@
           <div class="field"><label for="tu-cap">Most to spend in a month (£)</label><input class="input" id="tu-cap" type="number" min="0" step="1" inputmode="numeric" value="25"><span class="hint">Auto-reload stops at this amount until next month.</span></div>
           <div class="acts"><button class="btn btn-primary btn-sm" type="submit">Save</button><span class="muted small" id="tu-msg" role="status">Off unless you turn it on. Payments open soon; until then a saved setting cannot charge you.</span></div>
         </form></section>
+      <section class="panel" aria-labelledby="cp-h"><div class="panel-h"><h2 id="cp-h">Gift or discount code</h2></div>
+        <p class="muted small">Have a code? Free trial days and free energy are added straight away. A discount is saved on your account and comes off your bill once payments open.</p>
+        <form id="cp-form" class="rd-form" novalidate>
+          <div class="field"><label for="cp-code">Your code</label><input class="input" id="cp-code" autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="32" aria-describedby="cp-msg"></div>
+          <div class="acts"><button class="btn btn-primary btn-sm" type="submit">Apply code</button><span class="muted small" id="cp-msg" role="status"></span></div>
+        </form>
+        <ul class="ow-list" id="cp-used" aria-label="Codes you have used"></ul></section>
       <section class="panel"><div class="panel-h"><h2>Coming next</h2></div><p class="muted">Billing, privacy options and inviting teammates will live here.</p></section>
     </div>
 

@@ -33,6 +33,9 @@ services:
       - key: EMAIL_FROM      # must be on the domain verified in Resend
         value: MAIZ Agents <hello@maizagents.com>
       # Your sign-in email as the MAIZ platform owner: you review and sign off specialised tasks.
+      # Contact address shown on the Terms and Privacy pages (build time). Company details are in src/company.ts.
+      - key: CONTACT_EMAIL
+        sync: false
       - key: PLATFORM_OWNER_EMAILS
         sync: false
       # AI workers: RunPod does the heavy lifting, Claude supervises (docs/AI-ROUTING.md). Set both or neither.

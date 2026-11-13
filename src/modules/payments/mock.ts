@@ -46,6 +46,6 @@ export class MockPaymentProvider implements PaymentProvider {
     let e: Partial<ProviderEvent>;
     try { e = JSON.parse(rawBody); } catch { throw new WebhookSignatureError("webhook body is not JSON"); }
     if ((e.type !== "payment.succeeded" && e.type !== "payment.failed" && e.type !== "subscription.cancelled") || typeof e.orderId !== "string" || typeof e.providerRef !== "string") return undefined;
-    return { type: e.type, orderId: e.orderId, providerRef: e.providerRef };
+    return { type: e.type, orderId: e.orderId, providerRef: e.providerRef, ...(e.subscriptionRef ? { subscriptionRef: e.subscriptionRef } : {}), ...(e.customerRef ? { customerRef: e.customerRef } : {}), ...(e.eventId ? { eventId: e.eventId } : {}) };
   }
 }
