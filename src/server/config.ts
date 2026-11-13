@@ -28,8 +28,9 @@ export function checkEnv(env: Record<string, string | undefined>): string[] {
   if (!!env.RUNPOD_API_KEY !== !!env.RUNPOD_ENDPOINT_ID) problems.push("RUNPOD_API_KEY and RUNPOD_ENDPOINT_ID must be set together (or neither)");
   if (env.RUNPOD_ENDPOINT_ID && !/^[a-z0-9]{6,40}$/i.test(env.RUNPOD_ENDPOINT_ID)) problems.push("RUNPOD_ENDPOINT_ID must be the endpoint's id (letters and digits only), not a URL");
 
-  if (env.PAYMENTS_PROVIDER && env.PAYMENTS_PROVIDER !== "mock") problems.push(`PAYMENTS_PROVIDER "${env.PAYMENTS_PROVIDER}" is not built yet (only "mock", for development)`);
+  if (env.PAYMENTS_PROVIDER && env.PAYMENTS_PROVIDER !== "mock" && env.PAYMENTS_PROVIDER !== "stripe") problems.push(`PAYMENTS_PROVIDER "${env.PAYMENTS_PROVIDER}" is not built (use "stripe", or "mock" for development)`);
   if (production && env.PAYMENTS_PROVIDER === "mock") problems.push("PAYMENTS_PROVIDER=mock must not be used in production: it hands out paid items for free");
+  if (env.PAYMENTS_PROVIDER === "stripe") problems.push(...stripeEnvProblems(env, production));
 
   const owners = (env.PLATFORM_OWNER_EMAILS ?? "").split(",").map((e) => e.trim()).filter(Boolean);
   if (owners.some((e) => !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e))) problems.push("PLATFORM_OWNER_EMAILS must be a comma-separated list of email addresses");
@@ -68,4 +69,15 @@ export function integrationAppsFromEnv(env: Record<string, string | undefined>, 
     if (clientId && clientSecret) apps[c.key] = { clientId, clientSecret, redirectUri };
   }
   return apps;
+}
+
+/** Stripe needs its key and webhook secret. Live keys and test keys in production each need a deliberate opt-in. */
+function stripeEnvProblems(env: Record<string, string | undefined>, production: boolean): string[] {
+  const out: string[] = [];
+  const key = env.STRIPE_SECRET_KEY ?? "";
+  if (!/^(sk|rk)_(test|live)_\w+$/.test(key)) out.push("STRIPE_SECRET_KEY is required with PAYMENTS_PROVIDER=stripe (a restricted key rk_test_... or secret key sk_test_...)");
+  if (!/^whsec_\w+$/.test(env.STRIPE_WEBHOOK_SECRET ?? "")) out.push("STRIPE_WEBHOOK_SECRET (whsec_...) is required with PAYMENTS_PROVIDER=stripe");
+  if (/^(sk|rk)_live_/.test(key) && env.STRIPE_ALLOW_LIVE !== "1") out.push("a live Stripe key takes real money: set STRIPE_ALLOW_LIVE=1 only when the owner has said to go live");
+  if (production && /^(sk|rk)_test_/.test(key) && env.STRIPE_ALLOW_TEST_IN_PRODUCTION !== "1") out.push("a test Stripe key in production lets anyone 'pay' with a test card and get paid items free: use a staging server, or set STRIPE_ALLOW_TEST_IN_PRODUCTION=1 on purpose");
+  return out;
 }

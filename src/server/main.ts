@@ -5,7 +5,7 @@ import { createApp } from "./app.js";
 import { checkEnv, integrationAppsFromEnv, platformOwnersFromEnv } from "./config.js";
 import { loginAppsFromEnv } from "./social-login.js";
 import { QueuedEmailSender, ResendEmailSender } from "./email.js";
-import { MockPaymentProvider } from "../modules/payments/index.js";
+import { MockPaymentProvider, StripePaymentProvider } from "../modules/payments/index.js";
 import { createPlatform } from "./platform.js";
 import { clientIp, limitFor, RateLimiter } from "./rate-limit.js";
 import { createStatic } from "./static.js";
@@ -37,8 +37,11 @@ const platform = createPlatform({
   integrationApps: integrationAppsFromEnv(env, env.APP_URL ?? "http://localhost:5173"),
   loginApps: loginAppsFromEnv(env),
   platformOwners: platformOwnersFromEnv(env),
-  // No real payment provider exists yet. "mock" (development only) charges nobody; unset means checkout is refused.
-  payments: env.PAYMENTS_PROVIDER === "mock" ? new MockPaymentProvider() : undefined,
+  // The feature flag: unset means checkout is refused and nothing is charged. "mock" (development only) charges nobody.
+  payments:
+    env.PAYMENTS_PROVIDER === "mock" ? new MockPaymentProvider()
+    : env.PAYMENTS_PROVIDER === "stripe" ? new StripePaymentProvider({ secretKey: env.STRIPE_SECRET_KEY!, webhookSecret: env.STRIPE_WEBHOOK_SECRET!, automaticTax: env.STRIPE_AUTOMATIC_TAX === "1" })
+    : undefined,
 });
 
 let store: { close(): Promise<void> } | undefined;

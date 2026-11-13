@@ -26,6 +26,9 @@ export interface CheckoutRequest {
   monthlyMinor: number;
   successUrl: string;
   cancelUrl: string;
+  /** An agreed discount (a coupon from the promotions module). Without one, the provider may let the buyer enter a code. */
+  discount?: { percentOff: number } | { amountOffMinor: number };
+  discountMonths?: number | "forever";
 }
 
 export type CheckoutStatus = "requires_payment" | "paid" | "failed";
@@ -40,9 +43,20 @@ export interface CheckoutSession {
 
 /** What a verified webhook tells us. The order id is the one we sent in the request. */
 export interface ProviderEvent {
-  type: "payment.succeeded" | "payment.failed" | "subscription.cancelled";
-  orderId: string;
+  type: "payment.succeeded" | "payment.failed" | "payment.renewal_failed" | "payment.attention" | "subscription.cancelled";
+  /** The id we sent in the request. Absent on events that only know the provider's subscription. */
+  orderId?: string;
   providerRef: string;
+  /** The provider's id for the recurring subscription and the customer, kept to match later events and open the portal. */
+  subscriptionRef?: string;
+  customerRef?: string;
+  /** The provider's id for this delivery, so a replay is recognised and ignored. */
+  eventId?: string;
+  /** What the customer actually paid, so an event is only accepted for an order it fully covers. */
+  amountMinor?: number;
+  currency?: string;
+  /** Words for the platform owner on `payment.attention` (a dispute, a refund, a fraud warning). */
+  detail?: string;
 }
 
 export class WebhookSignatureError extends Error {}
@@ -57,4 +71,6 @@ export interface PaymentProvider {
    * event kind we do not care about. Throws WebhookSignatureError when the signature is wrong or missing.
    */
   parseWebhook(rawBody: string, headers: Record<string, string | undefined>): ProviderEvent | undefined;
+  /** A page where the customer manages their own card, invoices and cancellation. Optional: not every provider has one. */
+  createPortalSession?(customerRef: string, returnUrl: string): Promise<string>;
 }
