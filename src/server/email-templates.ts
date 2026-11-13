@@ -43,9 +43,18 @@ export interface EmailBrand {
   baseUrl: string;
   /** Optional help address, shown in the footer only when set (SUPPORT_EMAIL). */
   supportEmail?: string;
+  /** Registered office of MAIZ AI Ltd, shown in the footer only when set (REGISTERED_OFFICE). */
+  registeredOffice?: string;
 }
 
-export const brandFrom = (cfg: { appUrl?: string; supportEmail?: string }): EmailBrand => ({ baseUrl: (cfg.appUrl ?? "").replace(/\/$/, ""), supportEmail: cfg.supportEmail });
+/** The legal entity behind MAIZ Agents (Companies House certificate of incorporation, 13 November 2026). */
+export const COMPANY_LEGAL_LINE = "MAIZ Agents is a product of MAIZ AI Ltd, a company registered in England and Wales, company number 17579512.";
+
+export const brandFrom = (cfg: { appUrl?: string; supportEmail?: string; registeredOffice?: string }): EmailBrand => ({
+  baseUrl: (cfg.appUrl ?? "").replace(/\/$/, ""),
+  supportEmail: cfg.supportEmail,
+  registeredOffice: cfg.registeredOffice,
+});
 
 export const esc = (s: string): string =>
   s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
@@ -83,7 +92,7 @@ export function renderEmail(c: EmailContent, brand: EmailBrand): { html: string;
 ${c.paragraphs.map(p).join("")}${list}${c.button ? button(c.button.label, c.button.url) : ""}${fallbackLink}
 ${fine ? `<div style="margin-top:24px;padding-top:18px;border-top:1px solid ${SAND};">${fine}</div>` : ""}
 </td></tr>
-<tr><td style="padding:22px 12px 0;text-align:center;font:400 12px/1.6 ${SANS};color:${MUTED};">${help}${reason}<br><a href="${esc(brand.baseUrl || "https://maizagents.com")}" style="color:${MUTED};">${esc(siteLabel(brand.baseUrl))}</a> · MAIZ Agents</td></tr>
+<tr><td style="padding:22px 12px 0;text-align:center;font:400 12px/1.6 ${SANS};color:${MUTED};">${help}${reason}<br><a href="${esc(brand.baseUrl || "https://maizagents.com")}" style="color:${MUTED};">${esc(siteLabel(brand.baseUrl))}</a> · MAIZ Agents<br>${esc(COMPANY_LEGAL_LINE)}${brand.registeredOffice ? " Registered office: " + esc(brand.registeredOffice) + "." : ""}</td></tr>
 </table></td></tr></table></body></html>`;
   const text = [
     c.heading,
@@ -95,6 +104,7 @@ ${fine ? `<div style="margin-top:24px;padding-top:18px;border-top:1px solid ${SA
     ...(c.fineprint ?? []).flatMap((t) => [t, ""]),
     "--",
     "MAIZ Agents · " + siteLabel(brand.baseUrl),
+    COMPANY_LEGAL_LINE + (brand.registeredOffice ? ` Registered office: ${brand.registeredOffice}.` : ""),
     ...(brand.supportEmail ? [`Need help? ${brand.supportEmail}`] : []),
     c.audience === "owner" ? "Internal message for the platform owner." : "You are receiving this because this address was used at " + siteLabel(brand.baseUrl) + ". It is a service message about your account.",
   ].join("\n");

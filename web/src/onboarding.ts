@@ -230,6 +230,7 @@ function renderPlan(): void {
   const signedIn = !!getToken();
   $("email-f").toggleAttribute("hidden", signedIn);
   $("has-account").toggleAttribute("hidden", signedIn);
+  $("agree").toggleAttribute("hidden", signedIn);
   if (signedIn) $("social").setAttribute("hidden", ""); else void showSocialLogin($("social"), $("social-btns"));
   $("email-go").textContent = signedIn ? "Start my team" : "Start my free week";
 }

@@ -24,6 +24,18 @@ describe("email templates", () => {
     expect(text).toContain('<img src=x onerror="a()"> & more');
   });
 
+  it("names the legal entity, and the registered office only when configured", () => {
+    const content = { audience: "customer" as const, preheader: "p", heading: "h", paragraphs: ["x"] };
+    const plain = renderEmail(content, brand);
+    expect(plain.html).toContain("MAIZ AI Ltd");
+    expect(plain.html).toContain("company number 17579512");
+    expect(plain.text).toContain("registered in England and Wales");
+    expect(plain.html).not.toContain("Registered office");
+    const withOffice = renderEmail(content, { ...brand, registeredOffice: "1 Example Street, London" });
+    expect(withOffice.html).toContain("Registered office: 1 Example Street, London.");
+    expect(withOffice.text).toContain("Registered office: 1 Example Street, London.");
+  });
+
   it("shows the support address only when configured", () => {
     const content = { audience: "customer" as const, preheader: "p", heading: "h", paragraphs: ["x"] };
     expect(renderEmail(content, brand).html).not.toContain("mailto:");

@@ -23,6 +23,7 @@ const mailer = env.RESEND_API_KEY && env.EMAIL_FROM ? new QueuedEmailSender(new 
 const platform = createPlatform({
   appUrl: env.APP_URL ?? "http://localhost:5173",
   supportEmail: env.SUPPORT_EMAIL || undefined,
+  registeredOffice: env.REGISTERED_OFFICE || undefined,
   email: mailer,
   anthropicApiKey: env.ANTHROPIC_API_KEY,
   anthropicModel: env.ANTHROPIC_MODEL,
