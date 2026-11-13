@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { sampleEmails } from "../src/server/email-samples.js";
-import { renderEmail } from "../src/server/email-templates.js";
+import { brandFrom, renderEmail } from "../src/server/email-templates.js";
 
 const brand = { baseUrl: "https://maizagents.com" };
 
@@ -24,16 +24,15 @@ describe("email templates", () => {
     expect(text).toContain('<img src=x onerror="a()"> & more');
   });
 
-  it("names the legal entity, and the registered office only when configured", () => {
+  it("names the legal entity and the registered office in every footer", () => {
     const content = { audience: "customer" as const, preheader: "p", heading: "h", paragraphs: ["x"] };
-    const plain = renderEmail(content, brand);
-    expect(plain.html).toContain("MAIZ AI Ltd");
-    expect(plain.html).toContain("company number 17579512");
-    expect(plain.text).toContain("registered in England and Wales");
-    expect(plain.html).not.toContain("Registered office");
-    const withOffice = renderEmail(content, { ...brand, registeredOffice: "1 Example Street, London" });
-    expect(withOffice.html).toContain("Registered office: 1 Example Street, London.");
-    expect(withOffice.text).toContain("Registered office: 1 Example Street, London.");
+    const withOffice = renderEmail(content, brandFrom({ appUrl: "https://maizagents.com" }));
+    expect(withOffice.html).toContain("MAIZ AI Ltd");
+    expect(withOffice.html).toContain("company number 17579512");
+    expect(withOffice.html).toContain("Registered office: 20 Wenlock Road, London, N1 7GU, England.");
+    expect(withOffice.text).toContain("registered in England and Wales");
+    expect(withOffice.text).toContain("Registered office: 20 Wenlock Road, London, N1 7GU, England.");
+    expect(renderEmail(content, brand).html).not.toContain("Registered office");
   });
 
   it("shows the support address only when configured", () => {

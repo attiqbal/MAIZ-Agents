@@ -54,8 +54,6 @@ export interface PlatformConfig {
   appUrl?: string;
   /** Help address shown in email footers. Left out of the footer when not set. */
   supportEmail?: string;
-  /** Registered office of MAIZ AI Ltd for email footers (REGISTERED_OFFICE). */
-  registeredOffice?: string;
   /** Dev-only sign-in by email, no verification. Must stay off in production. */
   allowDevAuth: boolean;
   slack?: { clientId: string; clientSecret: string; signingSecret: string; redirectUri: string };

@@ -1,3 +1,4 @@
+import { COMPANY as BASE_COMPANY } from "../src/company";
 import { resolve } from "node:path";
 import { readFileSync } from "node:fs";
 import { createHash } from "node:crypto";
@@ -60,18 +61,16 @@ function industries(): Plugin {
 const SITE_URL = (process.env.SITE_URL ?? "http://localhost:5173").replace(/\/+$/, "");
 
 /**
- * The legal entity behind MAIZ Agents (Companies House certificate of incorporation, 13 November 2026). The pages,
- * footer and llms.txt read these values, so a change is made in one place. The certificate gives no registered office
- * address and no contact email, so those two come from the build (REGISTERED_OFFICE, CONTACT_EMAIL) and show a clearly
- * marked placeholder until they are set. Nothing here claims an ICO registration, a VAT number or insurance.
+ * The legal entity behind MAIZ Agents (see ../src/company.ts). The pages, footer and llms.txt read these values.
+ * The contact email is not on any record we hold, so it comes from CONTACT_EMAIL and shows a clearly marked placeholder until set.
  */
 const COMPANY = {
-  name: "MAIZ AI Ltd",
-  number: "17579512",
-  registeredIn: "England and Wales",
-  incorporated: "13 November 2026",
-  incorporatedIso: "2026-11-13",
-  office: (process.env.REGISTERED_OFFICE ?? "").trim() || "[registered office address to be added]",
+  name: BASE_COMPANY.name,
+  number: BASE_COMPANY.number,
+  registeredIn: BASE_COMPANY.registeredIn,
+  incorporated: BASE_COMPANY.incorporated,
+  incorporatedIso: BASE_COMPANY.incorporatedIso,
+  office: BASE_COMPANY.registeredOffice,
   email: (process.env.CONTACT_EMAIL ?? "").trim() || "[contact email to be added]",
 };
 const companyTokens = (html: string): string =>

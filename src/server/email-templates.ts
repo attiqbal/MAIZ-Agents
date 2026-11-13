@@ -16,6 +16,8 @@ const MUTED = "#565852";
 const SERIF = "Georgia, 'Times New Roman', serif";
 const SANS = "Helvetica, Arial, sans-serif";
 
+import { COMPANY } from "../company.js";
+
 export interface Mail {
   to: string;
   subject: string;
@@ -43,17 +45,17 @@ export interface EmailBrand {
   baseUrl: string;
   /** Optional help address, shown in the footer only when set (SUPPORT_EMAIL). */
   supportEmail?: string;
-  /** Registered office of MAIZ AI Ltd, shown in the footer only when set (REGISTERED_OFFICE). */
+  /** Registered office shown in the footer. From the company record (src/company.ts). */
   registeredOffice?: string;
 }
 
 /** The legal entity behind MAIZ Agents (Companies House certificate of incorporation, 13 November 2026). */
-export const COMPANY_LEGAL_LINE = "MAIZ Agents is a product of MAIZ AI Ltd, a company registered in England and Wales, company number 17579512.";
+export const COMPANY_LEGAL_LINE = `MAIZ Agents is a product of ${COMPANY.name}, a company registered in ${COMPANY.registeredIn}, company number ${COMPANY.number}.`;
 
-export const brandFrom = (cfg: { appUrl?: string; supportEmail?: string; registeredOffice?: string }): EmailBrand => ({
+export const brandFrom = (cfg: { appUrl?: string; supportEmail?: string }): EmailBrand => ({
   baseUrl: (cfg.appUrl ?? "").replace(/\/$/, ""),
   supportEmail: cfg.supportEmail,
-  registeredOffice: cfg.registeredOffice,
+  registeredOffice: COMPANY.registeredOffice,
 });
 
 export const esc = (s: string): string =>
