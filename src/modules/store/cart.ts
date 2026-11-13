@@ -9,7 +9,7 @@
  * The website imports this file too, so the cart and the API always agree.
  */
 import { EMPLOYEE_TEMPLATES } from "../workforce/templates.js";
-import { DEPARTMENTS } from "../workforce/blueprints.js";
+import { DEPARTMENTS, LEGACY_SPECIALIST_KEYS } from "../workforce/blueprints.js";
 import { CONSULTANTS } from "../workforce/consultants.js";
 import { STANDARD_TEAM } from "../onboarding/index.js";
 
@@ -51,7 +51,7 @@ export interface CatalogueItem {
   energy?: number;
   /** Custom specialists only: which monthly price band applies. */
   tier?: "standard" | "premium";
-  /** Group label for the picker, e.g. "Wealth and savings". */
+  /** Group label for the picker, e.g. "Specialist hires". */
   group: string;
   summary: string;
 }
@@ -73,7 +73,7 @@ export const CATALOGUE: readonly CatalogueItem[] = [
       key: r.key, title: r.title, kind: "specialist" as const, billing: "monthly" as const,
       priceGbp: r.tier === "premium" ? MONTHLY_PRICE_GBP.specialistPremium : MONTHLY_PRICE_GBP.specialistStandard,
       tier: r.tier === "premium" ? ("premium" as const) : ("standard" as const),
-      group: `Specialists · ${d.name}`, summary: r.purpose,
+      group: "Specialist hires", summary: r.purpose,
     })),
   ),
   ...CONSULTANTS.flatMap((c) =>
@@ -89,8 +89,10 @@ export function isCoreRole(key: string): boolean {
   return IN_PACKAGE.has(key) || key === "admin-manager";
 }
 
+/** Looks up a catalogue item. Old one-job specialist keys (saved carts, links) resolve to their specialist hire. */
 export function getItem(key: string): CatalogueItem | undefined {
-  return CATALOGUE.find((i) => i.key === key);
+  const resolved = LEGACY_SPECIALIST_KEYS[key] ?? key;
+  return CATALOGUE.find((i) => i.key === resolved);
 }
 
 export interface CartLine {

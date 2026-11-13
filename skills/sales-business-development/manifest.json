@@ -1,0 +1,110 @@
+{
+  "name": "sales-business-development",
+  "title": "Sales and business development",
+  "department": "Sales and business development",
+  "lane": "standard",
+  "tools": [
+    {
+      "name": "Business profile and setup answers",
+      "status": "available"
+    }
+  ],
+  "authority": {
+    "autonomous": [
+      "Draft work within this role",
+      "Keep this role's records up to date"
+    ],
+    "needsApproval": [
+      "Send, publish, submit or share anything outside the workspace",
+      "Contact anyone outside the business"
+    ],
+    "never": [
+      "Spend or move money",
+      "Sign or submit anything",
+      "Give legal, tax or medical advice",
+      "Invent facts, figures or rules"
+    ]
+  },
+  "deliverables": [
+    {
+      "name": "Set sales targets and plan the pipeline",
+      "cadence": "As agreed with the owner",
+      "energy": [
+        5,
+        20
+      ]
+    },
+    {
+      "name": "Build lead lists from the ideal customer profile",
+      "cadence": "As agreed with the owner",
+      "energy": [
+        5,
+        20
+      ]
+    },
+    {
+      "name": "Plan check-ins and renewals",
+      "cadence": "As agreed with the owner",
+      "energy": [
+        5,
+        20
+      ]
+    },
+    {
+      "name": "Find suitable tenders",
+      "cadence": "As agreed with the owner",
+      "energy": [
+        5,
+        20
+      ]
+    },
+    {
+      "name": "Keep product listings, photos briefs and prices accurate across shop and marketplaces",
+      "cadence": "As agreed with the owner",
+      "energy": [
+        5,
+        20
+      ]
+    },
+    {
+      "name": "Research and shortlist partners that fit the business",
+      "cadence": "As agreed with the owner",
+      "energy": [
+        5,
+        20
+      ]
+    },
+    {
+      "name": "Draft proposals, quotes and follow-ups",
+      "cadence": "As agreed with the owner",
+      "energy": [
+        5,
+        20
+      ]
+    },
+    {
+      "name": "Draft personalised outreach for approval",
+      "cadence": "As agreed with the owner",
+      "energy": [
+        5,
+        20
+      ]
+    },
+    {
+      "name": "Spot upsell and cross-sell chances",
+      "cadence": "As agreed with the owner",
+      "energy": [
+        5,
+        20
+      ]
+    },
+    {
+      "name": "Plan and draft bid responses",
+      "cadence": "As agreed with the owner",
+      "energy": [
+        5,
+        20
+      ]
+    }
+  ]
+}

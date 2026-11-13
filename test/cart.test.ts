@@ -4,7 +4,9 @@ import { CATALOGUE, MAX_QTY, getItem, quote } from "../src/modules/store/cart.js
 describe("store cart", () => {
   it("sells add-ons and specialists monthly and tasks once, never the basic package", () => {
     expect(getItem("supply-chain-manager")?.billing).toBe("monthly");
-    expect(getItem("payroll-specialist")?.billing).toBe("monthly");
+    expect(getItem("wealth-savings")).toMatchObject({ billing: "monthly", priceGbp: 35, group: "Specialist hires" });
+    expect(getItem("payroll-specialist")?.key).toBe("wealth-savings");
+    expect(CATALOGUE.filter((i) => i.kind === "specialist")).toHaveLength(12);
     expect(getItem("web-developer:month")).toMatchObject({ billing: "once", priceGbp: 349, days: 30, energy: 12000 });
     expect(getItem("web-developer:sprint")).toMatchObject({ billing: "once", priceGbp: 99, days: 7 });
     expect(getItem("finance-manager")).toBeUndefined();

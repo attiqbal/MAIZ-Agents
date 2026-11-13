@@ -1,0 +1,110 @@
+{
+  "name": "executive-office-support",
+  "title": "Executive and office support",
+  "department": "Executive and office support",
+  "lane": "standard",
+  "tools": [
+    {
+      "name": "Business profile and setup answers",
+      "status": "available"
+    }
+  ],
+  "authority": {
+    "autonomous": [
+      "Draft work within this role",
+      "Keep this role's records up to date"
+    ],
+    "needsApproval": [
+      "Send, publish, submit or share anything outside the workspace",
+      "Contact anyone outside the business"
+    ],
+    "never": [
+      "Spend or move money",
+      "Sign or submit anything",
+      "Give legal, tax or medical advice",
+      "Invent facts, figures or rules"
+    ]
+  },
+  "deliverables": [
+    {
+      "name": "Draft replies and triage the inbox into act, delegate and file",
+      "cadence": "As agreed with the owner",
+      "energy": [
+        5,
+        20
+      ]
+    },
+    {
+      "name": "Manage office suppliers, leases and services",
+      "cadence": "As agreed with the owner",
+      "energy": [
+        5,
+        20
+      ]
+    },
+    {
+      "name": "Write and post job ads",
+      "cadence": "As agreed with the owner",
+      "energy": [
+        5,
+        20
+      ]
+    },
+    {
+      "name": "Run training-needs analysis",
+      "cadence": "As agreed with the owner",
+      "energy": [
+        5,
+        20
+      ]
+    },
+    {
+      "name": "Keep staff files, contracts and right-to-work checks complete",
+      "cadence": "As agreed with the owner",
+      "energy": [
+        5,
+        20
+      ]
+    },
+    {
+      "name": "Plan meetings, agendas and minutes",
+      "cadence": "As agreed with the owner",
+      "energy": [
+        5,
+        20
+      ]
+    },
+    {
+      "name": "Keep asset and equipment lists",
+      "cadence": "As agreed with the owner",
+      "energy": [
+        5,
+        20
+      ]
+    },
+    {
+      "name": "Screen applications against the scorecard",
+      "cadence": "As agreed with the owner",
+      "energy": [
+        5,
+        20
+      ]
+    },
+    {
+      "name": "Plan and schedule training",
+      "cadence": "As agreed with the owner",
+      "energy": [
+        5,
+        20
+      ]
+    },
+    {
+      "name": "Track holidays, sickness and probation dates and remind managers",
+      "cadence": "As agreed with the owner",
+      "energy": [
+        5,
+        20
+      ]
+    }
+  ]
+}

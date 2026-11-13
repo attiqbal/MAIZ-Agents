@@ -1,0 +1,110 @@
+{
+  "name": "customer-service-reception",
+  "title": "Customer service and reception",
+  "department": "Customer service and reception",
+  "lane": "standard",
+  "tools": [
+    {
+      "name": "Business profile and setup answers",
+      "status": "available"
+    }
+  ],
+  "authority": {
+    "autonomous": [
+      "Draft work within this role",
+      "Keep this role's records up to date"
+    ],
+    "needsApproval": [
+      "Send, publish, submit or share anything outside the workspace",
+      "Contact anyone outside the business"
+    ],
+    "never": [
+      "Spend or move money",
+      "Sign or submit anything",
+      "Give legal, tax or medical advice",
+      "Invent facts, figures or rules"
+    ]
+  },
+  "deliverables": [
+    {
+      "name": "Answer phone, email and web enquiries and route them to the right person",
+      "cadence": "As agreed with the owner",
+      "energy": [
+        5,
+        20
+      ]
+    },
+    {
+      "name": "Draft answers to emails and chats",
+      "cadence": "As agreed with the owner",
+      "energy": [
+        5,
+        20
+      ]
+    },
+    {
+      "name": "Plan onboarding for new customers",
+      "cadence": "As agreed with the owner",
+      "energy": [
+        5,
+        20
+      ]
+    },
+    {
+      "name": "Answer booking requests and confirm appointments from the calendar",
+      "cadence": "As agreed with the owner",
+      "energy": [
+        5,
+        20
+      ]
+    },
+    {
+      "name": "Draft replies to reviews and comments for approval",
+      "cadence": "As agreed with the owner",
+      "energy": [
+        5,
+        20
+      ]
+    },
+    {
+      "name": "Take messages and callback requests and make sure they are followed up",
+      "cadence": "As agreed with the owner",
+      "energy": [
+        5,
+        20
+      ]
+    },
+    {
+      "name": "Keep the help articles up to date",
+      "cadence": "As agreed with the owner",
+      "energy": [
+        5,
+        20
+      ]
+    },
+    {
+      "name": "Track health scores and risks",
+      "cadence": "As agreed with the owner",
+      "energy": [
+        5,
+        20
+      ]
+    },
+    {
+      "name": "Send reminders and manage cancellations, no-shows and the waiting list",
+      "cadence": "As agreed with the owner",
+      "energy": [
+        5,
+        20
+      ]
+    },
+    {
+      "name": "Flag complaints and risks to Customer support the same day",
+      "cadence": "As agreed with the owner",
+      "energy": [
+        5,
+        20
+      ]
+    }
+  ]
+}

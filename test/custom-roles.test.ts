@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { allRoles, DEPARTMENTS } from "../src/modules/workforce/blueprints.js";
+import { allRoles, DEPARTMENTS, getBlueprint, LEGACY_SPECIALIST_KEYS, specialistHires } from "../src/modules/workforce/blueprints.js";
 import { draftCustomRole, similarRoles } from "../src/modules/workforce/custom-roles.js";
 import { getJobDescription } from "../src/modules/workforce/job-descriptions.js";
 
@@ -45,10 +45,10 @@ describe("Admin manager's role designer", () => {
   });
 
   test("points out existing roles that may already cover the job", () => {
-    expect(similarRoles("Payroll helper")).toContain("Payroll specialist");
+    expect(similarRoles("Payroll helper")).toContain("Wealth and savings (includes Payroll specialist)");
     const d = draftCustomRole({ ...brief, title: "Barista trainer", purpose: "Teach new baristas our recipes" });
     expect(d.ok && d.similar.length).toBe(0);
-    expect(similarRoles("Bookkeeper and accounts")).toContain("Bookkeeper");
+    expect(similarRoles("Bookkeeper and accounts")).toContain("Wealth and savings (includes Bookkeeper)");
   });
 
   test("the Admin manager's job description includes designing specialists and the sign-off gate", () => {
@@ -59,22 +59,31 @@ describe("Admin manager's role designer", () => {
     expect(jd.authority.needsApproval).toContain("Create, change or retire a custom specialist");
   });
 
-  test("the blueprint covers roles likely to come up later, each complete and unique", () => {
+  test("specialist hires: exactly 12, one per department, each merging its old one-job roles", () => {
     const keys = allRoles().map((r) => r.key);
     expect(new Set(keys).size).toBe(keys.length);
-    for (const k of ["ai-automation-specialist", "licensing-officer", "ecommerce-manager", "rota-coordinator", "import-export-coordinator", "bookings-coordinator"]) expect(keys).toContain(k);
-    const studio = DEPARTMENTS.find((d) => d.key === "creative-studio")!;
-    expect(studio.roles.map((r) => r.key)).toEqual(["creative-director", "campaign-producer", "video-content-producer", "graphic-designer", "image-producer", "print-designer", "motion-designer", "copywriter"]);
-    for (const r of allRoles().filter((x) => !x.jd)) {
-      expect(r.duties.length, r.key).toBeGreaterThanOrEqual(3);
-      expect(r.legal.length, r.key).toBeGreaterThanOrEqual(2);
-      expect(r.records.length, r.key).toBeGreaterThanOrEqual(2);
-    }
-    expect(DEPARTMENTS.map((d) => d.name)).toEqual([
+    const hires = specialistHires();
+    expect(hires.map((h) => h.role.title)).toEqual([
       "Creative studio", "Social media and content", "PR and communications", "Sales and business development",
-      "Customer service and reception", "Executive and office support", "Wealth and savings", "Legal and contracts",
-      "Operations and logistics", "Technology and data", "Product and research", "Fundraising and investor relations",
+      "Customer service and reception", "Executive and office support", "Wealth and savings", "Fundraising and investor relations",
+      "Legal and contracts", "Operations and logistics", "Technology and data", "Product and research",
     ]);
-    for (const k of ["receptionist", "investment-manager", "savings-treasury-manager", "personal-finance-manager"]) expect(keys).toContain(k);
+    expect(DEPARTMENTS).toHaveLength(12);
+    for (const d of DEPARTMENTS) expect(d.roles.filter((r) => !r.jd), d.key).toHaveLength(1);
+    expect(hires.find((h) => h.role.key === "creative-studio")!.role.covers).toContain("Motion and animation designer");
+    expect(hires.find((h) => h.role.key === "customer-service-reception")!.role.covers).toContain("Receptionist");
+    expect(hires.find((h) => h.role.key === "wealth-savings")!.role.legal[0]).toMatch(/^Not regulated financial advice/);
+    for (const { role } of hires) {
+      expect(role.duties.length, role.key).toBeGreaterThanOrEqual(3);
+      expect(role.legal.length, role.key).toBeGreaterThanOrEqual(2);
+      expect(role.records.length, role.key).toBeGreaterThanOrEqual(2);
+      expect(role.covers!.length, role.key).toBeGreaterThanOrEqual(1);
+    }
+  });
+
+  test("old one-job specialist keys still resolve to the hire that now does the work", () => {
+    for (const [old, hire] of Object.entries(LEGACY_SPECIALIST_KEYS)) expect(getBlueprint(old)?.role.key, old).toBe(hire);
+    expect(getBlueprint("ai-automation-specialist")?.role.title).toBe("Technology and data");
+    expect(getBlueprint("bookkeeper")?.role.title).toBe("Wealth and savings");
   });
 });

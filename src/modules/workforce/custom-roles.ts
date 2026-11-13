@@ -48,7 +48,8 @@ const words = (s: string) => new Set(slug(s).split("-").filter((w) => w.length >
 /** Existing employees, blueprint roles and consultants whose title shares a meaningful word with the brief. */
 export function similarRoles(title: string): string[] {
   const wanted = words(title);
-  const existing = [...JOB_DESCRIPTIONS.map((j) => j.jobTitle), ...allRoles().map((r) => r.title), ...CONSULTANTS.map((c) => c.title)];
+  const covered = allRoles().flatMap((r) => (r.covers ?? []).map((job) => `${r.title} (includes ${job})`));
+  const existing = [...JOB_DESCRIPTIONS.map((j) => j.jobTitle), ...allRoles().map((r) => r.title), ...covered, ...CONSULTANTS.map((c) => c.title)];
   return [...new Set(existing.filter((t) => [...words(t)].some((w) => wanted.has(w))))];
 }
 

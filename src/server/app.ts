@@ -158,7 +158,7 @@ export function createApp(p: Platform) {
       return json(200, {
         employees: TEMPLATES.map((t) => ({ key: t.key, title: t.title, summary: t.summary, kind: t.kind, tier: t.tier, firstJob: t.firstJob, jobDescription: getJobDescription(t.key) })),
         // Every department and role of a typical business; roles without a ready-made employee are custom specialists.
-        departments: DEPARTMENTS.map((d) => ({ key: d.key, name: d.name, mission: d.mission, roles: d.roles.map((r) => ({ key: r.key, title: r.title, purpose: r.purpose, readyMade: Boolean(r.jd) })) })),
+        departments: DEPARTMENTS.map((d) => ({ key: d.key, name: d.name, mission: d.mission, roles: d.roles.map((r) => ({ key: r.key, title: r.title, purpose: r.purpose, readyMade: Boolean(r.jd), covers: r.covers ?? [] })) })),
         customSpecialist: CUSTOM_SPECIALIST,
         // Consultants: one-off passes with an energy pool, and the task menu each can do.
         consultants: CONSULTANTS.map((c) => ({ key: c.key, title: c.title, purpose: c.purpose, passes: c.passes, menu: menuOf(c.key).map((t) => ({ key: t.key, title: t.title, energy: t.includedEnergy })) })),
