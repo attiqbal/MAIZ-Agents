@@ -237,6 +237,26 @@ $("tu-form").addEventListener("submit", async (ev) => {
 });
 void loadTopUps();
 
+// Settings: a gift or discount code. The server says in plain words why a code is refused.
+async function loadCodes(): Promise<void> {
+  if (!getToken()) return;
+  const r = await api<{ used: { code: string; at: string; applied: string }[] }>("/coupons");
+  const used = r.ok ? r.data?.used ?? [] : [];
+  $("cp-used").innerHTML = used.map((u) => `<li><b>${esc(u.code)}</b>: ${esc(u.applied)} (${new Date(u.at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })})</li>`).join("");
+}
+$("cp-form").addEventListener("submit", async (ev) => {
+  ev.preventDefault();
+  const code = $<HTMLInputElement>("cp-code").value.trim();
+  const msg = $("cp-msg");
+  if (!code) { msg.textContent = "Enter your code first."; $("cp-code").setAttribute("aria-invalid", "true"); $("cp-code").focus(); return; }
+  if (!getToken()) { toast("Example only: log in to use a code"); return; }
+  const r = await api<{ applied?: string; error?: string }>("/coupons/redeem", { body: { code } });
+  $("cp-code").setAttribute("aria-invalid", String(!r.ok));
+  msg.textContent = r.ok ? `Done: ${r.data?.applied}.` : r.data?.error ?? "Could not apply the code. Please try again.";
+  if (r.ok) { $<HTMLInputElement>("cp-code").value = ""; void loadCodes(); void loadOrg(); void loadTopUps(); }
+});
+void loadCodes();
+
 // Account menu: sign out, and the Settings screen's account details.
 function signOut(): void { clearSession(); location.href = "/signin.html"; }
 document.querySelectorAll("[data-signout]").forEach((b) => b.addEventListener("click", signOut));

@@ -101,7 +101,7 @@ export function wirePasswordToggles(root: ParentNode = document): void {
   });
 }
 
-export interface SignedIn { token: string; email: string; hasOrganisation: boolean; platformOwner?: boolean }
+export interface SignedIn { token: string; email: string; hasOrganisation: boolean; platformOwner?: boolean; affiliate?: boolean }
 
 /** Keeps the session from a successful log-in and sends the person where they belong. */
 export function finishSignIn(r: SignedIn): void {
@@ -111,7 +111,7 @@ export function finishSignIn(r: SignedIn): void {
     localStorage.setItem("maiz.profile", JSON.stringify({ ...profile, email: r.email }));
   } catch { /* storage unavailable */ }
   // The MAIZ platform owner lands on the quality review queue; clients on their control centre, or on setup if they have no team yet.
-  location.replace(r.platformOwner ? "/review.html" : r.hasOrganisation ? "/app.html" : "/onboarding.html");
+  location.replace(r.platformOwner ? "/review.html" : r.hasOrganisation ? "/app.html" : r.affiliate ? "/affiliate.html" : "/onboarding.html");
 }
 
 /** Plain-words message for a failed auth call. */

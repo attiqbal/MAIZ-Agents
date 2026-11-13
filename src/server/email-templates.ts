@@ -180,3 +180,37 @@ export const ownerAlertEmail = (subject: string, body: string, brand: EmailBrand
   heading: subject,
   paragraphs: body.split(/\n{2,}/).map((t) => t.trim()).filter(Boolean),
 }, brand);
+
+/** The owner sends someone a coupon: the code, what it gives, and where to use it. */
+export const couponGiftEmail = (code: string, summary: string, url: string, brand: EmailBrand) => build("A gift code for MAIZ Agents", {
+  audience: "customer",
+  preheader: `Your code ${code}: ${summary}.`,
+  heading: "You have a code for MAIZ Agents",
+  paragraphs: [`Your code gives you: ${summary}.`, `Code: ${code}`, "Enter it when you start your free trial, or in Settings if you already have a team."],
+  button: { label: "Start with your code", url },
+  fineprint: ["The code may have an expiry date or a limit on how many times it can be used. If it does not work, reply to the person who sent it to you."],
+}, brand);
+
+/** A new affiliate: their link, what they earn and where to see it. */
+export const affiliateWelcomeEmail = (name: string, referralUrl: string, dashboardUrl: string, commission: string, brand: EmailBrand) => build("You are a MAIZ Agents affiliate", {
+  audience: "customer",
+  preheader: "Your referral link and where to see your results.",
+  heading: `Welcome, ${name}`,
+  paragraphs: [
+    "You can now earn commission by introducing small businesses to MAIZ Agents.",
+    `Your referral link: ${referralUrl}`,
+    `What you earn: ${commission}. Commission is paid by hand after a short waiting period, so refunds can be covered first.`,
+    "To see your clicks, signups and earnings, log in with this email address.",
+  ],
+  button: { label: "Open your affiliate page", url: dashboardUrl },
+  fineprint: ["The written programme terms will be sent to you separately."],
+}, brand);
+
+/** The owner paid an affiliate by hand and marked it paid. */
+export const affiliatePaidEmail = (name: string, amount: string, reference: string | undefined, dashboardUrl: string, brand: EmailBrand) => build("Your MAIZ Agents commission has been paid", {
+  audience: "customer",
+  preheader: `${amount} commission has been marked as paid.`,
+  heading: `${amount} commission paid`,
+  paragraphs: [`Hello ${name}, we have marked ${amount} of your commission as paid.`, ...(reference ? [`Reference: ${reference}`] : [])],
+  button: { label: "See your earnings", url: dashboardUrl },
+}, brand);

@@ -39,6 +39,7 @@ import { ConsoleEmailSender, type EmailSender } from "./email.js";
 import { brandFrom, decisionsWaitingEmail, ownerAlertEmail } from "./email-templates.js";
 import { userIdFor } from "./identity.js";
 import { ExpiringSet, SendLog } from "./expiring.js";
+import { AffiliateService, CouponService } from "../modules/promotions/index.js";
 import { CredentialStore } from "../modules/credentials/index.js";
 
 export interface PlatformConfig {
@@ -105,6 +106,14 @@ export function createPlatform(cfg: PlatformConfig) {
   });
   // Add-on employees and specialists add their weekly energy to a paid team pool.
   energy.setPoolBonusResolver((ws) => workforce.templatesIn(ws).reduce((sum, key) => sum + prices.weeklyEnergyFor(key), 0));
+  /** Discount coupons: trial days and free energy work today; discounts on the bill are recorded for when billing starts. */
+  const coupons = new CouponService((userId) => ownerIdSet.has(userId), {
+    isTrial: (ws) => energy.onTrial(ws),
+    extendTrial: (ws, days, by) => { energy.extendTrial(ws, days, by); },
+    grantEnergy: (ws, n, by) => energy.grantEnergy(ws, n, by),
+  }, now);
+  /** Referral partners: links, signups, commission earned and payouts the owner marks as paid by hand. */
+  const affiliates = new AffiliateService((userId) => ownerIdSet.has(userId), now);
   const onboarding = new OnboardingService(identity, workforce, ledger, energy, audit, now, () => {
     const g = prices.general();
     return { days: g.trialDays, teamEnergy: g.trialTeamEnergy, dailyTeamCeiling: g.dailyTeamCeiling };
@@ -242,6 +251,9 @@ export function createPlatform(cfg: PlatformConfig) {
       }
       // A recurring line makes the client a paying one: they leave the free trial and start the paid plan with a full
       // pool (the trial's energy is not held against it). One-off consultant passes alone do not end the trial.
+      // A referred client's payment earns the affiliate their commission (the first N payments only).
+      // Only subscriptions count: one-off passes do not earn commission.
+      if (order.lines.some((l) => l.billing === "monthly")) affiliates.recordPayment(order.workspaceId, order.dueTodayMinor / 100, order.id);
       if (order.lines.some((l) => l.billing === "monthly")) energy.switchToPaid(order.workspaceId, paidTeamPlan(prices.general()), `user:${order.userId}`);
       return ids;
     },
@@ -435,8 +447,13 @@ export function createPlatform(cfg: PlatformConfig) {
     for (const x of s.peopleSettings ?? []) people.restoreSettings(x.workspaceId, x.settings);
     for (const r of s.batchRuns ?? []) batch.restoreRun(r);
     for (const c of s.credentials ?? []) credentials.restore(c.userId, c);
+    for (const x of s.promoRecords ?? []) {
+      if (x.kind === "coupon") coupons.restoreCoupon(x.data);
+      else if (x.kind === "redemption") coupons.restoreRedemption(x.data);
+      else affiliates.restore(x.kind, x.data);
+    }
     sink = store;
-    for (const part of [audit, identity, energy, workforce, ledger, router, admin, integrations, reviews, prices, specialists, aiSettings, spend, batch, payments, rota, reconciliation, people, conversations, notices, credentials]) part.useSink(store);
+    for (const part of [audit, identity, energy, workforce, ledger, router, admin, integrations, reviews, prices, specialists, aiSettings, spend, batch, payments, rota, reconciliation, people, conversations, notices, credentials, coupons, affiliates]) part.useSink(store);
   }
 
   const healthy = () => (sink as { healthy?: boolean } | undefined)?.healthy !== false;
@@ -454,8 +471,10 @@ export function createPlatform(cfg: PlatformConfig) {
   const credentials = new CredentialStore(() => now().getTime());
   /** Opens and saves per staff form link, so a link cannot be hammered. */
   const formHits = new SendLog();
+  /** Wrong coupon codes per person and per address, so codes cannot be guessed. */
+  const codeFails = new SendLog(15 * 60_000);
   /** Starts a sleeping RunPod worker for a client who just opened the app or started typing. */
   const warm = () => routing?.warm() ?? "skipped";
-  return { conversations, notices, warm, ownerDecisions, decisionDigest, dashboard, reconciliation, rota, people, payments, batch, email, usedLinks, sends, loginFails, resets, credentials, formHits, admin, reviews, prices, specialists, ai, clients, isPlatformOwner, healthy, cfg, now, audit, bus, identity, energy, workforce, ledger, onboarding, router, integrations, slackTokens, saveSlackToken, attachStore };
+  return { conversations, notices, warm, ownerDecisions, decisionDigest, dashboard, reconciliation, rota, people, payments, batch, email, usedLinks, sends, loginFails, resets, credentials, formHits, codeFails, coupons, affiliates, admin, reviews, prices, specialists, ai, clients, isPlatformOwner, healthy, cfg, now, audit, bus, identity, energy, workforce, ledger, onboarding, router, integrations, slackTokens, saveSlackToken, attachStore };
 }
 export type Platform = ReturnType<typeof createPlatform>;

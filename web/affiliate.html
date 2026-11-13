@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+<!--@include head title="Your affiliate page · MAIZ Agents" description="See your referral link, clicks, signups and commission."-->
+<meta name="robots" content="noindex">
+</head>
+<body>
+<div class="page-top">
+  <!--@include header-->
+  <main id="main">
+    <section class="section">
+      <div class="container" style="max-width:980px">
+        <div class="rv-head"><div><h1>Your affiliate page</h1><p class="sub">Your link, how many people opened it, who signed up and what you have earned.</p></div><span class="badge badge-dark" id="ow-eg" hidden>Example data</span></div>
+        <div class="ob-panel" id="ow-gate" hidden aria-live="polite"><h2 id="ow-gate-h" style="font-size:1.25rem;margin:0 0 6px"></h2><p id="ow-gate-p" class="sub" style="margin:0 0 14px"></p><a class="btn btn-primary" id="ow-gate-a" href="/signin.html">Log in</a></div>
+        <div id="ow-body">
+          <div class="ow-stack">
+            <section class="panel" aria-labelledby="af-link-h"><div class="panel-h"><h2 id="af-link-h">Your referral link</h2></div>
+              <div class="field"><label for="af-link">Share this link</label><div style="display:flex;gap:8px;flex-wrap:wrap"><input class="input" id="af-link" readonly style="flex:1;min-width:220px"><button type="button" class="btn btn-ghost" id="af-copy">Copy link</button></div>
+                <span class="hint" id="af-terms"></span></div></section>
+            <div class="kpis" id="af-kpis"></div>
+            <section class="panel" aria-labelledby="af-c-h"><div class="panel-h"><h2 id="af-c-h">Commission</h2></div>
+              <div class="tbl-wrap" tabindex="0" role="region" aria-label="Commission earned"><table class="tbl" id="af-comm"></table></div></section>
+            <section class="panel" aria-labelledby="af-p-h"><div class="panel-h"><h2 id="af-p-h">Payments to you</h2></div>
+              <div class="tbl-wrap" tabindex="0" role="region" aria-label="Payments to you"><table class="tbl" id="af-pay"></table></div></section>
+            <p class="small muted">You see how many businesses signed up, never who they are. Programme terms are sent to you separately.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+<!--@include footer-->
+<script type="module" src="/src/affiliate.ts"></script>
+</body>
+</html>

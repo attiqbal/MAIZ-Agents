@@ -28,7 +28,11 @@ export class RateLimiter {
 
 /** Limits for the API. Sign-in and sign-up are tighter because they send email or create customers. */
 export function limitFor(method: string, path: string): Limit | undefined {
+  // A referral visit sets a cookie and counts a click: a handful per address a minute is plenty.
+  if (method === "GET" && path.startsWith("/r/")) return { max: 20, windowMs: 60_000 };
   if (method !== "POST") return undefined;
+  // Coupon codes can be guessed, so tries are few per address. Wrong tries are also counted per person.
+  if (path === "/api/coupons/check" || path === "/api/coupons/redeem") return { max: 12, windowMs: 10 * 60_000 };
   if (path === "/api/slack/events") return undefined; // signed by Slack, and Slack retries on 429
   if (path === "/api/payments/webhook") return undefined; // signed by the payment provider, which retries on 429
   // Tasks are limited by energy (the team pool, the daily ceiling and the monthly cost cap), not by a request count:

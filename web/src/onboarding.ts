@@ -13,7 +13,7 @@ const PLAN_STEP = 4;
 const KEY = "maiz.profile";
 interface Profile {
   email?: string; biz?: string; sector?: string; sells?: string; country?: string; countryName?: string; needs?: string[]; size?: string;
-  apps?: string[]; site?: string; addOns?: string[]; slack?: boolean; contact?: "dashboard" | "slack";
+  apps?: string[]; site?: string; coupon?: string; addOns?: string[]; slack?: boolean; contact?: "dashboard" | "slack";
 }
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -294,13 +294,18 @@ single($("contact"), (b) => { profile.contact = b.dataset.v === "slack" ? "slack
 // ---- Step 6: create the organisation ----
 async function createOrganisation(): Promise<boolean> {
   // Real set-up when the API is running; otherwise the page stays a demo.
-  const r = await api<{ token: string }>("/signup", {
+  const r = await api<{ token: string; coupon?: { ok: boolean; message: string } }>("/signup", {
     body: {
       email: profile.email, businessName: profile.biz, sector: profile.sector, sells: profile.sells, needs: profile.needs, apps: profile.apps,
-      addOns: profile.addOns, size: profile.size, country: profile.country, countryName: profile.countryName, website: profile.site, contact: profile.contact,
+      addOns: profile.addOns, size: profile.size, country: profile.country, countryName: profile.countryName, website: profile.site, contact: profile.contact, ...(profile.coupon ? { coupon: profile.coupon } : {}),
     },
   });
-  if (r.ok && r.data?.token) { setToken(r.data.token); return true; }
+  if (r.ok && r.data?.token) {
+    setToken(r.data.token);
+    if (r.data.coupon) { const n = $("prov-coupon"); n.textContent = r.data.coupon.message; n.removeAttribute("hidden"); }
+    if (profile.coupon) { profile.coupon = undefined; save(); }
+    return true;
+  }
   if (r.status === 409) {
     // This email already has a team. Without a login on this device, the owner has to log in to reach it.
     $("prov-h").textContent = getToken() ? "You already have a team. Open your control centre." : "You already have a team. Log in to open it.";
@@ -336,6 +341,20 @@ if (profile.biz) $<HTMLInputElement>("biz").value = profile.biz;
 if (profile.sells) $<HTMLInputElement>("sells").value = profile.sells;
 if (profile.site) $<HTMLInputElement>("site").value = profile.site;
 if (profile.email) $<HTMLInputElement>("email").value = profile.email;
+
+// ---- A gift or discount code, checked when the field is left so a typo is caught before signing up ----
+const couponIn = $<HTMLInputElement>("coupon");
+const couponMsg = (text: string, bad: boolean) => { $("coupon-msg").textContent = text; couponIn.setAttribute("aria-invalid", String(bad)); };
+if (profile.coupon) couponIn.value = profile.coupon;
+couponIn.addEventListener("change", async () => {
+  const code = couponIn.value.trim();
+  profile.coupon = code || undefined; save();
+  if (!code) { couponMsg("Enter a gift or discount code if you were given one.", false); return; }
+  const r = await api<{ summary?: string; error?: string }>("/coupons/check", { body: { code, email: ($<HTMLInputElement>("email").value || profile.email || "").trim() } });
+  if (r.ok && r.data?.summary) couponMsg(`Code accepted: ${r.data.summary}. It is applied when your team is created.`, false);
+  else if (r.status === 0) couponMsg("We will check this code when your team is created.", false);
+  else couponMsg(r.data?.error ?? "We could not check that code. Try again.", true);
+});
 if (profile.size) $("size").querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", String(b.textContent === profile.size)));
 // Coming back from the emailed link with a verified session: the plan is waiting, one tap from done.
 // Someone who already has a team goes straight to it. Otherwise resume where they were in this tab,
