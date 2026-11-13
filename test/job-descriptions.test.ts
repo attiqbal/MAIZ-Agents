@@ -80,9 +80,9 @@ describe("org blueprints", () => {
     const workforce = new WorkforceService(identity, audit, bus, gateway);
     const ws = await identity.createWorkspace("owner", { name: "Acme" });
     const e = await workforce.hire("owner", ws.id, "payroll-specialist");
-    expect(e.name).toBe("Payroll specialist");
+    expect(e.name).toBe("Wealth and savings");
     await workforce.assign("owner", ws.id, e.id, "Prepare this month's payroll");
-    expect(seen[0]).toContain("Your job description: Payroll specialist (Wealth and savings");
+    expect(seen[0]).toContain("Your job description: Wealth and savings (Wealth and savings");
     expect(seen[0]).toContain("Payroll registers and pay slips");
     expect(getJobDescription("not-a-role")).toBeUndefined();
   });

@@ -58,7 +58,7 @@
     {
       "viewport": "1440x900",
       "artifact": "employees-1440x900.png",
-      "observation": "Employee cards each expand to a full job description; the add-on roles are filtered by exactly 12 category chips (Creative studio to Fundraising and investor relations; checked at 1440 on 2026-11-12) in a 3-column grid with 'In the store' and 'Custom specialist' tags, and an opened Payroll specialist role shows its full job description without breaking the grid."
+      "observation": "Employee cards each expand to a full job description; the Specialist hires section shows exactly 12 hire cards (Creative studio to Product and research), each listing the jobs it covers, with no filter chips; checked at 1440 and 375 on 2026-11-13 in a 3-column grid with 'In the store' and 'Custom specialist' tags, and an opened Payroll specialist role shows its full job description without breaking the grid."
     },
     {
       "viewport": "375x812",
