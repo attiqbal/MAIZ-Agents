@@ -169,11 +169,20 @@ async function loadOrg(): Promise<void> {
     if (!LOCAL_PREVIEW) { location.replace("/signin.html"); return; }
     $("demo-banner").hidden = false; return;
   }
-  const r = await api<Org>("/org");
+  const [r, me] = await Promise.all([api<Org>("/org"), api<{ platformOwner?: boolean; hasOrganisation?: boolean }>("/me")]);
   // Guard: this device's login has expired -> log-in page.
-  if (r.status === 401) { clearSession(); location.replace("/signin.html"); return; }
-  // API unreachable (or not set up yet) -> keep the page usable as a demo, and say so.
-  if (!r.ok || !r.data) { $("demo-banner").hidden = false; return; }
+  if (r.status === 401 || me.status === 401) { clearSession(); location.replace("/signin.html"); return; }
+  if (me.data?.platformOwner) $("owner-admin-link").hidden = false;
+  if (!r.ok || !r.data) {
+    // Signed in but no team: the platform owner goes to the owner admin, a new client to setup. Sample data never shows to a signed-in person.
+    if (!LOCAL_PREVIEW) {
+      if (me.data?.platformOwner) { location.replace("/owner-decisions.html"); return; }
+      if (r.status === 404) { location.replace("/onboarding.html"); return; }
+      toast("We can't load your control centre right now. Please reload in a moment.");
+      return;
+    }
+    $("demo-banner").hidden = false; return;
+  }
   realOrg = r.data;
   $("ask-when").hidden = false;
   warmUp();
