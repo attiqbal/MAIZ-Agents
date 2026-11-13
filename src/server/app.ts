@@ -436,6 +436,7 @@ export function createApp(p: Platform) {
       return json(201, { order: orderView(order), ...(url ? { url } : {}) });
     }
     if (method === "GET" && path === "/api/orders") return json(200, { enabled: p.payments.enabled, orders: p.payments.mine(userId, org.id).map(orderView) });
+    if (method === "POST" && path === "/api/billing/portal") return json(200, { url: await p.payments.portalUrl(userId, org.id, `${(p.cfg.appUrl ?? "").replace(/\/$/, "")}/app.html#team`) });
     const cancelOrder = /^\/api\/orders\/([\w-]{1,64})\/cancel$/.exec(path);
     if (method === "POST" && cancelOrder) return json(200, { order: orderView(await p.payments.cancel(userId, org.id, cancelOrder[1]!)) });
 
