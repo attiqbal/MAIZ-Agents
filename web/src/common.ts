@@ -11,7 +11,12 @@ export function initNav(): void {
     if (!target.hash && target.pathname === here) a.setAttribute("aria-current", "page");
   });
   if (getToken()) {
-    document.querySelectorAll<HTMLAnchorElement>("[data-account-link]").forEach((a) => { a.href = "/app.html"; a.textContent = "Open control centre"; });
+    const links = document.querySelectorAll<HTMLAnchorElement>("[data-account-link]");
+    links.forEach((a) => { a.href = "/app.html"; a.textContent = "Open control centre"; });
+    // The platform owner gets a clear way into the owner admin from every public page.
+    void api<{ platformOwner?: boolean }>("/me").then((r) => {
+      if (r.data?.platformOwner) links.forEach((a) => { a.href = "/owner-decisions.html"; a.textContent = "Owner admin"; });
+    });
   }
   const nav = document.querySelector<HTMLElement>(".nav");
   if (nav) {
