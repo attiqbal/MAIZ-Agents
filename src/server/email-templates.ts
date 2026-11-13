@@ -16,6 +16,8 @@ const MUTED = "#565852";
 const SERIF = "Georgia, 'Times New Roman', serif";
 const SANS = "Helvetica, Arial, sans-serif";
 
+import { COMPANY } from "../company.js";
+
 export interface Mail {
   to: string;
   subject: string;
@@ -43,9 +45,18 @@ export interface EmailBrand {
   baseUrl: string;
   /** Optional help address, shown in the footer only when set (SUPPORT_EMAIL). */
   supportEmail?: string;
+  /** Registered office shown in the footer. From the company record (src/company.ts). */
+  registeredOffice?: string;
 }
 
-export const brandFrom = (cfg: { appUrl?: string; supportEmail?: string }): EmailBrand => ({ baseUrl: (cfg.appUrl ?? "").replace(/\/$/, ""), supportEmail: cfg.supportEmail });
+/** The legal entity behind MAIZ Agents (Companies House certificate of incorporation, 13 November 2026). */
+export const COMPANY_LEGAL_LINE = `MAIZ Agents is a product of ${COMPANY.name}, a company registered in ${COMPANY.registeredIn}, company number ${COMPANY.number}.`;
+
+export const brandFrom = (cfg: { appUrl?: string; supportEmail?: string }): EmailBrand => ({
+  baseUrl: (cfg.appUrl ?? "").replace(/\/$/, ""),
+  supportEmail: cfg.supportEmail,
+  registeredOffice: COMPANY.registeredOffice,
+});
 
 export const esc = (s: string): string =>
   s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
@@ -83,7 +94,7 @@ export function renderEmail(c: EmailContent, brand: EmailBrand): { html: string;
 ${c.paragraphs.map(p).join("")}${list}${c.button ? button(c.button.label, c.button.url) : ""}${fallbackLink}
 ${fine ? `<div style="margin-top:24px;padding-top:18px;border-top:1px solid ${SAND};">${fine}</div>` : ""}
 </td></tr>
-<tr><td style="padding:22px 12px 0;text-align:center;font:400 12px/1.6 ${SANS};color:${MUTED};">${help}${reason}<br><a href="${esc(brand.baseUrl || "https://maizagents.com")}" style="color:${MUTED};">${esc(siteLabel(brand.baseUrl))}</a> · MAIZ Agents</td></tr>
+<tr><td style="padding:22px 12px 0;text-align:center;font:400 12px/1.6 ${SANS};color:${MUTED};">${help}${reason}<br><a href="${esc(brand.baseUrl || "https://maizagents.com")}" style="color:${MUTED};">${esc(siteLabel(brand.baseUrl))}</a> · MAIZ Agents<br>${esc(COMPANY_LEGAL_LINE)}${brand.registeredOffice ? " Registered office: " + esc(brand.registeredOffice) + "." : ""}</td></tr>
 </table></td></tr></table></body></html>`;
   const text = [
     c.heading,
@@ -95,6 +106,7 @@ ${fine ? `<div style="margin-top:24px;padding-top:18px;border-top:1px solid ${SA
     ...(c.fineprint ?? []).flatMap((t) => [t, ""]),
     "--",
     "MAIZ Agents · " + siteLabel(brand.baseUrl),
+    COMPANY_LEGAL_LINE + (brand.registeredOffice ? ` Registered office: ${brand.registeredOffice}.` : ""),
     ...(brand.supportEmail ? [`Need help? ${brand.supportEmail}`] : []),
     c.audience === "owner" ? "Internal message for the platform owner." : "You are receiving this because this address was used at " + siteLabel(brand.baseUrl) + ". It is a service message about your account.",
   ].join("\n");
@@ -169,4 +181,38 @@ export const ownerAlertEmail = (subject: string, body: string, brand: EmailBrand
   preheader: subject,
   heading: subject,
   paragraphs: body.split(/\n{2,}/).map((t) => t.trim()).filter(Boolean),
+}, brand);
+
+/** The owner sends someone a coupon: the code, what it gives, and where to use it. */
+export const couponGiftEmail = (code: string, summary: string, url: string, brand: EmailBrand) => build("A gift code for MAIZ Agents", {
+  audience: "customer",
+  preheader: `Your code ${code}: ${summary}.`,
+  heading: "You have a code for MAIZ Agents",
+  paragraphs: [`Your code gives you: ${summary}.`, `Code: ${code}`, "Enter it when you start your free trial, or in Settings if you already have a team."],
+  button: { label: "Start with your code", url },
+  fineprint: ["The code may have an expiry date or a limit on how many times it can be used. If it does not work, reply to the person who sent it to you."],
+}, brand);
+
+/** A new affiliate: their link, what they earn and where to see it. */
+export const affiliateWelcomeEmail = (name: string, referralUrl: string, dashboardUrl: string, commission: string, brand: EmailBrand) => build("You are a MAIZ Agents affiliate", {
+  audience: "customer",
+  preheader: "Your referral link and where to see your results.",
+  heading: `Welcome, ${name}`,
+  paragraphs: [
+    "You can now earn commission by introducing small businesses to MAIZ Agents.",
+    `Your referral link: ${referralUrl}`,
+    `What you earn: ${commission}. Commission is paid by hand after a short waiting period, so refunds can be covered first.`,
+    "To see your clicks, signups and earnings, log in with this email address.",
+  ],
+  button: { label: "Open your affiliate page", url: dashboardUrl },
+  fineprint: ["The written programme terms will be sent to you separately."],
+}, brand);
+
+/** The owner paid an affiliate by hand and marked it paid. */
+export const affiliatePaidEmail = (name: string, amount: string, reference: string | undefined, dashboardUrl: string, brand: EmailBrand) => build("Your MAIZ Agents commission has been paid", {
+  audience: "customer",
+  preheader: `${amount} commission has been marked as paid.`,
+  heading: `${amount} commission paid`,
+  paragraphs: [`Hello ${name}, we have marked ${amount} of your commission as paid.`, ...(reference ? [`Reference: ${reference}`] : [])],
+  button: { label: "See your earnings", url: dashboardUrl },
 }, brand);

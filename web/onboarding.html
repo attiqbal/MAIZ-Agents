@@ -92,9 +92,15 @@
           <div class="pw"><input class="input" id="pw" type="password" autocomplete="new-password" aria-describedby="pw-hint" aria-required="true"><button type="button" class="pw-toggle" data-pw-toggle="pw" aria-pressed="false">Show</button></div>
           <span class="hint" id="pw-hint">At least 8 characters. We email you a link to confirm your address. We only use your email to log you in and to reach you about your team.</span>
         </div>
+        <div class="field">
+          <label for="coupon">Have a code? (optional)</label>
+          <input class="input" id="coupon" type="text" autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="32" aria-describedby="coupon-msg">
+          <span class="hint" id="coupon-msg" role="status">Enter a gift or discount code if you were given one.</span>
+        </div>
       </form>
       <p class="err" id="email-err" role="alert" hidden></p>
       <p class="hint" id="email-sent" hidden role="status"></p>
+      <p class="hint" id="agree">By starting your trial you agree to the <a href="/terms.html" target="_blank" rel="noopener">Terms of service</a> and acknowledge the <a href="/privacy.html" target="_blank" rel="noopener">Privacy policy</a>.</p>
       <p class="hint" id="has-account">Already have an account? <a href="/signin.html">Log in</a></p>
       <div class="ob-actions"><button class="btn btn-ghost" data-back>Back</button><button class="btn btn-primary" id="email-go">Start my free week</button></div>
     </div>
@@ -134,6 +140,7 @@
         <li><span class="pdot"></span>Setup form filled in from your answers</li>
       </ul>
       <div class="learn"><b>Next</b><span id="prov-next">Your Admin manager will introduce the team and show you the setup form, already filled in from your answers. Check it, press send, and your team starts work. Each step can be undone.</span></div>
+      <p class="hint" id="prov-coupon" role="status" hidden></p>
       <a class="btn btn-primary btn-block" id="open-app" href="/app.html" hidden>Open my control centre</a>
       <button class="btn btn-primary btn-block" id="prov-retry" type="button" hidden>Try again</button>
     </div>

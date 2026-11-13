@@ -64,7 +64,12 @@ export interface Sink {
   peopleSettings(workspaceId: string, s: PeopleSettings): void;
   /** Platform-level: a person's password hash (never the password), keyed by user id. */
   credential(userId: string, rec: { hash: string; changedAt: string }): void;
+  /** Platform-level: a coupon, redemption, affiliate, referral, commission or payout, replaced on every change. */
+  promo(kind: PromoKind, id: string, data: unknown): void;
 }
+
+export const PROMO_KINDS = ["coupon", "redemption", "affiliate", "referral", "accrual", "payout"] as const;
+export type PromoKind = (typeof PROMO_KINDS)[number];
 
 /** Kinds stored through Sink.record. The database accepts any kind; this list is what load() hands back. */
 export const GENERIC_KINDS = ["order", "rota_staff", "rota_shift", "rota_settings", "recon", "task", "conversation", "notices"] as const;
@@ -103,4 +108,5 @@ export interface Snapshot {
   batchRuns?: BatchRunRecord[];
   records?: GenericRecord[];
   credentials?: { userId: string; hash: string; changedAt: string }[];
+  promoRecords?: { kind: PromoKind; id: string; data: any }[];
 }

@@ -1,3 +1,4 @@
+import { COMPANY as BASE_COMPANY } from "../src/company";
 import { resolve } from "node:path";
 import { readFileSync } from "node:fs";
 import { createHash } from "node:crypto";
@@ -19,7 +20,7 @@ function partials(): Plugin {
           for (const [, k, v] of attrs.matchAll(/(\w+)="([^"]*)"/g)) out = out.replaceAll(`{{${k}}}`, v!);
           return expand(out, depth + 1);
         });
-  return { name: "partials", transformIndexHtml: { order: "pre", handler: (html) => expand(html) } };
+  return { name: "partials", transformIndexHtml: { order: "pre", handler: (html) => companyTokens(expand(html)) } };
 }
 
 
@@ -59,8 +60,30 @@ function industries(): Plugin {
 // Set SITE_URL when building for the real domain (the Dockerfile and Render blueprint pass it in).
 const SITE_URL = (process.env.SITE_URL ?? "http://localhost:5173").replace(/\/+$/, "");
 
+/**
+ * The legal entity behind MAIZ Agents (see ../src/company.ts). The pages, footer and llms.txt read these values.
+ * The contact email is not on any record we hold, so it comes from CONTACT_EMAIL and shows a clearly marked placeholder until set.
+ */
+const COMPANY = {
+  name: BASE_COMPANY.name,
+  number: BASE_COMPANY.number,
+  registeredIn: BASE_COMPANY.registeredIn,
+  incorporated: BASE_COMPANY.incorporated,
+  incorporatedIso: BASE_COMPANY.incorporatedIso,
+  office: BASE_COMPANY.registeredOffice,
+  email: (process.env.CONTACT_EMAIL ?? "").trim() || "[contact email to be added]",
+};
+const companyTokens = (html: string): string =>
+  html
+    .replaceAll("%COMPANY_NAME%", COMPANY.name)
+    .replaceAll("%COMPANY_NUMBER%", COMPANY.number)
+    .replaceAll("%COMPANY_REGISTERED_IN%", COMPANY.registeredIn)
+    .replaceAll("%COMPANY_INCORPORATED%", COMPANY.incorporated)
+    .replaceAll("%REGISTERED_OFFICE%", COMPANY.office)
+    .replaceAll("%CONTACT_EMAIL%", COMPANY.email);
+
 /** Public, indexable pages. App and onboarding pages are noindex and stay out of the sitemap. */
-const INDEXED_PAGES = ["/", "/employees.html", "/how-it-works.html", "/control-centre.html", "/pricing.html", "/security.html", "/faq.html", "/energy.html", "/industries.html"];
+const INDEXED_PAGES = ["/", "/employees.html", "/how-it-works.html", "/control-centre.html", "/pricing.html", "/security.html", "/faq.html", "/energy.html", "/industries.html", "/terms.html", "/privacy.html", "/cookies.html"];
 
 // Optional search-engine verification codes, set at build time (Google Search Console, Bing Webmaster Tools).
 // DNS verification needs neither; these are for the "HTML tag" method.
@@ -118,7 +141,9 @@ function breadcrumbs(html: string, url: string): object | undefined {
 }
 
 const ORG = {
-  "@type": "Organization", "@id": `${SITE_URL}/#org`, name: "MAIZ Agents", url: `${SITE_URL}/`,
+  "@type": "Organization", "@id": `${SITE_URL}/#org`, name: "MAIZ Agents", legalName: COMPANY.name, url: `${SITE_URL}/`,
+  foundingDate: COMPANY.incorporatedIso,
+  identifier: { "@type": "PropertyValue", propertyID: "Companies House company number", value: COMPANY.number },
   logo: { "@type": "ImageObject", url: `${SITE_URL}/logo.png`, width: 512, height: 512 },
   description: "AI employees for small businesses: a Finance, Marketing, HR and Compliance manager and a Business consultant, run by a free Admin manager. You approve before anything goes out.",
 };
@@ -144,7 +169,7 @@ function seo(): Plugin {
     transformIndexHtml: {
       order: "pre",
       handler(html, ctx) {
-        let out = html.replaceAll("%SITE_URL%", SITE_URL);
+        let out = companyTokens(html.replaceAll("%SITE_URL%", SITE_URL));
         const page = "/" + (ctx.filename.split("/").pop() ?? "");
         const path = page === "/index.html" ? "/" : page;
         if (!INDEXED_PAGES.includes(path)) return out;
@@ -218,6 +243,13 @@ function llmsTxt(): string {
 - [Solutions by industry](${u("/industries.html")}): what the team does for each kind of business.
 - [Security and privacy](${u("/security.html")}): what is in place today and what is still to come.
 - [FAQs](${u("/faq.html")}): short answers to common questions.
+- [Terms of service](${u("/terms.html")}): the agreement between a business and ${COMPANY.name}.
+- [Privacy policy](${u("/privacy.html")}): how ${COMPANY.name} uses personal data under UK GDPR.
+- [Cookies](${u("/cookies.html")}): the few cookies and browser storage the site uses.
+
+## Who runs it
+
+- MAIZ Agents is a product of ${COMPANY.name}, a private company limited by shares, registered in ${COMPANY.registeredIn}, company number ${COMPANY.number}, incorporated ${COMPANY.incorporated}.
 `;
 }
 
@@ -240,6 +272,8 @@ export default defineConfig({
         ownerSpecialists: resolve(__dirname, "owner-specialists.html"),
         ownerClients: resolve(__dirname, "owner-clients.html"),
         ownerPrices: resolve(__dirname, "owner-prices.html"),
+        ownerPromotions: resolve(__dirname, "owner-promotions.html"),
+        affiliate: resolve(__dirname, "affiliate.html"),
         ownerAi: resolve(__dirname, "owner-ai.html"),
         employees: resolve(__dirname, "employees.html"),
         pricing: resolve(__dirname, "pricing.html"),
@@ -247,6 +281,9 @@ export default defineConfig({
         howItWorks: resolve(__dirname, "how-it-works.html"),
         controlCentre: resolve(__dirname, "control-centre.html"),
         faq: resolve(__dirname, "faq.html"),
+        terms: resolve(__dirname, "terms.html"),
+        privacy: resolve(__dirname, "privacy.html"),
+        cookies: resolve(__dirname, "cookies.html"),
         energy: resolve(__dirname, "energy.html"),
         industries: resolve(__dirname, "industries.html"),
         notFound: resolve(__dirname, "404.html"),

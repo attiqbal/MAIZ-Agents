@@ -106,7 +106,7 @@ describe("a payment that finishes later, by webhook", () => {
     expect(forged.status).toBe(400);
     expect(((await s.call("GET", "/api/orders", undefined, ann)).body as any).orders[0].status).toBe("pending");
 
-    const hook = provider.signedWebhook({ type: "payment.succeeded", orderId: order.id, providerRef: "x" });
+    const hook = provider.signedWebhook({ type: "payment.succeeded", orderId: order.id, providerRef: s.platform.payments.all().find((o) => o.id === order.id)!.providerRef! });
     expect((await s.call("POST", "/api/payments/webhook", undefined, hook.headers, hook.rawBody)).status).toBe(200);
     expect((await s.call("POST", "/api/payments/webhook", undefined, hook.headers, hook.rawBody)).status).toBe(200); // replay
     expect(((await s.call("GET", "/api/orders", undefined, ann)).body as any).orders[0]).toMatchObject({ status: "paid" });
@@ -146,7 +146,7 @@ describe("a payment that finishes later, by webhook", () => {
 describe("start-up checks", () => {
   it("rejects the mock provider in production and unknown providers anywhere", () => {
     expect(checkEnv({ PAYMENTS_PROVIDER: "mock" })).toEqual([]);
-    expect(checkEnv({ PAYMENTS_PROVIDER: "stripe" }).join()).toContain("not built yet");
+    expect(checkEnv({ PAYMENTS_PROVIDER: "paypal" }).join()).toContain("is not built");
     expect(checkEnv({ NODE_ENV: "production", PAYMENTS_PROVIDER: "mock" }).join()).toContain("must not be used in production");
   });
 });
