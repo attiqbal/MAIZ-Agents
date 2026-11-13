@@ -11,7 +11,7 @@ const stripeLib = new Stripe("sk_test_x");
 const sign = (payload: string) => stripeLib.webhooks.generateTestHeaderString({ payload, secret: SECRET });
 const evt = (id: string, type: string, object: unknown, livemode = false) => JSON.stringify({ id, object: "event", type, livemode, data: { object } });
 
-function fake() {
+function fake(extra: { portalConfiguration?: string } = {}) {
   const calls: any = { sessions: [] as any[], coupons: [] as any[], updates: [] as any[], expired: [] as string[], portal: [] as any[] };
   const client = Object.assign(new Stripe("sk_test_x"), {
     checkout: { sessions: { create: async (p: any) => { calls.sessions.push(p); return { id: "cs_test_1", url: "https://checkout.stripe.test/pay" }; }, expire: async (id: string) => { calls.expired.push(id); } } },
@@ -19,7 +19,7 @@ function fake() {
     subscriptions: { update: async (id: string, p: any) => { calls.updates.push([id, p]); } },
     billingPortal: { sessions: { create: async (p: any) => { calls.portal.push(p); return { url: "https://billing.stripe.test/p" }; } } },
   }) as unknown as Stripe;
-  return { calls, provider: new StripePaymentProvider({ secretKey: "sk_test_x", webhookSecret: SECRET, client }) };
+  return { calls, provider: new StripePaymentProvider({ secretKey: "sk_test_x", webhookSecret: SECRET, client, ...extra }) };
 }
 
 const req = (lines: CheckoutRequest["lines"], extra: Partial<CheckoutRequest> = {}): CheckoutRequest => ({
@@ -42,6 +42,8 @@ describe("Stripe checkout", () => {
     expect(p.line_items[1].price_data.recurring).toBeUndefined();
     expect(p.integration_identifier).toMatch(/^maiz-checkout-[a-z]{8}$/);
     expect(p.automatic_tax).toBeUndefined();
+    // MAIZ AI Ltd is the seller (see Terms). Without this, an account with Managed Payments on by default rejects lines that carry no tax code.
+    expect(p.managed_payments).toEqual({ enabled: false });
   });
 
   it("uses payment mode with an invoice for a cart of one-offs only", async () => {
@@ -70,6 +72,12 @@ describe("Stripe checkout", () => {
     const { provider, calls } = fake();
     expect(await provider.createPortalSession("cus_1", "https://x/back")).toBe("https://billing.stripe.test/p");
     expect(calls.portal[0]).toEqual({ customer: "cus_1", return_url: "https://x/back" });
+  });
+
+  it("opens the portal with MAIZ's own configuration when one is set, so a shared account's default never shows", async () => {
+    const { provider, calls } = fake({ portalConfiguration: "bpc_maiz" });
+    await provider.createPortalSession("cus_1", "https://x/back");
+    expect(calls.portal[0]).toEqual({ customer: "cus_1", return_url: "https://x/back", configuration: "bpc_maiz" });
   });
 });
 

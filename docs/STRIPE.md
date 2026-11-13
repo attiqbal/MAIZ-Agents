@@ -17,6 +17,7 @@ Payments are behind one flag. `PAYMENTS_PROVIDER` empty = checkout refused, noth
 | `PAYMENTS_PROVIDER=stripe` | the feature flag |
 | `STRIPE_SECRET_KEY` | restricted key `rk_test_...` (or `sk_test_...`) |
 | `STRIPE_WEBHOOK_SECRET` | `whsec_...` of the endpoint below |
+| `STRIPE_PORTAL_CONFIGURATION` | `bpc_...` of MAIZ's own customer portal configuration. Set it if the Stripe account is shared with other sites; otherwise customers see the account's default portal |
 | `STRIPE_AUTOMATIC_TAX=1` | only after a tax registration is active |
 | `STRIPE_ALLOW_LIVE=1` | required for live keys; leave unset until go-live |
 | `STRIPE_ALLOW_TEST_IN_PRODUCTION=1` | required to use test keys on the production server (anyone could then "pay" with a test card) |

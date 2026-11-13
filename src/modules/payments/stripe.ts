@@ -12,6 +12,8 @@ export interface StripeOptions {
   webhookSecret: string;
   /** Stripe Tax. Only switch on once the account has an active tax registration, or Stripe collects no tax at all. */
   automaticTax?: boolean;
+  /** Customer portal configuration (bpc_...) to use. Set it when the Stripe account is shared with other sites, or customers see the account default. */
+  portalConfiguration?: string;
   /** Tests hand in a fake. */
   client?: Stripe;
 }
@@ -56,6 +58,8 @@ export class StripePaymentProvider implements PaymentProvider {
       tax_id_collection: { enabled: true },
       ...(this.opts.automaticTax ? { automatic_tax: { enabled: true } } : {}),
       integration_identifier: this.integrationId,
+      // MAIZ AI Ltd is the seller of record (Terms). Stops an account-wide Managed Payments default from rejecting lines with no tax code.
+      managed_payments: { enabled: false },
     };
     const discount = req.discount ? await this.couponFor(req) : undefined;
     const withCodes = discount ? { discounts: [{ coupon: discount }] } : { allow_promotion_codes: true };
@@ -94,7 +98,11 @@ export class StripePaymentProvider implements PaymentProvider {
   }
 
   async createPortalSession(customerRef: string, returnUrl: string): Promise<string> {
-    const s = await this.stripe.billingPortal.sessions.create({ customer: customerRef, return_url: returnUrl });
+    const s = await this.stripe.billingPortal.sessions.create({
+      customer: customerRef,
+      return_url: returnUrl,
+      ...(this.opts.portalConfiguration ? { configuration: this.opts.portalConfiguration } : {}),
+    });
     return s.url;
   }
 

@@ -39,7 +39,7 @@ const platform = createPlatform({
   // The feature flag: unset means checkout is refused and nothing is charged. "mock" (development only) charges nobody.
   payments:
     env.PAYMENTS_PROVIDER === "mock" ? new MockPaymentProvider()
-    : env.PAYMENTS_PROVIDER === "stripe" ? new StripePaymentProvider({ secretKey: env.STRIPE_SECRET_KEY!, webhookSecret: env.STRIPE_WEBHOOK_SECRET!, automaticTax: env.STRIPE_AUTOMATIC_TAX === "1" })
+    : env.PAYMENTS_PROVIDER === "stripe" ? new StripePaymentProvider({ secretKey: env.STRIPE_SECRET_KEY!, webhookSecret: env.STRIPE_WEBHOOK_SECRET!, automaticTax: env.STRIPE_AUTOMATIC_TAX === "1", portalConfiguration: env.STRIPE_PORTAL_CONFIGURATION || undefined })
     : undefined,
 });
 
