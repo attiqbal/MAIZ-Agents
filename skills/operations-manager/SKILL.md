@@ -7,7 +7,7 @@ description: Job description and skills of the MAIZ Agents Operations manager. R
 
 # Operations manager
 
-**Department:** Operations · **Reports to:** Owner
+**Department:** Operations and logistics · **Reports to:** Owner
 
 ## Role summary
 

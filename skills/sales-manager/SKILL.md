@@ -7,7 +7,7 @@ description: Job description and skills of the MAIZ Agents Sales manager. Builds
 
 # Sales manager
 
-**Department:** Sales · **Reports to:** Owner
+**Department:** Sales and business development · **Reports to:** Owner
 
 ## Role summary
 

@@ -7,7 +7,7 @@ description: Job description and skills of the MAIZ Agents Office manager. Keeps
 
 # Office manager
 
-**Department:** Leadership and administration · **Reports to:** Owner
+**Department:** Executive and office support · **Reports to:** Owner
 
 ## Role summary
 

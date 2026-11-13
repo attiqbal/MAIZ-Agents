@@ -7,7 +7,7 @@ description: Job description and skills of the MAIZ Agents PR and communications
 
 # PR and communications manager
 
-**Department:** Marketing · **Reports to:** Owner
+**Department:** PR and communications · **Reports to:** Owner
 
 ## Role summary
 

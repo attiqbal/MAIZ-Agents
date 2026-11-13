@@ -7,7 +7,7 @@ description: Job description and skills of the MAIZ Agents SEO specialist. Gets 
 
 # SEO specialist
 
-**Department:** Marketing · **Reports to:** Owner
+**Department:** Social media and content · **Reports to:** Owner
 
 ## Role summary
 

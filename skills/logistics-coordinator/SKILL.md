@@ -7,7 +7,7 @@ description: Job description and skills of the MAIZ Agents Logistics coordinator
 
 # Logistics coordinator
 
-**Department:** Supply chain and procurement · **Reports to:** Owner
+**Department:** Operations and logistics · **Reports to:** Owner
 
 ## Role summary
 

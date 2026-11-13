@@ -70,6 +70,11 @@ describe("Admin manager's role designer", () => {
       expect(r.legal.length, r.key).toBeGreaterThanOrEqual(2);
       expect(r.records.length, r.key).toBeGreaterThanOrEqual(2);
     }
-    expect(DEPARTMENTS.length).toBeGreaterThanOrEqual(12);
+    expect(DEPARTMENTS.map((d) => d.name)).toEqual([
+      "Creative studio", "Social media and content", "PR and communications", "Sales and business development",
+      "Customer service and reception", "Executive and office support", "Wealth and savings", "Legal and contracts",
+      "Operations and logistics", "Technology and data", "Product and research", "Fundraising and investor relations",
+    ]);
+    for (const k of ["receptionist", "investment-manager", "savings-treasury-manager", "personal-finance-manager"]) expect(keys).toContain(k);
   });
 });

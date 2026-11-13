@@ -7,7 +7,7 @@ description: Job description and skills of the MAIZ Agents Bid and tender writer
 
 # Bid and tender writer
 
-**Department:** Sales · **Reports to:** Owner
+**Department:** Sales and business development · **Reports to:** Owner
 
 ## Role summary
 

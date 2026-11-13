@@ -7,7 +7,7 @@ description: Job description and skills of the MAIZ Agents Payroll specialist. P
 
 # Payroll specialist
 
-**Department:** Finance and accounting · **Reports to:** Owner
+**Department:** Wealth and savings · **Reports to:** Owner
 
 ## Role summary
 

@@ -7,7 +7,7 @@ description: Job description and skills of the MAIZ Agents Community and reviews
 
 # Community and reviews manager
 
-**Department:** Customer service · **Reports to:** Owner
+**Department:** Customer service and reception · **Reports to:** Owner
 
 ## Role summary
 

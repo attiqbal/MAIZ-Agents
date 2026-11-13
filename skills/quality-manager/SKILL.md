@@ -7,7 +7,7 @@ description: Job description and skills of the MAIZ Agents Quality manager. Make
 
 # Quality manager
 
-**Department:** Operations · **Reports to:** Owner
+**Department:** Operations and logistics · **Reports to:** Owner
 
 ## Role summary
 
