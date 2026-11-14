@@ -179,6 +179,15 @@ describe("slack", () => {
     // An install link works once: replaying it cannot connect another Slack workspace to this organisation.
     expect((await call("GET", "/api/slack/callback", undefined, {}, `code=abc&state=${state}`)).status).toBe(400);
   });
+  it("returns to the first-day conversation when the install started there, and to the team page otherwise", async () => {
+    const { call, auth } = await signedUp();
+    const from = async (q: string) => {
+      const { url } = (await call("GET", "/api/slack/install", undefined, auth, q)).body as any;
+      return (await call("GET", "/api/slack/callback", undefined, {}, `code=abc&state=${new URL(url).searchParams.get("state")}`)).headers?.location;
+    };
+    expect(await from("returnTo=firstday")).toBe("/app.html#firstday");
+    expect(await from("returnTo=https://evil.test")).toBe("/app.html#team");
+  });
   it("answers Slack events only when signed, and replies in the chat afterwards", async () => {
     const { call, auth, calls, clock } = await signedUp();
     const { url } = (await call("GET", "/api/slack/install", undefined, auth)).body as any;

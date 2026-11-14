@@ -42,6 +42,7 @@ function route(): void {
   const valid = screens.some((s) => s.dataset.screen === key) ? key : "home";
   if (valid === "desk") showDesk(sub);
   if (valid === "chat") void showChat(sub);
+  if (valid === "firstday") void import("./firstday").then((m) => m.showFirstDay());
   if (valid === "apps") void import("./apps").then((m) => m.setAppsView(sub));
   if (valid === "slack") void import("./apps").then((m) => m.initSlackTab(Boolean(profile.slack)));
   screens.forEach((s) => s.toggleAttribute("hidden", s.dataset.screen !== valid));
@@ -66,7 +67,7 @@ let storeReady = false;
 function openStoreIfShown(): void {
   if (storeReady || location.hash !== "#store") return;
   storeReady = true;
-  void import("./store").then((m) => m.initStore({ onPaid: () => { void loadOrg(); } }));
+  void import("./store").then((m) => m.initStore({ onPaid: () => { void loadOrg(); void meetNewHires(); } }));
 }
 window.addEventListener("hashchange", openStoreIfShown);
 openStoreIfShown();
@@ -161,6 +162,13 @@ function showTrial(endsAt: string | undefined): void {
 }
 
 const LOCAL_PREVIEW = ["localhost", "127.0.0.1"].includes(location.hostname);
+
+/** Someone just joined the team: take the owner to meet them, as people, instead of a bare "paid" message. */
+async function meetNewHires(): Promise<void> {
+  const { introduceNewHires } = await import("./firstday");
+  if (await introduceNewHires()) location.hash = "#firstday";
+}
+if (new URLSearchParams(location.search).has("order")) void meetNewHires();
 
 async function loadOrg(): Promise<void> {
   // The control centre is for signed-in customers only; there is no public demo. Logged-out visitors
