@@ -110,6 +110,8 @@ export async function metaClientRoute(req: Req, userId: string, c: MetaRouteCtx)
     const state = c.makeToken({ k: "meta-oauth", u: userId, w: ws, a: kind, n: nonce }, STATE_SECONDS);
     return { status: 200, body: { url: svc.authorizeUrl(userId, ws, kind, state, redirectUri(p)) }, headers: { "set-cookie": cookie(nonce, STATE_SECONDS, p.cfg.appUrl) } };
   }
+  const pend = /^\/api\/meta\/pending\/([0-9a-f]{20,64})$/.exec(path);
+  if (method === "GET" && pend) return json(200, await run(() => svc.pendingChoices(userId, ws, pend[1]!)));
   if (method === "POST" && path === "/api/meta/choose") {
     const b = c.body();
     return json(201, { connection: await run(() => svc.choose(userId, ws, String(b.pendingId ?? ""), Number(b.index))) });

@@ -406,3 +406,11 @@ describe("configuration", () => {
     }
   });
 });
+
+describe("App Review pack", () => {
+  it("docs/META-APP-REVIEW.md is up to date with the permission list (run npm run docs:meta)", async () => {
+    const { readFileSync } = await import("node:fs");
+    const { metaReviewDoc } = await import("../src/modules/meta-clients/review-doc.js");
+    expect(readFileSync(new URL("../docs/META-APP-REVIEW.md", import.meta.url), "utf8")).toBe(metaReviewDoc());
+  });
+});

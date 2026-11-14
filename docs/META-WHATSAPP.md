@@ -1,5 +1,7 @@
 # Facebook, Instagram and WhatsApp for the promotion agent
 
+> Clients connecting their own accounts (Tech Provider app): see [META-SERVICE-PROVIDER.md](META-SERVICE-PROVIDER.md).
+
 Owner only. Code: `src/modules/meta` (Graph API), `src/modules/whatsapp` (Cloud API and the owner bot), `PromoterService.publishToMeta`. Tests: `test/meta-whatsapp.test.ts`.
 
 ## What it does

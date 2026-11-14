@@ -126,6 +126,18 @@ export class MetaClientService {
     return { pendingId: id, choices: found.assets.map((a, i) => ({ index: i, name: a.name, handle: a.handle })), missing, simulated: this.mode === "sandbox" };
   }
 
+  /** What the person can choose from a login that just came back (names only, never tokens). */
+  pendingChoices(userId: string, ws: string, pendingId: string) {
+    this.need(userId, ws, "approval.decide");
+    const p = this.pending.get(pendingId);
+    if (!p || p.exp < this.now().getTime() || p.workspaceId !== ws || p.userId !== userId) throw new MetaClientError("That choice has expired. Start the connection again.");
+    const granted = new Set(p.scopes);
+    return {
+      choices: p.assets.map((a, i) => ({ index: i, name: a.name, handle: a.handle })),
+      missing: this.mode === "live" ? permissionsFor(p.kind).filter((x) => !granted.has(x.key)).map((x) => ({ key: x.key, plain: x.plain })) : [],
+    };
+  }
+
   /** The person picked one of the accounts. Now (and only now) it is connected and its token stored. */
   async choose(userId: string, ws: string, pendingId: string, index: number): Promise<ReturnType<typeof connectionView>> {
     this.need(userId, ws, "approval.decide");

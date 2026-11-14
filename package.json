@@ -16,7 +16,8 @@
     "skills": "tsx scripts/build-skills.ts",
     "stress": "rm -f test/stress/out/report.json && vitest run --config vitest.stress.config.ts",
     "stress:db": "bash db/with-postgres.sh npx vitest run --config vitest.stress.config.ts test/stress/postgres.stress.ts",
-    "emails:preview": "tsx scripts/preview-emails.ts"
+    "emails:preview": "tsx scripts/preview-emails.ts",
+    "docs:meta": "tsx scripts/build-meta-docs.ts"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
