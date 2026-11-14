@@ -4,18 +4,19 @@ import { initMotion } from "./motion";
 
 export function initNav(): void {
   initMotion();
-  // Mark the page we are on, and turn "Sign up / Sign in" into "Dashboard" for a signed-in visitor.
+  // Mark the page we are on, and swap "Sign up / Sign in" for "Dashboard" for a signed-in visitor.
   const here = location.pathname.replace(/\/index\.html$/, "/");
   document.querySelectorAll<HTMLAnchorElement>(".nav-links a, .mobile-menu a").forEach((a) => {
     const target = new URL(a.href, location.origin);
     if (!target.hash && target.pathname === here) a.setAttribute("aria-current", "page");
   });
   if (getToken()) {
-    const links = document.querySelectorAll<HTMLAnchorElement>("[data-account-link]");
-    links.forEach((a) => { a.href = "/app.html"; a.textContent = "Dashboard"; });
-    // The platform owner's Dashboard opens the owner admin; a client's opens their control centre.
+    // Logged in: hide Sign up / Sign in and show a Dashboard link (owner admin for the platform owner, control centre for clients).
+    document.querySelectorAll<HTMLElement>("[data-signin-link]").forEach((a) => { a.hidden = true; });
+    const links = document.querySelectorAll<HTMLAnchorElement>("[data-dashboard-link]");
+    links.forEach((a) => { a.hidden = false; });
     void api<{ platformOwner?: boolean }>("/me").then((r) => {
-      if (r.data?.platformOwner) links.forEach((a) => { a.href = "/owner-decisions.html"; a.textContent = "Dashboard"; });
+      if (r.data?.platformOwner) links.forEach((a) => { a.href = "/owner-decisions.html"; });
     });
   }
   const nav = document.querySelector<HTMLElement>(".nav");
