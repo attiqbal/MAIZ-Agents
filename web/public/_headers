@@ -18,3 +18,13 @@
 /staff-form.html
   Referrer-Policy: no-referrer
   Cache-Control: no-store
+
+# The WhatsApp signup window is Meta's own script and frame. Only this page may load them.
+/connect-social.html
+  Content-Security-Policy: default-src 'self'; script-src 'self' https://connect.facebook.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: https://www.facebook.com; connect-src 'self' https://www.facebook.com https://graph.facebook.com; frame-src https://www.facebook.com https://web.facebook.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'
+  Referrer-Policy: no-referrer
+  Cache-Control: no-store
+
+/sandbox-meta.html
+  Referrer-Policy: no-referrer
+  Cache-Control: no-store

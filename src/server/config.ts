@@ -32,7 +32,7 @@ export function checkEnv(env: Record<string, string | undefined>): string[] {
   if (production && env.PAYMENTS_PROVIDER === "mock") problems.push("PAYMENTS_PROVIDER=mock must not be used in production: it hands out paid items for free");
   if (env.PAYMENTS_PROVIDER === "stripe") problems.push(...stripeEnvProblems(env, production));
 
-  problems.push(...metaEnvProblems(env));
+  problems.push(...metaEnvProblems(env), ...metaClientEnvProblems(env));
   const owners = (env.PLATFORM_OWNER_EMAILS ?? "").split(",").map((e) => e.trim()).filter(Boolean);
   if (owners.some((e) => !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e))) problems.push("PLATFORM_OWNER_EMAILS must be a comma-separated list of email addresses");
 
@@ -112,4 +112,44 @@ export function whatsappFromEnv(env: Record<string, string | undefined>): import
   const owner = (env.WHATSAPP_OWNER_NUMBER ?? "").replace(/[\s()+.-]/g, "");
   if (!env.WHATSAPP_ACCESS_TOKEN || !env.WHATSAPP_PHONE_NUMBER_ID || !env.META_APP_SECRET || !env.WHATSAPP_VERIFY_TOKEN || !/^\d{8,15}$/.test(owner)) return undefined;
   return { accessToken: env.WHATSAPP_ACCESS_TOKEN, phoneNumberId: env.WHATSAPP_PHONE_NUMBER_ID, appSecret: env.META_APP_SECRET, verifyToken: env.WHATSAPP_VERIFY_TOKEN, ownerNumber: owner, alertTemplate: { name: env.WHATSAPP_ALERT_TEMPLATE || "maiz_owner_alert", language: env.WHATSAPP_TEMPLATE_LANGUAGE || "en_GB" }, version: env.META_GRAPH_VERSION || undefined };
+}
+
+/** Settings for connecting clients' own Facebook, Instagram and WhatsApp accounts (the Meta app MAIZ applied for as a Tech Provider). */
+export interface MetaClientSettings {
+  /** sandbox = simulated end to end. live = the real Graph API (works for app roles in Development mode, for everyone once approved). */
+  mode: "sandbox" | "live";
+  appId?: string;
+  appSecret?: string;
+  /** Facebook Login for Business configuration (holds the permissions). Optional: without it the scopes are sent directly. */
+  loginConfigId?: string;
+  /** WhatsApp Embedded Signup configuration id. */
+  whatsappConfigId?: string;
+  verifyToken?: string;
+  template: { name: string; language: string };
+  version?: string;
+}
+
+export function metaClientEnvProblems(env: Record<string, string | undefined>): string[] {
+  const out: string[] = [];
+  if (env.META_MODE && env.META_MODE !== "sandbox" && env.META_MODE !== "live") out.push("META_MODE must be sandbox or live");
+  if (env.META_MODE === "live") {
+    for (const k of ["META_APP_ID", "META_APP_SECRET", "META_WEBHOOK_VERIFY_TOKEN"]) if (!env[k]) out.push(`META_MODE=live needs ${k}`);
+    if (!env.APP_URL?.startsWith("https://")) out.push("META_MODE=live needs APP_URL to be an https address (Meta only calls back to https)");
+  }
+  if (env.META_APP_ID && !/^\d{5,25}$/.test(env.META_APP_ID)) out.push("META_APP_ID must be the numeric app id");
+  if (env.META_WEBHOOK_VERIFY_TOKEN && env.META_WEBHOOK_VERIFY_TOKEN.length < 16) out.push("META_WEBHOOK_VERIFY_TOKEN must be at least 16 characters");
+  return out;
+}
+
+/** Always returns settings: sandbox unless META_MODE=live (so a missing Meta approval never breaks the product). */
+export function metaClientsFromEnv(env: Record<string, string | undefined>): MetaClientSettings {
+  const live = env.META_MODE === "live" && !!env.META_APP_ID && !!env.META_APP_SECRET;
+  return {
+    mode: live ? "live" : "sandbox",
+    appId: env.META_APP_ID || undefined, appSecret: env.META_APP_SECRET || undefined,
+    loginConfigId: env.META_LOGIN_CONFIG_ID || undefined, whatsappConfigId: env.META_WHATSAPP_CONFIG_ID || undefined,
+    verifyToken: env.META_WEBHOOK_VERIFY_TOKEN || undefined,
+    template: { name: env.META_CLIENT_APPROVAL_TEMPLATE || "maiz_client_approval", language: env.WHATSAPP_TEMPLATE_LANGUAGE || "en_GB" },
+    version: env.META_GRAPH_VERSION || undefined,
+  };
 }

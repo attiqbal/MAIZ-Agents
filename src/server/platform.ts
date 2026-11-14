@@ -43,6 +43,8 @@ import { AffiliateService, CouponService } from "../modules/promotions/index.js"
 import { PromoterService } from "../modules/promoter/index.js";
 import { GrowthService } from "../modules/growth/index.js";
 import { MetaGraph, type MetaConfig } from "../modules/meta/index.js";
+import { LiveProvider, MetaClientService, SandboxProvider } from "../modules/meta-clients/index.js";
+import type { MetaClientSettings } from "./config.js";
 import { OwnerWhatsApp, WhatsAppCloud, type WhatsAppConfig } from "../modules/whatsapp/index.js";
 import { COMPANY } from "../company.js";
 import { CredentialStore } from "../modules/credentials/index.js";
@@ -80,6 +82,8 @@ export interface PlatformConfig {
   meta?: MetaConfig;
   /** The owner's WhatsApp line to the promotion agent. From environment variables. */
   whatsapp?: WhatsAppConfig;
+  /** Clients' own Facebook, Instagram and WhatsApp accounts. Leave out for sandbox mode. */
+  metaClients?: MetaClientSettings;
   now?: () => Date;
   http?: typeof fetch;
 }
@@ -186,6 +190,19 @@ export function createPlatform(cfg: PlatformConfig) {
     unsubscribeUrl: (token) => `${base}/unsubscribe.html#t=${encodeURIComponent(token)}`,
     sender: { name: COMPANY.name, address: COMPANY.registeredOffice },
     notifyOwner: () => { decisionDigest.poke(); void ownerWhatsApp?.notifyWaiting(); },
+  });
+  /**
+   * Clients' own Facebook Pages, Instagram accounts and WhatsApp numbers, connected through the Meta app MAIZ applied for as a
+   * Tech Provider. Sandbox (simulated, the default) and live differ only in the provider; everything else is the same code.
+   */
+  const metaSettings: MetaClientSettings = cfg.metaClients ?? { mode: "sandbox", template: { name: "maiz_client_approval", language: "en_GB" } };
+  const metaProvider = metaSettings.mode === "live" && metaSettings.appId && metaSettings.appSecret
+    ? new LiveProvider({ appId: metaSettings.appId, appSecret: metaSettings.appSecret, loginConfigId: metaSettings.loginConfigId, version: metaSettings.version }, cfg.http)
+    : new SandboxProvider(now);
+  const metaClients = new MetaClientService({
+    provider: metaProvider, appSecret: metaSettings.appSecret, template: metaSettings.template, now, audit,
+    deletionStatusUrl: (code) => `${base}/data-deletion.html?code=${encodeURIComponent(code)}`,
+    access: { can: (u, w, perm) => identity.can(u, w, perm) },
   });
   const firstOwner = [...ownerIdSet][0];
   if (cfg.whatsapp && firstOwner) ownerWhatsApp = new OwnerWhatsApp(new WhatsAppCloud(cfg.whatsapp, cfg.http), promoter, { ownerUserId: firstOwner, now });
@@ -451,13 +468,17 @@ export function createPlatform(cfg: PlatformConfig) {
     for (const l of s.links) router.restoreLink(l.key, l.userId);
     for (const t of s.slackTokens) slackTokens.set(t.team, t.token);
     for (const c of s.integrations ?? []) integrations.restoreConnection(c);
-    for (const x of s.integrationSecrets ?? []) integrations.restoreSecret(x.connectionId, x.secret);
+    for (const x of s.integrationSecrets ?? []) {
+      if (x.connectionId.startsWith("meta:")) metaClients.restoreSecret(x.connectionId, x.secret);
+      else integrations.restoreSecret(x.connectionId, x.secret);
+    }
     for (const r of s.integrationRecords ?? []) integrations.restoreRecord(r);
     for (const r of s.reviews ?? []) reviews.restore(r);
     for (const c of s.priceChanges ?? []) prices.restore(c);
     for (const r of s.specialistRequests ?? []) specialists.restore(r);
     for (const x of s.records ?? []) {
-      if (x.kind === "conversation") conversations.restore(x.data);
+      if (x.kind === "meta_conn" || x.kind === "meta_post" || x.kind === "meta_limits") metaClients.restore(x.kind, x.data);
+      else if (x.kind === "conversation") conversations.restore(x.data);
       else if (x.kind === "notices") notices.restore(x.data);
       else if (x.kind === "order") payments.restore(x.data);
       else if (x.kind === "recon") reconciliation.restore(x.data);
@@ -477,13 +498,14 @@ export function createPlatform(cfg: PlatformConfig) {
     for (const x of s.promoRecords ?? []) {
       if (x.kind === "coupon") coupons.restoreCoupon(x.data);
       else if (x.kind === "redemption") coupons.restoreRedemption(x.data);
+      else if (x.kind === "meta_review" || x.kind === "meta_deletion") metaClients.restorePlatform(x.kind, x.data);
       else if (x.kind === "channel") ownerWhatsApp?.restore(x.data);
       else if (["campaign", "draft", "lead", "optout", "fact"].includes(x.kind)) promoter.restore(x.kind, x.data);
       else if (["opportunity", "post", "publication", "account", "approval"].includes(x.kind)) growth.restore(x.kind, x.data);
       else affiliates.restore(x.kind, x.data);
     }
     sink = store;
-    for (const part of [audit, identity, energy, workforce, ledger, router, admin, integrations, reviews, prices, specialists, aiSettings, spend, batch, payments, rota, reconciliation, people, conversations, notices, credentials, coupons, affiliates, promoter, growth]) part.useSink(store);
+    for (const part of [audit, identity, energy, workforce, ledger, router, admin, integrations, reviews, prices, specialists, aiSettings, spend, batch, payments, rota, reconciliation, people, conversations, notices, credentials, coupons, affiliates, promoter, growth, metaClients]) part.useSink(store);
     ownerWhatsApp?.useSink(store);
   }
 
@@ -506,6 +528,6 @@ export function createPlatform(cfg: PlatformConfig) {
   const codeFails = new SendLog(15 * 60_000);
   /** Starts a sleeping RunPod worker for a client who just opened the app or started typing. */
   const warm = () => routing?.warm() ?? "skipped";
-  return { conversations, notices, warm, ownerDecisions, decisionDigest, dashboard, reconciliation, rota, people, payments, batch, email, usedLinks, sends, loginFails, resets, credentials, formHits, codeFails, coupons, affiliates, promoter, growth, ownerWhatsApp, admin, reviews, prices, specialists, ai, clients, isPlatformOwner, healthy, cfg, now, audit, bus, identity, energy, workforce, ledger, onboarding, router, integrations, slackTokens, saveSlackToken, attachStore };
+  return { conversations, notices, warm, ownerDecisions, decisionDigest, dashboard, reconciliation, rota, people, payments, batch, email, usedLinks, sends, loginFails, resets, credentials, formHits, codeFails, coupons, affiliates, promoter, growth, ownerWhatsApp, metaClients, metaSettings, admin, reviews, prices, specialists, ai, clients, isPlatformOwner, healthy, cfg, now, audit, bus, identity, energy, workforce, ledger, onboarding, router, integrations, slackTokens, saveSlackToken, attachStore };
 }
 export type Platform = ReturnType<typeof createPlatform>;
