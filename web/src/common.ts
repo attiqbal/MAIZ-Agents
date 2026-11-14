@@ -4,7 +4,7 @@ import { initMotion } from "./motion";
 
 export function initNav(): void {
   initMotion();
-  // Mark the page we are on, and turn "Log in" into "Open control centre" for a signed-in visitor.
+  // Mark the page we are on, and turn "Sign up / Sign in" into "Dashboard" for a signed-in visitor.
   const here = location.pathname.replace(/\/index\.html$/, "/");
   document.querySelectorAll<HTMLAnchorElement>(".nav-links a, .mobile-menu a").forEach((a) => {
     const target = new URL(a.href, location.origin);
@@ -12,10 +12,10 @@ export function initNav(): void {
   });
   if (getToken()) {
     const links = document.querySelectorAll<HTMLAnchorElement>("[data-account-link]");
-    links.forEach((a) => { a.href = "/app.html"; a.textContent = "Open control centre"; });
-    // The platform owner gets a clear way into the owner admin from every public page.
+    links.forEach((a) => { a.href = "/app.html"; a.textContent = "Dashboard"; });
+    // The platform owner's Dashboard opens the owner admin; a client's opens their control centre.
     void api<{ platformOwner?: boolean }>("/me").then((r) => {
-      if (r.data?.platformOwner) links.forEach((a) => { a.href = "/owner-decisions.html"; a.textContent = "Owner admin"; });
+      if (r.data?.platformOwner) links.forEach((a) => { a.href = "/owner-decisions.html"; a.textContent = "Dashboard"; });
     });
   }
   const nav = document.querySelector<HTMLElement>(".nav");
