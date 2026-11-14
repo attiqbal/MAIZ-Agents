@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+<head>
+<!--@include head title="Promotion agent · MAIZ Agents" description="The platform owner's promotion agent for Mock Test Room, Examutor and MAIZ Agents."-->
+<meta name="robots" content="noindex">
+</head>
+<body>
+<div class="page-top">
+  <!--@include owner-header-->
+  <main id="main">
+    <section class="section">
+      <div class="container" style="max-width:1180px">
+        <!--@include owner-nav-->
+        <div class="rv-head">
+          <div><h1>Promotion agent</h1>
+            <p class="sub">Plans campaigns and writes the outreach for Mock Test Room, Examutor and MAIZ Agents. It drafts; you decide. Nothing is sent, posted or spent until you approve it here.</p></div>
+          <span class="badge badge-dark" id="ow-eg" hidden>Example data</span>
+        </div>
+        <div class="ob-panel" id="ow-gate" hidden aria-live="polite"><h2 id="ow-gate-h" style="font-size:1.25rem;margin:0 0 6px"></h2><p id="ow-gate-p" class="sub" style="margin:0 0 14px"></p><a class="btn btn-primary" id="ow-gate-a" href="/signin.html">Log in</a></div>
+        <div id="ow-body">
+          <div class="ow-stack">
+            <div class="learn"><b>The rules it follows.</b>Email goes to one named person at a time, only to people who agreed, existing customers, or company contacts with a stated reason. No bought or scraped lists. Every email carries who you are, your address and an unsubscribe link. At most two follow-ups, five days apart, and 20 first-contact business emails a day. Posts, articles and ads are drafts you publish yourself.</div>
+
+            <section class="panel" aria-labelledby="dr-h"><div class="panel-h"><h2 id="dr-h">Waiting for your approval</h2><span class="r" id="dr-count"></span></div>
+              <div id="dr-list" class="ow-stack"></div></section>
+
+            <section class="panel" aria-labelledby="nd-h"><div class="panel-h"><h2 id="nd-h">Write a new draft</h2></div>
+              <form class="ow-stack" id="nd-form" novalidate>
+                <div class="ow-grid">
+                  <div class="field"><label for="nd-site">Website</label><select class="input" id="nd-site"></select></div>
+                  <div class="field"><label for="nd-channel">Channel</label><select class="input" id="nd-channel">
+                    <option value="social">Social post</option><option value="content">Article or guide</option><option value="email">Email to one person on your list</option><option value="partnership">Partner pitch</option><option value="affiliate">Affiliate invitation</option><option value="seo">Search engine fix</option><option value="community">Forum or group answer</option><option value="paid_ads">Ad copy (needs an approved campaign)</option></select></div>
+                  <div class="field"><label for="nd-campaign">Campaign (optional)</label><select class="input" id="nd-campaign"></select></div>
+                  <div class="field" id="nd-lead-f" hidden><label for="nd-lead">Send to</label><select class="input" id="nd-lead"></select></div>
+                  <div class="field" id="nd-step-f" hidden><label for="nd-step">Which email</label><select class="input" id="nd-step"><option value="0">First email</option><option value="1">Follow-up 1</option><option value="2">Follow-up 2</option></select></div>
+                  <div class="field" style="grid-column:1/-1"><label for="nd-brief">What should it say? (optional)</label><input class="input" id="nd-brief" maxlength="600" placeholder="For example: a study tip about SAT timing, ending with the free practice test"></div>
+                </div>
+                <div class="acts"><button class="btn btn-primary" type="submit" id="nd-go">Write draft</button><span class="muted small" id="nd-msg" role="status"></span></div>
+              </form></section>
+
+            <section class="panel" aria-labelledby="cm-h"><div class="panel-h"><h2 id="cm-h">Campaigns</h2><span class="r" id="cm-count"></span></div>
+              <form class="ow-stack" id="cm-form" novalidate>
+                <div class="ow-grid">
+                  <div class="field"><label for="cm-site">Website</label><select class="input" id="cm-site"></select></div>
+                  <div class="field"><label for="cm-goal">Goal</label><input class="input" id="cm-goal" maxlength="300" placeholder="More Digital SAT sign-ups"></div>
+                  <div class="field"><label for="cm-budget">Budget (£)</label><input class="input" id="cm-budget" type="number" min="0" step="1" inputmode="decimal" value="0"><span class="hint">£0 plans free channels only. Ads are planned from £150.</span></div>
+                  <div class="field"><label for="cm-weeks">Weeks</label><input class="input" id="cm-weeks" type="number" min="1" max="26" step="1" inputmode="numeric" value="8"></div>
+                  <div class="field"><label for="cm-start">Starts on</label><input class="input" id="cm-start" type="date"></div>
+                </div>
+                <div class="acts"><button class="btn btn-primary" type="submit">Plan campaign</button><span class="muted small" id="cm-msg" role="status"></span></div>
+              </form>
+              <div id="cm-list" class="ow-stack"></div></section>
+
+            <section class="panel" aria-labelledby="ld-h"><div class="panel-h"><h2 id="ld-h">People you may email</h2><span class="r" id="ld-count"></span></div>
+              <p class="muted small">Add people one at a time and say why you may email them. Bought, scraped or harvested contacts are refused. Sole traders count as individuals, so they need consent.</p>
+              <form class="ow-stack" id="ld-form" novalidate>
+                <div class="ow-grid">
+                  <div class="field"><label for="ld-site">Website</label><select class="input" id="ld-site"></select></div>
+                  <div class="field"><label for="ld-email">Email</label><input class="input" id="ld-email" type="email" autocomplete="off"></div>
+                  <div class="field"><label for="ld-name">Name (optional)</label><input class="input" id="ld-name" maxlength="80" autocomplete="off"></div>
+                  <div class="field"><label for="ld-company">Company (optional)</label><input class="input" id="ld-company" maxlength="120" autocomplete="off"></div>
+                  <div class="field"><label for="ld-kind">They are</label><select class="input" id="ld-kind"><option value="business">A company contact</option><option value="individual">An individual (or sole trader)</option></select></div>
+                  <div class="field"><label for="ld-basis">Why you may email them</label><select class="input" id="ld-basis"><option value="consent">They asked to hear from us</option><option value="soft_opt_in">Existing customer, similar product</option><option value="b2b_legitimate_interest">Company contact, relevant to their job</option><option value="existing_contact">They wrote to us first</option></select></div>
+                  <div class="field"><label for="ld-source">Where the contact came from</label><input class="input" id="ld-source" maxlength="200" placeholder="Met at an event, signed up on the site…"></div>
+                  <div class="field"><label for="ld-rel">Why it matters to them (company contacts)</label><input class="input" id="ld-rel" maxlength="300"></div>
+                </div>
+                <div class="acts"><button class="btn btn-primary" type="submit">Add person</button><span class="muted small" id="ld-msg" role="status"></span></div>
+              </form>
+              <div class="tbl-wrap" tabindex="0" role="region" aria-label="People you may email, scrolls sideways on small screens"><table class="tbl" id="ld-table"></table></div></section>
+
+            <section class="panel" aria-labelledby="kb-h"><div class="panel-h"><h2 id="kb-h">What the agent knows</h2></div>
+              <p class="muted small">Researched from the live sites on 14 November 2026. Anything marked "Confirm" could not be read from outside, so drafts will not state it until you confirm it below.</p>
+              <div id="kb-list" class="ow-stack"></div>
+              <form class="ow-stack" id="kb-form" novalidate>
+                <div class="ow-grid">
+                  <div class="field"><label for="kb-site">Website</label><select class="input" id="kb-site"></select></div>
+                  <div class="field" style="grid-column:span 2"><label for="kb-text">Add or confirm a fact</label><input class="input" id="kb-text" maxlength="400" placeholder="For example: Mock Test Room packages start at £…"></div>
+                </div>
+                <div class="acts"><button class="btn btn-primary" type="submit">Save fact</button><span class="muted small" id="kb-msg" role="status"></span></div>
+              </form></section>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+<!--@include footer-->
+<script type="module" src="/src/owner-promoter.ts"></script>
+</body>
+</html>

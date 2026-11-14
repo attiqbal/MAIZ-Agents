@@ -68,7 +68,7 @@ export interface Sink {
   promo(kind: PromoKind, id: string, data: unknown): void;
 }
 
-export const PROMO_KINDS = ["coupon", "redemption", "affiliate", "referral", "accrual", "payout"] as const;
+export const PROMO_KINDS = ["coupon", "redemption", "affiliate", "referral", "accrual", "payout", "campaign", "draft", "lead", "optout", "fact"] as const;
 export type PromoKind = (typeof PROMO_KINDS)[number];
 
 /** Kinds stored through Sink.record. The database accepts any kind; this list is what load() hands back. */

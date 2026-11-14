@@ -3,7 +3,7 @@
  * says how many are open, with a button to a page listing all of them, not one email per request.
  */
 export interface OpenDecision {
-  kind: "review" | "specialist";
+  kind: "review" | "specialist" | "promotion";
   id: string;
   title: string;
   clientName: string;
@@ -15,6 +15,8 @@ export interface OpenDecision {
 export interface DecisionSources {
   reviews: { id: string; status: string; clientName: string; ageHours: number; proposal: { title: string } }[];
   specialists: { id: string; status: string; clientName: string; submittedAt: string; role: { title: string } }[];
+  /** Promotion drafts and campaign plans waiting for the owner (optional so older callers still work). */
+  promotions?: { drafts: { id: string; title: string; site: string; createdAt: string }[]; plans: { id: string; name: string; site: string; createdAt: string }[] };
 }
 
 export function openDecisions(src: DecisionSources, nowMs: number): OpenDecision[] {
@@ -24,7 +26,12 @@ export function openDecisions(src: DecisionSources, nowMs: number): OpenDecision
   const specialists = src.specialists
     .filter((r) => r.status === "in_review")
     .map((r): OpenDecision => ({ kind: "specialist", id: r.id, title: r.role.title, clientName: r.clientName, ageHours: Math.max(0, Math.floor((nowMs - Date.parse(r.submittedAt)) / 3_600_000)), link: `/owner-specialists.html#${r.id}` }));
-  return [...reviews, ...specialists].sort((a, b) => b.ageHours - a.ageHours);
+  const hours = (iso: string) => Math.max(0, Math.floor((nowMs - Date.parse(iso)) / 3_600_000));
+  const promos: OpenDecision[] = [
+    ...(src.promotions?.drafts ?? []).map((d): OpenDecision => ({ kind: "promotion", id: d.id, title: d.title, clientName: `Promotion draft (${d.site})`, ageHours: hours(d.createdAt), link: `/owner-promoter.html#${d.id}` })),
+    ...(src.promotions?.plans ?? []).map((c): OpenDecision => ({ kind: "promotion", id: c.id, title: c.name, clientName: `Campaign plan (${c.site})`, ageHours: hours(c.createdAt), link: `/owner-promoter.html#${c.id}` })),
+  ];
+  return [...reviews, ...specialists, ...promos].sort((a, b) => b.ageHours - a.ageHours);
 }
 
 export interface DigestOptions {
