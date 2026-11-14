@@ -1,6 +1,6 @@
 // Promotion agent (owner-promoter.html): the platform owner's workbench for promoting the three websites.
 // Everything the agent writes lands in "Waiting for your approval". Emails go out one person at a time from
-// here after approval; posts, articles and ads are published by hand and then marked as posted.
+// here after approval; posts go to Facebook or Instagram from here when connected (otherwise by hand, then marked posted).
 import "./styles.css";
 import { api } from "./api";
 import { initNav, toast } from "./common";
@@ -27,6 +27,7 @@ const optionsOf = (names: Record<string, string>) => Object.entries(names).map((
 
 let data: Overview;
 let live = false;
+let channels = { facebook: false, instagram: false };
 
 const DEMO: Overview = {
   campaigns: [], drafts: [], leads: [], followUpsDue: [],
@@ -58,7 +59,13 @@ function draftCard(d: Draft): string {
     : d.status === "approved"
       ? (d.channel === "email"
         ? `<button type="button" class="btn btn-primary btn-sm" data-act="send" data-id="${esc(d.id)}">Send email now</button><button type="button" class="btn btn-quiet btn-sm" data-act="preview" data-id="${esc(d.id)}">Preview with footer</button>`
-        : `<input class="input" data-url="${esc(d.id)}" placeholder="Link to the published post (optional)" aria-label="Link to the published post for ${esc(d.title)}" style="min-width:220px"><button type="button" class="btn btn-primary btn-sm" data-act="posted" data-id="${esc(d.id)}">I published it</button>`)
+        : (d.channel === "social" || d.channel === "community") && (channels.facebook || channels.instagram)
+          ? `<select class="input" data-target="${esc(d.id)}" aria-label="Where to publish ${esc(d.title)}">${channels.facebook ? `<option value="facebook">Facebook Page</option>` : ""}${channels.instagram ? `<option value="instagram">Instagram</option>` : ""}</select>
+             <input class="input" data-image="${esc(d.id)}" placeholder="Image link (https://, needed for Instagram)" aria-label="Image link for ${esc(d.title)}" style="min-width:220px">
+             <label class="small">Schedule (Facebook only, optional) <input class="input" type="datetime-local" data-when="${esc(d.id)}"></label>
+             <button type="button" class="btn btn-primary btn-sm" data-act="publish" data-id="${esc(d.id)}">Publish for me</button>
+             <button type="button" class="btn btn-quiet btn-sm" data-act="posted" data-id="${esc(d.id)}">I published it myself</button>`
+          : `<input class="input" data-url="${esc(d.id)}" placeholder="Link to the published post (optional)" aria-label="Link to the published post for ${esc(d.title)}" style="min-width:220px"><button type="button" class="btn btn-primary btn-sm" data-act="posted" data-id="${esc(d.id)}">I published it</button>`)
       : "";
   return `<article class="panel" id="${esc(d.id)}" aria-labelledby="${esc(d.id)}-t">
     <h3 id="${esc(d.id)}-t" class="small">${esc(SITE_NAME[d.site] ?? d.site)} · ${esc(d.channel)} · ${esc(d.title)}</h3>
@@ -77,7 +84,7 @@ function renderDrafts(): void {
   $("dr-list").innerHTML = [
     ...plans.map((c) => `<p class="status info"><span class="dot"></span>A campaign plan is waiting: <a href="#${esc(c.id)}">${esc(c.name)}</a></p>`),
     ...waiting.map(draftCard), ...approved.map(draftCard),
-    recent.length ? `<h3 class="small">Recently done</h3><ul class="ow-list">${recent.map((d) => `<li>${esc(d.title)} · ${esc(d.status)}${d.error ? ` (${esc(d.error)})` : ""}${d.sentAt ? ` · ${esc(date(d.sentAt))}` : ""}</li>`).join("")}</ul>` : "",
+    recent.length ? `<h3 class="small">Recently done</h3><ul class="ow-list">${recent.map((d) => `<li>${esc(d.title)} · ${esc(d.status)}${d.error ? ` (${esc(d.error)})` : ""}${d.sentAt ? ` · ${esc(date(d.sentAt))}` : ""}${d.scheduledFor ? ` · goes live ${esc(date(d.scheduledFor))}` : ""}${d.postedUrl && /^https:\/\//.test(d.postedUrl) ? ` · <a href="${esc(d.postedUrl)}" rel="noopener noreferrer">view</a>` : ""}${d.stats ? ` · ${d.stats.likes} likes, ${d.stats.comments} comments` : ""}${d.externalId ? ` · <button type="button" class="btn btn-quiet btn-sm" data-act="stats" data-id="${esc(d.id)}">Refresh numbers</button>` : ""}</li>`).join("")}</ul>` : "",
   ].join("") || `<p class="muted">Nothing is waiting. Write a draft below.</p>`;
 }
 
@@ -143,6 +150,13 @@ $("dr-list").addEventListener("click", async (e) => {
   else if (act_ === "save") { if (await act(`/drafts/${id}/edit`, text(), null)) toast("Saved. It still needs your approval."); }
   else if (act_ === "reject") { if (await act(`/drafts/${id}/reject`, {}, null)) toast("Rejected."); }
   else if (act_ === "send") { b.disabled = true; if (await act(`/drafts/${id}/send`, {}, null)) toast("Email handed to the mail queue. It goes out within a minute or so."); b.disabled = false; }
+  else if (act_ === "publish") {
+    b.disabled = true;
+    const when = val_(`[data-when="${id}"]`);
+    const ok = await act(`/drafts/${id}/publish`, { target: val_(`[data-target="${id}"]`), imageUrl: val_(`[data-image="${id}"]`), scheduleAt: when ? new Date(when).toISOString() : undefined }, null);
+    if (ok) toast(when ? "Scheduled." : "Published."); else b.disabled = false;
+  }
+  else if (act_ === "stats") { if (await act(`/drafts/${id}/stats`, {}, null)) toast("Numbers updated."); }
   else if (act_ === "posted") { if (await act(`/drafts/${id}/posted`, { url: val_(`[data-url="${id}"]`) }, null)) toast("Marked as posted."); }
   else if (act_ === "preview") {
     const r = await api<{ preview: string }>(`/owner/promoter/drafts/${id}/preview`);
@@ -209,6 +223,7 @@ void (async () => {
   const loaded = await ownerLoad<Overview>("/owner/promoter");
   if (loaded === undefined) return;
   if (loaded === "demo") { data = DEMO; markDemo(); } else { data = loaded; live = true; }
+  if (live) { const c = await api<{ facebook: boolean; instagram: boolean }>("/owner/promoter/channels"); if (c.ok && c.data) channels = c.data; }
   render();
   if (location.hash.length > 1) document.getElementById(location.hash.slice(1))?.scrollIntoView();
 })();

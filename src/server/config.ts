@@ -32,6 +32,7 @@ export function checkEnv(env: Record<string, string | undefined>): string[] {
   if (production && env.PAYMENTS_PROVIDER === "mock") problems.push("PAYMENTS_PROVIDER=mock must not be used in production: it hands out paid items for free");
   if (env.PAYMENTS_PROVIDER === "stripe") problems.push(...stripeEnvProblems(env, production));
 
+  problems.push(...metaEnvProblems(env));
   const owners = (env.PLATFORM_OWNER_EMAILS ?? "").split(",").map((e) => e.trim()).filter(Boolean);
   if (owners.some((e) => !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e))) problems.push("PLATFORM_OWNER_EMAILS must be a comma-separated list of email addresses");
 
@@ -80,4 +81,35 @@ function stripeEnvProblems(env: Record<string, string | undefined>, production: 
   if (/^(sk|rk)_live_/.test(key) && env.STRIPE_ALLOW_LIVE !== "1") out.push("a live Stripe key takes real money: set STRIPE_ALLOW_LIVE=1 only when the owner has said to go live");
   if (production && /^(sk|rk)_test_/.test(key) && env.STRIPE_ALLOW_TEST_IN_PRODUCTION !== "1") out.push("a test Stripe key in production lets anyone 'pay' with a test card and get paid items free: use a staging server, or set STRIPE_ALLOW_TEST_IN_PRODUCTION=1 on purpose");
   return out;
+}
+
+/** Facebook/Instagram (META_*) and WhatsApp (WHATSAPP_*) settings: each group is all-or-nothing. */
+export function metaEnvProblems(env: Record<string, string | undefined>): string[] {
+  const out: string[] = [];
+  if (env.META_ACCESS_TOKEN && !env.META_FACEBOOK_PAGE_ID && !env.META_INSTAGRAM_ACCOUNT_ID) out.push("META_ACCESS_TOKEN needs META_FACEBOOK_PAGE_ID and/or META_INSTAGRAM_ACCOUNT_ID");
+  if (!env.META_ACCESS_TOKEN && (env.META_FACEBOOK_PAGE_ID || env.META_INSTAGRAM_ACCOUNT_ID)) out.push("META_FACEBOOK_PAGE_ID / META_INSTAGRAM_ACCOUNT_ID need META_ACCESS_TOKEN");
+  for (const k of ["META_FACEBOOK_PAGE_ID", "META_INSTAGRAM_ACCOUNT_ID"]) if (env[k] && !/^\d{5,25}$/.test(env[k]!)) out.push(`${k} must be the numeric id`);
+  const wa = ["WHATSAPP_ACCESS_TOKEN", "WHATSAPP_PHONE_NUMBER_ID", "META_APP_SECRET", "WHATSAPP_VERIFY_TOKEN", "WHATSAPP_OWNER_NUMBER"];
+  const set = wa.filter((k) => env[k]);
+  if (env.WHATSAPP_ACCESS_TOKEN || env.WHATSAPP_PHONE_NUMBER_ID || env.WHATSAPP_VERIFY_TOKEN || env.WHATSAPP_OWNER_NUMBER) {
+    const missing = wa.filter((k) => !set.includes(k));
+    if (missing.length) out.push(`WhatsApp also needs ${missing.join(", ")} (or remove the WHATSAPP_ settings)`);
+  }
+  if (env.WHATSAPP_PHONE_NUMBER_ID && !/^\d{5,25}$/.test(env.WHATSAPP_PHONE_NUMBER_ID)) out.push("WHATSAPP_PHONE_NUMBER_ID must be the numeric id from Meta, not the phone number");
+  if (env.WHATSAPP_OWNER_NUMBER && !/^\+?[\d\s()-]{8,20}$/.test(env.WHATSAPP_OWNER_NUMBER)) out.push("WHATSAPP_OWNER_NUMBER must be a phone number with country code, for example +447700900123");
+  if (env.WHATSAPP_VERIFY_TOKEN && env.WHATSAPP_VERIFY_TOKEN.length < 16) out.push("WHATSAPP_VERIFY_TOKEN must be at least 16 characters");
+  return out;
+}
+
+/** Facebook/Instagram settings, or undefined when not set. */
+export function metaFromEnv(env: Record<string, string | undefined>): import("../modules/meta/index.js").MetaConfig | undefined {
+  if (!env.META_ACCESS_TOKEN || (!env.META_FACEBOOK_PAGE_ID && !env.META_INSTAGRAM_ACCOUNT_ID)) return undefined;
+  return { accessToken: env.META_ACCESS_TOKEN, pageId: env.META_FACEBOOK_PAGE_ID || undefined, instagramId: env.META_INSTAGRAM_ACCOUNT_ID || undefined, appSecret: env.META_APP_SECRET || undefined, version: env.META_GRAPH_VERSION || undefined };
+}
+
+/** WhatsApp settings, or undefined unless every part is present and the number is valid. */
+export function whatsappFromEnv(env: Record<string, string | undefined>): import("../modules/whatsapp/index.js").WhatsAppConfig | undefined {
+  const owner = (env.WHATSAPP_OWNER_NUMBER ?? "").replace(/[\s()+.-]/g, "");
+  if (!env.WHATSAPP_ACCESS_TOKEN || !env.WHATSAPP_PHONE_NUMBER_ID || !env.META_APP_SECRET || !env.WHATSAPP_VERIFY_TOKEN || !/^\d{8,15}$/.test(owner)) return undefined;
+  return { accessToken: env.WHATSAPP_ACCESS_TOKEN, phoneNumberId: env.WHATSAPP_PHONE_NUMBER_ID, appSecret: env.META_APP_SECRET, verifyToken: env.WHATSAPP_VERIFY_TOKEN, ownerNumber: owner, alertTemplate: { name: env.WHATSAPP_ALERT_TEMPLATE || "maiz_owner_alert", language: env.WHATSAPP_TEMPLATE_LANGUAGE || "en_GB" }, version: env.META_GRAPH_VERSION || undefined };
 }

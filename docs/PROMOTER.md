@@ -19,7 +19,7 @@ Not visible from outside, so the owner must supply them: Search Console and Bing
 
 ## The sign-off gate
 
-Everything outward-facing waits for the owner. New drafts and campaign plans appear on the owner **Decisions** page (kind "Promotion") and count in the same email digest as quality reviews. A draft goes `awaiting_approval` to `approved` only when the owner presses Approve; editing sends it back. The agent never posts, publishes or spends: posts, articles and ads are published by the owner, who then marks them posted. Only emails are sent from the platform, one at a time, by the owner pressing "Send email now" on an approved draft. The agent cannot approve its own work.
+Everything outward-facing waits for the owner. New drafts and campaign plans appear on the owner **Decisions** page (kind "Promotion") and count in the same email digest as quality reviews. A draft goes `awaiting_approval` to `approved` only when the owner presses Approve; editing sends it back. The agent never publishes or spends on its own: the owner publishes posts, articles and ads (or presses "Publish for me" for Facebook and Instagram once connected) and marks them posted. Only emails are sent from the platform, one at a time, by the owner pressing "Send email now" on an approved draft. The agent cannot approve its own work.
 
 ## Anti-spam rules (UK PECR and UK GDPR)
 
@@ -46,5 +46,5 @@ No new keys for drafting: it uses the existing `RUNPOD_*` and `ANTHROPIC_API_KEY
 - **Sending email** uses the existing Resend sender (`EMAIL_FROM`, `RESEND_API_KEY`). The sending domain must be verified in Resend (already an open item), and `CONTACT_EMAIL`/`SUPPORT_EMAIL` should be set so replies reach a person.
 - **Google Search Console and Bing Webmaster** access for all three sites, or an export of queries, pages and indexing, so SEO work can start from real numbers.
 - **Mock Test Room package prices**, real student results and any reviews you are happy to quote.
-- **Social, ad and partner accounts** are not connected: the agent writes the posts and ad copy, you publish them. Say the word if you want direct posting later (it would need each platform's API keys, kept in secrets only, and the same approval gate).
+- **Facebook, Instagram and WhatsApp** can be connected (optional): approved posts publish from the page, and the agent messages you on WhatsApp so you can approve by replying. See `docs/META-WHATSAPP.md` for what you must set up. Other platforms, ads and partner accounts are not connected: you publish those yourself.
 - Domain tracking: the links use UTM parameters, so each site's analytics will show them with no setup.

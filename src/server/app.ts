@@ -84,6 +84,8 @@ export interface Req {
 export interface Res {
   status: number;
   body?: unknown;
+  /** A plain-text reply, sent as is (not JSON). */
+  text?: string;
   headers?: Record<string, string>;
   /** Work to do after the reply is sent (Slack needs an answer within 3 seconds). */
   after?: () => Promise<void>;
@@ -349,6 +351,23 @@ export function createApp(p: Platform) {
       } catch (e) {
         if (e instanceof WebhookSignatureError) return json(400, { error: "bad signature" });
         throw e;
+      }
+    }
+
+    // ---- WhatsApp: Meta's one-time handshake, then signed deliveries. Only the owner's number is ever obeyed ----
+    if (path === "/api/whatsapp/webhook") {
+      const wa = p.ownerWhatsApp;
+      if (!wa) return json(503, { error: "whatsapp is not configured" });
+      if (method === "GET") {
+        const challenge = wa.handshake(req.query);
+        return challenge ? { status: 200, text: challenge, headers: { "content-type": "text/plain; charset=utf-8" } } : json(403, { error: "bad verify token" });
+      }
+      if (method === "POST") {
+        if (!wa.verifySignature(req.rawBody, req.headers["x-hub-signature-256"])) return json(401, { error: "bad signature" });
+        let payload: unknown;
+        try { payload = JSON.parse(req.rawBody || "{}"); } catch { return json(400, { error: "invalid JSON" }); }
+        // Answer Meta at once (it retries slow replies); the work runs after the response is sent.
+        return { status: 200, body: { ok: true }, after: async () => { await wa.handle(payload).catch((e) => console.error("whatsapp webhook failed:", e instanceof Error ? e.message : e)); } };
       }
     }
 
@@ -844,7 +863,8 @@ export function createApp(p: Platform) {
     }
     const lead = /^\/api\/owner\/promoter\/leads\/([\w-]{1,64})\/replied$/.exec(path);
     if (method === "POST" && lead) { pr.markReplied(userId, lead[1]!); return json(200, overview()); }
-    const d = /^\/api\/owner\/promoter\/drafts\/([\w-]{1,64})\/(approve|reject|edit|send|posted|preview)$/.exec(path);
+    if (method === "GET" && path === "/api/owner/promoter/channels") return json(200, { ...pr.channels(userId), whatsapp: p.ownerWhatsApp?.status() ?? { connected: false } });
+    const d = /^\/api\/owner\/promoter\/drafts\/([\w-]{1,64})\/(approve|reject|edit|send|posted|preview|publish|stats)$/.exec(path);
     if (d) {
       const id = d[1]!;
       if (method === "GET" && d[2] === "preview") return json(200, { preview: pr.preview(userId, id) });
@@ -854,6 +874,8 @@ export function createApp(p: Platform) {
       else if (d[2] === "reject") pr.decide(userId, id, false, b.note);
       else if (d[2] === "edit") pr.edit(userId, id, b);
       else if (d[2] === "send") await pr.send(userId, id);
+      else if (d[2] === "publish") await pr.publishToMeta(userId, id, b);
+      else if (d[2] === "stats") await pr.refreshStats(userId, id);
       else pr.markPosted(userId, id, b.url);
       return json(200, overview());
     }
