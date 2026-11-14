@@ -274,6 +274,7 @@ export default defineConfig({
         ownerPrices: resolve(__dirname, "owner-prices.html"),
         ownerPromotions: resolve(__dirname, "owner-promotions.html"),
         affiliate: resolve(__dirname, "affiliate.html"),
+        ownerTeam: resolve(__dirname, "owner-team.html"),
         ownerGrowth: resolve(__dirname, "owner-growth.html"),
         ownerPromoter: resolve(__dirname, "owner-promoter.html"),
         unsubscribe: resolve(__dirname, "unsubscribe.html"),

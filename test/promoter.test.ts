@@ -3,10 +3,11 @@ import { createApp, makeToken, type Req } from "../src/server/app.js";
 import { userIdFor } from "../src/server/identity.js";
 import { createPlatform } from "../src/server/platform.js";
 import { MemoryEmailSender } from "../src/server/email.js";
+import { TEMPLATES } from "../src/modules/workforce/templates.js";
 import { openDecisions } from "../src/server/decisions.js";
 import { PermissionError } from "../src/modules/identity/index.js";
 import {
-  PromoterError, PromoterService, SITES, SITE_KEYS, checkLead, checkPlanInput, copyFlags, knowledgeText, planCampaign, sendProblems, trackedLink,
+  OWNER_SPECIALISTS, PromoterError, PromoterService, SITES, SITE_KEYS, checkLead, checkPlanInput, copyFlags, knowledgeText, planCampaign, sendProblems, trackedLink,
   type SendCheckInput,
 } from "../src/modules/promoter/index.js";
 import type { Completer } from "../src/modules/model-gateway/types.js";
@@ -285,6 +286,23 @@ describe("promoter service", () => {
   });
 });
 
+describe("owner's AI team", () => {
+  it("lists both owner-only specialists with full job descriptions that keep the approval limits", () => {
+    expect(OWNER_SPECIALISTS.map((s) => s.key)).toEqual(["promotion-agent", "community-growth-manager"]);
+    for (const s of OWNER_SPECIALISTS) {
+      expect(s.jobDescription.key).toBe(s.key);
+      expect(s.jobDescription.authority.needsApproval.length).toBeGreaterThan(2);
+      expect(s.jobDescription.authority.never.join(" ")).toMatch(/CAPTCHA/);
+      expect(s.jobDescription.authority.never.join(" ")).toMatch(/fake accounts/);
+      expect(s.jobDescription.responsibilities.length).toBeGreaterThan(2);
+    }
+    expect(OWNER_SPECIALISTS[1]!.jobDescription.authority.needsApproval).toEqual(["Publishing promotional content externally", "Sending guest-post pitches", "Creating new accounts", "Making commitments on behalf of the company"]);
+  });
+  it("is not in the client store, any package or the public templates", () => {
+    expect(TEMPLATES.some((t) => OWNER_SPECIALISTS.some((s) => s.key === t.key))).toBe(false);
+  });
+});
+
 describe("promoter HTTP routes", () => {
   function setup() {
     const clock = { d: new Date("2026-11-20T09:00:00Z") };
@@ -296,6 +314,16 @@ describe("promoter HTTP routes", () => {
     const bearer = (email: string) => ({ authorization: `Bearer ${makeToken("s3", { k: "session", u: userIdFor(email), e: email }, 7 * 86400, clock.d.getTime())}` });
     return { call, mail, owner: bearer(OWNER), other: bearer("someone@else.test") };
   }
+
+  it("shows the owner's team with live counts, and refuses everyone else", async () => {
+    const { call, owner, other } = setup();
+    expect((await call("GET", "/api/owner/team", undefined, other)).status).toBe(403);
+    await call("POST", "/api/owner/promoter/campaigns", plan, owner);
+    const team = (await call("GET", "/api/owner/team", undefined, owner)).body as any;
+    expect(team.specialists.map((s: any) => s.key)).toEqual(["promotion-agent", "community-growth-manager"]);
+    expect(team.specialists[0].status.waiting).toBe(1);
+    expect(team.specialists[1].status.waiting).toBe(0);
+  });
 
   it("refuses everyone but the platform owner", async () => {
     const { call, other } = setup();

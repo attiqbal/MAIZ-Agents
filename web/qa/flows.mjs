@@ -9,7 +9,7 @@ const mk = async (opts = {}) => { const ctx = await b.newContext({ viewport: { w
 // 1. Link check: every internal link and anchor on every page
 {
   const p = await mk(); const seen = new Map();
-  const pages = ["/", "/employees.html", "/pricing.html", "/security.html", "/signin.html", "/onboarding.html", "/app.html", "/review.html", "/owner-decisions.html", "/owner-specialists.html", "/owner-clients.html", "/owner-prices.html", "/owner-promotions.html", "/owner-promoter.html", "/owner-growth.html", "/affiliate.html", "/owner-ai.html", "/404.html"];
+  const pages = ["/", "/employees.html", "/pricing.html", "/security.html", "/signin.html", "/onboarding.html", "/app.html", "/review.html", "/owner-decisions.html", "/owner-specialists.html", "/owner-clients.html", "/owner-prices.html", "/owner-promotions.html", "/owner-promoter.html", "/owner-growth.html", "/owner-team.html", "/affiliate.html", "/owner-ai.html", "/404.html"];
   let broken = [];
   for (const pg of pages) {
     await p.goto(B + pg, { waitUntil: "networkidle" });

@@ -7,7 +7,7 @@ import { LedgerError } from "../modules/ledger/index.js";
 import { IntegrationError } from "../modules/integrations/index.js";
 import { ReviewError } from "../modules/review/index.js";
 import { PricingError } from "../modules/pricing/index.js";
-import { PromoterError } from "../modules/promoter/index.js";
+import { OWNER_SPECIALISTS, PromoterError } from "../modules/promoter/index.js";
 import { GROWTH_ROLE, GrowthError, discoveryQueries } from "../modules/growth/index.js";
 import { DEFAULT_COMMISSION, DEFAULT_HOLD_DAYS, PromoError, describeCommission } from "../modules/promotions/index.js";
 import { EnergyError, parseAutoReload } from "../modules/energy/index.js";
@@ -426,6 +426,15 @@ export function createApp(p: Platform) {
     if (path === "/api/owner/reviews" || path.startsWith("/api/owner/reviews/")) return ownerReviewRoutes(req, userId, body);
     if (path === "/api/owner/ai" || path.startsWith("/api/owner/ai/")) return ownerAiRoutes(req, userId, body);
     if (path === "/api/owner/prices" || path.startsWith("/api/owner/prices/")) return ownerPriceRoutes(req, userId, body);
+    if (method === "GET" && path === "/api/owner/team") {
+      if (!p.isPlatformOwner(userId)) return json(403, { error: "only the MAIZ platform owner can see the owner's team" });
+      const pw = p.promoter.waiting(userId), gw = p.growth.waiting(userId), go = p.growth.overview(userId);
+      const live = {
+        "promotion-agent": { waiting: pw.drafts.length + pw.plans.length, doing: `${p.promoter.campaignsList(userId).length} campaigns, ${p.promoter.leadsList(userId).length} people on the list`, due: p.promoter.followUpsDue(userId).length },
+        "community-growth-manager": { waiting: gw.items.length + gw.approvals.length, doing: `${go.opportunities.length} places, ${go.publications.length} publications recorded`, due: go.followUpsDue.length },
+      } as const;
+      return json(200, { specialists: OWNER_SPECIALISTS.map((s) => ({ ...s, status: live[s.key] })) });
+    }
     if (path.startsWith("/api/owner/growth")) return ownerGrowthRoutes(req, userId, body);
     if (path.startsWith("/api/owner/promoter")) return ownerPromoterRoutes(req, userId, body);
     if (path.startsWith("/api/owner/coupons") || path.startsWith("/api/owner/affiliates") || path === "/api/owner/promotions") return ownerPromoRoutes(req, userId, body);
