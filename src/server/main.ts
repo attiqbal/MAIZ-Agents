@@ -38,6 +38,8 @@ const platform = createPlatform({
   platformOwners: platformOwnersFromEnv(env),
   meta: metaFromEnv(env),
   whatsapp: whatsappFromEnv(env),
+  // Only to show the owner's Connections page whether each server-set service is set, and to test it. Never sent out.
+  connectionEnv: Object.fromEntries(["RESEND_API_KEY", "EMAIL_FROM", "PAYMENTS_PROVIDER", "STRIPE_SECRET_KEY", "STRIPE_WEBHOOK_SECRET", "RUNPOD_API_KEY", "RUNPOD_ENDPOINT_ID", "ANTHROPIC_API_KEY", "SLACK_CLIENT_ID", "SLACK_CLIENT_SECRET", "SLACK_SIGNING_SECRET", "SLACK_REDIRECT_URI", "META_GRAPH_VERSION"].map((k) => [k, env[k]])),
   // The feature flag: unset means checkout is refused and nothing is charged. "mock" (development only) charges nobody.
   payments:
     env.PAYMENTS_PROVIDER === "mock" ? new MockPaymentProvider()

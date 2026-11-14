@@ -42,8 +42,9 @@ import { ExpiringSet, SendLog } from "./expiring.js";
 import { AffiliateService, CouponService } from "../modules/promotions/index.js";
 import { PromoterService } from "../modules/promoter/index.js";
 import { GrowthService } from "../modules/growth/index.js";
-import { MetaGraph, type MetaConfig } from "../modules/meta/index.js";
+import { MetaGraph, MetaRejected, type MetaConfig } from "../modules/meta/index.js";
 import { OwnerWhatsApp, WhatsAppCloud, type WhatsAppConfig } from "../modules/whatsapp/index.js";
+import { ConnectionsService } from "../modules/connections/index.js";
 import { COMPANY } from "../company.js";
 import { CredentialStore } from "../modules/credentials/index.js";
 
@@ -80,6 +81,11 @@ export interface PlatformConfig {
   meta?: MetaConfig;
   /** The owner's WhatsApp line to the promotion agent. From environment variables. */
   whatsapp?: WhatsAppConfig;
+  /**
+   * The server-set services' variables (Resend, Stripe, RunPod, Anthropic, Slack, META_GRAPH_VERSION), only so the
+   * owner's Connections page can say whether each is set and test it. Never sent to the browser.
+   */
+  connectionEnv?: Record<string, string | undefined>;
   now?: () => Date;
   http?: typeof fetch;
 }
@@ -178,17 +184,38 @@ export function createPlatform(cfg: PlatformConfig) {
    * The promotion agent for the owner's three websites. Everything it drafts waits for the owner (the same decisions
    * page and email digest as quality review); it sends email only one person at a time and only after approval.
    */
-  const metaGraph = cfg.meta ? new MetaGraph(cfg.meta, cfg.http) : undefined;
-  let ownerWhatsApp: OwnerWhatsApp | undefined;
+  /**
+   * Facebook, Instagram and WhatsApp come from the owner's Connections page (stored encrypted) or, when set, the
+   * server's environment variables. They are rebuilt whenever the owner saves, so no restart or server login is needed.
+   */
+  const live: { graph?: MetaGraph; wa?: OwnerWhatsApp; waState?: unknown; sink?: Sink } = {};
+  const connections = new ConnectionsService((userId) => ownerIdSet.has(userId), {
+    now, http: cfg.http, appUrl: base, envMeta: cfg.meta, envWhatsApp: cfg.whatsapp, env: cfg.connectionEnv,
+    onChange: () => rebuildChannels(),
+    whatsapp: () => live.wa,
+  });
+  const graphNow = (): MetaGraph => {
+    if (!live.graph) throw new MetaRejected("Facebook and Instagram are not connected yet: connect them on the Connections page");
+    return live.graph;
+  };
   const promoter = new PromoterService((userId) => ownerIdSet.has(userId), {
     now, completer: gateway, send: (mail) => email.send(mail),
-    meta: metaGraph ? { status: () => metaGraph.status(), publish: (i) => metaGraph.publish(i), stats: (t, id, at) => metaGraph.stats(t, id, at) } : undefined,
+    meta: { status: () => live.graph?.status() ?? { facebook: false, instagram: false }, publish: (i) => graphNow().publish(i), stats: (t, id, at) => graphNow().stats(t, id, at) },
     unsubscribeUrl: (token) => `${base}/unsubscribe.html#t=${encodeURIComponent(token)}`,
     sender: { name: COMPANY.name, address: COMPANY.registeredOffice },
-    notifyOwner: () => { decisionDigest.poke(); void ownerWhatsApp?.notifyWaiting(); },
+    notifyOwner: () => { decisionDigest.poke(); void live.wa?.notifyWaiting(); },
   });
   const firstOwner = [...ownerIdSet][0];
-  if (cfg.whatsapp && firstOwner) ownerWhatsApp = new OwnerWhatsApp(new WhatsAppCloud(cfg.whatsapp, cfg.http), promoter, { ownerUserId: firstOwner, now });
+  function rebuildChannels(): void {
+    const m = connections.metaConfig();
+    live.graph = m ? new MetaGraph(m, cfg.http) : undefined;
+    const w = connections.whatsappConfig();
+    if (live.wa) live.waState = live.wa.exportState();
+    live.wa = w && firstOwner ? new OwnerWhatsApp(new WhatsAppCloud(w, cfg.http), promoter, { ownerUserId: firstOwner, now }) : undefined;
+    if (live.wa && live.waState) live.wa.restore(live.waState);
+    if (live.wa && live.sink) live.wa.useSink(live.sink);
+  }
+  rebuildChannels();
   /**
    * The Content Distribution and Community Growth Manager: researches places to publish, drafts for each one, and records
    * what went out and what it earned. Owner only. It never posts, creates accounts or sends pitches itself.
@@ -474,19 +501,24 @@ export function createPlatform(cfg: PlatformConfig) {
     for (const x of s.peopleSettings ?? []) people.restoreSettings(x.workspaceId, x.settings);
     for (const r of s.batchRuns ?? []) batch.restoreRun(r);
     for (const c of s.credentials ?? []) credentials.restore(c.userId, c);
+    for (const c of s.connectionSecrets ?? []) connections.restore(c.key, c.secret);
+    rebuildChannels();
     for (const x of s.promoRecords ?? []) {
       if (x.kind === "coupon") coupons.restoreCoupon(x.data);
       else if (x.kind === "redemption") coupons.restoreRedemption(x.data);
-      else if (x.kind === "channel") ownerWhatsApp?.restore(x.data);
+      else if (x.kind === "channel") { live.waState = x.data; live.wa?.restore(x.data); }
       else if (["campaign", "draft", "lead", "optout", "fact"].includes(x.kind)) promoter.restore(x.kind, x.data);
       else if (["opportunity", "post", "publication", "account", "approval"].includes(x.kind)) growth.restore(x.kind, x.data);
       else affiliates.restore(x.kind, x.data);
     }
     sink = store;
-    for (const part of [audit, identity, energy, workforce, ledger, router, admin, integrations, reviews, prices, specialists, aiSettings, spend, batch, payments, rota, reconciliation, people, conversations, notices, credentials, coupons, affiliates, promoter, growth]) part.useSink(store);
-    ownerWhatsApp?.useSink(store);
+    for (const part of [audit, identity, energy, workforce, ledger, router, admin, integrations, reviews, prices, specialists, aiSettings, spend, batch, payments, rota, reconciliation, people, conversations, notices, credentials, coupons, affiliates, promoter, growth, connections]) part.useSink(store);
+    live.sink = store;
+    live.wa?.useSink(store);
   }
 
+  /** True when changes are written to the database (false: memory only, lost on restart). */
+  const hasStore = () => !!live.sink;
   const healthy = () => (sink as { healthy?: boolean } | undefined)?.healthy !== false;
 
   /**
@@ -506,6 +538,6 @@ export function createPlatform(cfg: PlatformConfig) {
   const codeFails = new SendLog(15 * 60_000);
   /** Starts a sleeping RunPod worker for a client who just opened the app or started typing. */
   const warm = () => routing?.warm() ?? "skipped";
-  return { conversations, notices, warm, ownerDecisions, decisionDigest, dashboard, reconciliation, rota, people, payments, batch, email, usedLinks, sends, loginFails, resets, credentials, formHits, codeFails, coupons, affiliates, promoter, growth, ownerWhatsApp, admin, reviews, prices, specialists, ai, clients, isPlatformOwner, healthy, cfg, now, audit, bus, identity, energy, workforce, ledger, onboarding, router, integrations, slackTokens, saveSlackToken, attachStore };
+  return { conversations, notices, warm, ownerDecisions, decisionDigest, dashboard, reconciliation, rota, people, payments, batch, email, usedLinks, sends, loginFails, resets, credentials, formHits, codeFails, coupons, affiliates, promoter, growth, connections, get ownerWhatsApp() { return live.wa; }, admin, reviews, prices, specialists, ai, clients, isPlatformOwner, healthy, hasStore, cfg, now, audit, bus, identity, energy, workforce, ledger, onboarding, router, integrations, slackTokens, saveSlackToken, attachStore };
 }
 export type Platform = ReturnType<typeof createPlatform>;
