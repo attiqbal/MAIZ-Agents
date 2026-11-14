@@ -17,7 +17,10 @@ export interface MetaConfig {
 }
 
 /** Meta refused the request in words (a definite "no": nothing was published). */
-export class MetaRejected extends Error {}
+export class MetaRejected extends Error {
+  /** Meta's numeric error code when it gave one (190 = token no longer valid; 4, 17, 32, 613 = rate limited). */
+  constructor(message: string, readonly code?: number) { super(message); }
+}
 /** The call may or may not have reached Meta (timeout, dropped connection). Check the page before trying again. */
 export class MetaUncertain extends Error {}
 
@@ -82,7 +85,7 @@ export class MetaGraph {
       const reason = String(json?.error?.error_user_msg ?? json?.error?.message ?? `error ${res.status}`).replace(this.cfg.accessToken, "[token]").slice(0, 300);
       // A server fault after we sent a write is unclear; a 4xx with a Graph error is a definite refusal.
       if (res.status >= 500 && method === "POST") throw new MetaUncertain(`Meta had a fault (${reason}). Check the page before trying again.`);
-      throw new MetaRejected(`Meta said no: ${reason}`);
+      throw new MetaRejected(`Meta said no: ${reason}`, typeof json?.error?.code === "number" ? json.error.code : res.status === 429 ? 4 : undefined);
     }
     return json;
   }

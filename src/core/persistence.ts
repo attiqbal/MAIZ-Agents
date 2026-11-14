@@ -68,11 +68,11 @@ export interface Sink {
   promo(kind: PromoKind, id: string, data: unknown): void;
 }
 
-export const PROMO_KINDS = ["coupon", "redemption", "affiliate", "referral", "accrual", "payout", "campaign", "draft", "lead", "optout", "fact", "opportunity", "post", "publication", "account", "approval", "channel"] as const;
+export const PROMO_KINDS = ["coupon", "redemption", "affiliate", "referral", "accrual", "payout", "campaign", "draft", "lead", "optout", "fact", "opportunity", "post", "publication", "account", "approval", "channel", "meta_review", "meta_deletion"] as const;
 export type PromoKind = (typeof PROMO_KINDS)[number];
 
 /** Kinds stored through Sink.record. The database accepts any kind; this list is what load() hands back. */
-export const GENERIC_KINDS = ["order", "rota_staff", "rota_shift", "rota_settings", "recon", "task", "conversation", "notices"] as const;
+export const GENERIC_KINDS = ["order", "rota_staff", "rota_shift", "rota_settings", "recon", "task", "conversation", "notices", "meta_conn", "meta_post", "meta_limits"] as const;
 export type GenericKind = (typeof GENERIC_KINDS)[number];
 export interface GenericRecord { workspaceId: string; kind: GenericKind; id: string; data: any }
 

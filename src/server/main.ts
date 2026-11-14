@@ -2,7 +2,7 @@ import { randomBytes } from "node:crypto";
 import { createServer } from "node:http";
 import { join } from "node:path";
 import { createApp } from "./app.js";
-import { checkEnv, integrationAppsFromEnv, metaFromEnv, platformOwnersFromEnv, whatsappFromEnv } from "./config.js";
+import { checkEnv, integrationAppsFromEnv, metaClientsFromEnv, metaFromEnv, platformOwnersFromEnv, whatsappFromEnv } from "./config.js";
 import { loginAppsFromEnv } from "./social-login.js";
 import { QueuedEmailSender, ResendEmailSender } from "./email.js";
 import { MockPaymentProvider, StripePaymentProvider } from "../modules/payments/index.js";
@@ -38,6 +38,7 @@ const platform = createPlatform({
   platformOwners: platformOwnersFromEnv(env),
   meta: metaFromEnv(env),
   whatsapp: whatsappFromEnv(env),
+  metaClients: metaClientsFromEnv(env),
   // The feature flag: unset means checkout is refused and nothing is charged. "mock" (development only) charges nobody.
   payments:
     env.PAYMENTS_PROVIDER === "mock" ? new MockPaymentProvider()
@@ -127,7 +128,7 @@ server.listen(port, () => console.log(`listening on :${port}`));
 // Once a minute: the batch dispatcher, and the nightly books check (each client once, after their own midnight).
 // The batch dispatcher: once a minute, runs any client whose closing time has passed or whose queue is big enough.
 const BATCH_TICK_MS = 60_000;
-const batchTimer = setInterval(() => { void platform.batch.tick(); void platform.reconciliation.tick(); }, BATCH_TICK_MS);
+const batchTimer = setInterval(() => { void platform.batch.tick(); void platform.reconciliation.tick(); void platform.metaClients.maintenance().catch((e) => console.error("meta maintenance failed:", e instanceof Error ? e.message : e)); }, BATCH_TICK_MS);
 batchTimer.unref();
 
 // Hosts send SIGTERM before replacing the instance: stop taking requests and write pending changes to Postgres.

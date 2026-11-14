@@ -3,6 +3,7 @@ import { userIdFor } from "./identity.js";
 import { SetupError } from "../modules/admin-manager/index.js";
 import { ChannelError, noEnergyMessage, parseSlackEvent } from "../modules/channels/index.js";
 import { PermissionError } from "../modules/identity/index.js";
+import { MetaClientError } from "../modules/meta-clients/index.js";
 import { LedgerError } from "../modules/ledger/index.js";
 import { IntegrationError } from "../modules/integrations/index.js";
 import { ReviewError } from "../modules/review/index.js";
@@ -27,6 +28,7 @@ import { RotaError } from "../modules/rota/index.js";
 import { PeopleError } from "../modules/people/index.js";
 import { PaymentError, WebhookSignatureError, type Order } from "../modules/payments/index.js";
 import type { Platform } from "./platform.js";
+import { metaClientRoute, metaOwnerRoute, metaPublicRoute, type MetaRouteCtx } from "./meta-routes.js";
 import { suggestionsFor } from "./suggestions.js";
 import type { Reply } from "../modules/conversations/index.js";
 import type { TaskResult } from "../modules/workforce/index.js";
@@ -438,9 +440,14 @@ export function createApp(p: Platform) {
       return result ? json(200, { ok: true, added: result.added, updated: result.updated, warnings: result.warnings }) : json(404, { error: "not found" });
     }
 
+    // ---- Meta (Facebook, Instagram, WhatsApp): OAuth return, signed deauthorize / deletion calls, webhook ----
+    const metaCtx: MetaRouteCtx = { p, makeToken: (claims, ttl) => makeToken(secret, claims, ttl, p.now().getTime()), readToken: (t) => readToken(secret, t, p.now().getTime()), readCookie, orgOf, body };
+    if (path.startsWith("/api/meta/")) { const r = await metaPublicRoute(req, metaCtx); if (r) return r; }
+
     // ---- everything below needs a signed-in user ----
     const userId = session(req);
     if (!userId) return json(401, { error: "sign in first" });
+    { const r = (await metaOwnerRoute(req, userId, metaCtx)) ?? (await metaClientRoute(req, userId, metaCtx)); if (r) return r; }
     // ---- MAIZ quality review: the platform owner's queue across every client. Clients get 403. ----
     if (path === "/api/owner/reviews" || path.startsWith("/api/owner/reviews/")) return ownerReviewRoutes(req, userId, body);
     if (path === "/api/owner/ai" || path.startsWith("/api/owner/ai/")) return ownerAiRoutes(req, userId, body);
@@ -1020,7 +1027,7 @@ export function createApp(p: Platform) {
     try {
       return renewed(req, await route(req));
     } catch (err) {
-      if (err instanceof BadRequest || err instanceof SetupError || err instanceof SignupError || err instanceof LedgerError || err instanceof ChannelError || err instanceof IntegrationError || err instanceof ReviewError || err instanceof PeopleError || err instanceof PricingError || err instanceof PromoError || err instanceof PromoterError || err instanceof GrowthError || err instanceof EnergyError || err instanceof SettingsError || err instanceof BatchError || err instanceof PaymentError || err instanceof RotaError) return json(400, { error: err.message });
+      if (err instanceof BadRequest || err instanceof SetupError || err instanceof SignupError || err instanceof LedgerError || err instanceof ChannelError || err instanceof IntegrationError || err instanceof ReviewError || err instanceof PeopleError || err instanceof PricingError || err instanceof PromoError || err instanceof PromoterError || err instanceof GrowthError || err instanceof EnergyError || err instanceof SettingsError || err instanceof BatchError || err instanceof PaymentError || err instanceof RotaError || err instanceof MetaClientError) return json(400, { error: err.message });
       if (err instanceof PermissionError) return json(403, { error: "you don't have permission to do that" });
       console.error(`${req.method} ${req.path} failed:`, err);
       return json(500, { error: "something went wrong" });
