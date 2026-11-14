@@ -2,6 +2,7 @@ import { newId } from "../../core/ids.js";
 import type { Sink } from "../../core/persistence.js";
 import type { Mail } from "../../server/email-templates.js";
 import { PermissionError } from "../identity/index.js";
+import { MetaRejected, publishProblems, type MetaTarget, type PostStats, type Published, type PublishInput } from "../meta/index.js";
 import type { Completer } from "../model-gateway/types.js";
 import { SITES, SITE_KEYS, knowledgeText, isSiteKey, type SiteKey, type SiteProfile } from "./knowledge.js";
 import {
@@ -26,7 +27,7 @@ export interface Campaign {
   approvedAt?: string;
 }
 
-export type ItemStatus = "awaiting_approval" | "approved" | "rejected" | "sending" | "sent" | "posted" | "failed";
+export type ItemStatus = "awaiting_approval" | "approved" | "rejected" | "sending" | "publishing" | "sent" | "posted" | "failed";
 export type ItemKind = "email" | "post" | "article" | "ad" | "partner_pitch" | "affiliate_invite" | "seo_fix";
 
 export interface DraftItem {
@@ -50,6 +51,11 @@ export interface DraftItem {
   note?: string;
   sentAt?: string;
   postedUrl?: string;
+  /** Posted through Meta: where, the post id there, when it goes live (scheduled posts) and the latest engagement. */
+  target?: MetaTarget;
+  externalId?: string;
+  scheduledFor?: string;
+  stats?: PostStats;
   error?: string;
   /** How it was written: the model that drafted it, or "template" when no model was available. */
   writtenBy: string;
@@ -79,6 +85,8 @@ export interface PromoterOptions {
   send?: (mail: Mail) => Promise<void>;
   unsubscribeUrl: (token: string) => string;
   sender: Sender;
+  /** Facebook and Instagram, when connected. Only ever called for a draft the owner approved. */
+  meta?: { status(): { facebook: boolean; instagram: boolean }; publish(i: PublishInput): Promise<Published>; stats(t: MetaTarget, id: string, now: Date): Promise<PostStats> };
   /** Called whenever something new waits for the owner. */
   notifyOwner?: () => void;
 }
@@ -323,7 +331,7 @@ export class PromoterService {
   edit(userId: string, id: string, raw: unknown): DraftItem {
     this.require(userId);
     const i = this.item(id);
-    if (i.status === "sent" || i.status === "posted") throw new PromoterError("this has already gone out");
+    if (i.status === "sent" || i.status === "posted" || i.status === "sending" || i.status === "publishing") throw new PromoterError("this has already gone out or is going out now");
     const r = (raw ?? {}) as Record<string, unknown>;
     const body = r.body === undefined ? i.body : String(r.body).trim().slice(0, MAX_TEXT);
     const subject = r.subject === undefined ? i.subject : oneLine(String(r.subject));
@@ -375,6 +383,75 @@ export class PromoterService {
       throw new PromoterError("the email could not be sent. Nothing was delivered.");
     }
     return this.saveItem({ ...i, status: "sent", sentAt: now.toISOString() });
+  }
+
+  /** What is connected, for the owner's page. */
+  channels(userId: string): { facebook: boolean; instagram: boolean } {
+    this.require(userId);
+    return this.opts.meta?.status() ?? { facebook: false, instagram: false };
+  }
+
+  /**
+   * Publishes one approved social post to Facebook or Instagram. The same gate as email: only a draft the owner
+   * approved, once, and the owner's words are re-read now. It never spends money (organic posts only).
+   */
+  async publishToMeta(userId: string, id: string, raw: unknown): Promise<DraftItem> {
+    this.require(userId);
+    const i = this.item(id);
+    if (i.status !== "approved") throw new PromoterError("only drafts you approved can be published");
+    if (i.channel !== "social" && i.channel !== "community") throw new PromoterError("only social posts are published to Facebook or Instagram");
+    const meta = this.opts.meta;
+    if (!meta) throw new PromoterError("Facebook and Instagram are not connected yet. See docs/META-WHATSAPP.md");
+    const r = (raw ?? {}) as Record<string, unknown>;
+    if (r.target !== "facebook" && r.target !== "instagram") throw new PromoterError("choose Facebook or Instagram");
+    const target = r.target;
+    if (!meta.status()[target]) throw new PromoterError(`${target === "facebook" ? "Facebook" : "Instagram"} is not connected yet`);
+    const optional = (v: unknown): string | undefined => (v === undefined || v === null || v === "" ? undefined : String(v).trim());
+    const when = optional(r.scheduleAt);
+    const now = this.now();
+    const input: PublishInput = { target, message: i.body, imageUrl: optional(r.imageUrl), linkUrl: optional(r.linkUrl), scheduleAt: when ? new Date(when) : undefined };
+    const problems = publishProblems(input, now);
+    if (problems.length) throw new PromoterError(`not published: ${problems.join("; ")}.`);
+    // Marked before the first await, so a second press while this one is in flight finds it no longer approved.
+    this.saveItem({ ...i, status: "publishing", target });
+    try {
+      const out = await meta.publish(input);
+      return this.saveItem({ ...i, status: "posted", target, externalId: out.id, postedUrl: out.url, scheduledFor: out.scheduledFor, sentAt: now.toISOString(), error: undefined });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Meta could not be reached";
+      if (e instanceof MetaRejected) {
+        // A clear refusal: nothing is live, so it goes back to approved and can be retried after fixing the cause.
+        this.saveItem({ ...i, status: "approved", target: undefined, error: msg });
+        throw new PromoterError(msg);
+      }
+      console.error("meta publish uncertain:", msg);
+      this.saveItem({ ...i, status: "failed", target, error: msg });
+      throw new PromoterError(msg);
+    }
+  }
+
+  /** Reads likes, comments and shares for a post published through Meta. */
+  async refreshStats(userId: string, id: string): Promise<DraftItem> {
+    this.require(userId);
+    const i = this.item(id);
+    if (!i.target || !i.externalId || i.scheduledFor && Date.parse(i.scheduledFor) > this.now().getTime()) throw new PromoterError("this post is not live on Facebook or Instagram yet");
+    if (!this.opts.meta) throw new PromoterError("Facebook and Instagram are not connected yet");
+    try {
+      return this.saveItem({ ...i, stats: await this.opts.meta.stats(i.target, i.externalId, this.now()) });
+    } catch (e) {
+      throw new PromoterError(e instanceof Error ? e.message : "Meta could not be reached");
+    }
+  }
+
+  /** The short code used in WhatsApp: the first five characters of the draft's id. */
+  static shortCode(id: string): string { return id.replace(/-/g, "").slice(0, 5); }
+
+  /** Finds one draft by its short code among the given statuses. Undefined when none or more than one match. */
+  findByCode(userId: string, code: string, statuses: ItemStatus[]): DraftItem | undefined {
+    this.require(userId);
+    const c = code.toLowerCase();
+    const hits = [...this.items.values()].filter((x) => statuses.includes(x.status) && PromoterService.shortCode(x.id) === c);
+    return hits.length === 1 ? hits[0] : undefined;
   }
 
   /** The owner published a post, article or ad by hand. */

@@ -2,7 +2,7 @@ import { randomBytes } from "node:crypto";
 import { createServer } from "node:http";
 import { join } from "node:path";
 import { createApp } from "./app.js";
-import { checkEnv, integrationAppsFromEnv, platformOwnersFromEnv } from "./config.js";
+import { checkEnv, integrationAppsFromEnv, metaFromEnv, platformOwnersFromEnv, whatsappFromEnv } from "./config.js";
 import { loginAppsFromEnv } from "./social-login.js";
 import { QueuedEmailSender, ResendEmailSender } from "./email.js";
 import { MockPaymentProvider, StripePaymentProvider } from "../modules/payments/index.js";
@@ -36,6 +36,8 @@ const platform = createPlatform({
   integrationApps: integrationAppsFromEnv(env, env.APP_URL ?? "http://localhost:5173"),
   loginApps: loginAppsFromEnv(env),
   platformOwners: platformOwnersFromEnv(env),
+  meta: metaFromEnv(env),
+  whatsapp: whatsappFromEnv(env),
   // The feature flag: unset means checkout is refused and nothing is charged. "mock" (development only) charges nobody.
   payments:
     env.PAYMENTS_PROVIDER === "mock" ? new MockPaymentProvider()
@@ -109,7 +111,7 @@ const server = createServer(async (incoming, out) => {
       if (res.after) res.after().catch((err) => console.error("background task failed:", err));
       return;
     }
-    out.end(res.body === undefined ? undefined : JSON.stringify(res.body));
+    out.end(res.text !== undefined ? res.text : res.body === undefined ? undefined : JSON.stringify(res.body));
     if (res.after) res.after().catch((err) => console.error("background task failed:", err));
   } catch (err) {
     console.error("request failed:", err);
