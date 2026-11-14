@@ -1682,3 +1682,15 @@ h1, .sec-head h2, .final h2, .stage-band h2, .article-head h1, .sec-title, .bent
 .legal-doc a { color: var(--accent-text); text-decoration: underline; text-underline-offset: 2px; }
 .legal-doc code { font-size: .92em; background: var(--color-sand, #f1ecda); padding: 1px 6px; border-radius: 6px; }
 .legal-doc .legal-meta { font-size: .9rem; color: var(--text-muted); margin-bottom: 8px; }
+
+/* Signed-in account menu in the header */
+.dd-end .dd-panel { left: auto; right: 0; min-width: 260px; }
+.avatar-btn { padding: 4px 10px 4px 4px; gap: 8px; }
+.avatar { display: inline-grid; place-items: center; width: 36px; height: 36px; border-radius: 50%; background: var(--color-fresh-grass); color: var(--color-graphite); font: 600 14px var(--font-inter); letter-spacing: 0; }
+.acct-who { margin: 0; padding: 10px 12px 12px; display: grid; gap: 2px; border-bottom: 1px solid var(--line-strong); }
+.acct-who span { font-size: 13px; color: var(--text-muted); }
+.acct-who b { font-weight: 500; font-size: 15px; overflow-wrap: anywhere; }
+.acct-panel a { display: flex; flex-direction: column; gap: 2px; padding: 10px 12px; border-radius: 18px; font-family: var(--font-inter); font-size: 15px; }
+.acct-panel a:hover, .acct-out:hover, .mm-out:hover { background: var(--color-ash); }
+.acct-out, .mm-out { min-height: 40px; text-align: left; background: none; border: 0; border-radius: 18px; padding: 10px 12px; font: 500 15px var(--font-inter); color: var(--color-graphite); cursor: pointer; }
+.mm-out { padding: 12px 0; border-radius: 0; }

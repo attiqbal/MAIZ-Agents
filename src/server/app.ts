@@ -461,7 +461,7 @@ export function createApp(p: Platform) {
       }
       return json(404, { error: "not found" });
     }
-    if (method === "GET" && path === "/api/me") return json(200, { platformOwner: p.isPlatformOwner(userId), hasOrganisation: !!orgOf(userId) });
+    if (method === "GET" && path === "/api/me") return json(200, { platformOwner: p.isPlatformOwner(userId), hasOrganisation: !!orgOf(userId), email: sessionClaims(req)?.e });
 
     // ---- affiliate: whoever logs in with an affiliate's email sees their own results ----
     if (method === "GET" && path === "/api/affiliate/me") return json(200, { affiliate: affiliateView(sessionClaims(req)?.e) });

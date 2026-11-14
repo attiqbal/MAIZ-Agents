@@ -28,18 +28,27 @@
           <a href="/faq.html"><b>FAQs</b><span>Short answers</span></a>
         </div>
       </div>
-      <a href="/app.html" data-dashboard-link hidden>Dashboard</a>
+      <a href="/app.html" data-dash-href data-signed-in hidden>Dashboard</a>
     </nav>
     <div class="nav-cta">
-      <a class="btn btn-primary" href="/signin.html" data-signin-link>Sign up / Sign in</a>
+      <a class="btn btn-primary" href="/signin.html" data-signed-out>Sign up / Sign in</a>
+      <div class="dd dd-end" data-signed-in hidden>
+        <button class="dd-btn avatar-btn" type="button" aria-expanded="false" aria-controls="dd-acct" aria-label="Your account"><span class="avatar" data-avatar aria-hidden="true">Me</span><svg viewBox="0 0 12 12" aria-hidden="true"><path d="M2.5 4.5 6 8l3.5-3.5" fill="none" stroke="currentColor" stroke-width="1.5"/></svg></button>
+        <div class="dd-panel acct-panel" id="dd-acct">
+          <p class="acct-who"><span>Signed in as</span><b data-acct-email>your account</b></p>
+          <a href="/app.html" data-dash-href><b>Dashboard</b><span>Your AI team and jobs</span></a>
+          <a href="/app.html#settings" data-acct-settings><b>Account settings</b><span>Plan, billing and sign-in</span></a>
+          <button type="button" class="acct-out" data-signout>Sign out</button>
+        </div>
+      </div>
     </div>
     <button class="nav-toggle" aria-label="Menu" aria-expanded="false" aria-controls="mobile-menu"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
   </div>
   <nav class="mobile-menu" id="mobile-menu" aria-label="Menu" hidden>
+    <span class="mm-h" data-signed-in hidden>Your account</span><a href="/app.html" data-dash-href data-signed-in hidden>Dashboard</a><a href="/app.html#settings" data-acct-settings data-signed-in hidden>Account settings</a><button type="button" class="mm-out" data-signout data-signed-in hidden>Sign out</button>
+    <a class="btn btn-primary" href="/signin.html" data-signed-out>Sign up / Sign in</a>
     <span class="mm-h">Product</span><a href="/employees.html">AI employees</a><a href="/employees.html#store">Employee store</a><a href="/control-centre.html">Control centre</a>
     <span class="mm-h">How it works</span><a href="/how-it-works.html">Set up in 3 minutes</a><a href="/how-it-works.html#apps">Slack and apps</a><a href="/how-it-works.html#approvals">Approvals</a><a href="/energy.html">Energy explained</a>
-    <a href="/app.html" data-dashboard-link hidden>Dashboard</a>
     <span class="mm-h">More</span><a href="/industries.html">Solutions</a><a href="/pricing.html">Pricing</a><a href="/security.html">Security and privacy</a><a href="/faq.html">FAQs</a>
-    <a class="btn btn-primary" href="/signin.html" data-signin-link>Sign up / Sign in</a>
-  </nav>
+    </nav>
 </header>

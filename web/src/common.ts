@@ -1,5 +1,5 @@
 // Shared bits: sticky nav behaviour, mobile menu, toast.
-import { api, getToken, setToken } from "./api";
+import { api, clearSession, getToken, setToken } from "./api";
 import { initMotion } from "./motion";
 
 export function initNav(): void {
@@ -10,15 +10,7 @@ export function initNav(): void {
     const target = new URL(a.href, location.origin);
     if (!target.hash && target.pathname === here) a.setAttribute("aria-current", "page");
   });
-  if (getToken()) {
-    // Logged in: hide Sign up / Sign in and show a Dashboard link (owner admin for the platform owner, control centre for clients).
-    document.querySelectorAll<HTMLElement>("[data-signin-link]").forEach((a) => { a.hidden = true; });
-    const links = document.querySelectorAll<HTMLAnchorElement>("[data-dashboard-link]");
-    links.forEach((a) => { a.hidden = false; });
-    void api<{ platformOwner?: boolean }>("/me").then((r) => {
-      if (r.data?.platformOwner) links.forEach((a) => { a.href = "/owner-decisions.html"; });
-    });
-  }
+  if (getToken()) showSignedIn();
   const nav = document.querySelector<HTMLElement>(".nav");
   if (nav) {
     const onScroll = () => nav.classList.toggle("scrolled", window.scrollY > 8);
@@ -40,6 +32,33 @@ export function initNav(): void {
       if (e.key === "Escape" && !menu.hasAttribute("hidden")) { setOpen(false); toggle.focus(); }
     });
   }
+}
+
+/** Initials from an email: "jane.doe@x.com" gives "JD", "atif@x.com" gives "A". */
+export function initialsOf(email: string): string {
+  const parts = (email.split("@")[0] ?? "").split(/[._\-+\s]+/).filter(Boolean);
+  const letters = parts.length > 1 ? parts[0]![0]! + parts[1]![0]! : (parts[0] ?? "").slice(0, 1);
+  return letters ? letters.toUpperCase() : "Me";
+}
+
+/** Logged in: hide Sign up / Sign in, show the Dashboard link and the account menu with the person's initials. */
+function showSignedIn(): void {
+  document.querySelectorAll<HTMLElement>("[data-signed-out]").forEach((el) => { el.hidden = true; });
+  document.querySelectorAll<HTMLElement>("[data-signed-in]").forEach((el) => { el.hidden = false; });
+  document.querySelectorAll("[data-signout]").forEach((b) => b.addEventListener("click", () => { clearSession(); location.href = "/signin.html"; }));
+  void api<{ platformOwner?: boolean; email?: string }>("/me").then((r) => {
+    if (!r.ok) return;
+    const owner = !!r.data?.platformOwner;
+    // The platform owner's Dashboard is the owner admin and has no client settings page.
+    if (owner) {
+      document.querySelectorAll<HTMLAnchorElement>("[data-dash-href]").forEach((a) => { a.href = "/owner-decisions.html"; });
+      document.querySelectorAll<HTMLElement>("[data-acct-settings]").forEach((a) => { a.hidden = true; });
+    }
+    const email = r.data?.email;
+    if (!email) return;
+    document.querySelectorAll<HTMLElement>("[data-avatar]").forEach((el) => { el.textContent = initialsOf(email); });
+    document.querySelectorAll<HTMLElement>("[data-acct-email]").forEach((el) => { el.textContent = email; });
+  });
 }
 
 let toastTimer: number | undefined;
