@@ -409,7 +409,7 @@ export function createApp(p: Platform) {
       if (o.authed_user?.id) p.router.linkUser(state.u, org.id, "slack", o.team.id, o.authed_user.id);
       // Anything the Admin manager was holding for Slack goes out now.
       await p.admin.deliverPending(state.u, org.id).catch(() => 0);
-      return { status: 302, headers: { location: "/app.html#team" } };
+      return { status: 302, headers: { location: state.r === "firstday" ? "/app.html#firstday" : "/app.html#team" } };
     }
 
     // ---- business apps: OAuth return and webhooks are public; state or the secret link proves who they are for ----
@@ -421,14 +421,15 @@ export function createApp(p: Platform) {
       if (readCookie(req.headers["cookie"], OAUTH_COOKIE) !== state.n || p.usedLinks.has(state.n)) return json(400, { error: "invalid or expired connect link" });
       p.usedLinks.add(state.n, state.exp * 1000);
       const org = orgOf(state.u);
-      if (!code || !org) return { status: 302, headers: { location: "/app.html#apps" } }; // owner pressed Cancel in the app
+      const home = state.r === "firstday" ? "#firstday" : "#apps";
+      if (!code || !org) return { status: 302, headers: { location: `/app.html${home}` } }; // owner pressed Cancel in the app
       try {
         await p.integrations.completeOAuth(state.u, org.id, state.a, code);
       } catch (e) {
         if (!(e instanceof IntegrationError)) throw e;
-        return { status: 302, headers: { location: "/app.html?connect=failed#apps" } };
+        return { status: 302, headers: { location: `/app.html?connect=failed${home}` } };
       }
-      return { status: 302, headers: { location: "/app.html#apps" } };
+      return { status: 302, headers: { location: `/app.html${home}` } };
     }
     const hook = /^\/api\/integrations\/hooks\/([\w-]{1,64})\/([\w-]{16,128})$/.exec(path);
     if (method === "POST" && hook) {
@@ -695,7 +696,9 @@ export function createApp(p: Platform) {
     if (method === "GET" && path === "/api/slack/install") {
       const cfg = p.cfg.slack;
       if (!cfg) return json(503, { error: "slack is not configured" });
-      const state = makeToken(secret, { u: userId, k: "slack-install", n: randomBytes(16).toString("hex") }, OAUTH_STATE_SECONDS, p.now().getTime());
+      // Started from the first-day conversation, the owner comes back to it instead of the team page.
+      const back = req.query.get("returnTo") === "firstday" ? { r: "firstday" } : {};
+      const state = makeToken(secret, { u: userId, k: "slack-install", n: randomBytes(16).toString("hex"), ...back }, OAUTH_STATE_SECONDS, p.now().getTime());
       const url = new URL("https://slack.com/oauth/v2/authorize");
       url.searchParams.set("client_id", cfg.clientId);
       url.searchParams.set("scope", "app_mentions:read,chat:write,im:history,im:read,im:write");
@@ -964,7 +967,8 @@ export function createApp(p: Platform) {
       if (c.auth.kind === "oauth2") {
         // The nonce is also set as a cookie, so only the browser that started the connection can finish it.
         const nonce = randomBytes(16).toString("hex");
-        const state = makeToken(secret, { k: "int-oauth", u: userId, a: key, n: nonce }, OAUTH_STATE_SECONDS, p.now().getTime());
+        const back = body().returnTo === "firstday" ? { r: "firstday" } : {};
+        const state = makeToken(secret, { k: "int-oauth", u: userId, a: key, n: nonce, ...back }, OAUTH_STATE_SECONDS, p.now().getTime());
         return { status: 200, body: { url: ig.authorizeUrl(userId, orgId, key, state) }, headers: { "set-cookie": oauthCookie(nonce, OAUTH_STATE_SECONDS, p.cfg.appUrl) } };
       }
       if (c.auth.kind === "api_key") return json(201, { connection: ig.connectWithKey(userId, orgId, key, body().values ?? {}) });

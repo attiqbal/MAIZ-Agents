@@ -5,6 +5,7 @@ import "./styles.css";
 import { drawPseudoQr, showSocialLogin, wirePasswordToggles } from "./common";
 import { api, getToken, setToken } from "./api";
 import { MAX_NEEDS, cleanCountryName, planSignup, resolveSector, type SignupPlan, type SignupSize } from "../../src/modules/onboarding/recommend";
+import { introLines, personaFor } from "../../src/modules/onboarding/people";
 import { APPS, COUNTRIES, NEEDS, OTHER_SECTOR, SECTORS, countryFacts, getSector, type AppHow } from "../../src/modules/onboarding/sectors";
 
 wirePasswordToggles();
@@ -199,7 +200,7 @@ function renderPlan(): void {
   $("plan-h").textContent = `${profile.biz}: your team and what happens first`;
   const row = (m: SignupPlan["team"][number]) => {
     const [initials, cls] = AVATAR[m.key] ?? ["AI", "av-tl"];
-    return `<div class="team-row"><span class="av ${cls}" aria-hidden="true">${initials}</span><div><b>${esc(m.title)}</b><div class="first">First: ${esc(m.firstJob)}</div><div class="why">${esc(m.why)}</div></div></div>`;
+    return `<div class="team-row"><span class="av ${cls}" aria-hidden="true">${initials}</span><div><b>${esc(m.title)}</b><div class="first">${esc(personaFor(m.key, m.title).name)} will start with: ${esc(m.firstJob)}</div><div class="why">${esc(m.why)}</div></div></div>`;
   };
   const focus = plan.team.filter((m) => m.focus);
   const standby = plan.team.filter((m) => !m.focus);
@@ -322,9 +323,9 @@ function provision(): void {
   const plan = currentPlan();
   $("prov-h").textContent = `Setting up ${profile.biz ?? "your company"}`;
   if (plan) {
-    $("prov-team").textContent = `Admin manager and ${plan.team.length - 1} employees hired`;
+    $("prov-team").textContent = `Maya, your Admin manager, and ${plan.team.length - 1} employees joined`;
     const first = plan.team.find((m) => m.focus);
-    if (first) $("prov-next").textContent = `Your Admin manager will show you the setup form, already filled in from your answers. Check it, press send, and your ${first.title} starts on: ${first.firstJob.charAt(0).toLowerCase()}${first.firstJob.slice(1)}. Each step can be undone.`;
+    if (first) $("prov-next").textContent = `Next, your team would like to meet you and ask a few things only you know, one at a time. Skip anything you're not sure of. Then your ${first.title} starts on: ${first.firstJob.charAt(0).toLowerCase()}${first.firstJob.slice(1)}. Each setup step can be undone.`;
   }
   const items = Array.from(document.querySelectorAll<HTMLElement>("#prov li"));
   items.forEach((li) => li.classList.remove("run", "done"));
@@ -332,8 +333,27 @@ function provision(): void {
   $("prov-retry").setAttribute("hidden", "");
   items.forEach((li, i) => {
     window.setTimeout(() => { li.classList.add("run"); }, i * 700);
-    window.setTimeout(() => { li.classList.remove("run"); li.classList.add("done"); if (i === items.length - 1) void created.then((ok) => { $(ok ? "open-app" : "prov-retry").removeAttribute("hidden"); }); }, i * 700 + 650);
+    window.setTimeout(() => { li.classList.remove("run"); li.classList.add("done"); if (i === items.length - 1) void created.then((ok) => { if (ok) void arrive(plan); $(ok ? "open-app" : "prov-retry").removeAttribute("hidden"); }); }, i * 700 + 650);
   });
+}
+
+/** The team walks in one at a time and says hello, so the page ends on people rather than a progress list. */
+async function arrive(plan: SignupPlan | undefined): Promise<void> {
+  const box = $("arrivals");
+  box.innerHTML = "";
+  if (!plan) return;
+  const keys = ["admin-manager", ...plan.team.map((m) => m.key)];
+  const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  for (const key of keys) {
+    const p = personaFor(key, plan.team.find((m) => m.key === key)?.title);
+    const job = plan.team.find((m) => m.key === key)?.firstJob;
+    const card = document.createElement("div");
+    card.className = "arrival";
+    card.innerHTML = `<span class="av ${p.avatar}" aria-hidden="true">${esc(p.initials)}</span><div><b>${esc(p.name)} <span class="ob-role">${esc(p.role)}</span></b><p>${esc(introLines(p, profile.biz ?? "your business")[0] ?? "")}</p>${job ? `<p class="first">First job: ${esc(job)}</p>` : ""}</div>`;
+    box.appendChild(card);
+    if (!reduce) await new Promise((r) => window.setTimeout(r, 450));
+  }
+  $("prov-sub").textContent = "Everyone is here. They'd like to meet you properly, and ask a few things only you know.";
 }
 
 $("prov-retry").addEventListener("click", () => provision());

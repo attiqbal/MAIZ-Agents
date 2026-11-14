@@ -41,7 +41,7 @@
     <div class="group">Account</div>
     <a class="ni" href="#usage" data-nav="usage"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 2L4 14h7l-1 8 9-12h-7z"/></svg>Energy and spend</a>
     <a class="ni" href="#store" data-nav="store"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8l2-4h12l2 4M4 8v11h16V8M4 8h16M9 12h6"/></svg>Hire from the store</a>
-    <a class="ni" href="#setup" data-nav="setup"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h16v11H9l-5 4z"/><path d="M8 9.5h8M8 12.5h5"/></svg>Setup<span class="count" id="setup-badge">1</span></a>
+    <a class="ni" href="#firstday" data-nav="firstday"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h16v11H9l-5 4z"/><path d="M8 9.5h8M8 12.5h5"/></svg>First day<span class="count" id="setup-badge">1</span></a>
     <a class="ni" href="#settings" data-nav="settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3"/></svg>Settings</a>
     <a class="ni" href="/owner-decisions.html" id="owner-admin-link" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l8 3v6c0 4.5-3.2 8-8 9-4.8-1-8-4.5-8-9V6z"/></svg>Owner admin</a>
     </nav>
@@ -75,7 +75,7 @@
       <section class="panel" aria-labelledby="needs-h">
         <div class="panel-h"><h2 id="needs-h">Needs you</h2><span class="r">Usually under 2 minutes a day</span></div>
         <div class="needs" id="needs">
-          <div class="need hi" id="setup-need"><span class="k"><span class="av av-sm av-tl">AM</span>Setup · Admin manager</span><b>Fill in your 3-minute setup form</b><span class="d">So I can train your team, create your storage and prepare your AI models</span><div class="acts"><a class="btn btn-sm btn-primary" href="#setup">Open form</a></div></div>
+          <div class="need hi" id="setup-need"><span class="k"><span class="av av-sm av-tl">AM</span>Setup · Admin manager</span><b>Your team is waiting to meet you</b><span class="d">A short conversation: they introduce themselves, ask what they need and test each connection</span><div class="acts"><a class="btn btn-sm btn-primary" href="#firstday">Start your first day</a><a class="btn btn-sm btn-quiet" href="#setup">Prefer one form?</a></div></div>
           <div class="need hi" data-need="posts"><span class="k"><span class="av av-sm av-mm">MM</span>Approval · Marketing</span><b>3 Instagram posts for the autumn blend</b><span class="d">Ready to schedule for Thu to Sat</span><div class="acts"><a class="btn btn-sm btn-primary" href="#approvals">Review</a><button class="btn btn-sm btn-ghost" data-resolve="posts" data-msg="Posts approved and scheduled">Approve all</button></div></div>
           <div class="need" data-need="vat"><span class="k"><span class="av av-sm av-fm">FM</span>Question · Finance</span><b>Are you VAT registered?</b><span class="d">Needed for October's profit and loss</span><div class="acts"><button class="btn btn-sm btn-ghost" data-resolve="vat" data-msg="Thanks, Finance will close October">Yes</button><button class="btn btn-sm btn-ghost" data-resolve="vat" data-msg="Noted, no VAT applied">No</button><button class="btn btn-sm btn-quiet" data-resolve="vat" data-msg="Finance will help you check">Not sure</button></div></div>
           <div class="need" data-need="pack"><span class="k"><span class="av av-sm av-bc">BC</span>Alert · Consultant</span><b>Packaging cost up 18% this month</b><span class="d">Two cheaper suppliers found, saving about £140 a month</span><div class="acts"><button class="btn btn-sm btn-primary" data-resolve="pack" data-msg="Quote requests sent for approval">See options</button></div></div>
@@ -184,6 +184,19 @@
       <section class="panel" id="setup-run" hidden><div class="panel-h"><h2 id="setup-run-h">Setting up your team</h2><span class="r" id="setup-state"></span></div>
         <ul class="prov" id="setup-steps"></ul>
         <div class="acts" style="margin-top:16px"><button class="btn btn-ghost btn-sm" id="setup-undo" hidden>Undo setup</button></div></section>
+    </div>
+
+    <!-- FIRST DAY -->
+    <div class="content" data-screen="firstday" hidden>
+      <div class="page-h"><div><h1>Your first day</h1><p>Meet the people on your team. They ask for what they need, one at a time, and check every connection works before they rely on it.</p></div><a class="btn btn-ghost btn-sm" href="#setup">Prefer one form?</a></div>
+      <div class="fd">
+        <aside class="fd-roster" id="fd-roster" role="region" aria-label="Your team" tabindex="0"></aside>
+        <section class="fd-thread" aria-labelledby="fd-h">
+          <h2 class="sr-only" id="fd-h">Conversation with your team</h2>
+          <div class="fd-log" id="fd-log" role="log" aria-live="polite" aria-relevant="additions" tabindex="0"></div>
+          <div class="fd-reply" id="fd-reply" hidden></div>
+        </section>
+      </div>
     </div>
 
     <!-- TEAM -->
