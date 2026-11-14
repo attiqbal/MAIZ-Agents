@@ -7,6 +7,8 @@ import { LedgerError } from "../modules/ledger/index.js";
 import { IntegrationError } from "../modules/integrations/index.js";
 import { ReviewError } from "../modules/review/index.js";
 import { PricingError } from "../modules/pricing/index.js";
+import { OWNER_SPECIALISTS, PromoterError } from "../modules/promoter/index.js";
+import { GROWTH_ROLE, GrowthError, discoveryQueries } from "../modules/growth/index.js";
 import { DEFAULT_COMMISSION, DEFAULT_HOLD_DAYS, PromoError, describeCommission } from "../modules/promotions/index.js";
 import { EnergyError, parseAutoReload } from "../modules/energy/index.js";
 import { BatchError } from "../modules/batch/schedule.js";
@@ -187,6 +189,11 @@ export function createApp(p: Platform) {
     }
 
     // ---- a member of staff filling in their own details from their form link (no account) ----
+    // Public: the unsubscribe link in every promotion email. The secret token in the link is the only thing needed.
+    if (method === "POST" && path === "/api/promoter/unsubscribe") {
+      const t = String(body().token ?? "").slice(0, 100);
+      return p.promoter.unsubscribe(t) ? json(200, { unsubscribed: true }) : json(404, { error: "this link is not valid any more" });
+    }
     if (method === "POST" && (path === "/api/staff-form/open" || path === "/api/staff-form/save")) {
       const raw = body();
       if (!raw || typeof raw !== "object" || Array.isArray(raw)) throw new BadRequest("send the form as an object");
@@ -419,6 +426,17 @@ export function createApp(p: Platform) {
     if (path === "/api/owner/reviews" || path.startsWith("/api/owner/reviews/")) return ownerReviewRoutes(req, userId, body);
     if (path === "/api/owner/ai" || path.startsWith("/api/owner/ai/")) return ownerAiRoutes(req, userId, body);
     if (path === "/api/owner/prices" || path.startsWith("/api/owner/prices/")) return ownerPriceRoutes(req, userId, body);
+    if (method === "GET" && path === "/api/owner/team") {
+      if (!p.isPlatformOwner(userId)) return json(403, { error: "only the MAIZ platform owner can see the owner's team" });
+      const pw = p.promoter.waiting(userId), gw = p.growth.waiting(userId), go = p.growth.overview(userId);
+      const live = {
+        "promotion-agent": { waiting: pw.drafts.length + pw.plans.length, doing: `${p.promoter.campaignsList(userId).length} campaigns, ${p.promoter.leadsList(userId).length} people on the list`, due: p.promoter.followUpsDue(userId).length },
+        "community-growth-manager": { waiting: gw.items.length + gw.approvals.length, doing: `${go.opportunities.length} places, ${go.publications.length} publications recorded`, due: go.followUpsDue.length },
+      } as const;
+      return json(200, { specialists: OWNER_SPECIALISTS.map((s) => ({ ...s, status: live[s.key] })) });
+    }
+    if (path.startsWith("/api/owner/growth")) return ownerGrowthRoutes(req, userId, body);
+    if (path.startsWith("/api/owner/promoter")) return ownerPromoterRoutes(req, userId, body);
     if (path.startsWith("/api/owner/coupons") || path.startsWith("/api/owner/affiliates") || path === "/api/owner/promotions") return ownerPromoRoutes(req, userId, body);
     if (path.startsWith("/api/owner/")) {
       if (!p.isPlatformOwner(userId)) return json(403, { error: "only the MAIZ platform owner can see this" });
@@ -773,6 +791,75 @@ export function createApp(p: Platform) {
     };
   }
 
+  /** The community growth manager: the platform owner only. Nothing is posted, pitched or created by it; the owner does that by hand and records it here. */
+  async function ownerGrowthRoutes(req: Req, userId: string, body: () => any): Promise<Res> {
+    if (!p.isPlatformOwner(userId)) return json(403, { error: "only the MAIZ platform owner can use the community growth manager" });
+    const { method, path } = req;
+    const g = p.growth;
+    const overview = () => ({ ...g.overview(userId), report: g.report(userId) });
+    if (method === "GET" && path === "/api/owner/growth") return json(200, { ...overview(), role: GROWTH_ROLE, discovery: Object.fromEntries((["mocktestroom", "examutor", "maizagents"] as const).map((k) => [k, discoveryQueries(k)])) });
+    if (method === "POST" && path === "/api/owner/growth/opportunities") { g.addOpportunity(userId, body()); return json(201, overview()); }
+    if (method === "POST" && path === "/api/owner/growth/drafts") { await g.draft(userId, body()); return json(201, overview()); }
+    if (method === "POST" && path === "/api/owner/growth/approvals") { g.raiseApproval(userId, body()); return json(201, overview()); }
+    if (method === "POST" && path === "/api/owner/growth/accounts") { g.registerAccount(userId, body()); return json(201, overview()); }
+    const route = /^\/api\/owner\/growth\/(opportunities|drafts|approvals|publications)\/([\w-]{1,64})\/(update|approve|reject|edit|published|decide|verify|metrics|follow-up)$/.exec(path);
+    if (method === "POST" && route) {
+      const [, kind, id, action] = route as unknown as [string, string, string, string];
+      const b = body() ?? {};
+      if (kind === "opportunities" && action === "update") g.updateOpportunity(userId, id, b);
+      else if (kind === "drafts" && action === "approve") g.decide(userId, id, true, b.acknowledge === true);
+      else if (kind === "drafts" && action === "reject") g.decide(userId, id, false);
+      else if (kind === "drafts" && action === "edit") g.edit(userId, id, b);
+      else if (kind === "drafts" && action === "published") g.markPublished(userId, id, b);
+      else if (kind === "approvals" && action === "decide") g.decideApproval(userId, id, b.approve === true);
+      else if (kind === "publications" && action === "verify") g.verify(userId, id, b);
+      else if (kind === "publications" && action === "metrics") g.recordMetrics(userId, id, b);
+      else if (kind === "publications" && action === "follow-up") g.setFollowUp(userId, id, b);
+      else return json(404, { error: "not found" });
+      return json(200, overview());
+    }
+    return json(404, { error: "not found" });
+  }
+
+  /** The promotion agent: the platform owner only (the service checks again). Drafts wait for approval; nothing posts or spends by itself. */
+  async function ownerPromoterRoutes(req: Req, userId: string, body: () => any): Promise<Res> {
+    if (!p.isPlatformOwner(userId)) return json(403, { error: "only the MAIZ platform owner can use the promotion agent" });
+    const { method, path } = req;
+    const pr = p.promoter;
+    const overview = () => ({ campaigns: pr.campaignsList(userId), drafts: pr.items_(userId), leads: pr.leadsList(userId), followUpsDue: pr.followUpsDue(userId) });
+    if (method === "GET" && path === "/api/owner/promoter") return json(200, { ...overview(), knowledge: pr.knowledge(userId).sites });
+    if (method === "POST" && path === "/api/owner/promoter/facts") { const b = body(); return json(200, { facts: pr.addFact(userId, b.site, b.text) }); }
+    if (method === "POST" && path === "/api/owner/promoter/campaigns") return json(201, { campaign: pr.createCampaign(userId, body()), ...overview() });
+    if (method === "POST" && path === "/api/owner/promoter/leads") { const b = body(); const lead = pr.addLead(userId, b.site, b); return json(201, { lead: { ...lead, token: undefined }, ...overview() }); }
+    if (method === "POST" && path === "/api/owner/promoter/drafts") return json(201, { draft: await pr.draft(userId, body()), ...overview() });
+    const camp = /^\/api\/owner\/promoter\/campaigns\/([\w-]{1,64})\/(status|spend|results|report)$/.exec(path);
+    if (camp) {
+      const b = method === "POST" ? body() : {};
+      if (method === "GET" && camp[2] === "report") return json(200, { report: pr.report(userId, camp[1]!) });
+      if (method === "POST" && camp[2] === "status") pr.setCampaignStatus(userId, camp[1]!, b.status);
+      else if (method === "POST" && camp[2] === "spend") pr.recordSpend(userId, camp[1]!, b.amountGbp, b.note);
+      else if (method === "POST" && camp[2] === "results") pr.recordResult(userId, camp[1]!, b.metric, b.value, b.note);
+      else return json(404, { error: "not found" });
+      return json(200, overview());
+    }
+    const lead = /^\/api\/owner\/promoter\/leads\/([\w-]{1,64})\/replied$/.exec(path);
+    if (method === "POST" && lead) { pr.markReplied(userId, lead[1]!); return json(200, overview()); }
+    const d = /^\/api\/owner\/promoter\/drafts\/([\w-]{1,64})\/(approve|reject|edit|send|posted|preview)$/.exec(path);
+    if (d) {
+      const id = d[1]!;
+      if (method === "GET" && d[2] === "preview") return json(200, { preview: pr.preview(userId, id) });
+      if (method !== "POST") return json(404, { error: "not found" });
+      const b = body();
+      if (d[2] === "approve") pr.decide(userId, id, true, b.note);
+      else if (d[2] === "reject") pr.decide(userId, id, false, b.note);
+      else if (d[2] === "edit") pr.edit(userId, id, b);
+      else if (d[2] === "send") await pr.send(userId, id);
+      else pr.markPosted(userId, id, b.url);
+      return json(200, overview());
+    }
+    return json(404, { error: "not found" });
+  }
+
   /** Coupons and affiliates: the platform owner only (the services check again). */
   async function ownerPromoRoutes(req: Req, userId: string, body: () => any): Promise<Res> {
     if (!p.isPlatformOwner(userId)) return json(403, { error: "only the MAIZ platform owner can manage coupons and affiliates" });
@@ -911,7 +998,7 @@ export function createApp(p: Platform) {
     try {
       return renewed(req, await route(req));
     } catch (err) {
-      if (err instanceof BadRequest || err instanceof SetupError || err instanceof SignupError || err instanceof LedgerError || err instanceof ChannelError || err instanceof IntegrationError || err instanceof ReviewError || err instanceof PeopleError || err instanceof PricingError || err instanceof PromoError || err instanceof EnergyError || err instanceof SettingsError || err instanceof BatchError || err instanceof PaymentError || err instanceof RotaError) return json(400, { error: err.message });
+      if (err instanceof BadRequest || err instanceof SetupError || err instanceof SignupError || err instanceof LedgerError || err instanceof ChannelError || err instanceof IntegrationError || err instanceof ReviewError || err instanceof PeopleError || err instanceof PricingError || err instanceof PromoError || err instanceof PromoterError || err instanceof GrowthError || err instanceof EnergyError || err instanceof SettingsError || err instanceof BatchError || err instanceof PaymentError || err instanceof RotaError) return json(400, { error: err.message });
       if (err instanceof PermissionError) return json(403, { error: "you don't have permission to do that" });
       console.error(`${req.method} ${req.path} failed:`, err);
       return json(500, { error: "something went wrong" });

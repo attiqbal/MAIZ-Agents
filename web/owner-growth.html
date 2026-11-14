@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+<head>
+<!--@include head title="Community growth · MAIZ Agents" description="The platform owner's content distribution and community growth manager."-->
+<meta name="robots" content="noindex">
+</head>
+<body>
+<div class="page-top">
+  <!--@include owner-header-->
+  <main id="main">
+    <section class="section">
+      <div class="container" style="max-width:1180px">
+        <!--@include owner-nav-->
+        <div class="rv-head">
+          <div><h1>Community growth</h1>
+            <p class="sub">Content Distribution &amp; Community Growth Manager for Mock Test Room, Examutor and MAIZ Agents. It researches places to publish, writes for each one, and keeps the record. It never posts, pitches, opens accounts or promises anything for you.</p></div>
+          <span class="badge badge-dark" id="ow-eg" hidden>Example data</span>
+        </div>
+        <div class="ob-panel" id="ow-gate" hidden aria-live="polite"><h2 id="ow-gate-h" style="font-size:1.25rem;margin:0 0 6px"></h2><p id="ow-gate-p" class="sub" style="margin:0 0 14px"></p><a class="btn btn-primary" id="ow-gate-a" href="/signin.html">Log in</a></div>
+        <div id="ow-body">
+          <div class="ow-stack">
+            <div class="learn"><b>How it works.</b>Research a place, score it, record its rules, draft for it, you approve, you publish by hand, then record the link, check it is live and log the results. Reddit: at most 3 contributions a day and one visit a week to each community, one account only, affiliation always disclosed, links only where the community and audience fit allow them. Nothing bypasses a CAPTCHA, a rate limit or moderation.</div>
+
+            <section class="panel" aria-labelledby="wa-h"><div class="panel-h"><h2 id="wa-h">Waiting for your approval</h2><span class="r" id="wa-count"></span></div>
+              <div id="wa-list" class="ow-stack"></div></section>
+
+            <section class="panel" aria-labelledby="op-h"><div class="panel-h"><h2 id="op-h">Opportunities</h2><span class="r" id="op-count"></span></div>
+              <p class="muted small">Add a place you found, score it from 0 to 5, then record what its rules say. Drafting stays locked until the rules are recorded.</p>
+              <form class="ow-stack" id="op-form" novalidate>
+                <div class="ow-grid">
+                  <div class="field"><label for="op-site">Website</label><select class="input" id="op-site"></select></div>
+                  <div class="field"><label for="op-platform">Kind of place</label><select class="input" id="op-platform"></select></div>
+                  <div class="field"><label for="op-name">Name</label><input class="input" id="op-name" maxlength="120" placeholder="r/ASAT, a blog, a forum…"></div>
+                  <div class="field"><label for="op-url">Web address</label><input class="input" id="op-url" type="url" maxlength="400" placeholder="https://"></div>
+                  <div class="field" style="grid-column:1/-1"><label for="op-aud">Who reads it</label><input class="input" id="op-aud" maxlength="300"></div>
+                  <div class="field"><label for="op-fit">Audience fit (0 to 5)</label><input class="input" id="op-fit" type="number" min="0" max="5" step="1" value="3"></div>
+                  <div class="field"><label for="op-dom">Site quality (0 to 5)</label><input class="input" id="op-dom" type="number" min="0" max="5" step="1" value="3"></div>
+                  <div class="field"><label for="op-rules">Rules fit (0 to 5)</label><input class="input" id="op-rules" type="number" min="0" max="5" step="1" value="3"><span class="hint">0 means its rules forbid this.</span></div>
+                  <div class="field"><label for="op-com">Links and promotion</label><select class="input" id="op-com"></select></div>
+                </div>
+                <div class="acts"><button class="btn btn-primary" type="submit">Add and score</button><span class="muted small" id="op-msg" role="status"></span></div>
+              </form>
+              <div class="tbl-wrap" tabindex="0" role="region" aria-label="Opportunities, scrolls sideways on small screens"><table class="tbl" id="op-table"></table></div>
+              <div id="op-rules-box" class="ow-stack" hidden>
+                <h3 class="small" id="op-rules-h"></h3>
+                <div class="field"><label for="op-rules-text">What the rules say (at least 20 characters)</label><textarea class="input" id="op-rules-text" rows="4" maxlength="1500"></textarea></div>
+                <div class="acts"><button type="button" class="btn btn-primary btn-sm" id="op-rules-save">Save rules</button><button type="button" class="btn btn-quiet btn-sm" id="op-rules-close">Cancel</button><span class="muted small" id="op-rules-msg" role="status"></span></div>
+              </div>
+              <details class="panel"><summary><b>Search phrases to find places</b></summary><div id="op-disc" class="ow-stack"></div></details>
+            </section>
+
+            <section class="panel" aria-labelledby="dr-h"><div class="panel-h"><h2 id="dr-h">Write a draft</h2></div>
+              <form class="ow-stack" id="dr-form" novalidate>
+                <div class="ow-grid">
+                  <div class="field"><label for="dr-opp">Place</label><select class="input" id="dr-opp"></select></div>
+                  <div class="field"><label for="dr-mode">What to write</label><select class="input" id="dr-mode"><option value="contribution">A reply or answer in a discussion</option><option value="article">An article for a blog or publication</option><option value="guest_pitch">A guest-post pitch to an editor</option></select></div>
+                  <div class="field" id="dr-turl-f"><label for="dr-turl">The discussion's web address</label><input class="input" id="dr-turl" type="url" maxlength="400" placeholder="https://"></div>
+                  <div class="field" id="dr-tsum-f" style="grid-column:1/-1"><label for="dr-tsum">What the discussion is asking</label><input class="input" id="dr-tsum" maxlength="500"><span class="hint">Replies must answer a real question. This is how the agent knows a link belongs.</span></div>
+                  <div class="field" style="grid-column:1/-1"><label for="dr-brief">What should it say? (optional)</label><input class="input" id="dr-brief" maxlength="600"></div>
+                </div>
+                <div class="acts"><button class="btn btn-primary" type="submit" id="dr-go">Write draft</button><span class="muted small" id="dr-msg" role="status"></span></div>
+              </form></section>
+
+            <section class="panel" aria-labelledby="ac-h"><div class="panel-h"><h2 id="ac-h">Accounts and permissions</h2></div>
+              <p class="muted small">The agent never creates accounts or makes commitments. To use a platform you approve an account request, open the account yourself, then record it here. One account per platform.</p>
+              <div id="ac-list" class="ow-stack"></div>
+              <form class="ow-stack" id="ap-form" novalidate>
+                <div class="ow-grid">
+                  <div class="field"><label for="ap-kind">Ask your approval for</label><select class="input" id="ap-kind"><option value="account">A new account</option><option value="commitment">A commitment for the company</option><option value="other">Something else</option></select></div>
+                  <div class="field"><label for="ap-platform">Platform (accounts)</label><select class="input" id="ap-platform"></select></div>
+                  <div class="field" style="grid-column:1/-1"><label for="ap-sum">What and why</label><input class="input" id="ap-sum" maxlength="400"></div>
+                </div>
+                <div class="acts"><button class="btn btn-primary" type="submit">Ask me</button><span class="muted small" id="ap-msg" role="status"></span></div>
+              </form>
+              <form class="ow-stack" id="rg-form" novalidate>
+                <div class="ow-grid">
+                  <div class="field"><label for="rg-platform">I opened an approved account on</label><select class="input" id="rg-platform"></select></div>
+                  <div class="field"><label for="rg-handle">Account name</label><input class="input" id="rg-handle" maxlength="60" autocomplete="off"></div>
+                </div>
+                <div class="acts"><button class="btn btn-primary" type="submit">Record account</button><span class="muted small" id="rg-msg" role="status"></span></div>
+              </form></section>
+
+            <section class="panel" aria-labelledby="pb-h"><div class="panel-h"><h2 id="pb-h">What went out, and what it earned</h2><span class="r" id="pb-count"></span></div>
+              <div id="rp-kpis" class="ow-stack"></div>
+              <div class="tbl-wrap" tabindex="0" role="region" aria-label="Publication record, scrolls sideways on small screens"><table class="tbl" id="pb-table"></table></div></section>
+
+            <section class="panel" aria-labelledby="ro-h"><div class="panel-h"><h2 id="ro-h">The role</h2></div>
+              <details><summary>Read the full brief the agent works to</summary><pre class="small" id="ro-text" style="white-space:pre-wrap"></pre></details></section>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+<!--@include footer-->
+<script type="module" src="/src/owner-growth.ts"></script>
+</body>
+</html>

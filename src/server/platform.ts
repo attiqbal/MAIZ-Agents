@@ -40,6 +40,9 @@ import { brandFrom, decisionsWaitingEmail, ownerAlertEmail } from "./email-templ
 import { userIdFor } from "./identity.js";
 import { ExpiringSet, SendLog } from "./expiring.js";
 import { AffiliateService, CouponService } from "../modules/promotions/index.js";
+import { PromoterService } from "../modules/promoter/index.js";
+import { GrowthService } from "../modules/growth/index.js";
+import { COMPANY } from "../company.js";
 import { CredentialStore } from "../modules/credentials/index.js";
 
 export interface PlatformConfig {
@@ -153,7 +156,7 @@ export function createPlatform(cfg: PlatformConfig) {
   const ownerDecisions = (): OpenDecision[] => {
     const owner = [...ownerIdSet][0];
     if (!owner) return [];
-    return openDecisions({ reviews: reviews.queue(owner), specialists: specialists.queue(owner) }, now().getTime());
+    return openDecisions({ reviews: reviews.queue(owner), specialists: specialists.queue(owner), promotions: promoter.waiting(owner), growth: growth.waiting(owner) }, now().getTime());
   };
   // One email for any number of waiting decisions, with a button to the page that lists them all.
   const decisionDigest = new DecisionDigest({
@@ -165,6 +168,21 @@ export function createPlatform(cfg: PlatformConfig) {
       }
     },
   });
+  /**
+   * The promotion agent for the owner's three websites. Everything it drafts waits for the owner (the same decisions
+   * page and email digest as quality review); it sends email only one person at a time and only after approval.
+   */
+  const promoter = new PromoterService((userId) => ownerIdSet.has(userId), {
+    now, completer: gateway, send: (mail) => email.send(mail),
+    unsubscribeUrl: (token) => `${base}/unsubscribe.html#t=${encodeURIComponent(token)}`,
+    sender: { name: COMPANY.name, address: COMPANY.registeredOffice },
+    notifyOwner: () => decisionDigest.poke(),
+  });
+  /**
+   * The Content Distribution and Community Growth Manager: researches places to publish, drafts for each one, and records
+   * what went out and what it earned. Owner only. It never posts, creates accounts or sends pitches itself.
+   */
+  const growth = new GrowthService((userId) => ownerIdSet.has(userId), { now, completer: gateway, notifyOwner: () => decisionDigest.poke() });
   /** MAIZ quality review: every client's specialised tasks wait here for the platform owner's sign-off. */
   const reviews = new QualityReviewService(identity, audit, isPlatformOwner, {
     now,
@@ -448,10 +466,12 @@ export function createPlatform(cfg: PlatformConfig) {
     for (const x of s.promoRecords ?? []) {
       if (x.kind === "coupon") coupons.restoreCoupon(x.data);
       else if (x.kind === "redemption") coupons.restoreRedemption(x.data);
+      else if (["campaign", "draft", "lead", "optout", "fact"].includes(x.kind)) promoter.restore(x.kind, x.data);
+      else if (["opportunity", "post", "publication", "account", "approval"].includes(x.kind)) growth.restore(x.kind, x.data);
       else affiliates.restore(x.kind, x.data);
     }
     sink = store;
-    for (const part of [audit, identity, energy, workforce, ledger, router, admin, integrations, reviews, prices, specialists, aiSettings, spend, batch, payments, rota, reconciliation, people, conversations, notices, credentials, coupons, affiliates]) part.useSink(store);
+    for (const part of [audit, identity, energy, workforce, ledger, router, admin, integrations, reviews, prices, specialists, aiSettings, spend, batch, payments, rota, reconciliation, people, conversations, notices, credentials, coupons, affiliates, promoter, growth]) part.useSink(store);
   }
 
   const healthy = () => (sink as { healthy?: boolean } | undefined)?.healthy !== false;
@@ -473,6 +493,6 @@ export function createPlatform(cfg: PlatformConfig) {
   const codeFails = new SendLog(15 * 60_000);
   /** Starts a sleeping RunPod worker for a client who just opened the app or started typing. */
   const warm = () => routing?.warm() ?? "skipped";
-  return { conversations, notices, warm, ownerDecisions, decisionDigest, dashboard, reconciliation, rota, people, payments, batch, email, usedLinks, sends, loginFails, resets, credentials, formHits, codeFails, coupons, affiliates, admin, reviews, prices, specialists, ai, clients, isPlatformOwner, healthy, cfg, now, audit, bus, identity, energy, workforce, ledger, onboarding, router, integrations, slackTokens, saveSlackToken, attachStore };
+  return { conversations, notices, warm, ownerDecisions, decisionDigest, dashboard, reconciliation, rota, people, payments, batch, email, usedLinks, sends, loginFails, resets, credentials, formHits, codeFails, coupons, affiliates, promoter, growth, admin, reviews, prices, specialists, ai, clients, isPlatformOwner, healthy, cfg, now, audit, bus, identity, energy, workforce, ledger, onboarding, router, integrations, slackTokens, saveSlackToken, attachStore };
 }
 export type Platform = ReturnType<typeof createPlatform>;
