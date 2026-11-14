@@ -8,9 +8,9 @@
  */
 
 /** What a connection can be used for. Employees are granted capabilities, never raw app access. */
-export type Capability = "sales.read" | "payroll.read" | "accounts.read";
+export type Capability = "sales.read" | "payroll.read" | "accounts.read" | "traffic.read" | "search.read";
 
-export type Category = "till" | "payroll" | "accounting" | "payments" | "ecommerce" | "bridge";
+export type Category = "till" | "payroll" | "accounting" | "payments" | "ecommerce" | "marketing" | "bridge";
 
 /**
  * How honest we can be about an app today.
@@ -85,10 +85,40 @@ export interface AccountsMonth {
   netProfit: number;
 }
 
+/** One day of a website's visits, from the owner's own analytics. Revenue is in minor units, like the ledger. */
+export interface TrafficDay {
+  /** YYYY-MM-DD */
+  date: string;
+  currency: string;
+  sessions: number;
+  users: number;
+  newUsers: number;
+  engagedSessions: number;
+  /** Key events (what the owner marked as a goal: a sign-up, a purchase, an enquiry). */
+  conversions: number;
+  revenue: number;
+  /** Visits by where they came from (organic search, direct, social ...), biggest first. */
+  channels: { name: string; sessions: number; conversions: number }[];
+}
+
+/** One day of a website's appearance in Google search. */
+export interface SearchDay {
+  /** YYYY-MM-DD */
+  date: string;
+  clicks: number;
+  impressions: number;
+  /** Average position in the results (1 is the top), to one decimal. */
+  position: number;
+  /** The searches that brought the most clicks in the 28 days to this date. Only the newest day carries it. */
+  topQueries?: { query: string; clicks: number; impressions: number; position: number }[];
+}
+
 export interface Records {
   sales?: SalesDay[];
   payroll?: PayrollRun[];
   accounts?: AccountsMonth[];
+  traffic?: TrafficDay[];
+  search?: SearchDay[];
 }
 
 export interface ParsedFile extends Records {
@@ -140,6 +170,11 @@ export interface Connector {
   exchangeCode?(http: typeof fetch, app: OAuthApp, code: string): Promise<{ credentials: Credentials; externalAccount?: string }>;
   /** Check API-key values before saving them. Returns a plain-language problem, or undefined when fine. */
   validate?(values: Record<string, string>): string | undefined;
+  /**
+   * What the connected login can pick from (Google Analytics properties, Search Console sites). When there is
+   * more than one, the owner chooses; the pick is kept as the credentials' `tenant`.
+   */
+  choices?(ctx: ConnectorContext): Promise<{ id: string; name: string }[]>;
   /** Swap a refresh token for a fresh access token. Called before `read` when the token has expired. */
   refresh?(http: typeof fetch, app: OAuthApp, credentials: Credentials): Promise<Credentials>;
 }

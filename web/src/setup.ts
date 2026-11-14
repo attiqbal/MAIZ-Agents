@@ -185,6 +185,11 @@ async function initSetupLive(): Promise<boolean> {
     if (!res.ok || !res.data) { toast("Could not undo. Try again."); return; }
     apply(res.data);
   });
+  // The first-day conversation sends the same form; refresh this screen when it has.
+  window.addEventListener("maiz:setup-changed", async () => {
+    const fresh = await api<LiveStatus>("/setup");
+    if (fresh.ok && fresh.data) apply(fresh.data);
+  });
   return true;
 }
 

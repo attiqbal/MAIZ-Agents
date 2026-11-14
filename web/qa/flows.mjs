@@ -77,15 +77,16 @@ const mk = async (opts = {}) => { const ctx = await b.newContext({ viewport: { w
   await p.keyboard.press("Escape");
   ok("bell: Escape closes it", !(await p.isVisible("#bell-panel")));
   await p.goto(B + "/app.html#home"); await p.waitForTimeout(400);
-  for (const s of ["approvals", "work", "team", "usage", "store", "finance", "compliance", "apps", "setup", "settings"]) {
-    await p.click(`.rail a[data-nav="${s}"]`); await p.waitForTimeout(150);
-    ok(`app nav: ${s} screen opens`, await p.isVisible(`[data-screen="${s}"] h1`) && (await p.getAttribute(`.rail a[data-nav="${s}"]`, "aria-current")) === "page");
+  // Screens are picked by the hash; departments own the rail links, so open each directly.
+  for (const s of ["approvals", "work", "team", "usage", "store", "finance", "compliance", "apps", "setup", "firstday", "settings"]) {
+    await p.evaluate((h) => { location.hash = h; }, s); await p.waitForTimeout(200);
+    ok(`app nav: ${s} screen opens`, await p.isVisible(`[data-screen="${s}"] h1`));
   }
-  await p.click('.rail a[data-nav="store"]'); await p.waitForTimeout(500);
+  await p.evaluate(() => { location.hash = "store"; }); await p.waitForTimeout(500);
   ok("store (signed in): opens inside the control centre with the picker", p.url().includes("app.html#store") && (await p.locator("#store-pick option").count()) > 1);
-  await p.click('.rail a[data-nav="apps"]'); await p.waitForTimeout(400);
+  await p.evaluate(() => { location.hash = "apps"; }); await p.waitForTimeout(400);
   ok("apps (signed in): catalogue from API", (await p.locator("#apps-grid .app-card").count()) >= 5);
-  await p.click('.rail a[data-nav="settings"]'); await p.click("[data-signout]"); await p.waitForURL(/signin/);
+  await p.evaluate(() => { location.hash = "settings"; }); await p.click("[data-signout]"); await p.waitForURL(/signin/);
   ok("sign out returns to log in", true);
   await p.context().close();
 }

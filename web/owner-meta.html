@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+<!--@include head title="Meta approval · MAIZ Agents" description="The MAIZ platform owner's view of Meta App Review: what is approved, what is pending, and whether MAIZ is ready to go live."-->
+<meta name="robots" content="noindex">
+</head>
+<body>
+<div class="page-top">
+  <!--@include owner-header-->
+  <main id="main">
+    <section class="section">
+      <div class="container" style="max-width:1180px">
+        <!--@include owner-nav-->
+        <div class="rv-head">
+          <div><h1>Meta approval</h1>
+            <p class="sub">Where MAIZ stands with Meta as a service provider for clients' Facebook, Instagram and WhatsApp. Going live is a settings change, not new code.</p></div>
+          <span class="badge badge-dark" id="ow-eg" hidden>Example data</span>
+        </div>
+        <div class="ob-panel" id="ow-gate" hidden aria-live="polite"><h2 id="ow-gate-h" style="font-size:1.25rem;margin:0 0 6px"></h2><p id="ow-gate-p" class="sub" style="margin:0 0 14px"></p><a class="btn btn-primary" id="ow-gate-a" href="/signin.html">Log in</a></div>
+        <div id="ow-body">
+          <div class="ow-stack">
+            <div class="kpis" id="om-kpis"></div>
+            <section class="panel" aria-labelledby="om-perm-h"><div class="panel-h"><h2 id="om-perm-h">Permissions</h2><span class="r" id="om-perm-count"></span></div>
+              <p class="muted small">Meta decides these, not MAIZ. Record each decision here when Meta emails you, so this page always matches the App Review dashboard. The justification and screencast script for every row are in <span class="mono">docs/META-APP-REVIEW.md</span>.</p>
+              <div class="tbl-wrap" tabindex="0" role="region" aria-label="Permissions and review status, scrolls sideways on small screens"><table class="tbl" id="om-perms"></table></div>
+              <span class="muted small" id="om-msg" role="status"></span>
+            </section>
+            <section class="panel" aria-labelledby="om-ready-h"><div class="panel-h"><h2 id="om-ready-h">Ready to go live?</h2><span class="r" id="om-ready-count"></span></div>
+              <p class="muted small">Settings are read from the server. The three page checks really load your public pages just now.</p>
+              <ul class="ow-list" id="om-ready"></ul></section>
+            <section class="panel" aria-labelledby="om-url-h"><div class="panel-h"><h2 id="om-url-h">Addresses to enter in the Meta dashboard</h2></div>
+              <div class="tbl-wrap" tabindex="0" role="region" aria-label="Addresses for the Meta dashboard"><table class="tbl" id="om-urls"></table></div></section>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+<!--@include footer-->
+<script type="module" src="/src/owner-meta.ts"></script>
+</body>
+</html>

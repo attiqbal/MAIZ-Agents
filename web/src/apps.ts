@@ -3,11 +3,12 @@ import { api, getToken } from "./api";
 import { toast } from "./common";
 
 interface CatalogueItem {
-  key: string; name: string; category: "till" | "payroll" | "accounting" | "payments" | "ecommerce" | "bridge"; summary: string;
+  key: string; name: string; category: "till" | "payroll" | "accounting" | "payments" | "ecommerce" | "marketing" | "bridge"; summary: string;
   availability: "live" | "file" | "partner" | "planned"; note?: string;
   connect: "oauth" | "api_key" | "webhook" | "file" | "bridge"; howToExport?: string[]; fields?: { key: string; label: string; help?: string }[]; acceptsFiles: boolean; defaultAccess: string[];
 }
-interface Connection { id: string; connectorKey: string; status: string; lastSyncAt?: string; lastError?: string; access: string[] }
+interface Connection { id: string; connectorKey: string; status: string; lastSyncAt?: string; lastError?: string; access: string[]; needsChoice?: boolean; externalAccount?: string }
+interface Growth { connected: boolean; waiting: string[]; lines: string[]; growth: { alerts: { severity: "bad" | "good"; title: string; detail: string }[] } }
 interface Pending { id: string; kind: "sales" | "payroll"; date: string; data: { currency: string; gross: number; net?: number; transactions?: number; headcount?: number } }
 interface AppsData { catalogue: CatalogueItem[]; connections: Connection[]; pending: Pending[] }
 interface ImportResult { added: number; updated: number; unchanged: number; conflicts: string[]; warnings: string[]; unmapped: string[] }
@@ -17,9 +18,9 @@ const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&
 const money = (n: number, cur: string) => { try { return new Intl.NumberFormat(undefined, { style: "currency", currency: cur }).format(n / 100); } catch { return `${(n / 100).toFixed(2)} ${cur}`; } };
 
 const EMPLOYEES: [string, string][] = [["finance-manager", "Finance"], ["business-consultant", "Consultant"], ["marketing-manager", "Marketing"], ["hr-manager", "HR"]];
-const CATEGORY: Record<CatalogueItem["category"], string> = { till: "Tills", payroll: "Payroll", accounting: "Accounting", payments: "Payments", ecommerce: "Online shop", bridge: "Any other app" };
+const CATEGORY: Record<CatalogueItem["category"], string> = { till: "Tills", payroll: "Payroll", accounting: "Accounting", payments: "Payments", ecommerce: "Online shop", marketing: "Website and Google", bridge: "Any other app" };
 /** Filter chips: payments and online shops share one. */
-const GROUP: Record<CatalogueItem["category"], string> = { till: "till", payroll: "payroll", accounting: "accounting", payments: "payments", ecommerce: "payments", bridge: "bridge" };
+const GROUP: Record<CatalogueItem["category"], string> = { till: "till", payroll: "payroll", accounting: "accounting", payments: "payments", ecommerce: "payments", marketing: "marketing", bridge: "bridge" };
 const BADGE: Record<CatalogueItem["availability"], [string, string]> = {
   live: ["good", "Connects directly"], file: ["info", "File upload"], planned: ["info", "Direct connection coming"], partner: ["warn", "API is partner-only"],
 };
@@ -43,12 +44,20 @@ let live = false;
 let filter = "all";
 let uploading: CatalogueItem | undefined;
 let keying: CatalogueItem | undefined;
+let growth: Growth | undefined;
+/** Options Google offered for a connection that still needs a property or site picked. */
+const choicesFor = new Map<string, { id: string; name: string }[]>();
 
 export async function loadApps(): Promise<void> {
   // Logged-out visitors see the example catalogue; asking the API would only return "not signed in".
   const r = getToken() ? await api<AppsData>("/integrations") : { ok: false, data: undefined };
   live = r.ok && !!r.data;
   data = live ? r.data! : DEMO;
+  growth = undefined;
+  if (live && data.connections.some((c) => c.connectorKey === "ga4" || c.connectorKey === "search-console")) {
+    const g = await api<Growth>("/integrations/growth");
+    if (g.ok && g.data) growth = g.data;
+  }
   setAppsView(view);
 }
 
@@ -73,6 +82,14 @@ function render(): void {
     return `<div class="app-line"><span>${esc(p.date)}</span><span>${esc(what)}</span><span class="mono">${esc(money(d.gross, d.currency))}</span></div>`;
   }).join("");
 
+  // Growth this week (Google Analytics and Search Console)
+  $("apps-growth-panel").hidden = !growth?.connected;
+  if (growth?.connected) {
+    const alerts = growth.growth.alerts.map((a) => `<p class="status wrap ${a.severity === "bad" ? "crit" : "good"}"><span class="dot"></span><span><b>${esc(a.title)}.</b> ${esc(a.detail)}</span></p>`).join("");
+    const waiting = growth.waiting.length ? `<p class="status wrap warn"><span class="dot"></span>Choose which website to read in the Connected list below (${esc(growth.waiting.join(", "))}).</p>` : "";
+    $("apps-growth").innerHTML = waiting + alerts + growth.lines.map((l) => `<p class="small">${esc(l)}</p>`).join("");
+  }
+
   // Connected
   $("apps-connected-panel").hidden = data.connections.length === 0;
   $("apps-connected").innerHTML = data.connections.map((c) => {
@@ -80,13 +97,17 @@ function render(): void {
     const state = c.status === "error" ? `<span class="status crit"><span class="dot"></span>${esc(c.lastError ?? "Needs attention")}</span>`
       : `<span class="status good"><span class="dot"></span>${c.lastSyncAt ? `Updated ${esc(new Date(c.lastSyncAt).toLocaleString())}` : "Connected"}</span>`;
     const chips = EMPLOYEES.map(([k, label]) => `<button type="button" class="chip" aria-pressed="${c.access.includes(k)}" data-access="${esc(c.id)}" data-emp="${k}">${label}</button>`).join("");
+    const options = choicesFor.get(c.id);
+    const choose = !c.needsChoice ? (c.externalAccount && item?.category === "marketing" ? `<p class="xs muted">Reading: ${esc(c.externalAccount)}</p>` : "")
+      : options ? `<div class="field"><label for="pick-${esc(c.id)}">Which one should your team read?</label><select class="input" id="pick-${esc(c.id)}">${options.map((o) => `<option value="${esc(o.id)}">${esc(o.name)}</option>`).join("")}</select></div><div class="acts"><button class="btn btn-primary btn-sm" data-pick="${esc(c.id)}">Use this one</button></div>`
+      : `<p class="small status wrap warn"><span class="dot"></span>Google found more than one. Choose which to read.</p><div class="acts"><button class="btn btn-primary btn-sm" data-choices="${esc(c.id)}">Choose</button></div>`;
     const actions = [
-      item?.connect === "oauth" ? `<button class="btn btn-ghost btn-sm" data-sync="${esc(c.id)}">Update now</button>` : "",
+      item?.connect === "oauth" && !c.needsChoice ? `<button class="btn btn-ghost btn-sm" data-sync="${esc(c.id)}">Update now</button>` : "",
       item?.acceptsFiles ? `<button class="btn btn-ghost btn-sm" data-upload="${esc(c.connectorKey)}">Upload file</button>` : "",
       `<button class="btn btn-quiet btn-sm" data-disconnect="${esc(c.id)}">Disconnect</button>`,
     ].join("");
     return `<div class="app-conn"><div class="app-conn-h"><b>${esc(item?.name ?? c.connectorKey)}</b>${state}</div>
-      <div class="field"><span class="label" id="acc-${esc(c.id)}">Who on your team can see it</span><div class="chips" role="group" aria-labelledby="acc-${esc(c.id)}">${chips}</div></div>
+      ${choose}<div class="field"><span class="label" id="acc-${esc(c.id)}">Who on your team can see it</span><div class="chips" role="group" aria-labelledby="acc-${esc(c.id)}">${chips}</div></div>
       <div class="acts">${actions}</div></div>`;
   }).join("");
 
@@ -157,6 +178,25 @@ export function initApps(): void {
         $<HTMLDialogElement>("apps-hook").showModal();
         void loadApps();
       } else location.href = r.data.url;
+      return;
+    }
+    const ch = t.closest<HTMLElement>("[data-choices]");
+    if (ch) {
+      const r = await api<{ choices: { id: string; name: string }[] }>(`/integrations/connections/${ch.dataset.choices}/choices`);
+      if (!r.ok || !r.data) { toast((r.data as { error?: string } | undefined)?.error ?? "Could not ask Google"); return; }
+      choicesFor.set(ch.dataset.choices!, r.data.choices);
+      render();
+      return;
+    }
+    const pick = t.closest<HTMLElement>("[data-pick]");
+    if (pick) {
+      const id = pick.dataset.pick!;
+      const r = await api(`/integrations/connections/${id}/choose`, { body: { id: $<HTMLSelectElement>(`pick-${id}`).value } });
+      if (!r.ok) { toast((r.data as { error?: string } | undefined)?.error ?? "Could not save that choice"); return; }
+      choicesFor.delete(id);
+      toast("Saved. Updating your figures…");
+      await api(`/integrations/connections/${id}/sync`, { body: {} });
+      void loadApps();
       return;
     }
     const sync = t.closest<HTMLElement>("[data-sync]");

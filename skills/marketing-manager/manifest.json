@@ -21,7 +21,15 @@
       "status": "planned"
     },
     {
-      "name": "Email platform and analytics connections",
+      "name": "Google Analytics and Search Console (read-only)",
+      "status": "available"
+    },
+    {
+      "name": "Weekly growth report and drop alerts",
+      "status": "available"
+    },
+    {
+      "name": "Email platform connection",
       "status": "planned"
     }
   ],
@@ -107,6 +115,14 @@
       "energy": [
         10,
         25
+      ]
+    },
+    {
+      "name": "Weekly growth report and alerts (from Google Analytics and Search Console)",
+      "cadence": "Weekly",
+      "energy": [
+        0,
+        0
       ]
     }
   ]

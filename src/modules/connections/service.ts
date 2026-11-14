@@ -4,6 +4,8 @@ import { normalizeNumber, WhatsAppError, type WhatsAppConfig } from "../whatsapp
 import type { OAuthApp } from "../integrations/index.js";
 import { CATALOG, defOf, type ConnDef, type ConnKey, type GuideStep } from "./catalog.js";
 import { probeApp, ProbeUnreachable, type ProbeKind } from "./probes.js";
+import { deskKeyWorks } from "../research/desk.js";
+import { redditToken, ResearchError, xTokenWorks, youtubeKeyWorks } from "../research/sources.js";
 
 /**
  * The platform owner's connections (Facebook, Instagram, WhatsApp, and the status of the server-set services).
@@ -71,10 +73,17 @@ const ENV: Partial<Record<ConnKey, { vars: Record<string, string>; required: str
   slack: { vars: { clientId: "SLACK_CLIENT_ID", clientSecret: "SLACK_CLIENT_SECRET", signingSecret: "SLACK_SIGNING_SECRET" }, required: ["clientId", "clientSecret", "signingSecret"], extra: ["SLACK_REDIRECT_URI"] },
   xero: { vars: { clientId: "XERO_CLIENT_ID", clientSecret: "XERO_CLIENT_SECRET" }, required: ["clientId", "clientSecret"] },
   square: { vars: { clientId: "SQUARE_CLIENT_ID", clientSecret: "SQUARE_CLIENT_SECRET" }, required: ["clientId", "clientSecret"] },
+  "google-data": { vars: { clientId: "GOOGLE_DATA_CLIENT_ID", clientSecret: "GOOGLE_DATA_CLIENT_SECRET" }, required: ["clientId", "clientSecret"] },
+  reddit: { vars: { clientId: "REDDIT_CLIENT_ID", clientSecret: "REDDIT_CLIENT_SECRET", username: "REDDIT_USERNAME" }, required: ["clientId", "clientSecret", "username"] },
+  youtube: { vars: { apiKey: "YOUTUBE_API_KEY" }, required: ["apiKey"] },
+  x: { vars: { bearerToken: "X_BEARER_TOKEN" }, required: ["bearerToken"] },
+  fred: { vars: { apiKey: "FRED_API_KEY" }, required: ["apiKey"] },
+  alphavantage: { vars: { apiKey: "ALPHAVANTAGE_API_KEY" }, required: ["apiKey"] },
+  companieshouse: { vars: { apiKey: "COMPANIES_HOUSE_API_KEY" }, required: ["apiKey"] },
 };
 /** Secrets set only on the server, so a test message can never carry one back. */
 const SERVER_SECRETS = ["STRIPE_SECRET_KEY", "STRIPE_WEBHOOK_SECRET", "RUNPOD_API_KEY", "ANTHROPIC_API_KEY"];
-const PROBED: readonly ConnKey[] = ["google", "microsoft", "slack", "xero", "square"];
+const PROBED: readonly ConnKey[] = ["google", "microsoft", "slack", "xero", "square", "google-data"];
 /** What each sign-in or client card says when it works, and when it does not. */
 const APP_TEXT: Partial<Record<ConnKey, [string, string]>> = {
   google: ["Clients see a Continue with Google button.", "Not set: the Google button is hidden from sign-up and log-in."],
@@ -82,6 +91,13 @@ const APP_TEXT: Partial<Record<ConnKey, [string, string]>> = {
   slack: ["Clients can add their AI team to Slack.", "Not set: clients cannot add Slack yet."],
   xero: ["Clients can connect Xero with one click.", "Not set: clients cannot connect Xero with one click yet."],
   square: ["Clients can connect Square with one click.", "Not set: clients cannot connect Square with one click yet."],
+  "google-data": ["Clients can connect Google Analytics and Search Console.", "Not set: clients cannot connect Google Analytics or Search Console yet."],
+  reddit: ["Your team can read Reddit for market research.", "Not set: no Reddit research."],
+  youtube: ["Your team can search YouTube for market research.", "Not set: no YouTube research."],
+  x: ["Your team can search recent X posts for market research.", "Not set: no X research."],
+  fred: ["Your team can look up economic series.", "Not set: no economic series look-ups."],
+  alphavantage: ["Your team can look up share prices.", "Not set: no share price look-ups."],
+  companieshouse: ["Your team can look up UK companies.", "Not set: no UK company look-ups."],
 };
 
 const TEST_GAP_MS = 2_000;
@@ -105,6 +121,15 @@ const RULES: Record<string, [RegExp, string]> = {
   "resend.apiKey": [/^re_[A-Za-z0-9_]{8,200}$/, "A Resend key starts with re_ and has no spaces. Copy it again in full."],
   "resend.from": [/^(?:[\p{L}\p{N} .,'&()-]{1,80} <[^\s@<>]{1,64}@[A-Za-z0-9.-]{1,190}\.[A-Za-z]{2,24}>|[^\s@<>]{1,64}@[A-Za-z0-9.-]{1,190}\.[A-Za-z]{2,24})$/u, "Write it as a name and an address, for example: MAIZ Agents <hello@maizagents.com>"],
   "google.clientId": [/^[\w-]{5,150}\.apps\.googleusercontent\.com$/, "A Google client ID ends in .apps.googleusercontent.com. Copy it again in full."],
+  "google-data.clientId": [/^[\w-]{5,150}\.apps\.googleusercontent\.com$/, "A Google client ID ends in .apps.googleusercontent.com. Copy it again in full."],
+  "reddit.clientId": [/^[A-Za-z0-9_-]{10,30}$/, "The Reddit client ID is about 22 letters and numbers, shown under the app's name."],
+  "reddit.clientSecret": [/^[A-Za-z0-9_-]{16,60}$/, "The Reddit secret is one code of letters and numbers with no spaces. Copy it again in full."],
+  "reddit.username": [/^(u\/)?[A-Za-z0-9_-]{3,20}$/, "Type your Reddit username, 3 to 20 letters, numbers, dashes or underscores."],
+  "fred.apiKey": [/^[a-f0-9]{32}$/i, "A FRED key is 32 letters (a to f) and numbers. Copy it again in full."],
+  "alphavantage.apiKey": [/^[A-Za-z0-9]{8,40}$/, "An Alpha Vantage key is letters and numbers with no spaces. Copy it again in full."],
+  "companieshouse.apiKey": [/^[A-Za-z0-9-]{20,60}$/, "A Companies House key is letters, numbers and dashes with no spaces. Copy it again in full."],
+  "x.bearerToken": [/^[A-Za-z0-9%_.~=+-]{30,500}$/, "An X bearer token is one long code with no spaces. Copy it again in full."],
+  "youtube.apiKey": [/^AIza[\w-]{30,60}$/, "A YouTube API key starts with AIza and has no spaces. Copy it again in full."],
   "microsoft.clientId": [/^[0-9a-f]{8}-([0-9a-f]{4}-){3}[0-9a-f]{12}$/i, "The Application (client) ID is a long id with dashes, from the app's Overview page."],
   "microsoft.tenant": [/^(common|organizations|consumers|[a-z0-9][a-z0-9.-]{0,79})$/i, "Leave it empty, or use common, organizations, consumers, or your tenant's id or domain."],
   "slack.clientId": [/^\d{4,20}\.\d{4,20}$/, "The Slack client ID is two numbers with a dot between them."],
@@ -243,7 +268,23 @@ export class ConnectionsService {
       const v = this.typed(k);
       if (v) out[k] = { clientId: v.clientId!, clientSecret: v.clientSecret!, redirectUri: `${this.base}/api/integrations/callback` };
     }
+    // One Google app serves both Analytics and Search Console.
+    const g = this.typed("google-data");
+    if (g) for (const k of ["ga4", "search-console"]) out[k] = { clientId: g.clientId!, clientSecret: g.clientSecret!, redirectUri: `${this.base}/api/integrations/callback` };
     return out;
+  }
+  /** Reddit app for market research, typed on this page (or the server's). */
+  redditApp(): { clientId: string; clientSecret: string; username: string } | undefined {
+    const v = this.complete("reddit");
+    return v ? { clientId: v.clientId!, clientSecret: v.clientSecret!, username: v.username!.replace(/^u\//, "") } : undefined;
+  }
+  /** YouTube Data API key for market research, typed on this page (or the server's). */
+  youtubeKey(): string | undefined { return this.complete("youtube")?.apiKey; }
+  /** X bearer token for market research, typed on this page (or the server's). */
+  xToken(): string | undefined { return this.complete("x")?.bearerToken; }
+  /** Keys for the data desk (economic series, share prices, UK companies). */
+  deskKeys(): { fred?: string; alphaVantage?: string; companiesHouse?: string } {
+    return { fred: this.complete("fred")?.apiKey, alphaVantage: this.complete("alphavantage")?.apiKey, companiesHouse: this.complete("companieshouse")?.apiKey };
   }
   private get base(): string { return this.opts.appUrl.replace(/\/$/, ""); }
 
@@ -302,7 +343,7 @@ export class ConnectionsService {
         const ok = !!v("ANTHROPIC_API_KEY");
         return { ok, missing: ok ? [] : ["ANTHROPIC_API_KEY on the server"], text: ok ? "Claude is set up." : "Not set: no quality checking by Claude." };
       }
-      case "google": case "microsoft": case "slack": case "xero": case "square": {
+      case "google": case "microsoft": case "slack": case "xero": case "square": case "google-data": case "reddit": case "youtube": case "x": case "fred": case "alphavantage": case "companieshouse": {
         const ok = !!this.complete(key);
         return { ok, missing: this.missingOf(key), text: APP_TEXT[key]![ok ? 0 : 1] };
       }
@@ -535,13 +576,53 @@ export class ConnectionsService {
         if (r.status === 200) return { ok: true, message: "Claude accepted the key.", details: [] };
         return { ok: false, message: `Anthropic said no: ${redact(String(r.json?.error?.message ?? `error ${r.status}`), k).slice(0, 200)}`, details: [] };
       }
-      case "google": case "microsoft": case "slack": case "xero": case "square":
+      case "google": case "microsoft": case "slack": case "xero": case "square": case "google-data":
         return this.probe(key);
+      case "reddit": {
+        const app = this.redditApp();
+        if (!app) return this.notReady(key);
+        try {
+          await redditToken(this.http, app);
+        } catch (e) {
+          return { ok: false, message: e instanceof ResearchError ? e.message : "Reddit could not be reached.", details: [] };
+        }
+        return { ok: true, message: "Reddit accepted the keys and gave a read-only token.", details: ["This test only asks for a token. Nothing was read or posted."] };
+      }
+      case "fred": case "alphavantage": case "companieshouse": {
+        const k = this.complete(key)?.apiKey;
+        if (!k) return this.notReady(key);
+        try {
+          await deskKeyWorks(this.http, key, k);
+        } catch (e) {
+          return { ok: false, message: e instanceof ResearchError ? e.message : "The service could not be reached.", details: [] };
+        }
+        return { ok: true, message: `${defOf(key)!.title.replace(/ \(.*/, "")} accepted the key.`, details: ["The test made one small read."] };
+      }
+      case "x": {
+        const t = this.xToken();
+        if (!t) return this.notReady(key);
+        try {
+          await xTokenWorks(this.http, t);
+        } catch (e) {
+          return { ok: false, message: e instanceof ResearchError ? `${e.message} If the token is right, check your X plan includes reading posts.` : "X could not be reached.", details: [] };
+        }
+        return { ok: true, message: "X accepted the token.", details: ["The test looked up one public account. Whether your plan allows searching posts is only known when you search."] };
+      }
+      case "youtube": {
+        const k = this.youtubeKey();
+        if (!k) return this.notReady(key);
+        try {
+          await youtubeKeyWorks(this.http, k);
+        } catch (e) {
+          return { ok: false, message: e instanceof ResearchError ? `${e.message} Check the key is allowed to use the YouTube Data API v3.` : "YouTube could not be reached.", details: [] };
+        }
+        return { ok: true, message: "YouTube accepted the key.", details: ["The test read one public list (about 1 unit of today's 10,000)."] };
+      }
     }
   }
 
   /** Checks a sign-in app's keys with the provider, using a made-up code (see probes.ts). */
-  private async probe(key: ConnKey & ProbeKind): Promise<Omit<TestResult, "at">> {
+  private async probe(key: ConnKey): Promise<Omit<TestResult, "at">> {
     const v = this.complete(key);
     if (!v) return this.notReady(key);
     const redirectUri = key === "slack" && this.envSet("slack") ? this.env("SLACK_REDIRECT_URI")! : `${this.base}${defOf(key)!.copies![0]!.path}`;
@@ -551,7 +632,8 @@ export class ConnectionsService {
       baseUrl = b && /^https:\/\/connect\.squareup(sandbox)?\.com$/.test(b) ? b : "https://connect.squareup.com";
       if (v.clientId!.startsWith("sandbox-") && !baseUrl.includes("sandbox")) return { ok: false, message: "That is a Sandbox application ID. Switch to Production at the top of the Square Developer page and copy the Production ID and secret.", details: [] };
     }
-    const r = await probeApp(key, { clientId: v.clientId!, clientSecret: v.clientSecret!, redirectUri, tenant: v.tenant || undefined, baseUrl }, this.http);
+    const kind: ProbeKind = key === "google-data" ? "google" : (key as ProbeKind);
+    const r = await probeApp(kind, { clientId: v.clientId!, clientSecret: v.clientSecret!, redirectUri, tenant: v.tenant || undefined, baseUrl }, this.http);
     if (key === "slack" && r.ok) return { ...r, details: [...r.details, "The signing secret cannot be checked this way. Slack checks it when you turn on Event subscriptions (step 4): Verified there means it is right."] };
     return r;
   }

@@ -47,6 +47,9 @@ No changes to the server, storage, website or employees are needed.
 | POST | `/api/integrations/connections/:id/sync` | member: pull the last 30 days |
 | POST | `/api/integrations/connections/:id/access` | owner: `{ employees: [templateKey…] }` |
 | DELETE | `/api/integrations/connections/:id` | owner |
+| GET | `/api/integrations/growth` | member: this week's traffic and Google search figures, alerts, plain-words lines |
+| GET | `/api/integrations/connections/:id/choices` | owner: the Analytics properties or Search Console sites this Google login can read |
+| POST | `/api/integrations/connections/:id/choose` | owner: `{ id }`, re-checked against Google's live list |
 | POST | `/api/integrations/post` | member: add pending records to the books |
 | GET | `/api/integrations/callback` | public, signed state: OAuth return |
 | POST | `/api/integrations/hooks/:id/:secret` | public, secret link: `{ sales | payroll | accounts: [...], amountsIn?: "major" }` |
@@ -59,6 +62,7 @@ No changes to the server, storage, website or employees are needed.
 | **BrightPay** | Cloud Payroll API is OAuth but UK only, in development, and open only to timesheet providers who apply by email. Its methods read employers, employees and hourly rates and push hours in; nothing reads payslips or totals. BrightPay posts payroll journals into Xero, QuickBooks, Sage and others, and exports reports to CSV/Excel. | **File**: payroll summary CSV. If the owner posts BrightPay journals to Xero, the Xero connection already sees payroll costs. |
 | **Square** | Public OAuth API (Payments, Orders). | **Live**: completed payments per day. Tax is on Orders, so it shows 0 for now (flagged). |
 | **Stripe** | Public API, restricted keys. | **Live**: balance transactions with a read-only restricted key. |
+| **Google Analytics 4**, **Google Search Console** | Public OAuth 2.0 APIs (Analytics Data and Admin, Search Console). One Google app serves both and every client. | **Live**, read-only, never posted to the books. See `docs/GROWTH-ANALYTICS.md`. |
 | SumUp, Zettle, Epos Now, Clover | Public APIs (OAuth, or key and secret for Epos Now). | Listed; sales CSV upload works today. Direct connectors next. |
 | Lightspeed, Toast | APIs for approved partners only. | Listed honestly; CSV upload works today. |
 | QuickBooks Online, Sage Accounting, FreeAgent, Zoho Books, MYOB, FreshBooks | Public OAuth APIs. | Listed; Zapier/Make link today. QuickBooks is next after Xero. |
