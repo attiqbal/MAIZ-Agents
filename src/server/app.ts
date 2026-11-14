@@ -9,6 +9,7 @@ import { ReviewError } from "../modules/review/index.js";
 import { PricingError } from "../modules/pricing/index.js";
 import { OWNER_SPECIALISTS, PromoterError } from "../modules/promoter/index.js";
 import { GROWTH_ROLE, GrowthError, discoveryQueries } from "../modules/growth/index.js";
+import { ResearchError } from "../modules/research/index.js";
 import { DEFAULT_COMMISSION, DEFAULT_HOLD_DAYS, PromoError, describeCommission } from "../modules/promotions/index.js";
 import { EnergyError, parseAutoReload } from "../modules/energy/index.js";
 import { BatchError } from "../modules/batch/schedule.js";
@@ -459,6 +460,12 @@ export function createApp(p: Platform) {
     }
     if (path === "/api/owner/connections" || path.startsWith("/api/owner/connections/")) return ownerConnectionRoutes(req, userId, body);
     if (path.startsWith("/api/owner/growth")) return ownerGrowthRoutes(req, userId, body);
+    if (path === "/api/owner/research" || path === "/api/owner/research/search" || path === "/api/owner/research/desk") {
+      if (!p.isPlatformOwner(userId)) return json(403, { error: "only the MAIZ platform owner can use market research" });
+      if (req.method === "GET" && path === "/api/owner/research") return json(200, { sources: p.research.status(userId), desk: p.research.deskStatus(userId) });
+      if (req.method === "POST" && path === "/api/owner/research/desk") return json(200, await p.research.desk(userId, body()));
+      if (req.method === "POST" && path === "/api/owner/research/search") return json(200, await p.research.search(userId, body()));
+    }
     if (path.startsWith("/api/owner/promoter")) return ownerPromoterRoutes(req, userId, body);
     if (path.startsWith("/api/owner/coupons") || path.startsWith("/api/owner/affiliates") || path === "/api/owner/promotions") return ownerPromoRoutes(req, userId, body);
     if (path.startsWith("/api/owner/")) {
@@ -856,7 +863,7 @@ export function createApp(p: Platform) {
     try {
       if (method === "GET" && path === "/api/owner/connections") return json(200, all());
       if (method === "POST" && path === "/api/owner/connections/whatsapp/send-test") { const r = await c.sendWhatsAppTest(userId); return json(200, { ...r, ...all() }); }
-      const m = /^\/api\/owner\/connections\/([a-z]{2,20})(?:\/(test|disconnect))?$/.exec(path);
+      const m = /^\/api\/owner\/connections\/([a-z-]{1,20})(?:\/(test|disconnect))?$/.exec(path);
       if (m && method === "PUT" && !m[2]) { c.save(userId, m[1]!, body()); return json(200, all()); }
       if (m && method === "POST" && m[2] === "test") { await c.test(userId, m[1]!); return json(200, all()); }
       if (m && method === "POST" && m[2] === "disconnect") { c.disconnect(userId, m[1]!); return json(200, all()); }
@@ -979,6 +986,7 @@ export function createApp(p: Platform) {
       return json(200, { catalogue: ig.catalogue(), connections: ig.list(userId, orgId), pending: ig.pending(userId, orgId) });
     }
     if (method === "POST" && path === "/api/integrations/post") return json(200, ig.post(userId, orgId));
+    if (method === "GET" && path === "/api/integrations/growth") return json(200, ig.growth(userId, orgId));
     const app = /^\/api\/integrations\/apps\/([a-z0-9-]{2,40})\/(connect|import)$/.exec(path);
     if (method === "POST" && app) {
       const [, key, action] = app as unknown as [string, string, string];
@@ -1003,9 +1011,11 @@ export function createApp(p: Platform) {
       }
       throw new BadRequest(`${c.name} works by file upload`);
     }
-    const conn = /^\/api\/integrations\/connections\/([\w-]{1,64})(?:\/(sync|access))?$/.exec(path);
+    const conn = /^\/api\/integrations\/connections\/([\w-]{1,64})(?:\/(sync|access|choices|choose))?$/.exec(path);
     if (conn) {
       const [, id, action] = conn as unknown as [string, string, string | undefined];
+      if (method === "GET" && action === "choices") return json(200, { choices: await ig.choices(userId, orgId, id) });
+      if (method === "POST" && action === "choose") return json(200, { connection: await ig.choose(userId, orgId, id, String(body().id ?? "")) });
       if (method === "DELETE" && !action) { ig.disconnect(userId, orgId, id); return json(200, { ok: true }); }
       if (method === "POST" && action === "sync") return json(200, await ig.sync(userId, orgId, id));
       if (method === "POST" && action === "access") {
@@ -1047,7 +1057,7 @@ export function createApp(p: Platform) {
     try {
       return renewed(req, await route(req));
     } catch (err) {
-      if (err instanceof BadRequest || err instanceof SetupError || err instanceof SignupError || err instanceof LedgerError || err instanceof ChannelError || err instanceof IntegrationError || err instanceof ReviewError || err instanceof PeopleError || err instanceof PricingError || err instanceof PromoError || err instanceof PromoterError || err instanceof GrowthError || err instanceof EnergyError || err instanceof SettingsError || err instanceof BatchError || err instanceof PaymentError || err instanceof RotaError) return json(400, { error: err.message });
+      if (err instanceof BadRequest || err instanceof SetupError || err instanceof SignupError || err instanceof LedgerError || err instanceof ChannelError || err instanceof IntegrationError || err instanceof ReviewError || err instanceof PeopleError || err instanceof PricingError || err instanceof PromoError || err instanceof PromoterError || err instanceof GrowthError || err instanceof ResearchError || err instanceof EnergyError || err instanceof SettingsError || err instanceof BatchError || err instanceof PaymentError || err instanceof RotaError) return json(400, { error: err.message });
       if (err instanceof PermissionError) return json(403, { error: "you don't have permission to do that" });
       console.error(`${req.method} ${req.path} failed:`, err);
       return json(500, { error: "something went wrong" });

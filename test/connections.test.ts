@@ -51,7 +51,7 @@ describe("Connections page API", () => {
     const { call } = setup();
     const r = await call("GET", "/api/owner/connections");
     const keys = (r.body as any).connections.map((c: any) => c.key);
-    expect(keys).toEqual(["facebook", "instagram", "whatsapp", "resend", "google", "microsoft", "slack", "xero", "square", "stripe", "runpod", "anthropic"]);
+    expect(keys).toEqual(["facebook", "instagram", "whatsapp", "resend", "google", "microsoft", "slack", "xero", "square", "google-data", "reddit", "youtube", "x", "fred", "alphavantage", "companieshouse", "stripe", "runpod", "anthropic"]);
     for (const c of (r.body as any).connections) { expect(c.guide.length).toBeGreaterThan(1); expect(c.status).toBe("not_connected"); }
     expect((r.body as any).persistent).toBe(false);
   });

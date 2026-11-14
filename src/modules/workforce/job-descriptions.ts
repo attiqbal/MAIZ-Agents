@@ -268,6 +268,7 @@ export const JOB_DESCRIPTIONS: readonly JobDescription[] = [
           "Watch competitors' offers, prices and messaging and report what changed",
           "Plan email nurture and win-back sequences",
           "Report monthly on reach, leads, conversion and cost per lead, with what to do next",
+          "When Google Analytics and Search Console are connected: read the weekly figures, say in plain words what changed and why it may have, and warn the owner the same day visits or Google clicks drop sharply",
         ],
       },
       {
@@ -303,7 +304,7 @@ export const JOB_DESCRIPTIONS: readonly JobDescription[] = [
       { skill: "SEO fundamentals", level: "Advanced", detail: "Keyword intent, on-page basics and content that answers real searches." },
       { skill: "Email marketing", level: "Advanced", detail: "Sequences with clear subject lines, one goal per email and opt-in respected." },
       { skill: "Paid social and search ad copy", level: "Working", detail: "Variants built for testing, within platform rules." },
-      { skill: "Analytics and reporting", level: "Advanced", detail: "Reads funnel numbers the owner provides and turns them into next steps." },
+      { skill: "Analytics and reporting", level: "Advanced", detail: "Reads funnel numbers the owner provides, and the figures from their connected Google Analytics and Search Console, and turns them into next steps." },
       { skill: "Competitor and audience research", level: "Advanced", detail: "Summarises what competitors do and where the gap is." },
       { skill: "Brand positioning", level: "Advanced", detail: "A value proposition a customer understands in one read." },
     ],
@@ -318,7 +319,9 @@ export const JOB_DESCRIPTIONS: readonly JobDescription[] = [
       { name: "Approve, redo or edit drafts in Slack", status: "available" },
       { name: "Learn brand voice from your website", status: "planned" },
       { name: "Scheduling to social platforms", status: "planned" },
-      { name: "Email platform and analytics connections", status: "planned" },
+      { name: "Google Analytics and Search Console (read-only)", status: "available" },
+      { name: "Weekly growth report and drop alerts", status: "available" },
+      { name: "Email platform connection", status: "planned" },
     ],
     deliverables: [
       { name: "30-day marketing plan", cadence: "Monthly", energy: [15, 40] },
@@ -329,6 +332,7 @@ export const JOB_DESCRIPTIONS: readonly JobDescription[] = [
       { name: "Landing page or product copy", cadence: "On request", energy: [8, 25] },
       { name: "Competitor watch note", cadence: "Monthly", energy: [10, 30] },
       { name: "Marketing results report", cadence: "Monthly", energy: [10, 25] },
+      { name: "Weekly growth report and alerts (from Google Analytics and Search Console)", cadence: "Weekly", energy: [0, 0] },
     ],
     kpis: [
       "Drafts approved first time 80% or more",

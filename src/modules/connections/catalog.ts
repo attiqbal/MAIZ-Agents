@@ -2,7 +2,7 @@
  * What the owner can connect, and the plain-English steps for each. Pure data: the service turns it into the
  * Connections page. Screens at Meta change often, so each step says what to look for, not just where to click.
  */
-export type ConnKey = "facebook" | "instagram" | "whatsapp" | "resend" | "google" | "microsoft" | "slack" | "xero" | "square" | "stripe" | "runpod" | "anthropic";
+export type ConnKey = "facebook" | "instagram" | "whatsapp" | "resend" | "google" | "microsoft" | "slack" | "xero" | "square" | "google-data" | "reddit" | "youtube" | "x" | "fred" | "alphavantage" | "companieshouse" | "stripe" | "runpod" | "anthropic";
 
 export interface FieldDef {
   key: string;
@@ -207,6 +207,103 @@ export const CATALOG: readonly ConnDef[] = [
       { text: "At the top switch to Production. Open OAuth, paste the address from the box below as the Redirect URL, and save." },
       { text: "Copy the Application ID (Credentials page) and the Application secret (OAuth page, press Show) into the boxes below and click Save." },
       { text: "Click Test connection. It asks Square whether it knows your app, using a made-up code, so nothing is connected." },
+    ],
+  },
+  {
+    key: "google-data", title: "Google Analytics and Search Console (clients' websites)", group: "clients", editable: true,
+    summary: "Lets clients connect their Google Analytics and Search Console with one click, read-only, so their Marketing manager can write a weekly growth report and warn them when visits drop.",
+    usedBy: ["marketing-manager"],
+    clientsSee: "Two Connect buttons on their Apps page (Google Analytics, Google Search Console) and a weekly growth report from their Marketing manager.",
+    copies: [{ label: "Authorised redirect URI", path: "/api/integrations/callback" }],
+    fields: [
+      { key: "clientId", label: "Client ID", secret: false, required: true, placeholder: "…apps.googleusercontent.com", help: "Ends in .apps.googleusercontent.com." },
+      { key: "clientSecret", label: "Client secret", secret: true, required: true, placeholder: "Starts with GOCSPX-", help: "Shown next to the client ID in Google Cloud." },
+    ],
+    guide: [
+      { text: "Use the same Google Cloud project as Sign in with Google, or create one. Never paste these keys into a chat or an email; they only go in the boxes below.", link: { href: "https://console.cloud.google.com/projectcreate", label: "Google Cloud: new project" } },
+      { text: "Turn on three APIs for the project: Google Analytics Data API, Google Analytics Admin API and Google Search Console API. Open each link and press Enable.", link: { href: "https://console.cloud.google.com/apis/library/analyticsdata.googleapis.com", label: "Analytics Data API" } },
+      { text: "Open Google Auth Platform, Data access, and add two scopes: .../auth/analytics.readonly and .../auth/webmasters.readonly. Both only read.", link: { href: "https://console.cloud.google.com/auth/scopes", label: "Google Auth Platform: data access" } },
+      { text: "Under Clients, click Create client. Type: Web application. Paste the address from the box below under Authorised redirect URIs. You can reuse the Sign in with Google client if you add this address to it, but a separate client keeps things tidy.", link: { href: "https://console.cloud.google.com/auth/clients", label: "Google Auth Platform: clients" } },
+      { text: "Copy the Client ID and Client secret into the boxes below and click Save. Then click Test connection." },
+      { text: "Important: Google treats these two read permissions as sensitive. Until Google has verified your app, only the people you list under Audience, Test users can connect, and their connection stops working after 7 days. To let any client connect, press Publish app and complete Google's verification (a short video and your privacy page). Confirm the current rules in Google's own help, because they change." },
+    ],
+  },
+  {
+    key: "reddit", title: "Reddit (market research)", group: "platform", editable: true,
+    summary: "Lets your team read public Reddit posts and comments about a market, to find what people ask for and complain about. Read-only: nothing is ever posted to Reddit.",
+    usedBy: ["marketing-manager", "business-consultant"],
+    fields: [
+      { key: "clientId", label: "Client ID", secret: false, required: true, placeholder: "About 22 letters and numbers", help: "Shown under the app's name, below the words personal use script or web app." },
+      { key: "clientSecret", label: "Secret", secret: true, required: true, help: "The line labelled secret on the app." },
+      { key: "username", label: "Your Reddit username", secret: false, required: true, placeholder: "e.g. maiz_research", help: "Reddit asks every program to say who runs it. Only the name, never your password." },
+    ],
+    guide: [
+      { text: "Sign in to Reddit with the account that will own the app, then open the app list and press Create another app. Name: MAIZ Agents. Type: script. Redirect URI: your home page address (it is not used). Reddit asks you to describe how you will use the data; say: read-only market research for client businesses.", link: { href: "https://www.reddit.com/prefs/apps", label: "Reddit: your apps" } },
+      { text: "Copy the Client ID (under the app name) and the secret into the boxes below, add your Reddit username, and click Save." },
+      { text: "Click Test connection. It asks Reddit for a read-only token and nothing else." },
+      { text: "Read Reddit's current Data API terms before you use this for clients' businesses. As far as we know, Reddit wants an application for commercial use and limits free use to about 100 requests a minute; we stay far below that. MAIZ only reads and never posts, comments, votes or sends messages." , link: { href: "https://www.reddit.com/wiki/api/", label: "Reddit: Data API terms" } },
+    ],
+  },
+  {
+    key: "youtube", title: "YouTube (market research)", group: "platform", editable: true,
+    summary: "Lets your team search public YouTube videos for a market: what is popular, how many views, and which channels lead. Read-only.",
+    usedBy: ["marketing-manager", "business-consultant"],
+    fields: [
+      { key: "apiKey", label: "API key", secret: true, required: true, placeholder: "Starts with AIza", help: "A key restricted to the YouTube Data API v3." },
+    ],
+    guide: [
+      { text: "In the Google Cloud project, turn on the YouTube Data API v3.", link: { href: "https://console.cloud.google.com/apis/library/youtube.googleapis.com", label: "YouTube Data API v3" } },
+      { text: "Open Credentials, press Create credentials, then API key. Open the key, choose Restrict key, API restrictions, and tick only YouTube Data API v3. Copy it.", link: { href: "https://console.cloud.google.com/apis/credentials", label: "Google Cloud: credentials" } },
+      { text: "Paste the key below and click Save, then Test connection. The test reads one public list, which costs almost nothing. Google gives 10,000 units a day free; each search costs 100." },
+    ],
+  },
+  {
+    key: "x", title: "X / Twitter (market research)", group: "platform", editable: true,
+    summary: "Lets your team search recent public posts on X (the last seven days) to see what people say about a market. Read-only: nothing is ever posted.",
+    usedBy: ["marketing-manager", "business-consultant"],
+    fields: [
+      { key: "bearerToken", label: "Bearer token", secret: true, required: true, placeholder: "A long code, often starting AAAA", help: "From your app's Keys and tokens page. Not the API key or secret." },
+    ],
+    guide: [
+      { text: "Sign in to the X developer portal, create a project and an app, and check which plan includes reading posts (search). As far as we know X no longer gives search access free, so there is a cost. Check the current price on X's page before you pay.", link: { href: "https://developer.x.com/en/portal/dashboard", label: "X developer portal" } },
+      { text: "Open the app, Keys and tokens, and press Generate under Bearer token. Copy it. It is shown once." },
+      { text: "Paste it below and click Save, then Test connection. The test looks up one public account, which uses a tiny part of your allowance." },
+    ],
+  },
+  {
+    key: "fred", title: "Economic data (FRED)", group: "platform", editable: true,
+    summary: "Lets your team look up economic series such as inflation, unemployment and interest rates from the US Federal Reserve's free data library. Read-only.",
+    usedBy: ["marketing-manager", "business-consultant"],
+    fields: [
+      { key: "apiKey", label: "FRED API key", secret: true, required: true, placeholder: "32 letters and numbers", help: "Free. Shown on your API keys page." },
+    ],
+    guide: [
+      { text: "Create a free FRED account, then open My Account, API Keys, and press Request API Key.", link: { href: "https://fredaccount.stlouisfed.org/apikeys", label: "FRED: API keys" } },
+      { text: "Paste the key below, click Save, then Test connection. The test reads the latest US unemployment figure." },
+    ],
+  },
+  {
+    key: "alphavantage", title: "Share prices (Alpha Vantage)", group: "platform", editable: true,
+    summary: "Lets your team look up the latest price of a share or fund. Read-only. The free key allows about 25 look-ups a day.",
+    usedBy: ["marketing-manager", "business-consultant"],
+    fields: [
+      { key: "apiKey", label: "API key", secret: true, required: true, placeholder: "Letters and numbers", help: "Free from Alpha Vantage." },
+    ],
+    guide: [
+      { text: "Ask Alpha Vantage for a free API key. As far as we know the free plan is limited to about 25 requests a day and prices can be delayed. Check their page for the current limits.", link: { href: "https://www.alphavantage.co/support/#api-key", label: "Alpha Vantage: get a key" } },
+      { text: "Paste the key below, click Save, then Test connection. The test looks up one price and uses one of the day's requests." },
+    ],
+  },
+  {
+    key: "companieshouse", title: "UK companies (Companies House)", group: "platform", editable: true,
+    summary: "Lets your team look up UK companies: status, number, address and when they were formed. Read-only, free.",
+    usedBy: ["marketing-manager", "business-consultant"],
+    fields: [
+      { key: "apiKey", label: "API key", secret: true, required: true, placeholder: "Letters, numbers and dashes", help: "From a Companies House developer application." },
+    ],
+    guide: [
+      { text: "Sign in to the Companies House developer hub, create an application, then create a key of type REST. Free.", link: { href: "https://developer.company-information.service.gov.uk/manage-applications", label: "Companies House: your applications" } },
+      { text: "Paste the key below, click Save, then Test connection. The test runs one small company search." },
     ],
   },
   {

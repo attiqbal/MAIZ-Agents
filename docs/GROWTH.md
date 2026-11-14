@@ -23,7 +23,7 @@ The role brief is stored word for word in `role.ts` (`GROWTH_ROLE`), shown on th
 
 ## Not built
 
-- Automatic discovery of places or discussions (needs search or platform API keys). Today the agent supplies search phrases and you add places.
+- Fully automatic discovery. The owner page now has **Find conversations** (read-only search of Reddit, Hacker News and YouTube, see `docs/GROWTH-ANALYTICS.md`), and "Use as a place" / "Reply to this" prefill the forms below, but you still choose and approve every place and draft.
 - Posting through platform APIs. If you want it later it would need each platform's keys, kept in secrets only, authorised accounts and the same approval gate.
 - Automatic checking that a link is live: `verify` is your confirmation. A server-side fetch of a user-supplied address was left out on purpose (SSRF risk) until it can be restricted to the platform's own hosts.
 - Traffic numbers are typed in from your analytics; they are not pulled in.

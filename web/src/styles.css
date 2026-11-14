@@ -186,6 +186,8 @@ main:focus { outline: none; }
 .status.good { color: var(--color-good); }
 .status.warn { color: var(--color-warn); }
 .status.crit { color: var(--color-crit); }
+.status.wrap { display: flex; align-items: flex-start; white-space: normal; font-size: 14px; line-height: 1.45; }
+.status.wrap .dot { margin-top: 6px; flex: none; }
 .status.info { color: var(--accent-text); }
 .status.live .dot { box-shadow: 0 0 0 0 currentColor; animation: ping 1.8s ease-out infinite; }
 @keyframes ping { 0% { box-shadow: 0 0 0 0 rgba(47, 107, 74, .45); } 100% { box-shadow: 0 0 0 7px rgba(47, 107, 74, 0); } }

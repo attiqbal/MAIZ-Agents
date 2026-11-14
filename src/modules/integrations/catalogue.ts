@@ -1,4 +1,6 @@
 import { brightpay } from "./connectors/brightpay.js";
+import { ga4 } from "./connectors/ga4.js";
+import { searchConsole } from "./connectors/search-console.js";
 import { square } from "./connectors/square.js";
 import { parseTillCsv, tillFile } from "./connectors/till-csv.js";
 import { webhookBridge } from "./connectors/webhook.js";
@@ -82,6 +84,6 @@ export const COMMON_APPS: readonly Connector[] = [
 /** The registry the platform uses, with every connector we ship. */
 export function defaultRegistry(): ConnectorRegistry {
   const r = new ConnectorRegistry();
-  for (const c of [xero, square, stripe, brightpay, tillFile, webhookBridge, ...PLANNED, ...COMMON_APPS]) r.register(c);
+  for (const c of [xero, square, stripe, ga4, searchConsole, brightpay, tillFile, webhookBridge, ...PLANNED, ...COMMON_APPS]) r.register(c);
   return r;
 }

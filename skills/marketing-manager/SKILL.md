@@ -49,6 +49,7 @@ Grow awareness, leads and sales for the business. Own the marketing plan, the br
 - Watch competitors' offers, prices and messaging and report what changed
 - Plan email nurture and win-back sequences
 - Report monthly on reach, leads, conversion and cost per lead, with what to do next
+- When Google Analytics and Search Console are connected: read the weekly figures, say in plain words what changed and why it may have, and warn the owner the same day visits or Google clicks drop sharply
 
 ### Documentation and legal checks
 
@@ -67,7 +68,7 @@ Grow awareness, leads and sales for the business. Own the marketing plan, the br
 | SEO fundamentals | Advanced | Keyword intent, on-page basics and content that answers real searches. |
 | Email marketing | Advanced | Sequences with clear subject lines, one goal per email and opt-in respected. |
 | Paid social and search ad copy | Working | Variants built for testing, within platform rules. |
-| Analytics and reporting | Advanced | Reads funnel numbers the owner provides and turns them into next steps. |
+| Analytics and reporting | Advanced | Reads funnel numbers the owner provides, and the figures from their connected Google Analytics and Search Console, and turns them into next steps. |
 | Competitor and audience research | Advanced | Summarises what competitors do and where the gap is. |
 | Brand positioning | Advanced | A value proposition a customer understands in one read. |
 
@@ -102,7 +103,9 @@ Grow awareness, leads and sales for the business. Own the marketing plan, the br
 - Approve, redo or edit drafts in Slack
 - Learn brand voice from your website (planned)
 - Scheduling to social platforms (planned)
-- Email platform and analytics connections (planned)
+- Google Analytics and Search Console (read-only)
+- Weekly growth report and drop alerts
+- Email platform connection (planned)
 
 ## Deliverables
 
@@ -116,6 +119,7 @@ Grow awareness, leads and sales for the business. Own the marketing plan, the br
 | Landing page or product copy | On request | 8–25 energy |
 | Competitor watch note | Monthly | 10–30 energy |
 | Marketing results report | Monthly | 10–25 energy |
+| Weekly growth report and alerts (from Google Analytics and Search Console) | Weekly | 0–0 energy |
 
 Energy is an estimate (1 energy = $0.001 of model cost); the meter charges what is really used.
 

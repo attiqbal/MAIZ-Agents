@@ -155,6 +155,88 @@ $("pb-table").addEventListener("click", async (e) => {
   else if (b.dataset.fu) await act(`/publications/${b.dataset.fu}/follow-up`, { done: true }, null);
 });
 
+// ---- Data desk (news, economic figures, prices, UK companies)
+interface DeskRow { title: string; value?: string; detail: string; url?: string; date?: string }
+const DESK_HINT: Record<string, [string, string, string]> = {
+  news: ["Topic", "e.g. UK interest rates", "Stories from news sites around the world."],
+  series: ["FRED series id", "e.g. UNRATE", "UNRATE is US unemployment, CPIAUCSL is US prices, FEDFUNDS is the US interest rate."],
+  quote: ["Share or fund symbol", "e.g. IBM", "UK shares end in .LON, for example VOD.LON."],
+  company: ["Company name", "e.g. MAIZ", "Searches the UK register."],
+  indicator: ["", "", ""],
+};
+function syncDesk(): void {
+  const k = sel("dk-kind");
+  $("dk-q-f").hidden = k === "indicator"; $("dk-c-f").hidden = k !== "indicator"; $("dk-i-f").hidden = k !== "indicator";
+  const [l, ph, h] = DESK_HINT[k]!;
+  if (k !== "indicator") { $("dk-q-l").textContent = l; $<HTMLInputElement>("dk-q").placeholder = ph; $("dk-q-h").textContent = h; }
+}
+const httpsOnly = (u: string): string => (/^https:\/\//.test(u) ? u : "#");
+$("dk-kind").addEventListener("change", syncDesk);
+syncDesk();
+$("dk-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const msg = $("dk-msg"), go = $<HTMLButtonElement>("dk-go");
+  if (!live) { msg.textContent = "This is example data. Log in as the platform owner to look things up."; return; }
+  msg.textContent = "Looking…"; go.disabled = true;
+  const r = await api<{ items: DeskRow[]; error?: string }>("/owner/research/desk", { body: { kind: sel("dk-kind"), query: val("dk-q"), country: val("dk-c"), indicator: val("dk-i") } });
+  go.disabled = false;
+  if (!r.ok) { msg.textContent = (r.data as { error?: string } | undefined)?.error ?? "That did not work."; $("dk-table").innerHTML = ""; return; }
+  const items = (r.data as { items: DeskRow[] }).items;
+  msg.textContent = items.length ? "" : "Nothing found.";
+  $("dk-count").textContent = items.length ? `${items.length} found` : "";
+  $("dk-table").innerHTML = items.length ? `<thead><tr><th scope="col">Item</th><th scope="col">Value</th><th scope="col">Details</th><th scope="col">Date</th></tr></thead><tbody>${items.map((i) => `<tr><td class="ow-title"><b>${i.url ? `<a href="${esc(httpsOnly(i.url))}" rel="noopener noreferrer" target="_blank">${esc(i.title)}</a>` : esc(i.title)}</b></td><td class="num">${esc(i.value ?? "")}</td><td>${esc(i.detail)}</td><td>${esc(i.date ?? "")}</td></tr>`).join("")}</tbody>` : "";
+});
+
+// ---- Find conversations (read-only research on Reddit, Hacker News and YouTube)
+interface Found { source: string; title: string; url: string; community: string; score: number; comments: number; createdAt: string; snippet: string }
+interface Found_ { mentions: Found[]; searched: string[]; skipped: { source: string; reason: string }[]; cached: boolean }
+const SOURCE: Record<string, string> = { reddit: "Reddit", hackernews: "Hacker News", youtube: "YouTube", x: "X" };
+let found: Found[] = [];
+const safeUrl = (u: string): string => (/^https:\/\/(www\.)?(reddit\.com|news\.ycombinator\.com|youtube\.com|x\.com)\//.test(u) ? u : "#");
+function renderFound(): void {
+  $("rs-count").textContent = found.length ? `${found.length} found` : "";
+  $("rs-table").innerHTML = found.length ? `<thead><tr><th scope="col">Post</th><th scope="col">Where</th><th scope="col">Numbers</th><th scope="col"><span class="sr-only">Actions</span></th></tr></thead><tbody>${found.map((m, i) => `<tr><td class="ow-title"><b><a href="${esc(safeUrl(m.url))}" rel="noopener noreferrer" target="_blank">${esc(m.title)}</a></b><span>${esc(m.snippet)}</span></td>
+    <td>${esc(SOURCE[m.source] ?? m.source)}<br><span class="muted small">${esc(m.community)}</span></td>
+    <td class="num">${m.score.toLocaleString("en-GB")} ${m.source === "youtube" ? "views" : m.source === "x" ? "likes and reposts" : "points"}<br><span class="muted small">${m.comments.toLocaleString("en-GB")} comments · ${esc(date(m.createdAt))}</span></td>
+    <td><div class="acts"><button type="button" class="btn btn-quiet btn-sm" data-place="${i}">Use as a place</button>${m.source === "reddit" || m.source === "hackernews" ? `<button type="button" class="btn btn-quiet btn-sm" data-reply="${i}">Reply to this</button>` : ""}</div></td></tr>`).join("")}</tbody>` : "";
+}
+$("rs-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const msg = $("rs-msg"), go = $<HTMLButtonElement>("rs-go");
+  if (!live) { msg.textContent = "This is example data. Log in as the platform owner to search."; return; }
+  const sources = [...document.querySelectorAll<HTMLInputElement>('input[name="rs-src"]:checked')].map((c) => c.value);
+  msg.textContent = "Searching…"; go.disabled = true;
+  const r = await api<Found_ & { error?: string }>("/owner/research/search", { body: { query: val("rs-q"), sources, subreddits: val("rs-subs").split(",").map((x) => x.trim()).filter(Boolean), within: sel("rs-within"), sort: sel("rs-sort") } });
+  go.disabled = false;
+  if (!r.ok) { msg.textContent = (r.data as { error?: string } | undefined)?.error ?? "That did not work."; return; }
+  const d = r.data as Found_;
+  found = d.mentions;
+  const skipped = d.skipped.map((s) => s.reason).join(" ");
+  msg.textContent = `${d.mentions.length ? "" : "Nothing found. "}${skipped}`.trim();
+  renderFound();
+});
+$("rs-table").addEventListener("click", (e) => {
+  const b = (e.target as HTMLElement).closest<HTMLButtonElement>("button");
+  if (!b) return;
+  const m = found[Number(b.dataset.place ?? b.dataset.reply)];
+  if (!m) return;
+  if (b.dataset.place !== undefined) {
+    // Reddit: the community's own address. Everything else: the post's address.
+    const sub = m.source === "reddit" ? /^https:\/\/www\.reddit\.com\/(r\/[\w]+)\//.exec(m.url)?.[1] : undefined;
+    $<HTMLSelectElement>("op-platform").value = m.source === "reddit" ? "reddit" : "community";
+    $<HTMLInputElement>("op-name").value = m.source === "reddit" ? m.community : m.title.slice(0, 120);
+    $<HTMLInputElement>("op-url").value = sub ? `https://www.reddit.com/${sub}/` : m.url;
+    $("op-form").scrollIntoView({ block: "center" });
+    $("op-name").focus();
+  } else {
+    $<HTMLSelectElement>("dr-mode").value = "contribution"; syncMode();
+    $<HTMLInputElement>("dr-turl").value = m.url;
+    $<HTMLInputElement>("dr-tsum").value = m.title.slice(0, 500);
+    $("dr-form").scrollIntoView({ block: "center" });
+    $("dr-brief").focus();
+  }
+});
+
 $("dr-mode").addEventListener("change", syncMode);
 $("op-form").addEventListener("submit", async (e) => {
   e.preventDefault();

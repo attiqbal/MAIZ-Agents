@@ -42,9 +42,11 @@ import { ExpiringSet, SendLog } from "./expiring.js";
 import { AffiliateService, CouponService } from "../modules/promotions/index.js";
 import { PromoterService } from "../modules/promoter/index.js";
 import { GrowthService } from "../modules/growth/index.js";
+import { ResearchService } from "../modules/research/index.js";
 import { MetaGraph, MetaRejected, type MetaConfig } from "../modules/meta/index.js";
 import { OwnerWhatsApp, WhatsAppCloud, type WhatsAppConfig } from "../modules/whatsapp/index.js";
 import { ConnectionsService } from "../modules/connections/index.js";
+import { isoWeek } from "../modules/integrations/insights.js";
 import { COMPANY } from "../company.js";
 import { CredentialStore } from "../modules/credentials/index.js";
 
@@ -237,6 +239,8 @@ export function createPlatform(cfg: PlatformConfig) {
    * what went out and what it earned. Owner only. It never posts, creates accounts or sends pitches itself.
    */
   const growth = new GrowthService((userId) => ownerIdSet.has(userId), { now, completer: gateway, notifyOwner: () => decisionDigest.poke() });
+  /** Read-only market research on Reddit, Hacker News and YouTube. Owner only; keys come from the Connections page. */
+  const research = new ResearchService({ isOwner: (userId) => ownerIdSet.has(userId), reddit: () => connections.redditApp(), youtubeKey: () => connections.youtubeKey(), xToken: () => connections.xToken(), deskKeys: () => connections.deskKeys(), http: cfg.http, now });
   /** MAIZ quality review: every client's specialised tasks wait here for the platform owner's sign-off. */
   const reviews = new QualityReviewService(identity, audit, isPlatformOwner, {
     now,
@@ -533,6 +537,17 @@ export function createPlatform(cfg: PlatformConfig) {
     live.wa?.useSink(store);
   }
 
+  /** Daily analytics refresh, the weekly growth report and growth alerts, in each client's own time. */
+  const growthTick = () => integrations.growthTick(
+    (ws, n) => { notices.add(ws, { kind: "info", title: n.title, body: n.body, link: "/app.html#apps" }); },
+    (ws) => {
+      const l = localParts(now(), batch.scheduleOf(ws).timezone);
+      const date = `${l.y}-${String(l.m).padStart(2, "0")}-${String(l.d).padStart(2, "0")}`;
+      const weekday = ((new Date(Date.UTC(l.y, l.m - 1, l.d)).getUTCDay() + 6) % 7) + 1;
+      return { weekday, hour: l.hh, isoWeek: isoWeek(date), date };
+    },
+  );
+
   /** True when changes are written to the database (false: memory only, lost on restart). */
   const hasStore = () => !!live.sink;
   const healthy = () => (sink as { healthy?: boolean } | undefined)?.healthy !== false;
@@ -562,6 +577,6 @@ export function createPlatform(cfg: PlatformConfig) {
     slack: { enumerable: true, get: () => cfg.slack ?? connections.slackApp() },
     loginApps: { enumerable: true, get: (): LoginApps => ({ ...connections.loginApps(), ...cfg.loginApps }) },
   });
-  return { conversations, notices, warm, ownerDecisions, decisionDigest, dashboard, reconciliation, rota, people, payments, batch, email, usedLinks, sends, loginFails, resets, credentials, formHits, codeFails, coupons, affiliates, promoter, growth, connections, get ownerWhatsApp() { return live.wa; }, admin, reviews, prices, specialists, ai, clients, isPlatformOwner, healthy, hasStore, cfg: liveCfg, now, audit, bus, identity, energy, workforce, ledger, onboarding, router, integrations, slackTokens, saveSlackToken, attachStore };
+  return { conversations, notices, warm, ownerDecisions, decisionDigest, dashboard, reconciliation, rota, people, payments, batch, email, usedLinks, sends, loginFails, resets, credentials, formHits, codeFails, coupons, affiliates, promoter, growth, research, connections, growthTick, get ownerWhatsApp() { return live.wa; }, admin, reviews, prices, specialists, ai, clients, isPlatformOwner, healthy, hasStore, cfg: liveCfg, now, audit, bus, identity, energy, workforce, ledger, onboarding, router, integrations, slackTokens, saveSlackToken, attachStore };
 }
 export type Platform = ReturnType<typeof createPlatform>;

@@ -9,6 +9,8 @@ export const DEFAULT_ACCESS: Record<Capability, readonly string[]> = {
   "sales.read": ["finance-manager", "business-consultant", "marketing-manager", "compliance-manager"],
   "payroll.read": ["finance-manager", "hr-manager", "compliance-manager"],
   "accounts.read": ["finance-manager", "business-consultant", "compliance-manager"],
+  "traffic.read": ["marketing-manager", "business-consultant"],
+  "search.read": ["marketing-manager", "business-consultant"],
 };
 
 /** Employees that may never be given app data (the Admin manager runs setup, not the business). */

@@ -277,10 +277,13 @@
         <div id="apps-pending"></div>
         <p class="xs muted">Figures come straight from your apps. Nothing goes into your books until you add it.</p>
         <div class="acts"><button class="btn btn-primary btn-sm" id="apps-post">Add to books</button></div></section>
+      <section class="panel" id="apps-growth-panel" hidden aria-labelledby="apps-growth-h"><div class="panel-h"><h2 id="apps-growth-h">Your growth this week</h2><span class="r" id="apps-growth-who"></span></div>
+        <div id="apps-growth" class="ow-stack" aria-live="polite"></div>
+        <p class="xs muted">Worked out from your own Google Analytics and Search Console. Google's figures run a day or three behind. Your Marketing manager sends this to you every Monday and warns you sooner if something changes a lot.</p></section>
       <section class="panel" id="apps-connected-panel" hidden><div class="panel-h"><h2>Connected</h2></div><div id="apps-connected" class="app-conns"></div></section>
       <section class="panel"><div class="panel-h"><h2>Add an app</h2></div>
         <div class="chips" role="group" aria-label="Show apps by type" id="apps-filter">
-          <button type="button" class="chip" data-filter="all">All</button><button type="button" class="chip" data-filter="accounting">Accounting</button><button type="button" class="chip" data-filter="till">Tills</button><button type="button" class="chip" data-filter="payments">Payments and shops</button><button type="button" class="chip" data-filter="payroll">Payroll</button><button type="button" class="chip" data-filter="bridge">Any other app</button>
+          <button type="button" class="chip" data-filter="all">All</button><button type="button" class="chip" data-filter="accounting">Accounting</button><button type="button" class="chip" data-filter="marketing">Website and Google</button><button type="button" class="chip" data-filter="till">Tills</button><button type="button" class="chip" data-filter="payments">Payments and shops</button><button type="button" class="chip" data-filter="payroll">Payroll</button><button type="button" class="chip" data-filter="bridge">Any other app</button>
         </div>
         <div class="apps-grid" id="apps-grid"></div>
         <p class="xs muted">Don't see your app? Zapier or Make can send data from thousands more apps through a private link, and any till that exports a CSV works with "Any till".</p></section>

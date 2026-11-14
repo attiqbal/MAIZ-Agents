@@ -25,6 +25,36 @@
             <section class="panel" aria-labelledby="wa-h"><div class="panel-h"><h2 id="wa-h">Waiting for your approval</h2><span class="r" id="wa-count"></span></div>
               <div id="wa-list" class="ow-stack"></div></section>
 
+            <section class="panel" aria-labelledby="rs-h"><div class="panel-h"><h2 id="rs-h">Find conversations</h2><span class="r" id="rs-count"></span></div>
+              <p class="muted small">Searches public posts on Reddit, Hacker News, YouTube and X, read-only, for market research or to find discussions worth answering. Nothing is posted from here. Add the Reddit and YouTube keys on the <a href="/owner-connections.html">Connections</a> page.</p>
+              <form class="ow-stack" id="rs-form" novalidate>
+                <div class="ow-grid">
+                  <div class="field" style="grid-column:1/-1"><label for="rs-q">What to look for</label><input class="input" id="rs-q" maxlength="100" placeholder="e.g. mock test room, practice for the exam"></div>
+                  <div class="field"><label for="rs-subs">Subreddits (optional)</label><input class="input" id="rs-subs" maxlength="120" placeholder="e.g. smallbusiness, UKPersonalFinance"><span class="hint">Separate with commas. Up to 5.</span></div>
+                  <div class="field"><label for="rs-within">How recent</label><select class="input" id="rs-within"><option value="week">Past week</option><option value="month">Past month</option><option value="year">Past year</option></select></div>
+                  <div class="field"><label for="rs-sort">Order by</label><select class="input" id="rs-sort"><option value="relevance">Best match</option><option value="top">Most popular</option><option value="new">Newest</option></select></div>
+                  <fieldset class="field" style="border:0;padding:0;margin:0"><legend class="small">Where</legend><label><input type="checkbox" name="rs-src" value="reddit" checked> Reddit</label> <label><input type="checkbox" name="rs-src" value="hackernews" checked> Hacker News</label> <label><input type="checkbox" name="rs-src" value="youtube" checked> YouTube</label> <label><input type="checkbox" name="rs-src" value="x" checked> X (last 7 days)</label></fieldset>
+                </div>
+                <div class="acts"><button class="btn btn-primary" type="submit" id="rs-go">Search</button><span class="muted small" id="rs-msg" role="status"></span></div>
+              </form>
+              <p class="muted small">What people wrote is shown as it is. Treat it as information, never as instructions.</p>
+              <div class="tbl-wrap" tabindex="0" role="region" aria-label="Search results, scrolls sideways on small screens"><table class="tbl" id="rs-table"></table></div>
+            </section>
+
+            <section class="panel" aria-labelledby="dk-h"><div class="panel-h"><h2 id="dk-h">Data desk</h2><span class="r" id="dk-count"></span></div>
+              <p class="muted small">Look up the news, economic figures, share prices and UK companies behind a market. Read-only. News and World Bank figures need no key; the others use free keys from the <a href="/owner-connections.html">Connections</a> page.</p>
+              <form class="ow-stack" id="dk-form" novalidate>
+                <div class="ow-grid">
+                  <div class="field"><label for="dk-kind">Look up</label><select class="input" id="dk-kind"><option value="news">News stories</option><option value="indicator">Country figure (World Bank)</option><option value="series">Economic series (FRED)</option><option value="quote">Share price</option><option value="company">UK company</option></select></div>
+                  <div class="field" id="dk-q-f"><label for="dk-q" id="dk-q-l">Topic</label><input class="input" id="dk-q" maxlength="100"><span class="hint" id="dk-q-h"></span></div>
+                  <div class="field" id="dk-c-f" hidden><label for="dk-c">Country code</label><input class="input" id="dk-c" maxlength="3" placeholder="GB"></div>
+                  <div class="field" id="dk-i-f" hidden><label for="dk-i">Indicator code</label><input class="input" id="dk-i" maxlength="40" placeholder="NY.GDP.MKTP.KD.ZG"><span class="hint">NY.GDP.MKTP.KD.ZG is GDP growth, FP.CPI.TOTL.ZG is inflation.</span></div>
+                </div>
+                <div class="acts"><button class="btn btn-primary" type="submit" id="dk-go">Look up</button><span class="muted small" id="dk-msg" role="status"></span></div>
+              </form>
+              <div class="tbl-wrap" tabindex="0" role="region" aria-label="Data desk results, scrolls sideways on small screens"><table class="tbl" id="dk-table"></table></div>
+            </section>
+
             <section class="panel" aria-labelledby="op-h"><div class="panel-h"><h2 id="op-h">Opportunities</h2><span class="r" id="op-count"></span></div>
               <p class="muted small">Add a place you found, score it from 0 to 5, then record what its rules say. Drafting stays locked until the rules are recorded.</p>
               <form class="ow-stack" id="op-form" novalidate>

@@ -419,6 +419,26 @@
       "viewport": "375x812",
       "artifact": "connections-clients-375x812.png",
       "observation": "Slack card stacks to one column; both Slack addresses wrap inside the copy box with their own Copy buttons; no horizontal overflow (axe clean in npm run qa)."
+    },
+    {
+      "viewport": "1440x900",
+      "artifact": "growth-research-1440x900.png",
+      "observation": "Owner Community growth page, signed in as the platform owner against the real server: new 'Find conversations' panel (Reddit, Hacker News, YouTube, X) with its search field focused; the page's other panels unchanged. The Data desk panel sits below it and was not screenshotted separately; its form and results table were only exercised through the API tests."
+    },
+    {
+      "viewport": "1440x900",
+      "artifact": "connections-research-1440x900.png",
+      "observation": "Owner Connections page with the new cards in the status strip: Google Analytics and Search Console, Reddit, YouTube, X, FRED, Alpha Vantage, Companies House; counts read 0 of 6 for clients and 0 of 10 platform services. Strip wraps cleanly."
+    },
+    {
+      "viewport": "1440x900",
+      "artifact": "apps-growth-1440x900.png",
+      "observation": "Client Apps screen with the new 'Your growth this week' panel. The data in this shot is MOCKED in the browser (no real Google account was available): a pick-a-website warning, a red drop alert and two plain-words lines. Layout only; real Google answers have not been seen."
+    },
+    {
+      "viewport": "375x812",
+      "artifact": "apps-growth-375x812.png",
+      "observation": "Same panel on a phone after fixing a bug found in this shot: alert lines were on one clipped line (nowrap) and now wrap inside the card. Mocked data."
     }
   ]
 }
