@@ -35,7 +35,7 @@ import { PeopleService } from "../modules/people/index.js";
 import { ConversationService } from "../modules/conversations/index.js";
 import { NotificationService } from "../modules/notifications/index.js";
 
-import { ConsoleEmailSender, type EmailSender } from "./email.js";
+import { ConsoleEmailSender, QueuedEmailSender, ResendEmailSender, type EmailSender } from "./email.js";
 import { brandFrom, decisionsWaitingEmail, ownerAlertEmail } from "./email-templates.js";
 import { userIdFor } from "./identity.js";
 import { ExpiringSet, SendLog } from "./expiring.js";
@@ -133,7 +133,12 @@ export function createPlatform(cfg: PlatformConfig) {
   });
   const router = new ChannelRouter(identity, workforce, audit);
   /** Business apps (tills, payroll). Employees get only the app data the owner granted them. */
-  const integrations = new IntegrationService(identity, audit, ledger, defaultRegistry(), { http: cfg.http, now, oauthApps: cfg.integrationApps });
+  // Our Xero/Square apps: the server's when set there, otherwise what the owner typed on the Connections page
+  // (looked up on each use, so a saved app works at once).
+  const oauthApps = new Proxy({} as Record<string, OAuthApp>, {
+    get: (_t, k) => (typeof k === "string" ? cfg.integrationApps?.[k] ?? connections.integrationApps()[k] : undefined),
+  });
+  const integrations = new IntegrationService(identity, audit, ledger, defaultRegistry(), { http: cfg.http, now, oauthApps });
   workforce.addContext((ws, templateKey) => integrations.contextFor(ws, templateKey));
   /** Welcomes new owners and runs setup. Storage and models are stand-ins until real RunPod/bucket provisioning is wired in. */
   const admin = new AdminManager(identity, workforce, audit, bus, new InMemoryStorageProvisioner(), new InMemoryModelProvisioner(), router, { now });
@@ -159,7 +164,18 @@ export function createPlatform(cfg: PlatformConfig) {
   energy.setZoneResolver((ws) => batch.scheduleOf(ws).timezone);
   workforce.setIntake(batch);
   workforce.addContext((ws, templateKey, taskType) => batch.contextFor(ws, templateKey, taskType));
-  const email = cfg.email ?? new ConsoleEmailSender();
+  // Email goes through the server's Resend settings when set there, otherwise the ones typed on the Connections
+  // page (a new sender as soon as they change), otherwise the log.
+  const consoleEmail = new ConsoleEmailSender();
+  let typedMail: { apiKey: string; from: string; sender: QueuedEmailSender } | undefined;
+  const currentEmail = (): EmailSender => {
+    if (cfg.email) return cfg.email;
+    const s = connections.emailSettings();
+    if (!s) return consoleEmail;
+    if (typedMail?.apiKey !== s.apiKey || typedMail.from !== s.from) typedMail = { ...s, sender: new QueuedEmailSender(new ResendEmailSender(s.apiKey, s.from, cfg.http)) };
+    return typedMail.sender;
+  };
+  const email: EmailSender & { idle(): Promise<void> } = { send: (m) => currentEmail().send(m), idle: async () => { await typedMail?.sender.idle(); } };
   const base = (cfg.appUrl ?? "").replace(/\/$/, "");
   /** Signed-in user ids of the platform owners (the same id the session carries). */
   const ownerEmails = ownerEmailsEarly;
@@ -538,6 +554,14 @@ export function createPlatform(cfg: PlatformConfig) {
   const codeFails = new SendLog(15 * 60_000);
   /** Starts a sleeping RunPod worker for a client who just opened the app or started typing. */
   const warm = () => routing?.warm() ?? "skipped";
-  return { conversations, notices, warm, ownerDecisions, decisionDigest, dashboard, reconciliation, rota, people, payments, batch, email, usedLinks, sends, loginFails, resets, credentials, formHits, codeFails, coupons, affiliates, promoter, growth, connections, get ownerWhatsApp() { return live.wa; }, admin, reviews, prices, specialists, ai, clients, isPlatformOwner, healthy, hasStore, cfg, now, audit, bus, identity, energy, workforce, ledger, onboarding, router, integrations, slackTokens, saveSlackToken, attachStore };
+  /**
+   * The config as the routes read it: Slack and the Google/Microsoft sign-in apps include what the owner typed on
+   * the Connections page, looked up on each request. Server settings win.
+   */
+  const liveCfg: PlatformConfig = Object.defineProperties({ ...cfg }, {
+    slack: { enumerable: true, get: () => cfg.slack ?? connections.slackApp() },
+    loginApps: { enumerable: true, get: (): LoginApps => ({ ...connections.loginApps(), ...cfg.loginApps }) },
+  });
+  return { conversations, notices, warm, ownerDecisions, decisionDigest, dashboard, reconciliation, rota, people, payments, batch, email, usedLinks, sends, loginFails, resets, credentials, formHits, codeFails, coupons, affiliates, promoter, growth, connections, get ownerWhatsApp() { return live.wa; }, admin, reviews, prices, specialists, ai, clients, isPlatformOwner, healthy, hasStore, cfg: liveCfg, now, audit, bus, identity, energy, workforce, ledger, onboarding, router, integrations, slackTokens, saveSlackToken, attachStore };
 }
 export type Platform = ReturnType<typeof createPlatform>;

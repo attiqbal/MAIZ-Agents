@@ -17,10 +17,11 @@ const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as 
 interface Field { key: string; label: string; help: string; secret: boolean; required: boolean; placeholder?: string; generate?: boolean; set: boolean; value?: string; fallback?: string }
 interface TestResult { ok: boolean; message: string; details: string[]; at: string }
 interface Conn {
-  key: string; title: string; summary: string; group: "social" | "messaging" | "platform"; usedBy: string[];
+  key: string; title: string; summary: string; group: "social" | "messaging" | "clients" | "platform"; usedBy: string[];
   editable: boolean; status: ConnStatus; source: "browser" | "server" | "none"; statusText: string; missing: string[];
   canTest: boolean; lastTest?: TestResult; fields: Field[]; guide: GuideStep[];
   webhook?: { callbackUrl: string; verifyToken?: string; seenAt?: string };
+  copies?: { label: string; value: string }[]; clientsSee?: string;
 }
 interface View { connections: Conn[]; persistent: boolean }
 
@@ -37,8 +38,9 @@ const DEMO: View = {
   persistent: true,
   connections: CATALOG.map((c) => ({
     key: c.key, title: c.title, summary: c.summary, group: c.group, usedBy: [...c.usedBy], editable: c.editable, status: "not_connected", source: "none",
-    statusText: "Not connected yet.", missing: c.fields.filter((f) => f.required).map((f) => f.label), canTest: c.key !== "slack",
-    fields: c.fields.map((f) => ({ ...f, set: false })), guide: [...c.guide],
+    statusText: "Not connected yet.", missing: c.fields.filter((f) => f.required).map((f) => f.label), canTest: true,
+    fields: c.fields.map((f) => ({ ...f, set: false })), guide: [...c.guide], clientsSee: c.clientsSee,
+    copies: c.copies?.map((x) => ({ label: x.label, value: `${location.origin}${x.path}` })),
     webhook: c.key === "whatsapp" ? { callbackUrl: `${location.origin}/api/whatsapp/webhook` } : undefined,
   })),
 };
@@ -60,7 +62,7 @@ function askers(c: Conn): string {
 
 function result(c: Conn): string {
   const t = c.lastTest;
-  if (!t) return c.status === "connected" ? `<p class="cx-result cx-untested" role="status">Saved, not tested yet. Press <b>Test connection</b> to check it with ${c.group === "platform" ? "the service" : "Meta"}.</p>` : `<p class="cx-result" role="status" hidden></p>`;
+  if (!t) return c.status === "connected" ? `<p class="cx-result cx-untested" role="status">Saved, not tested yet. Press <b>Test connection</b> to check it with ${c.group === "social" || c.group === "messaging" ? "Meta" : "the service"}.</p>` : `<p class="cx-result" role="status" hidden></p>`;
   return `<div class="cx-result ${t.ok ? "cx-ok" : "cx-bad"}" role="status"><p><b>${t.ok ? "It works." : "Not working yet."}</b> ${esc(t.message)}</p>
     ${t.details.length ? `<ul>${t.details.map((d) => `<li>${esc(d)}</li>`).join("")}</ul>` : ""}<p class="small muted">Tested ${esc(when(t.at))}</p></div>`;
 }
@@ -95,6 +97,20 @@ function webhookBox(c: Conn): string {
     <p class="small ${w.seenAt ? "cx-ok-t" : "muted"}">${w.seenAt ? `Meta reached the webhook at ${esc(when(w.seenAt))}.` : "Meta has not reached the webhook since the server last started."}</p></div>`;
 }
 
+/** Addresses to paste into the provider's own screens (redirect URLs and the like). */
+function copiesBox(c: Conn): string {
+  if (!c.copies?.length) return "";
+  return `<div class="cx-hook"><h3 class="small">Paste into ${esc(c.title.replace(/^Sign in with /, "").replace(/ \(.*\)$/, ""))}'s settings</h3>
+    ${c.copies.map((x, i) => `<div class="cx-copy"><span class="cx-copy-k">${esc(x.label)}</span><code id="cp-${esc(c.key)}-${i}">${esc(x.value)}</code><button type="button" class="btn btn-ghost btn-sm" data-copy="cp-${esc(c.key)}-${i}">Copy<span class="sr-only"> ${esc(x.label)}</span></button></div>`).join("")}</div>`;
+}
+
+const GROUPS: { id: string; groups: Conn["group"][] }[] = [
+  { id: "cx-team", groups: ["social", "messaging"] },
+  { id: "cx-clients", groups: ["clients"] },
+  { id: "cx-platform", groups: ["platform"] },
+];
+const inGroup = (gs: Conn["group"][]) => view.connections.filter((c) => gs.includes(c.group));
+
 function card(c: Conn): string {
   const open = c.status !== "connected" && c.editable;
   const done = c.guide.filter((_, i) => readTicks()[`${c.key}:${i}`]).length;
@@ -107,6 +123,7 @@ function card(c: Conn): string {
   return `<section class="panel cx-card" id="c-${esc(c.key)}" aria-labelledby="c-${esc(c.key)}-h" tabindex="-1">
     <div class="cx-top"><div class="cx-title"><h2 id="c-${esc(c.key)}-h">${esc(c.title)}</h2><p class="muted">${esc(c.summary)}</p></div>${statusBadge(c.status)}</div>
     ${askers(c)}
+    ${c.clientsSee ? `<p class="cx-sees small"><b>What your clients get:</b> ${esc(c.clientsSee)}</p>` : ""}
     <p class="cx-state">${esc(c.statusText)}${c.missing.length && c.status === "not_connected" ? ` Still needed: ${esc(c.missing.join(", "))}.` : ""}${c.source === "server" && c.editable === false && CATALOG.find((d) => d.key === c.key)?.editable ? " To manage it here instead, remove those settings from the server." : ""}</p>
     ${result(c)}
     <details class="cx-setup"${open ? " open" : ""}><summary>${c.editable ? (c.status === "not_connected" ? "Set it up, step by step" : "Steps and details") : "Where this is set, and how"} <span class="muted small">${c.guide.length} steps${done ? `, ${done} ticked` : ""}</span></summary>
@@ -114,26 +131,26 @@ function card(c: Conn): string {
     </details>
     ${c.editable || c.fields.length ? `<form class="cx-form" data-form="${esc(c.key)}" novalidate>
       ${c.fields.length ? `<div class="ow-grid cx-fields">${c.fields.map((f) => fieldHtml(c, f)).join("")}</div>` : ""}
+      ${copiesBox(c)}
       ${webhookBox(c)}
       ${actions}</form>` : actions}
   </section>`;
 }
 
 function summary(): void {
-  const team = view.connections.filter((c) => c.group !== "platform");
+  const [team, clients, platform] = GROUPS.map((g) => inGroup(g.groups)) as [Conn[], Conn[], Conn[]];
   const ok = team.filter((c) => c.status === "connected").length;
-  const platform = view.connections.filter((c) => c.group === "platform");
+  const cOk = clients.filter((c) => c.status === "connected").length;
   const pOk = platform.filter((c) => c.status === "connected").length;
   $("cx-progress").innerHTML = `<div class="cx-meter" role="img" aria-label="${ok} of ${team.length} connected"><span style="width:${Math.round((ok / Math.max(1, team.length)) * 100)}%"></span></div>
-    <p><b class="tnum">${ok} of ${team.length}</b> things your team asked for are connected. <span class="muted">Platform services: <span class="tnum">${pOk} of ${platform.length}</span> working.</span></p>
+    <p><b class="tnum">${ok} of ${team.length}</b> things your team asked for are connected. <span class="muted">For your clients: <span class="tnum">${cOk} of ${clients.length}</span>. Platform services: <span class="tnum">${pOk} of ${platform.length}</span> working.</span></p>
     <ul class="cx-jump">${view.connections.map((c) => `<li><a href="#c-${esc(c.key)}">${statusBadge(c.status)}<span>${esc(c.title)}</span></a></li>`).join("")}</ul>`;
   $("cx-temp").hidden = !live || view.persistent;
 }
 
 function render(): void {
   summary();
-  $("cx-team").innerHTML = view.connections.filter((c) => c.group !== "platform").map(card).join("");
-  $("cx-platform").innerHTML = view.connections.filter((c) => c.group === "platform").map(card).join("");
+  for (const g of GROUPS) $(g.id).innerHTML = inGroup(g.groups).map(card).join("");
 }
 
 /** New data from the server. Cards with half-typed changes are left alone, except the one just acted on. */

@@ -1,7 +1,9 @@
 import type { Sink } from "../../core/persistence.js";
 import { MetaGraph, MetaRejected, MetaUncertain, type MetaConfig } from "../meta/index.js";
 import { normalizeNumber, WhatsAppError, type WhatsAppConfig } from "../whatsapp/index.js";
+import type { OAuthApp } from "../integrations/index.js";
 import { CATALOG, defOf, type ConnDef, type ConnKey, type GuideStep } from "./catalog.js";
+import { probeApp, ProbeUnreachable, type ProbeKind } from "./probes.js";
 
 /**
  * The platform owner's connections (Facebook, Instagram, WhatsApp, and the status of the server-set services).
@@ -29,6 +31,9 @@ export interface ConnectionView {
   fields: FieldView[];
   guide: GuideStep[];
   webhook?: { callbackUrl: string; verifyToken?: string; seenAt?: string };
+  /** Addresses to paste into the provider's screens. */
+  copies?: { label: string; value: string }[];
+  clientsSee?: string;
 }
 
 /** The owner's WhatsApp line, as far as the Connections page needs it. */
@@ -51,6 +56,34 @@ export interface ConnectionsOptions {
 
 type Stored = Partial<Record<ConnKey, Record<string, string>>>;
 
+/** "Continue with Google / Microsoft" apps, in the shape sign-in uses. */
+export interface StoredLoginApps { google?: { clientId: string; clientSecret: string }; microsoft?: { clientId: string; clientSecret: string; tenant: string } }
+export interface StoredSlackApp { clientId: string; clientSecret: string; signingSecret: string; redirectUri: string }
+
+/**
+ * The server variables behind each browser-editable platform card. When every required one is set on the server,
+ * the server's values win and the card says so; otherwise what was typed on the page is used.
+ */
+const ENV: Partial<Record<ConnKey, { vars: Record<string, string>; required: string[]; extra?: string[] }>> = {
+  resend: { vars: { apiKey: "RESEND_API_KEY", from: "EMAIL_FROM" }, required: ["apiKey", "from"] },
+  google: { vars: { clientId: "GOOGLE_CLIENT_ID", clientSecret: "GOOGLE_CLIENT_SECRET" }, required: ["clientId", "clientSecret"] },
+  microsoft: { vars: { clientId: "MICROSOFT_CLIENT_ID", clientSecret: "MICROSOFT_CLIENT_SECRET", tenant: "MICROSOFT_TENANT" }, required: ["clientId", "clientSecret"] },
+  slack: { vars: { clientId: "SLACK_CLIENT_ID", clientSecret: "SLACK_CLIENT_SECRET", signingSecret: "SLACK_SIGNING_SECRET" }, required: ["clientId", "clientSecret", "signingSecret"], extra: ["SLACK_REDIRECT_URI"] },
+  xero: { vars: { clientId: "XERO_CLIENT_ID", clientSecret: "XERO_CLIENT_SECRET" }, required: ["clientId", "clientSecret"] },
+  square: { vars: { clientId: "SQUARE_CLIENT_ID", clientSecret: "SQUARE_CLIENT_SECRET" }, required: ["clientId", "clientSecret"] },
+};
+/** Secrets set only on the server, so a test message can never carry one back. */
+const SERVER_SECRETS = ["STRIPE_SECRET_KEY", "STRIPE_WEBHOOK_SECRET", "RUNPOD_API_KEY", "ANTHROPIC_API_KEY"];
+const PROBED: readonly ConnKey[] = ["google", "microsoft", "slack", "xero", "square"];
+/** What each sign-in or client card says when it works, and when it does not. */
+const APP_TEXT: Partial<Record<ConnKey, [string, string]>> = {
+  google: ["Clients see a Continue with Google button.", "Not set: the Google button is hidden from sign-up and log-in."],
+  microsoft: ["Clients see a Continue with Microsoft button.", "Not set: the Microsoft button is hidden from sign-up and log-in."],
+  slack: ["Clients can add their AI team to Slack.", "Not set: clients cannot add Slack yet."],
+  xero: ["Clients can connect Xero with one click.", "Not set: clients cannot connect Xero with one click yet."],
+  square: ["Clients can connect Square with one click.", "Not set: clients cannot connect Square with one click yet."],
+};
+
 const TEST_GAP_MS = 2_000;
 /** A real WhatsApp message each time: kept rare so a slip (or a stolen login) cannot spam the number. */
 const SEND_GAP_MS = 30_000;
@@ -68,7 +101,20 @@ const RULES: Record<string, [RegExp, string]> = {
   verifyToken: [/^[A-Za-z0-9._~-]{16,100}$/, "Use 16 to 100 letters and numbers, no spaces. Press Make one for me."],
   alertTemplate: [/^[a-z0-9_]{1,100}$/, "Template names are lower-case letters, numbers and underscores, for example maiz_owner_alert."],
   templateLanguage: [/^[a-z]{2,3}(_[A-Z]{2})?$/, "Use a language code such as en_GB or en_US."],
+  clientSecret: [/^[\x21-\x7e]{8,300}$/, "The secret is one code with no spaces. Copy it again in full."],
+  "resend.apiKey": [/^re_[A-Za-z0-9_]{8,200}$/, "A Resend key starts with re_ and has no spaces. Copy it again in full."],
+  "resend.from": [/^(?:[\p{L}\p{N} .,'&()-]{1,80} <[^\s@<>]{1,64}@[A-Za-z0-9.-]{1,190}\.[A-Za-z]{2,24}>|[^\s@<>]{1,64}@[A-Za-z0-9.-]{1,190}\.[A-Za-z]{2,24})$/u, "Write it as a name and an address, for example: MAIZ Agents <hello@maizagents.com>"],
+  "google.clientId": [/^[\w-]{5,150}\.apps\.googleusercontent\.com$/, "A Google client ID ends in .apps.googleusercontent.com. Copy it again in full."],
+  "microsoft.clientId": [/^[0-9a-f]{8}-([0-9a-f]{4}-){3}[0-9a-f]{12}$/i, "The Application (client) ID is a long id with dashes, from the app's Overview page."],
+  "microsoft.tenant": [/^(common|organizations|consumers|[a-z0-9][a-z0-9.-]{0,79})$/i, "Leave it empty, or use common, organizations, consumers, or your tenant's id or domain."],
+  "slack.clientId": [/^\d{4,20}\.\d{4,20}$/, "The Slack client ID is two numbers with a dot between them."],
+  "slack.clientSecret": [/^[a-f0-9]{16,64}$/i, "The Slack client secret is a code of letters a to f and numbers. Press Show in App credentials and copy it again."],
+  "slack.signingSecret": [/^[a-f0-9]{16,64}$/i, "The signing secret is a code of letters a to f and numbers. Press Show in App credentials and copy it again."],
+  "xero.clientId": [/^[A-Za-z0-9]{20,64}$/, "The Xero client id is one code of letters and numbers, from the app's Configuration page."],
+  "square.clientId": [/^(sandbox-)?sq0id[a-z]-[\w-]{8,100}$/, "The Square Application ID starts with sq0idp-. Copy it again in full."],
+  "square.clientSecret": [/^(sandbox-)?sq0csp-[\w-]{8,200}$/, "The Square Application secret starts with sq0csp-. Press Show on the OAuth page and copy it again."],
 };
+const ruleFor = (key: string, field: string): [RegExp, string] | undefined => RULES[`${key}.${field}`] ?? RULES[field];
 
 async function getJson(http: typeof fetch, url: string, headers: Record<string, string>): Promise<{ status: number; json: any }> {
   let res: Response;
@@ -111,7 +157,7 @@ export class ConnectionsService {
       if (!v || typeof v !== "object") return;
       // Stored values are checked again: anything that would not be accepted today is dropped, not trusted.
       const known = new Set(defOf(key)!.fields.map((f) => f.key));
-      const ok = (f: string, x: unknown): x is string => typeof x === "string" && known.has(f) && (f === "ownerNumber" ? !!normalizeNumber(x) : !RULES[f] || RULES[f]![0].test(x));
+      const ok = (f: string, x: unknown): x is string => typeof x === "string" && known.has(f) && (f === "ownerNumber" ? !!normalizeNumber(x) : !ruleFor(key, f) || ruleFor(key, f)![0].test(x));
       this.stored[key as ConnKey] = Object.fromEntries(Object.entries(v).filter(([f, x]) => ok(f, x))) as Record<string, string>;
     } catch { /* an unreadable record is treated as not connected */ }
   }
@@ -151,6 +197,56 @@ export class ConnectionsService {
     return { accessToken, appSecret, phoneNumberId, verifyToken, ownerNumber: owner, alertTemplate: { name: w("alertTemplate") ?? "maiz_owner_alert", language: w("templateLanguage") ?? "en_GB" }, version: this.graphVersion() };
   }
 
+  /** True when every required server variable for this card is set, so the server's values are used. */
+  private envSet(key: ConnKey): boolean {
+    const e = ENV[key];
+    return !!e && e.required.every((f) => this.env(e.vars[f]!)) && (e.extra ?? []).every((k) => this.env(k));
+  }
+  /** The values in force for an env-backed card: the server's when set there, otherwise the page's. */
+  private values(key: ConnKey): Record<string, string | undefined> {
+    const e = ENV[key];
+    if (e && this.envSet(key)) return Object.fromEntries(Object.entries(e.vars).map(([f, k]) => [f, this.env(k)]));
+    return { ...(this.stored[key] ?? {}) };
+  }
+  /** The values when every required field is there, otherwise undefined. */
+  private complete(key: ConnKey): Record<string, string | undefined> | undefined {
+    const v = this.values(key);
+    return defOf(key)!.fields.filter((f) => f.required).every((f) => v[f.key]) ? v : undefined;
+  }
+  /** Typed on this page (the server's own settings are used directly by the platform). */
+  private typed(key: ConnKey): Record<string, string> | undefined {
+    return this.envSet(key) ? undefined : (this.complete(key) as Record<string, string> | undefined);
+  }
+
+  /** Email settings typed on this page, or undefined (then the server's, or the log, are used). */
+  emailSettings(): { apiKey: string; from: string } | undefined {
+    const v = this.typed("resend");
+    return v ? { apiKey: v.apiKey!, from: v.from! } : undefined;
+  }
+  /** Sign-in apps typed on this page. */
+  loginApps(): StoredLoginApps {
+    const g = this.typed("google"), m = this.typed("microsoft");
+    return {
+      ...(g ? { google: { clientId: g.clientId!, clientSecret: g.clientSecret! } } : {}),
+      ...(m ? { microsoft: { clientId: m.clientId!, clientSecret: m.clientSecret!, tenant: m.tenant || "common" } } : {}),
+    };
+  }
+  /** The platform's Slack app as typed on this page. */
+  slackApp(): StoredSlackApp | undefined {
+    const v = this.typed("slack");
+    return v ? { clientId: v.clientId!, clientSecret: v.clientSecret!, signingSecret: v.signingSecret!, redirectUri: `${this.base}/api/slack/callback` } : undefined;
+  }
+  /** Client connector apps (Xero, Square) typed on this page, by connector key. */
+  integrationApps(): Record<string, OAuthApp> {
+    const out: Record<string, OAuthApp> = Object.create(null);
+    for (const k of ["xero", "square"] as const) {
+      const v = this.typed(k);
+      if (v) out[k] = { clientId: v.clientId!, clientSecret: v.clientSecret!, redirectUri: `${this.base}/api/integrations/callback` };
+    }
+    return out;
+  }
+  private get base(): string { return this.opts.appUrl.replace(/\/$/, ""); }
+
   /** Meta reached the webhook (a good handshake or a signed delivery). Shown on the WhatsApp card. */
   noteWebhook(): void { this.webhookSeenAt = this.opts.now().toISOString(); }
 
@@ -159,7 +255,7 @@ export class ConnectionsService {
   private serverSet(key: ConnKey): boolean {
     if (key === "facebook" || key === "instagram") return !!this.opts.envMeta;
     if (key === "whatsapp") return !!this.opts.envWhatsApp;
-    return false;
+    return this.envSet(key);
   }
 
   private configured(key: ConnKey): { ok: boolean; missing: string[]; text: string } {
@@ -190,8 +286,8 @@ export class ConnectionsService {
         return { ok: false, missing, text: "Not connected yet." };
       }
       case "resend": {
-        const ok = !!(v("RESEND_API_KEY") && v("EMAIL_FROM"));
-        return { ok, missing: ok ? [] : ["RESEND_API_KEY and EMAIL_FROM on the server"], text: ok ? `Emails are sent from ${v("EMAIL_FROM")!.slice(0, 120)}.` : "Not set: emails are only written to the server log." };
+        const c = this.complete("resend");
+        return { ok: !!c, missing: this.missingOf(key), text: c ? `Emails are sent from ${c.from!.slice(0, 120)}.` : "Not set: emails are only written to the server log." };
       }
       case "stripe": {
         const key = v("STRIPE_SECRET_KEY") ?? "";
@@ -206,11 +302,16 @@ export class ConnectionsService {
         const ok = !!v("ANTHROPIC_API_KEY");
         return { ok, missing: ok ? [] : ["ANTHROPIC_API_KEY on the server"], text: ok ? "Claude is set up." : "Not set: no quality checking by Claude." };
       }
-      case "slack": {
-        const ok = ["SLACK_CLIENT_ID", "SLACK_CLIENT_SECRET", "SLACK_SIGNING_SECRET", "SLACK_REDIRECT_URI"].every((k) => v(k));
-        return { ok, missing: ok ? [] : ["the four SLACK_ settings on the server"], text: ok ? "Clients can add their AI team to Slack." : "Not set: clients cannot add Slack yet." };
+      case "google": case "microsoft": case "slack": case "xero": case "square": {
+        const ok = !!this.complete(key);
+        return { ok, missing: this.missingOf(key), text: APP_TEXT[key]![ok ? 0 : 1] };
       }
     }
+  }
+
+  private missingOf(key: ConnKey): string[] {
+    const v = this.values(key);
+    return defOf(key)!.fields.filter((f) => f.required && !v[f.key]).map((f) => f.label);
   }
 
   private viewOf(def: ConnDef): ConnectionView {
@@ -232,8 +333,10 @@ export class ConnectionsService {
       editable: def.editable && !server, status, source,
       statusText: server && c.ok ? `${c.text} Set on the server, so it cannot be changed here.` : c.text,
       missing: c.missing,
-      canTest: def.key !== "slack",
+      canTest: true,
       lastTest: last, fields, guide: def.guide,
+      copies: def.copies?.map((c) => ({ label: c.label, value: `${this.base}${c.path}` })),
+      clientsSee: def.clientsSee,
       webhook: def.key === "whatsapp" ? { callbackUrl: `${this.opts.appUrl.replace(/\/$/, "")}/api/whatsapp/webhook`, verifyToken: server ? undefined : (wa?.verifyToken ?? this.field("whatsapp", "verifyToken")), seenAt: this.webhookSeenAt } : undefined,
     };
   }
@@ -276,7 +379,7 @@ export class ConnectionsService {
       } else if (f.key === "pageId" || f.key === "instagramId" || f.key === "phoneNumberId") {
         s = s.replace(/\s+/g, "");
       }
-      const rule = RULES[f.key];
+      const rule = ruleFor(def.key, f.key);
       if (rule && !rule[0].test(s)) { problems.push(`${f.label}: ${rule[1]}`); continue; }
       next[f.key] = s;
     }
@@ -315,7 +418,7 @@ export class ConnectionsService {
   async test(userId: string, key: string): Promise<ConnectionView> {
     this.require(userId);
     const def = defOf(key);
-    if (!def || def.key === "slack") throw new ConnectionsError("there is no safe test for this connection");
+    if (!def) throw new ConnectionsError("unknown connection");
     this.throttle(`test:${def.key}`);
     let result: Omit<TestResult, "at">;
     try {
@@ -325,14 +428,25 @@ export class ConnectionsService {
       const msg = e instanceof MetaUncertain ? "Meta could not be reached, or had a fault. Nothing was changed. Try again in a minute."
         : e instanceof MetaRejected ? explainMeta(e.message)
         : e instanceof WhatsAppError ? explainMeta(e.message)
-        : e instanceof ConnectionsError ? `${def.title} ${e.message}`
+        : e instanceof ConnectionsError || e instanceof ProbeUnreachable ? `${def.title} ${e.message}`
         : "The test failed unexpectedly. Nothing was changed.";
-      if (!(e instanceof MetaRejected || e instanceof MetaUncertain || e instanceof WhatsAppError || e instanceof ConnectionsError)) console.error("connection test failed:", def.key, e instanceof Error ? e.name : "error");
-      const m = this.metaConfig(), w = this.whatsappConfig();
-      result = { ok: false, message: redact(msg, m?.accessToken, m?.appSecret, w?.accessToken, w?.appSecret), details: [] };
+      if (!(e instanceof MetaRejected || e instanceof MetaUncertain || e instanceof WhatsAppError || e instanceof ConnectionsError || e instanceof ProbeUnreachable)) console.error("connection test failed:", def.key, e instanceof Error ? e.name : "error");
+      result = { ok: false, message: msg, details: [] };
     }
+    const secrets = this.allSecrets();
+    result = { ...result, message: redact(result.message, ...secrets), details: result.details.map((d) => redact(d, ...secrets)) };
     this.tests.set(def.key, { ...result, at: this.opts.now().toISOString() });
     return this.viewOf(def);
+  }
+
+  /** Every secret this service knows, typed or from the server, so none can appear in a message. */
+  private allSecrets(): string[] {
+    const out: (string | undefined)[] = [];
+    for (const d of CATALOG) for (const f of d.fields) if (f.secret) { out.push(this.field(d.key, f.key)); const k = ENV[d.key]?.vars[f.key]; if (k) out.push(this.env(k)); }
+    for (const k of SERVER_SECRETS) out.push(this.env(k));
+    const m = this.opts.envMeta, w = this.opts.envWhatsApp;
+    out.push(m?.accessToken, m?.appSecret, w?.accessToken, w?.appSecret);
+    return out.filter((x): x is string => !!x);
   }
 
   private notReady(def: ConnKey): Omit<TestResult, "at"> {
@@ -382,7 +496,8 @@ export class ConnectionsService {
         return { ok: true, message: `Connected to the WhatsApp business number ${info.number ?? ""}${info.name ? ` (${info.name})` : ""}.`.replace("  ", " "), details };
       }
       case "resend": {
-        const k = this.env("RESEND_API_KEY"), from = this.env("EMAIL_FROM");
+        const c = this.complete("resend");
+        const k = c?.apiKey, from = c?.from;
         if (!k || !from) return this.notReady(key);
         const r = await getJson(this.http, "https://api.resend.com/domains", { authorization: `Bearer ${k}` });
         const domain = /@([^>\s]+)>?\s*$/.exec(from)?.[1]?.toLowerCase();
@@ -420,9 +535,25 @@ export class ConnectionsService {
         if (r.status === 200) return { ok: true, message: "Claude accepted the key.", details: [] };
         return { ok: false, message: `Anthropic said no: ${redact(String(r.json?.error?.message ?? `error ${r.status}`), k).slice(0, 200)}`, details: [] };
       }
-      case "slack":
-        return { ok: false, message: "There is no safe test for Slack.", details: [] };
+      case "google": case "microsoft": case "slack": case "xero": case "square":
+        return this.probe(key);
     }
+  }
+
+  /** Checks a sign-in app's keys with the provider, using a made-up code (see probes.ts). */
+  private async probe(key: ConnKey & ProbeKind): Promise<Omit<TestResult, "at">> {
+    const v = this.complete(key);
+    if (!v) return this.notReady(key);
+    const redirectUri = key === "slack" && this.envSet("slack") ? this.env("SLACK_REDIRECT_URI")! : `${this.base}${defOf(key)!.copies![0]!.path}`;
+    let baseUrl: string | undefined;
+    if (key === "square") {
+      const b = this.env("SQUARE_BASE_URL");
+      baseUrl = b && /^https:\/\/connect\.squareup(sandbox)?\.com$/.test(b) ? b : "https://connect.squareup.com";
+      if (v.clientId!.startsWith("sandbox-") && !baseUrl.includes("sandbox")) return { ok: false, message: "That is a Sandbox application ID. Switch to Production at the top of the Square Developer page and copy the Production ID and secret.", details: [] };
+    }
+    const r = await probeApp(key, { clientId: v.clientId!, clientSecret: v.clientSecret!, redirectUri, tenant: v.tenant || undefined, baseUrl }, this.http);
+    if (key === "slack" && r.ok) return { ...r, details: [...r.details, "The signing secret cannot be checked this way. Slack checks it when you turn on Event subscriptions (step 4): Verified there means it is right."] };
+    return r;
   }
 
   /** Sends the owner one real WhatsApp message to prove the line works end to end. */

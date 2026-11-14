@@ -26,6 +26,8 @@ Open **Connections** in the owner menu (`/owner-connections.html`). The Facebook
 
 Details typed there are stored encrypted (AES-256-GCM with `TOKEN_KEY`, in `platform_records` as `connection_secret`), never returned to the browser after saving, never logged. Code: `src/modules/connections`, tests `test/connections.test.ts`.
 
+The same page also takes the platform's own keys, so none of them needs a server login: **Email sending (Resend)**, and under **For your clients**, **Sign in with Google**, **Sign in with Microsoft**, **Slack**, **Xero** and **Square**, each with its steps, the redirect addresses to copy and a test (tests: `test/connections-platform.test.ts`). The sign-in app tests send the provider a made-up code (Microsoft: a request for a token with no permissions), so nothing is created; Google's and Microsoft's answers to wrong keys were checked live on 2026-11-14, Slack's, Xero's and Square's follow their documentation. Stripe, RunPod and Claude stay server settings on purpose.
+
 The environment variables below still work and **win** when a whole group is set (the page then shows "Set on the server" and cannot change it). Use them only if you prefer server settings.
 
 ## What you must do at Meta (the page walks you through it)

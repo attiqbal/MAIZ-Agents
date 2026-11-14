@@ -973,6 +973,8 @@ body > main, body > .page-top { flex: none; }
 .cx-jump a:hover { border-color: var(--color-graphite); }
 .cx-jump .cx-badge { font-size: 0; gap: 0; min-height: 28px; width: 28px; padding: 0; justify-content: center; }
 .cx-group-h { font-family: var(--font-polysans); font-size: clamp(24px, 3vw, 32px); font-weight: 400; letter-spacing: -0.02em; margin: 16px 0 0; }
+.cx-group-p { margin: -8px 0 0; max-width: 72ch; }
+.cx-sees { margin: 0; padding: 8px 14px; border-radius: 16px; background: color-mix(in srgb, var(--color-sky) 14%, white); color: var(--color-graphite); max-width: 72ch; }
 .cx-card { scroll-margin-top: 120px; }
 .cx-card:focus { outline: none; }
 .cx-card:focus-visible { outline: 2px solid var(--color-graphite); outline-offset: 2px; }

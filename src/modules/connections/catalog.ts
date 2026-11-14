@@ -2,7 +2,7 @@
  * What the owner can connect, and the plain-English steps for each. Pure data: the service turns it into the
  * Connections page. Screens at Meta change often, so each step says what to look for, not just where to click.
  */
-export type ConnKey = "facebook" | "instagram" | "whatsapp" | "resend" | "stripe" | "runpod" | "anthropic" | "slack";
+export type ConnKey = "facebook" | "instagram" | "whatsapp" | "resend" | "google" | "microsoft" | "slack" | "xero" | "square" | "stripe" | "runpod" | "anthropic";
 
 export interface FieldDef {
   key: string;
@@ -20,12 +20,17 @@ export interface ConnDef {
   key: ConnKey;
   title: string;
   summary: string;
-  group: "social" | "messaging" | "platform";
+  /** social/messaging: asked for by the owner's own team. clients: what clients sign in with or connect. platform: runs the site. */
+  group: "social" | "messaging" | "clients" | "platform";
   /** True when the owner can enter the details in the browser. False: set on the server, shown here as status + test. */
   editable: boolean;
   fields: FieldDef[];
   guide: GuideStep[];
   usedBy: string[];
+  /** What clients see once this works, in their words. */
+  clientsSee?: string;
+  /** Addresses to paste into the provider's screens, as paths on this site (shown with the site's address in front). */
+  copies?: { label: string; path: string }[];
 }
 
 const META_APPS = { href: "https://developers.facebook.com/apps/", label: "Meta for Developers: your apps" };
@@ -92,14 +97,116 @@ export const CATALOG: readonly ConnDef[] = [
     ],
   },
   {
-    key: "resend", title: "Email sending (Resend)", group: "platform", editable: false,
+    key: "resend", title: "Email sending (Resend)", group: "platform", editable: true,
     summary: "Sends sign-in links, receipts, your decisions digest and the promotion agent's approved emails.",
     usedBy: ["decisions", "promotion-agent"],
-    fields: [],
+    clientsSee: "Their sign-in links and receipts arrive in seconds, from your own address.",
+    fields: [
+      { key: "apiKey", label: "Resend API key", secret: true, required: true, placeholder: "Starts with re_", help: "A Sending access key is safest. Resend shows it only once." },
+      { key: "from", label: "Send emails from", secret: false, required: true, placeholder: "MAIZ Agents <hello@maizagents.com>", help: "A name and an address on your verified domain." },
+    ],
     guide: [
-      { text: "Create a free account and an API key (Full access or Sending access).", link: { href: "https://resend.com/api-keys", label: "Resend: API keys" } },
-      { text: "Add and verify your sending domain by adding the DNS records Resend shows you.", link: { href: "https://resend.com/domains", label: "Resend: domains" } },
-      { text: "The key and the From address (RESEND_API_KEY and EMAIL_FROM) are server settings. Entering them in the browser is not built yet; Test connection checks what the server has." },
+      { text: "Create a Resend account (free to start), then add your domain, for example maizagents.com.", link: { href: "https://resend.com/domains", label: "Resend: domains" } },
+      { text: "Resend shows a few DNS records. Add each one where your domain's DNS lives (for maizagents.com that is Cloudflare: DNS, then Records, then Add record). Turn the orange cloud off for them. Press Verify in Resend; it can take a few minutes." },
+      { text: "In Resend open API keys, click Create API key, choose Sending access and your domain, and copy the key.", link: { href: "https://resend.com/api-keys", label: "Resend: API keys" } },
+      { text: "Paste the key below, type the From address (a name, then the address in angle brackets), and click Save. Emails switch over straight away." },
+      { text: "Click Test connection. It checks the key and, when the key is allowed to, that your domain is verified. It sends nothing." },
+    ],
+  },
+  {
+    key: "google", title: "Sign in with Google", group: "clients", editable: true,
+    summary: "Adds a Continue with Google button to sign-up and log-in, so clients do not need another password.",
+    usedBy: [],
+    clientsSee: "A Continue with Google button on sign-up and log-in.",
+    copies: [{ label: "Authorised redirect URI", path: "/api/signin/oauth/google/callback" }],
+    fields: [
+      { key: "clientId", label: "Client ID", secret: false, required: true, placeholder: "…apps.googleusercontent.com", help: "Ends in .apps.googleusercontent.com." },
+      { key: "clientSecret", label: "Client secret", secret: true, required: true, placeholder: "Starts with GOCSPX-", help: "Shown next to the client ID in Google Cloud." },
+    ],
+    guide: [
+      { text: "Open Google Cloud and create a project (any name, for example MAIZ Agents).", link: { href: "https://console.cloud.google.com/projectcreate", label: "Google Cloud: new project" } },
+      { text: "Open Google Auth Platform (it used to be called the OAuth consent screen). Click Get started, give the app name MAIZ Agents and your support email, choose External, and finish. Under Branding add your home page, privacy page and terms page addresses.", link: { href: "https://console.cloud.google.com/auth/overview", label: "Google Auth Platform" } },
+      { text: "Under Audience, click Publish app, so anyone can sign in (not just test users). Sign-in with only the basic profile and email needs no review by Google." },
+      { text: "Under Clients, click Create client. Type: Web application. Under Authorised redirect URIs click Add URI and paste the address from the box below. Click Create.", link: { href: "https://console.cloud.google.com/auth/clients", label: "Google Auth Platform: clients" } },
+      { text: "Copy the Client ID and Client secret into the boxes below and click Save. The Google button appears on sign-up and log-in straight away." },
+      { text: "Click Test connection. It asks Google whether it knows your app, using a made-up code, so nothing is created. Then try it yourself on the log-in page." },
+    ],
+  },
+  {
+    key: "microsoft", title: "Sign in with Microsoft", group: "clients", editable: true,
+    summary: "Adds a Continue with Microsoft button, for clients who use Outlook or Microsoft 365 at work.",
+    usedBy: [],
+    clientsSee: "A Continue with Microsoft button on sign-up and log-in.",
+    copies: [{ label: "Redirect URI (Web)", path: "/api/signin/oauth/microsoft/callback" }],
+    fields: [
+      { key: "clientId", label: "Application (client) ID", secret: false, required: true, placeholder: "e.g. 1a2b3c4d-…", help: "The long id with dashes on the app's Overview page." },
+      { key: "clientSecret", label: "Client secret value", secret: true, required: true, help: "The Value column, not the Secret ID. Shown only once." },
+      { key: "tenant", label: "Who can sign in", secret: false, required: false, placeholder: "common", help: "Leave empty for any work or personal Microsoft account." },
+    ],
+    guide: [
+      { text: "Open Microsoft Entra, App registrations, and click New registration. Name it MAIZ Agents. Under Supported account types choose \"Accounts in any organizational directory and personal Microsoft accounts\".", link: { href: "https://entra.microsoft.com/#view/Microsoft_AAD_RegisteredApps/ApplicationsListBlade", label: "Microsoft Entra: app registrations" } },
+      { text: "Under Redirect URI choose Web and paste the address from the box below. Click Register." },
+      { text: "On the Overview page, copy the Application (client) ID into the first box below." },
+      { text: "Open Certificates and secrets, click New client secret, pick the longest expiry, and copy the Value (not the Secret ID) into the second box. Put a reminder in your calendar a week before it expires." },
+      { text: "Open Token configuration, click Add optional claim, choose ID, tick xms_edov and click Add (tick the box Microsoft offers to add the Graph permission too). Without this, people signing in with a work account are turned away, because MAIZ cannot trust their email address otherwise." },
+      { text: "Click Save. The Microsoft button appears straight away. Click Test connection: it asks Microsoft for a token with no permissions, which shows whether it knows your app, and creates nothing." },
+    ],
+  },
+  {
+    key: "slack", title: "Slack (clients' teams)", group: "clients", editable: true,
+    summary: "Lets each client chat with their AI employees in Slack. This is the platform's one Slack app, shared by every client.",
+    usedBy: [],
+    clientsSee: "An Add to Slack button in their workspace settings, then their AI team answers in Slack.",
+    copies: [
+      { label: "Redirect URL (OAuth and permissions)", path: "/api/slack/callback" },
+      { label: "Request URL (Event subscriptions)", path: "/api/slack/events" },
+    ],
+    fields: [
+      { key: "clientId", label: "Client ID", secret: false, required: true, placeholder: "e.g. 1234567890.1234567890", help: "Two numbers with a dot between them." },
+      { key: "clientSecret", label: "Client secret", secret: true, required: true, help: "From Basic information, App credentials." },
+      { key: "signingSecret", label: "Signing secret", secret: true, required: true, help: "Also from App credentials. It proves messages really come from Slack." },
+    ],
+    guide: [
+      { text: "Open Slack's app page, click Create New App, choose From scratch, name it MAIZ Agents and pick any workspace of yours to build it in.", link: { href: "https://api.slack.com/apps", label: "Slack: your apps" } },
+      { text: "Open OAuth and Permissions. Under Redirect URLs paste the first address from the box below and save. Under Bot token scopes add: app_mentions:read, chat:write, im:history, im:read, im:write." },
+      { text: "Open Basic information, App credentials. Copy the Client ID, Client secret and Signing secret into the boxes below and click Save. Save before the next step, because Slack checks the address straight away." },
+      { text: "Open Event subscriptions, switch it on, and paste the second address from the box below as the Request URL. Wait for Verified. Under Subscribe to bot events add app_mention and message.im, then Save changes." },
+      { text: "Open Manage distribution and click Activate public distribution, so clients' workspaces can add it." },
+      { text: "Click Test connection. It asks Slack whether it knows your app, using a made-up code, so nothing is installed anywhere." },
+    ],
+  },
+  {
+    key: "xero", title: "Xero (clients' accounts)", group: "clients", editable: true,
+    summary: "Lets clients connect their Xero books with one click, so their finance employee can read their accounts.",
+    usedBy: [],
+    clientsSee: "A Connect Xero button that opens Xero's own sign-in, instead of uploading files.",
+    copies: [{ label: "Redirect URI", path: "/api/integrations/callback" }],
+    fields: [
+      { key: "clientId", label: "Client id", secret: false, required: true, placeholder: "32 letters and numbers", help: "From your app's Configuration page." },
+      { key: "clientSecret", label: "Client secret", secret: true, required: true, help: "Press Generate a secret there. Shown only once." },
+    ],
+    guide: [
+      { text: "Open Xero Developer, My Apps, and click New app. Name it MAIZ Agents, choose Web app, and give your home page address.", link: { href: "https://developer.xero.com/app/manage", label: "Xero Developer: my apps" } },
+      { text: "As the Redirect URI paste the address from the box below. Tick the terms and click Create app." },
+      { text: "Open Configuration, copy the Client id, then press Generate a secret and copy it. Paste both below and click Save." },
+      { text: "Click Test connection. It asks Xero whether it knows your app, using a made-up code, so nothing is connected. A new Xero app can connect up to 25 organisations; apply for more in Xero Developer when you grow." },
+    ],
+  },
+  {
+    key: "square", title: "Square (clients' tills)", group: "clients", editable: true,
+    summary: "Lets clients connect their Square account with one click, so daily sales arrive without file uploads.",
+    usedBy: [],
+    clientsSee: "A Connect Square button that opens Square's own sign-in.",
+    copies: [{ label: "Redirect URL", path: "/api/integrations/callback" }],
+    fields: [
+      { key: "clientId", label: "Application ID", secret: false, required: true, placeholder: "Starts with sq0idp-", help: "From the app's Credentials page (Production)." },
+      { key: "clientSecret", label: "Application secret", secret: true, required: true, placeholder: "Starts with sq0csp-", help: "From the app's OAuth page. Press Show." },
+    ],
+    guide: [
+      { text: "Open the Square Developer dashboard and click the + to create an application named MAIZ Agents.", link: { href: "https://developer.squareup.com/apps", label: "Square Developer: applications" } },
+      { text: "At the top switch to Production. Open OAuth, paste the address from the box below as the Redirect URL, and save." },
+      { text: "Copy the Application ID (Credentials page) and the Application secret (OAuth page, press Show) into the boxes below and click Save." },
+      { text: "Click Test connection. It asks Square whether it knows your app, using a made-up code, so nothing is connected." },
     ],
   },
   {
@@ -108,7 +215,7 @@ export const CATALOG: readonly ConnDef[] = [
     usedBy: [],
     fields: [],
     guide: [
-      { text: "Keys and the webhook secret (PAYMENTS_PROVIDER, STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET) are server settings. Test connection checks that the server's key is accepted by Stripe.", link: { href: "https://dashboard.stripe.com/apikeys", label: "Stripe: API keys" } },
+      { text: "Payments stay a server setting on purpose: a mistake here takes real money, and the server checks live and test keys before it starts. PAYMENTS_PROVIDER, STRIPE_SECRET_KEY and STRIPE_WEBHOOK_SECRET are set once. Test connection checks that the server's key is accepted by Stripe.", link: { href: "https://dashboard.stripe.com/apikeys", label: "Stripe: API keys" } },
       { text: "The webhook endpoint in Stripe should point to your site's /api/payments/webhook.", link: { href: "https://dashboard.stripe.com/webhooks", label: "Stripe: webhooks" } },
     ],
   },
@@ -119,7 +226,7 @@ export const CATALOG: readonly ConnDef[] = [
     fields: [],
     guide: [
       { text: "Create a restricted API key and a serverless endpoint.", link: { href: "https://www.runpod.io/console/serverless", label: "RunPod: serverless" } },
-      { text: "RUNPOD_API_KEY and RUNPOD_ENDPOINT_ID are server settings. Test connection asks the endpoint for its health, which costs nothing." },
+      { text: "RUNPOD_API_KEY and RUNPOD_ENDPOINT_ID are set once on the server, because every agent's work depends on them. Test connection asks the endpoint for its health, which costs nothing." },
     ],
   },
   {
@@ -129,17 +236,7 @@ export const CATALOG: readonly ConnDef[] = [
     fields: [],
     guide: [
       { text: "Create an API key and set a monthly spend limit.", link: { href: "https://console.anthropic.com/settings/keys", label: "Anthropic Console: API keys" } },
-      { text: "ANTHROPIC_API_KEY is a server setting. Test connection lists one model, which is free." },
-    ],
-  },
-  {
-    key: "slack", title: "Slack (clients' teams)", group: "platform", editable: false,
-    summary: "Lets each client chat with their AI employees in Slack. This is the platform's Slack app, not yours.",
-    usedBy: [],
-    fields: [],
-    guide: [
-      { text: "Create the Slack app once for the whole platform.", link: { href: "https://api.slack.com/apps", label: "Slack: your apps" } },
-      { text: "SLACK_CLIENT_ID, SLACK_CLIENT_SECRET, SLACK_SIGNING_SECRET and SLACK_REDIRECT_URI are server settings. There is nothing safe to test without installing it into a workspace." },
+      { text: "ANTHROPIC_API_KEY is set once on the server. Test connection lists one model, which is free." },
     ],
   },
 ] as const;

@@ -51,7 +51,7 @@ describe("Connections page API", () => {
     const { call } = setup();
     const r = await call("GET", "/api/owner/connections");
     const keys = (r.body as any).connections.map((c: any) => c.key);
-    expect(keys).toEqual(["facebook", "instagram", "whatsapp", "resend", "stripe", "runpod", "anthropic", "slack"]);
+    expect(keys).toEqual(["facebook", "instagram", "whatsapp", "resend", "google", "microsoft", "slack", "xero", "square", "stripe", "runpod", "anthropic"]);
     for (const c of (r.body as any).connections) { expect(c.guide.length).toBeGreaterThan(1); expect(c.status).toBe("not_connected"); }
     expect((r.body as any).persistent).toBe(false);
   });
@@ -92,7 +92,7 @@ describe("Connections page API", () => {
     expect(bad.status).toBe(400);
     expect((bad.body as any).error).toMatch(/number/);
     expect((await call("PUT", "/api/owner/connections/whatsapp", { fields: { ownerNumber: "call me" } })).status).toBe(400);
-    expect((await call("PUT", "/api/owner/connections/resend", { fields: {} })).status).toBe(400);
+    expect((await call("PUT", "/api/owner/connections/stripe", { fields: {} })).status).toBe(400);
     expect((await call("PUT", "/api/owner/connections/nothing", { fields: {} })).status).toBe(400);
   });
 
@@ -220,7 +220,9 @@ describe("Connections page API", () => {
     expect(calls.every((c) => c.method === "GET")).toBe(true);
     const all = JSON.stringify((await call("GET", "/api/owner/connections")).body);
     for (const v of ["re_secret_123456", "rk_live_abcdef", "whsec_x", "rp_key", "sk-ant-xyz"]) expect(all).not.toContain(v);
-    expect((await call("POST", "/api/owner/connections/slack/test")).status).toBe(400);
+    // Set on the server, so the page shows it but cannot change it.
+    expect((await card("resend")).editable).toBe(false);
+    expect((await call("PUT", "/api/owner/connections/resend", { fields: { from: "x@y.com" } })).status).toBe(400);
   });
 
   it("flags an unverified Resend domain", async () => {
