@@ -8,6 +8,7 @@ import { IntegrationError } from "../modules/integrations/index.js";
 import { ReviewError } from "../modules/review/index.js";
 import { PricingError } from "../modules/pricing/index.js";
 import { PromoterError } from "../modules/promoter/index.js";
+import { GROWTH_ROLE, GrowthError, discoveryQueries } from "../modules/growth/index.js";
 import { DEFAULT_COMMISSION, DEFAULT_HOLD_DAYS, PromoError, describeCommission } from "../modules/promotions/index.js";
 import { EnergyError, parseAutoReload } from "../modules/energy/index.js";
 import { BatchError } from "../modules/batch/schedule.js";
@@ -425,6 +426,7 @@ export function createApp(p: Platform) {
     if (path === "/api/owner/reviews" || path.startsWith("/api/owner/reviews/")) return ownerReviewRoutes(req, userId, body);
     if (path === "/api/owner/ai" || path.startsWith("/api/owner/ai/")) return ownerAiRoutes(req, userId, body);
     if (path === "/api/owner/prices" || path.startsWith("/api/owner/prices/")) return ownerPriceRoutes(req, userId, body);
+    if (path.startsWith("/api/owner/growth")) return ownerGrowthRoutes(req, userId, body);
     if (path.startsWith("/api/owner/promoter")) return ownerPromoterRoutes(req, userId, body);
     if (path.startsWith("/api/owner/coupons") || path.startsWith("/api/owner/affiliates") || path === "/api/owner/promotions") return ownerPromoRoutes(req, userId, body);
     if (path.startsWith("/api/owner/")) {
@@ -780,6 +782,36 @@ export function createApp(p: Platform) {
     };
   }
 
+  /** The community growth manager: the platform owner only. Nothing is posted, pitched or created by it; the owner does that by hand and records it here. */
+  async function ownerGrowthRoutes(req: Req, userId: string, body: () => any): Promise<Res> {
+    if (!p.isPlatformOwner(userId)) return json(403, { error: "only the MAIZ platform owner can use the community growth manager" });
+    const { method, path } = req;
+    const g = p.growth;
+    const overview = () => ({ ...g.overview(userId), report: g.report(userId) });
+    if (method === "GET" && path === "/api/owner/growth") return json(200, { ...overview(), role: GROWTH_ROLE, discovery: Object.fromEntries((["mocktestroom", "examutor", "maizagents"] as const).map((k) => [k, discoveryQueries(k)])) });
+    if (method === "POST" && path === "/api/owner/growth/opportunities") { g.addOpportunity(userId, body()); return json(201, overview()); }
+    if (method === "POST" && path === "/api/owner/growth/drafts") { await g.draft(userId, body()); return json(201, overview()); }
+    if (method === "POST" && path === "/api/owner/growth/approvals") { g.raiseApproval(userId, body()); return json(201, overview()); }
+    if (method === "POST" && path === "/api/owner/growth/accounts") { g.registerAccount(userId, body()); return json(201, overview()); }
+    const route = /^\/api\/owner\/growth\/(opportunities|drafts|approvals|publications)\/([\w-]{1,64})\/(update|approve|reject|edit|published|decide|verify|metrics|follow-up)$/.exec(path);
+    if (method === "POST" && route) {
+      const [, kind, id, action] = route as unknown as [string, string, string, string];
+      const b = body() ?? {};
+      if (kind === "opportunities" && action === "update") g.updateOpportunity(userId, id, b);
+      else if (kind === "drafts" && action === "approve") g.decide(userId, id, true, b.acknowledge === true);
+      else if (kind === "drafts" && action === "reject") g.decide(userId, id, false);
+      else if (kind === "drafts" && action === "edit") g.edit(userId, id, b);
+      else if (kind === "drafts" && action === "published") g.markPublished(userId, id, b);
+      else if (kind === "approvals" && action === "decide") g.decideApproval(userId, id, b.approve === true);
+      else if (kind === "publications" && action === "verify") g.verify(userId, id, b);
+      else if (kind === "publications" && action === "metrics") g.recordMetrics(userId, id, b);
+      else if (kind === "publications" && action === "follow-up") g.setFollowUp(userId, id, b);
+      else return json(404, { error: "not found" });
+      return json(200, overview());
+    }
+    return json(404, { error: "not found" });
+  }
+
   /** The promotion agent: the platform owner only (the service checks again). Drafts wait for approval; nothing posts or spends by itself. */
   async function ownerPromoterRoutes(req: Req, userId: string, body: () => any): Promise<Res> {
     if (!p.isPlatformOwner(userId)) return json(403, { error: "only the MAIZ platform owner can use the promotion agent" });
@@ -957,7 +989,7 @@ export function createApp(p: Platform) {
     try {
       return renewed(req, await route(req));
     } catch (err) {
-      if (err instanceof BadRequest || err instanceof SetupError || err instanceof SignupError || err instanceof LedgerError || err instanceof ChannelError || err instanceof IntegrationError || err instanceof ReviewError || err instanceof PeopleError || err instanceof PricingError || err instanceof PromoError || err instanceof PromoterError || err instanceof EnergyError || err instanceof SettingsError || err instanceof BatchError || err instanceof PaymentError || err instanceof RotaError) return json(400, { error: err.message });
+      if (err instanceof BadRequest || err instanceof SetupError || err instanceof SignupError || err instanceof LedgerError || err instanceof ChannelError || err instanceof IntegrationError || err instanceof ReviewError || err instanceof PeopleError || err instanceof PricingError || err instanceof PromoError || err instanceof PromoterError || err instanceof GrowthError || err instanceof EnergyError || err instanceof SettingsError || err instanceof BatchError || err instanceof PaymentError || err instanceof RotaError) return json(400, { error: err.message });
       if (err instanceof PermissionError) return json(403, { error: "you don't have permission to do that" });
       console.error(`${req.method} ${req.path} failed:`, err);
       return json(500, { error: "something went wrong" });
