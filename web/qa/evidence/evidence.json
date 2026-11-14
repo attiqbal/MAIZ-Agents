@@ -439,6 +439,31 @@
       "viewport": "375x812",
       "artifact": "apps-growth-375x812.png",
       "observation": "Same panel on a phone after fixing a bug found in this shot: alert lines were on one clipped line (nowrap) and now wrap inside the card. Mocked data."
+    },
+    {
+      "viewport": "390x844",
+      "artifact": "meta-posts-waiting-390.png",
+      "observation": "Real server in sandbox mode, driven in a browser: Test mode banner, Facebook connected (labelled Test), WhatsApp connected with confirmed approver number (masked), a drafted post waiting with its approval code and Approve/Skip buttons, follower figure, and the pretend-phone panel showing the confirm and approval messages. No page overflow."
+    },
+    {
+      "viewport": "390x844",
+      "artifact": "meta-posted-390.png",
+      "observation": "After Approve and post: the post shows Posted and 'Test post (nothing was published)', not a clickable link."
+    },
+    {
+      "viewport": "390x844",
+      "artifact": "meta-choose-390.png",
+      "observation": "After the pretend Meta login: the client must pick which Page to use before anything is connected."
+    },
+    {
+      "viewport": "1440x900",
+      "artifact": "meta-owner-1440.png",
+      "observation": "Owner Meta approval page: five tiles, 10 permissions all Not submitted with a status selector each (the selector was too narrow and was widened after this shot), ready-to-go-live list (3 of 10: the three public pages really fetched), and the addresses to paste into Meta."
+    },
+    {
+      "viewport": "390x844",
+      "artifact": "meta-data-deletion-390.png",
+      "observation": "Data deletion page with an unknown code: says the code was not found and how to get help."
     }
   ]
 }

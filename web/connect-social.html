@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+<!--@include head title="Social accounts · MAIZ Agents" description="Connect your Facebook Page, Instagram account and WhatsApp number so your marketing employee can post for you, after you approve each post."-->
+<meta name="robots" content="noindex">
+</head>
+<body>
+<div class="page-top">
+  <!--@include header-->
+  <main id="main">
+    <section class="section">
+      <div class="container" style="max-width:980px">
+        <div class="rv-head">
+          <div><h1>Social accounts</h1>
+            <p class="sub">Connect your own Facebook Page, Instagram account and WhatsApp number. Your marketing employee writes the posts. Nothing goes out until you say yes.</p></div>
+          <span class="badge badge-dark" id="ms-mode" hidden>Test mode</span>
+        </div>
+        <div class="ob-panel" id="ow-gate" hidden aria-live="polite"><h2 id="ow-gate-h" style="font-size:1.25rem;margin:0 0 6px"></h2><p id="ow-gate-p" class="sub" style="margin:0 0 14px"></p><a class="btn btn-primary" id="ow-gate-a" href="/signin.html">Log in</a></div>
+        <div id="ow-body">
+          <div class="ow-stack">
+            <div class="learn" id="ms-sandbox" hidden><b>Test mode.</b>Meta has not approved MAIZ yet, so everything on this page is a rehearsal. The accounts are pretend, nothing is posted to Facebook, Instagram or WhatsApp, and nothing is sent to real people. It works exactly the way it will on the day Meta says yes.</div>
+            <p class="small" id="ms-msg" role="status" aria-live="polite"></p>
+
+            <section class="panel" id="ms-choose" aria-labelledby="ms-choose-h" hidden>
+              <div class="panel-h"><h2 id="ms-choose-h">Which one should your team use?</h2></div>
+              <p class="muted small">Choose one. MAIZ only works on the account you pick here.</p>
+              <div class="acts" id="ms-choices" role="group" aria-label="Accounts you can choose"></div>
+              <div id="ms-missing" class="small" style="margin-top:12px"></div>
+            </section>
+
+            <section class="panel" aria-labelledby="ms-acc-h"><div class="panel-h"><h2 id="ms-acc-h">Your accounts</h2></div>
+              <div class="ow-stack" id="ms-cards"></div>
+            </section>
+
+            <section class="panel" id="ms-post-panel" aria-labelledby="ms-post-h" hidden>
+              <div class="panel-h"><h2 id="ms-post-h">Write a post</h2></div>
+              <form class="ow-stack" id="ms-form" novalidate>
+                <div class="ow-grid">
+                  <div class="field"><label for="ms-acct">Post to</label><select class="input" id="ms-acct"></select></div>
+                  <div class="field"><label for="ms-when">Post at (optional)</label><input class="input" id="ms-when" type="datetime-local"><span class="hint">Leave empty to post as soon as you approve it.</span></div>
+                </div>
+                <div class="field"><label for="ms-text">What should it say?</label><textarea class="input" id="ms-text" rows="4" maxlength="6000"></textarea></div>
+                <div class="ow-grid">
+                  <div class="field"><label for="ms-img">Picture address (optional on Facebook, needed on Instagram)</label><input class="input" id="ms-img" type="url" placeholder="https://" autocomplete="off"></div>
+                  <div class="field"><label for="ms-link">Link (optional, Facebook only)</label><input class="input" id="ms-link" type="url" placeholder="https://" autocomplete="off"></div>
+                </div>
+                <div class="acts"><button class="btn btn-primary" type="submit">Send for my approval</button><span class="muted small">It will wait here, and on WhatsApp if you connected it.</span></div>
+              </form>
+            </section>
+
+            <section class="panel" id="ms-list-panel" aria-labelledby="ms-list-h" hidden>
+              <div class="panel-h"><h2 id="ms-list-h">Your posts</h2><span class="r" id="ms-limits"></span></div>
+              <div class="ow-stack" id="ms-posts" aria-live="polite"></div>
+            </section>
+
+            <section class="panel" id="ms-ins-panel" aria-labelledby="ms-ins-h" hidden>
+              <div class="panel-h"><h2 id="ms-ins-h">How your accounts are doing</h2></div>
+              <div class="kpis" id="ms-ins"></div>
+            </section>
+
+            <section class="panel" id="ms-sbx-panel" aria-labelledby="ms-sbx-h" hidden>
+              <div class="panel-h"><h2 id="ms-sbx-h">Test mode: pretend to be your phone</h2></div>
+              <p class="muted small">Messages MAIZ would send to your approver number appear here. Type a reply as if you were on your phone, for example YES followed by the code.</p>
+              <ul class="ow-list" id="ms-outbox"></ul>
+              <form class="acts" id="ms-reply" novalidate><label class="sr-only" for="ms-reply-t">Reply as the approver</label><input class="input" id="ms-reply-t" maxlength="200" placeholder="YES K7P2" autocomplete="off" style="max-width:260px"><button class="btn btn-ghost" type="submit">Send reply</button></form>
+            </section>
+
+            <section class="panel" aria-labelledby="ms-priv-h"><div class="panel-h"><h2 id="ms-priv-h">Your data and your control</h2></div>
+              <p class="muted small">MAIZ only reads and posts on the accounts you chose, and only for the jobs listed on each card. You can disconnect any account at any time, and you can remove MAIZ in your Facebook settings. If you want everything MAIZ holds from Meta deleted, press the button. <a class="link" href="/privacy.html">Privacy policy</a> · <a class="link" href="/data-deletion.html">How deletion works</a></p>
+              <div class="acts"><button type="button" class="btn btn-quiet" id="ms-delete">Delete everything from Meta</button></div>
+            </section>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+<!--@include footer-->
+<script type="module" src="/src/connect-social.ts"></script>
+</body>
+</html>

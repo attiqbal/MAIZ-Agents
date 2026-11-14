@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+<!--@include head title="Delete your Meta data · MAIZ Agents" description="How to have MAIZ Agents delete the Facebook, Instagram and WhatsApp information it holds, and how to check a deletion request."-->
+<link rel="canonical" href="%SITE_URL%/data-deletion.html">
+</head>
+<body>
+<div class="page-top">
+  <!--@include header-->
+  <main id="main">
+    <section class="section">
+      <div class="container" style="max-width:760px">
+        <h1>Delete your Facebook, Instagram and WhatsApp data</h1>
+        <p class="sub">When a business connects its accounts to MAIZ Agents, MAIZ holds a small amount of information from Meta. You can have all of it deleted at any time.</p>
+        <div class="ob-panel" id="dd-status" hidden aria-live="polite"><h2 id="dd-h" style="font-size:1.25rem;margin:0 0 6px"></h2><p id="dd-p" class="sub" style="margin:0"></p></div>
+        <h2>What MAIZ holds</h2>
+        <ul>
+          <li>The name and ID of the Facebook Page, Instagram account or WhatsApp number you connected.</li>
+          <li>An access token that lets MAIZ act on that account only. It is stored encrypted.</li>
+          <li>The posts MAIZ drafted or published for you, and the likes, comments and follower figures MAIZ read for them.</li>
+          <li>For WhatsApp, the mobile number you chose to approve posts from, and the messages used to approve them.</li>
+        </ul>
+        <h2>How to delete it</h2>
+        <ol>
+          <li><b>From MAIZ:</b> sign in, open <a class="link" href="/connect-social.html">Social accounts</a> and press <b>Delete everything from Meta</b>. It happens immediately.</li>
+          <li><b>From Facebook:</b> open Settings, then Business Integrations (or Apps and Websites), find <b>MAIZ Agents</b> and press Remove. Choose to delete the information it received. Facebook then tells MAIZ, and MAIZ deletes the same information straight away and gives Facebook a confirmation code.</li>
+          <li><b>By email:</b> write to the address on our <a class="link" href="/privacy.html">privacy policy</a> and we will delete it within 30 days.</li>
+        </ol>
+        <p>Deleting this data does not delete your MAIZ account, your team or your other business information. Billing records we are legally required to keep are not part of this data.</p>
+        <h2>Check a deletion request</h2>
+        <form class="acts" id="dd-form" novalidate><label class="sr-only" for="dd-code">Confirmation code</label><input class="input" id="dd-code" autocomplete="off" spellcheck="false" placeholder="Confirmation code" style="max-width:300px"><button class="btn btn-ghost" type="submit">Check</button></form>
+      </div>
+    </section>
+  </main>
+</div>
+<!--@include footer-->
+<script type="module" src="/src/data-deletion.ts"></script>
+</body>
+</html>
