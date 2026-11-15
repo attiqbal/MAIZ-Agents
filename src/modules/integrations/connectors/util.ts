@@ -1,5 +1,3 @@
-import { lookup } from "node:dns/promises";
-import { isIP } from "node:net";
 import { IntegrationError, type ConnectorContext } from "../types.js";
 
 /** Small helpers shared by the customer-app connectors. Each connector stays a few lines of mapping. */
@@ -113,7 +111,7 @@ export const toMinor = (v: unknown): number => { const n = typeof v === "string"
 
 /** True for loopback, private, link-local, carrier-grade NAT, multicast and other non-public addresses (IPv4 and IPv6). */
 export function isPrivateIp(ip: string): boolean {
-  const v4 = /^::ffff:(\d+\.\d+\.\d+\.\d+)$/i.exec(ip)?.[1] ?? (isIP(ip) === 4 ? ip : undefined);
+  const v4 = /^::ffff:(\d+\.\d+\.\d+\.\d+)$/i.exec(ip)?.[1] ?? (/^\d+\.\d+\.\d+\.\d+$/.test(ip) ? ip : undefined);
   if (v4) {
     const [a, b] = v4.split(".").map(Number) as [number, number];
     return a === 0 || a === 10 || a === 127 || a >= 224 || (a === 100 && b >= 64 && b <= 127) || (a === 169 && b === 254) || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168) || (a === 192 && b === 0) || (a === 198 && (b === 18 || b === 19));
@@ -122,7 +120,8 @@ export function isPrivateIp(ip: string): boolean {
   return l === "::" || l === "::1" || /^f[cd]/.test(l) || /^fe[89ab]/.test(l) || l.startsWith("ff");
 }
 
-let resolver: (host: string) => Promise<string[]> = async (h) => (await lookup(h, { all: true })).map((a) => a.address);
+// Loaded on first use so the website bundle, which shares the app list, never pulls in Node-only modules.
+let resolver: (host: string) => Promise<string[]> = async (h) => (await (await import("node:dns/promises")).lookup(h, { all: true })).map((a) => a.address);
 /** For tests: replace the DNS lookup. */
 export function setHostResolver(fn: (host: string) => Promise<string[]>): void { resolver = fn; }
 
