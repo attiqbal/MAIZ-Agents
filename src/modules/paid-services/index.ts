@@ -33,7 +33,7 @@ export interface PaidUse {
 }
 
 export interface PaidServicesOptions {
-  meter: Pick<EnergyMeter, "canAfford" | "recordPaid">;
+  meter: Pick<EnergyMeter, "canAfford" | "holdPaid" | "settlePaid" | "releasePaid">;
   /** The owner's one setting, read each time so a change on the Prices page applies to the next quote. */
   multiplier: () => number;
   keys: () => { creatomate?: string; shotstack?: string };
@@ -58,6 +58,8 @@ export class PaidServices {
   private uses: PaidUse[] = [];
   /** Payers with a paid call in flight, so two presses cannot both pass the same energy check. */
   private busy = new Set<string>();
+  /** Paid requests each payer has made today, counted when they start. */
+  private attempts = new Map<string, { day: string; n: number }>();
 
   constructor(private readonly opts: PaidServicesOptions) {}
 
@@ -70,47 +72,64 @@ export class PaidServices {
     return PAID_SERVICES.map((s) => ({ ...s, estCostMicro: undefined, connected: this.connected(s), quote: s.kind === "api" ? this.quote(s.key) : undefined }));
   }
 
-  /** What one use costs right now. Shown before anything runs. */
-  quote(key: string): PaidQuote & { simulated: boolean } {
+  /**
+   * What one use costs right now. Shown before anything runs. `charge` is what will really be taken: the full
+   * figure when the service is connected, nothing for a practice render.
+   */
+  quote(key: string): PaidQuote & { simulated: boolean; charge: number } {
     const s = paidService(key);
     if (!s || s.kind !== "api") throw new PaidServiceError("that service cannot be run from here yet");
-    return { ...quoteFor(s, this.opts.multiplier()), simulated: !this.connected(s) };
+    const q = quoteFor(s, this.opts.multiplier());
+    const simulated = !this.connected(s);
+    return { ...q, simulated, charge: simulated ? 0 : q.energy };
+  }
+
+  /** Counts a paid request towards the payer's day, whether or not it then succeeds: a failed call may still cost us. */
+  private countAttempt(pk: string): void {
+    const day = this.opts.now().toISOString().slice(0, 10);
+    const a = this.attempts.get(pk);
+    if (a && a.day === day && a.n >= MAX_PAID_USES_PER_DAY) throw new PaidServiceError(`that is ${MAX_PAID_USES_PER_DAY} paid requests today, which is the daily safety limit`);
+    this.attempts.set(pk, a && a.day === day ? { day, n: a.n + 1 } : { day, n: 1 });
   }
 
   /**
-   * Renders one video. `confirmEnergy` must equal the current quote: if the owner changed the multiplier since the
-   * person looked, the call is refused with the new figure rather than charging a number nobody saw.
+   * Renders one video. `confirmEnergy` must equal the quote's `charge`: if the owner changed the multiplier, or the
+   * service was connected, since the person looked, the call is refused with the new figure rather than charging a
+   * number nobody saw.
    */
   async render(payer: Payer, key: string, rawInput: unknown, confirmEnergy: unknown): Promise<PaidUse> {
     const s = paidService(key);
     const quote = this.quote(key);
     const input = cleanRender(rawInput);
-    if (confirmEnergy !== quote.energy) {
+    if (confirmEnergy !== quote.charge) {
       throw new PaidServiceError(quote.simulated
-        ? `${s!.name} is not connected yet, so this would be a practice render that uses no energy. Once connected it uses ${quote.energy} energy (${quote.multiplier} times its plain cost of ${quote.baseEnergy}). Confirm to continue.`
+        ? `${s!.name} is not connected yet, so this is a practice render that uses no energy. Once connected it uses ${quote.energy} energy (${quote.multiplier} times its plain cost of ${quote.baseEnergy}). Confirm to continue.`
         : `This uses ${quote.energy} energy from the team's pool (${quote.multiplier} times its plain cost of ${quote.baseEnergy}), because ${s!.name} is a paid service. Confirm to continue.`, quote);
     }
     const pk = this.payerKey(payer);
     if (this.busy.has(pk)) throw new PaidServiceError("another paid request is still running. Wait for it to finish");
-    const day = this.opts.now().toISOString().slice(0, 10);
-    if (this.uses.filter((u) => this.payerKey(u.payer) === pk && u.at.startsWith(day)).length >= MAX_PAID_USES_PER_DAY) throw new PaidServiceError(`that is ${MAX_PAID_USES_PER_DAY} paid requests today, which is the daily safety limit`);
     const apiKey = s!.connection ? this.opts.keys()[s!.connection] : undefined;
-    let overtime = false;
+    const cost = s!.estCostMicro ?? 0;
+    // From here to the hold nothing is awaited, so two requests cannot both pass the same check.
     if (apiKey && payer.kind === "client") {
-      const v = this.opts.meter.canAfford(payer.workspaceId, payer.employeeId, quote.energy);
+      const v = this.opts.meter.canAfford(payer.workspaceId, payer.employeeId, quote.energy, cost);
       if (!v.allowed) throw new PaidServiceError(`Not started: ${REASONS[v.reason] ?? "energy is not available"}.`, quote);
-      overtime = v.overtime;
     }
+    this.countAttempt(pk);
+    const hold = apiKey && payer.kind === "client" ? this.opts.meter.holdPaid(payer.workspaceId, quote.energy) : undefined;
     this.busy.add(pk);
     try {
       const render = !apiKey ? renderPractice(input, () => newId("r")) : s!.connection === "creatomate" ? await renderCreatomate(this.opts.http, apiKey, input) : await renderShotstack(this.opts.http, apiKey, input);
-      // Charged only once the service accepted the job. A refusal above this line costs nothing.
-      const energy = render.simulated ? 0 : quote.energy;
-      if (!render.simulated && payer.kind === "client") this.opts.meter.recordPaid(payer.workspaceId, payer.employeeId, `paid:${s!.key}`, s!.estCostMicro ?? 0, energy, overtime);
-      const use: PaidUse = { id: newId("paid"), at: this.opts.now().toISOString(), service: s!.key, payer, energy, simulated: render.simulated, render };
+      // Charged only once the service accepted the job: the energy set aside becomes the record.
+      if (hold && payer.kind === "client") this.opts.meter.settlePaid(hold, payer.employeeId, `paid:${s!.key}`, cost);
+      const use: PaidUse = { id: newId("paid"), at: this.opts.now().toISOString(), service: s!.key, payer, energy: render.simulated ? 0 : quote.energy, simulated: render.simulated, render };
       this.uses = [...this.uses, use].slice(-KEPT);
       this.opts.onUse?.(use);
       return use;
+    } catch (e) {
+      // Refused or unreachable: the energy set aside goes back. Nothing is recorded.
+      if (hold) this.opts.meter.releasePaid(hold);
+      throw e;
     } finally {
       this.busy.delete(pk);
     }

@@ -6,12 +6,13 @@ Some things cost MAIZ money every time they run, on top of the AI itself. The fi
 
 - One energy is one tenth of a US cent of real cost (see the energy section of `docs/ARCHITECTURE.md`).
 - A paid service uses **its plain cost in energy, times one multiplier**. The multiplier is a single setting, `paidServiceMultiplier`, on the Prices page (`web/owner-prices.html`). It starts at **2** (double) and can be set from 1 to 10. It is dated and logged like every other price change.
-- The cost is **shown before anything runs**. A request without the confirmed figure is refused with HTTP 409 and the quote. The caller sends the same figure back as `confirmEnergy`. If the owner changed the multiplier in between, the old figure is refused and the new one is shown.
+- The cost is **shown before anything runs**. A request without the confirmed figure is refused with HTTP 409 and the quote. The caller sends back the quote's `charge` as `confirmEnergy`: the full figure when the service is connected, 0 for a practice render. If the owner changed the multiplier, or connected the service, in between, the old figure is refused and the new one is shown.
 - A client's agent pays from the **team's weekly pool** like any other work. There is still no per-task limit. The usual safety checks apply (trial ended, daily ceiling, an agent's own cap, the hidden monthly cost cap), and the pool plus bought top-ups must cover the whole amount, because a render cannot be half done. What the pool has is used first and the rest comes from top-ups.
 - The owner's own agents (the promotion agent) have no pool. Their paid requests go through the same quote and confirm step and are logged with the energy figure, so the owner sees what a client would pay, but nothing is deducted.
 - The hidden monthly cost cap counts the **real** cost, not the multiplied figure.
-- Energy is taken only after the service accepts the job. A refusal, a wrong key or a network failure costs nothing.
-- At most 25 paid requests per client (or per owner agent) a day, as a runaway guard.
+- The energy is set aside before the service is called, so other work running at the same moment cannot spend it too. It becomes a charge only when the service accepts the job. A refusal, a wrong key or a network failure gives it back.
+- The whole amount must also fit under an employee's own daily cap and under the hidden monthly cost cap.
+- At most 25 paid requests per client (or per owner agent) a day, as a runaway guard. Failed attempts count, because a call that timed out may still have cost us.
 
 ## Practice mode
 

@@ -142,6 +142,9 @@ export interface TeamEnergy {
   refillsAt: string | null;
 }
 
+/** A paid service's energy set aside while the service is called: how much from the pool and how much from top-ups. */
+export interface PaidHold { workspaceId: string; pool: number; topUp: number }
+
 /** A task's energy set aside while it runs. */
 export interface EnergyHold { workspaceId: string; energy: number; overtime: boolean }
 
@@ -491,35 +494,66 @@ export class EnergyMeter {
 
   /**
    * Can this workspace spend `energy` in one go (a paid service costs a known amount up front)? Changes nothing.
-   * The ordinary checks apply (trial, daily ceiling, an agent's own cap, monthly cost cap); on top of that the
-   * pool plus bought top-ups must cover the whole amount, because a paid call cannot be half done.
+   * The ordinary checks apply (trial, daily ceiling, monthly cost cap) and, because a paid call cannot be half done,
+   * the whole amount must fit: in the pool plus bought top-ups, under the employee's own cap, and under the cost cap.
    */
-  canAfford(workspaceId: string, employeeId: string, energy: number): Verdict {
+  canAfford(workspaceId: string, employeeId: string, energy: number, realCostMicro = 0): Verdict {
     const v = this.check(workspaceId, employeeId);
     if (!v.allowed) return v;
+    const plan = this.planOf(workspaceId);
+    const day = this.today(workspaceId);
+    const monthRows = this.rowsOf(workspaceId).filter((u) => u.day.startsWith(day.slice(0, 7)));
+    const topUpThisMonth = this.topUpLeft(workspaceId) + monthRows.filter((u) => u.overtime).reduce((s, u) => s + u.energy, 0);
+    if (monthRows.reduce((s, u) => s + u.costMicro, 0) + realCostMicro > effectiveCostCapMicro(plan, this.poolBonus(workspaceId, plan), topUpThisMonth)) return { allowed: false, reason: "monthly_cost_cap_reached" };
+    const mineToday = this.poolRowsOf(workspaceId).filter((u) => u.employeeId === employeeId && u.day === day && !u.overtime).reduce((s, u) => s + u.energy, 0);
     const team = this.teamEnergyOf(workspaceId);
-    if (!team) return v;
+    if (!team) {
+      // A plan without a pool: the whole amount must fit in the employee's day. Paid services never run on overtime there.
+      return mineToday + energy > this.dailyQuota(workspaceId, employeeId) ? { allowed: false, reason: "daily_quota_used" } : { allowed: true, overtime: false };
+    }
     if (team.left + this.topUpLeft(workspaceId) < energy) return { allowed: false, reason: "weekly_pool_used" };
-    // The daily safety limit applies to the part taken from the pool.
-    if (team.dailyCeiling !== null && team.leftToday < Math.min(energy, team.left)) return { allowed: false, reason: "daily_ceiling_reached" };
+    const fromPool = Math.min(energy, team.left);
+    // The daily safety limit and an agent's own cap apply to the part taken from the pool.
+    if (team.dailyCeiling !== null && team.leftToday < fromPool) return { allowed: false, reason: "daily_ceiling_reached" };
+    const cap = this.agentCap(workspaceId, employeeId);
+    if (cap !== undefined && mineToday + fromPool > cap) return { allowed: false, reason: "daily_quota_used" };
     return v;
   }
 
   /**
-   * Record one use of a paid service (video rendering and the like). `realCostMicro` is what it really cost us and is what
-   * the hidden monthly cost cap counts; `energy` is what the client is charged, already multiplied by the owner's rule.
-   * It does not feed the next task's estimate, because a render is not like a drafted document.
+   * Sets a paid service's energy aside before the service is called, so work that runs meanwhile cannot spend it too.
+   * What the pool has is used first and the rest comes from bought top-ups. Call `canAfford` first, with nothing awaited
+   * in between, then `settlePaid` when the service accepted the job or `releasePaid` when it did not.
    */
-  recordPaid(workspaceId: string, employeeId: string, service: string, realCostMicro: number, energy: number, overtime: boolean): UsageRecord[] {
+  holdPaid(workspaceId: string, energy: number): PaidHold {
     const total = Math.max(0, Math.ceil(energy));
     const team = this.teamEnergyOf(workspaceId);
-    // With a shared pool, what the pool still has is used first and only the rest comes from bought top-ups.
-    const fromPool = team ? Math.min(total, team.left) : overtime ? 0 : total;
-    const base = { workspaceId, employeeId, day: this.today(workspaceId), provider: service, inputTokens: 0, outputTokens: 0 };
+    const pool = team ? Math.min(total, team.left) : total;
+    const h = this.held.get(workspaceId) ?? { pool: 0, topUp: 0 };
+    this.held.set(workspaceId, { pool: h.pool + pool, topUp: h.topUp + (total - pool) });
+    return { workspaceId, pool, topUp: total - pool };
+  }
+
+  releasePaid(hold: PaidHold): void {
+    const h = this.held.get(hold.workspaceId);
+    if (!h) return;
+    const next = { pool: Math.max(0, h.pool - hold.pool), topUp: Math.max(0, h.topUp - hold.topUp) };
+    if (next.pool === 0 && next.topUp === 0) this.held.delete(hold.workspaceId);
+    else this.held.set(hold.workspaceId, next);
+  }
+
+  /**
+   * Turns a hold into the record of one paid use (video rendering and the like). `realCostMicro` is what it really cost
+   * us and is what the hidden monthly cost cap counts; the energy is what was held, already multiplied by the owner's rule.
+   * It does not feed the next task's estimate, because a render is not like a drafted document.
+   */
+  settlePaid(hold: PaidHold, employeeId: string, service: string, realCostMicro: number): UsageRecord[] {
+    this.releasePaid(hold);
+    const base = { workspaceId: hold.workspaceId, employeeId, day: this.today(hold.workspaceId), provider: service, inputTokens: 0, outputTokens: 0 };
     const cost = Math.max(0, Math.ceil(realCostMicro));
     const rows: UsageRecord[] = [];
-    if (fromPool > 0 || total === 0) rows.push({ ...base, costMicro: cost, energy: fromPool, overtime: false });
-    if (total - fromPool > 0) rows.push({ ...base, costMicro: rows.length ? 0 : cost, energy: total - fromPool, overtime: true });
+    if (hold.pool > 0 || hold.topUp === 0) rows.push({ ...base, costMicro: cost, energy: hold.pool, overtime: false });
+    if (hold.topUp > 0) rows.push({ ...base, costMicro: rows.length ? 0 : cost, energy: hold.topUp, overtime: true });
     for (const rec of rows) { this.addRow(rec); this.sink?.usage(rec); }
     return rows;
   }

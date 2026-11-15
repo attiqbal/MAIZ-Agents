@@ -86,7 +86,7 @@ function videoBox(d: Draft): string {
   const v = d.video;
   const state = !v ? "" : v.simulated
     ? `<p class="small" role="status"><b>Practice video made.</b> No service is connected, so nothing was rendered and no energy was used. <a href="/owner-connections.html#c-creatomate">Connect Creatomate or Shotstack</a> to make real ones.</p>`
-    : v.status === "done" && v.url
+    : v.status === "done" && v.url && /^https:\/\//.test(v.url)
       ? `<p class="small" role="status"><b>Video ready.</b> <a href="${esc(v.url)}" target="_blank" rel="noopener noreferrer">Open the video<span class="sr-only"> (opens in a new tab)</span></a> · used <span class="tnum">${v.energy}</span> energy</p>`
       : `<p class="small" role="status"><b>Video is being made.</b> Used <span class="tnum">${v.energy}</span> energy. <button type="button" class="btn btn-quiet btn-sm" data-act="video-status" data-id="${esc(d.id)}">Check if it is ready</button></p>`;
   return `<details class="pm-video"><summary class="small">Make a video from this draft (paid service)</summary>
@@ -183,12 +183,12 @@ $("dr-list").addEventListener("click", async (e) => {
   else if (act_ === "video") {
     if (!live) { toast("This is example data. Log in as the platform owner to use it."); return; }
     b.disabled = true;
-    const r = await api<Overview & { error?: string; quote?: { energy: number } }>(`/owner/promoter/drafts/${id}/video`, { body: { service: val_(`[data-vservice="${id}"]`), templateId: val_(`[data-vtemplate="${id}"]`), textSlot: val_(`[data-vslot="${id}"]`) || undefined, confirmEnergy: videoQuotes.get(id) } });
+    const r = await api<Overview & { error?: string; quote?: { energy: number; charge: number } }>(`/owner/promoter/drafts/${id}/video`, { body: { service: val_(`[data-vservice="${id}"]`), templateId: val_(`[data-vtemplate="${id}"]`), textSlot: val_(`[data-vslot="${id}"]`) || undefined, confirmEnergy: videoQuotes.get(id) } });
     b.disabled = false;
     const note = $(`${id}-vq`);
     if (r.status === 409 && r.data?.quote) {
       // The server refused because the cost has not been confirmed: show it and let the next press confirm.
-      videoQuotes.set(id, r.data.quote.energy);
+      videoQuotes.set(id, r.data.quote.charge);
       note.textContent = r.data.error ?? `This uses ${r.data.quote.energy} energy.`;
       b.textContent = "Confirm and make the video";
     } else if (!r.ok) {

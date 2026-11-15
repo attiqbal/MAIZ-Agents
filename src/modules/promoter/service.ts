@@ -77,7 +77,7 @@ export interface DraftVideo {
 
 /** What the promotion agent needs from the paid-services desk. Kept as a small shape so this module does not know about energy. */
 export interface VideoDesk {
-  quote(service: string): { service: string; baseEnergy: number; multiplier: number; energy: number; simulated: boolean };
+  quote(service: string): { service: string; baseEnergy: number; multiplier: number; energy: number; simulated: boolean; charge: number };
   render(service: string, input: { templateId: unknown; fields: Record<string, unknown> }, confirmEnergy: unknown): Promise<{ id: string; energy: number; simulated: boolean; render: { status: "done" | "pending"; url?: string } }>;
   status(useId: string): Promise<{ render: { status: "done" | "pending"; url?: string } }>;
 }

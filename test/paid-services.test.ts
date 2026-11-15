@@ -96,8 +96,10 @@ describe("paid services: the double-energy rule", () => {
 
   it("runs a practice render with no key: nothing is called and nothing is charged", async () => {
     const { paid, payer, calls, energy, ws } = await desk();
-    expect(paid.quote("creatomate")).toMatchObject({ simulated: true, energy: 200 });
-    const use = await paid.render(payer, "creatomate", input, 200);
+    expect(paid.quote("creatomate")).toMatchObject({ simulated: true, energy: 200, charge: 0 });
+    // A practice render is confirmed with what it really takes (nothing), so a key saved in between cannot charge by surprise.
+    await expect(paid.render(payer, "creatomate", input, 200)).rejects.toBeInstanceOf(PaidServiceError);
+    const use = await paid.render(payer, "creatomate", input, 0);
     expect(use).toMatchObject({ simulated: true, energy: 0, render: { status: "done" } });
     expect(calls).toHaveLength(0);
     expect(energy.teamEnergyOf(ws)!.used).toBe(0);
@@ -121,10 +123,46 @@ describe("paid services: the double-energy rule", () => {
     expect(team.topUpLeft).toBe(450);
   });
 
+  it("sets the energy aside while the service is called, so other work cannot spend it too", async () => {
+    let during: number | undefined;
+    const d = await desk({ keys: { creatomate: KEY }, plan: { ...TEAM, weeklyTeamEnergy: 250 } });
+    const slow = (async (...a: Parameters<typeof fetch>) => { during = d.energy.teamEnergyOf(d.ws)!.left; return d.http(...a); }) as typeof fetch;
+    const paid = new PaidServices({ meter: d.energy, multiplier: () => 2, keys: () => ({ creatomate: KEY }), http: slow, now: () => d.clock.d });
+    await paid.render(d.payer, "creatomate", input, 200);
+    expect(during).toBe(50);
+    expect(d.energy.teamEnergyOf(d.ws)!.left).toBe(50);
+    // A refusal gives the held energy back.
+    const refused = await desk({ keys: { creatomate: KEY }, plan: { ...TEAM, weeklyTeamEnergy: 250 }, answer: () => ({ status: 500 }) });
+    await expect(refused.paid.render(refused.payer, "creatomate", input, 200)).rejects.toBeInstanceOf(RenderError);
+    expect(refused.energy.teamEnergyOf(refused.ws)!.left).toBe(250);
+  });
+
+  it("respects an employee's own daily cap and the hidden cost cap for the whole amount", async () => {
+    const capped = await desk({ keys: { creatomate: KEY } });
+    capped.energy.setQuotaResolver(() => 150);
+    await expect(capped.paid.render(capped.payer, "creatomate", input, 200)).rejects.toThrow(/used its energy for today/);
+    // A plan without a pool: the cost cap is the plan's own figure, and the whole amount must fit in the employee's day.
+    const costly = await desk({ keys: { creatomate: KEY }, plan: { dailyQuotaPerEmployee: 300, monthlyOvertimeCap: 0, monthlyCostCapMicro: 50_000 } });
+    await expect(costly.paid.render(costly.payer, "creatomate", input, 200)).rejects.toThrow(/limit has been reached/);
+    expect(costly.calls).toHaveLength(0);
+    const small = await desk({ keys: { creatomate: KEY }, plan: { dailyQuotaPerEmployee: 150, monthlyOvertimeCap: 0, monthlyCostCapMicro: 5_000_000 } });
+    await expect(small.paid.render(small.payer, "creatomate", input, 200)).rejects.toThrow(/used its energy for today/);
+  });
+
+  it("counts failed attempts towards the daily limit and refuses a render id it could not look up later", async () => {
+    const d = await desk({ keys: { creatomate: KEY }, answer: () => ({ json: [{ id: "../../etc", status: "planned" }] }) });
+    await expect(d.paid.render(d.payer, "creatomate", input, 200)).rejects.toBeInstanceOf(RenderError);
+    expect(d.energy.teamEnergyOf(d.ws)!.used).toBe(0);
+    for (let i = 1; i < MAX_PAID_USES_PER_DAY; i++) await d.paid.render(d.payer, "creatomate", input, 200).catch(() => undefined);
+    await expect(d.paid.render(d.payer, "creatomate", input, 200)).rejects.toThrow(/daily safety limit/);
+  });
+
   it("stops a runaway at the daily safety limit", async () => {
     const d = await desk();
-    for (let i = 0; i < MAX_PAID_USES_PER_DAY; i++) await d.paid.render(d.payer, "creatomate", input, 200);
-    await expect(d.paid.render(d.payer, "creatomate", input, 200)).rejects.toThrow(/daily safety limit/);
+    for (let i = 0; i < MAX_PAID_USES_PER_DAY; i++) await d.paid.render(d.payer, "creatomate", input, 0);
+    await expect(d.paid.render(d.payer, "creatomate", input, 0)).rejects.toThrow(/daily safety limit/);
+    d.clock.d = new Date("2026-11-18T10:00:00Z");
+    await d.paid.render(d.payer, "creatomate", input, 0);
   });
 
   it("checks a started render without charging again, and only for the payer who asked", async () => {
@@ -175,13 +213,13 @@ describe("paid services through the site", () => {
     const id = d.draft.id;
     const body = { service: "creatomate", templateId: TEMPLATE };
     // Not approved yet: refused whatever is confirmed.
-    expect((await call("POST", `/api/owner/promoter/drafts/${id}/video`, { ...body, confirmEnergy: 200 })).status).toBe(400);
+    expect((await call("POST", `/api/owner/promoter/drafts/${id}/video`, { ...body, confirmEnergy: 0 })).status).toBe(400);
     await call("POST", `/api/owner/promoter/drafts/${id}/approve`, {});
     // Approved but the cost has not been seen: 409 with the figure.
     const ask = await call("POST", `/api/owner/promoter/drafts/${id}/video`, body);
     expect(ask.status).toBe(409);
-    expect((ask.body as any).quote).toMatchObject({ energy: 200, multiplier: 2 });
-    const made = await call("POST", `/api/owner/promoter/drafts/${id}/video`, { ...body, confirmEnergy: 200 });
+    expect((ask.body as any).quote).toMatchObject({ energy: 200, multiplier: 2, simulated: true, charge: 0 });
+    const made = await call("POST", `/api/owner/promoter/drafts/${id}/video`, { ...body, confirmEnergy: 0 });
     expect(made.status).toBe(200);
     const draft = (made.body as any).drafts.find((x: any) => x.id === id);
     // No key was saved, so this was a practice render and no vendor was called.
