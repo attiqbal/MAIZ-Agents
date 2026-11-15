@@ -15,13 +15,6 @@ const entry = (key: string, name: string, category: Category, capabilities: Capa
 const approval = (console: ProviderSetup["console"], steps: string[], wait: string): ProviderSetup => ({ console, steps, approval: wait });
 
 export const APPROVAL_APPS: readonly Connector[] = [
-  entry("gmail", "Gmail", "messaging", ["inbox.read"], "approval", "How many emails reach your inbox each day. Never the emails themselves.", "Google treats Gmail access as a restricted scope: MAIZ must pass Google's app verification and an annual security assessment first.",
-    approval({ href: "https://console.cloud.google.com/auth/overview", label: "Google Auth Platform" }, [
-      "In the Google Cloud project open Google Auth Platform, Data access, and add the gmail.metadata scope (it shows message headers and counts, not bodies).",
-      "Submit the app for verification: a short video of how it is used, your privacy page, and the explanation that only counts are kept.",
-      "Google may require a third-party security assessment (CASA) for restricted scopes. Ask for the lowest tier that applies.",
-    ], "Several weeks, plus the cost of the security assessment. Test users you list can connect meanwhile."),
-  ),
   entry("google-business-profile", "Google Business Profile", "customers", ["reviews.read"], "approval", "New Google reviews and your average star rating.", "Google gives Business Profile API access only after a request that it reviews.",
     approval({ href: "https://developers.google.com/my-business/content/prereqs", label: "Business Profile API: request access" }, [
       "Check your Business Profile has been verified and active for 60 days or more.",
@@ -97,23 +90,16 @@ const planned = (key: string, name: string, category: Category, capabilities: Ca
 
 export const PLANNED_CUSTOMER_APPS: readonly Connector[] = [
   // Sales and customers
-  planned("salesforce", "Salesforce", "customers", ["crm.read"], "Leads and opportunities from Salesforce.", "Salesforce has a public REST API with a connected app. Direct connection is planned."),
   planned("zoho-crm", "Zoho CRM", "customers", ["crm.read"], "Leads and deals from Zoho CRM.", "Zoho CRM has a public OAuth API. Direct connection is planned."),
-  planned("intercom", "Intercom", "customers", ["support.read"], "Conversations opened and closed in Intercom.", "Intercom has a public API. Direct connection is planned."),
-  planned("helpscout", "Help Scout", "customers", ["support.read"], "Support conversations in Help Scout.", "Help Scout has a public API. Direct connection is planned."),
   planned("freshsales", "Freshsales", "customers", ["crm.read"], "Leads and deals from Freshsales.", "Freshsales has a public API with an API key. Direct connection is planned."),
   // Messaging and email
   planned("microsoft-teams", "Microsoft Teams", "messaging", [], "Let your AI team post in your Teams channels.", "Teams needs a bot registered in Azure and approved by each organisation's administrator. Planned as an employee channel, like Slack."),
   planned("telegram", "Telegram", "messaging", [], "Let customers or staff message your AI team on Telegram.", "Telegram bots are free and self-serve with a bot token. Planned as an employee channel, like Slack."),
   planned("discord", "Discord", "messaging", [], "Let your community message your AI team on Discord.", "Discord bots are self-serve. Planned as an employee channel, like Slack."),
-  planned("twilio", "Twilio (SMS and calls)", "messaging", [], "Text messages to and from customers.", "Twilio is self-serve with an account key, but UK and US texting needs sender registration. Planned."),
   planned("klaviyo", "Klaviyo", "marketing", ["audience.read"], "Your email list and campaign results from Klaviyo.", "Klaviyo has a public API with a private key. Direct connection is planned."),
-  planned("constant-contact", "Constant Contact", "marketing", ["audience.read"], "Your email list and campaign results.", "Constant Contact has a public OAuth API. Direct connection is planned."),
   // Websites and shops
   planned("wordpress", "WordPress", "marketing", [], "Publish approved posts to your WordPress site.", "WordPress.com and self-hosted sites both have public APIs. Planned for the promotion agent."),
   planned("wix", "Wix", "ecommerce", ["sales.read"], "Orders from your Wix shop.", "Wix has a public API for apps. Direct connection is planned."),
-  planned("squarespace", "Squarespace", "ecommerce", ["sales.read"], "Orders from your Squarespace shop.", "Squarespace has a Commerce API with a key for paid plans. Direct connection is planned."),
-  planned("bigcommerce", "BigCommerce", "ecommerce", ["sales.read"], "Orders from your BigCommerce shop.", "BigCommerce has a public API with a token. Direct connection is planned."),
   // Marketing
   planned("buffer", "Buffer", "marketing", [], "Schedule approved posts through Buffer.", "Buffer is not giving out new API access at the moment, so use Zapier or Make."),
   planned("canva", "Canva", "marketing", [], "Make designs from your brand with Canva.", "Canva's Connect API is for approved integrations."),
@@ -127,7 +113,6 @@ export const PLANNED_CUSTOMER_APPS: readonly Connector[] = [
   planned("airtable", "Airtable", "teamwork", [], "Counts and figures from your Airtable bases.", "Airtable has a public OAuth API. Planned."),
   planned("dropbox", "Dropbox", "teamwork", [], "Let your team read documents you choose to share.", "Needs the knowledge-base feature. Planned."),
   planned("monday", "monday.com", "teamwork", ["tasks.read"], "Open and overdue items on your monday.com boards.", "monday.com has a public API. Direct connection is planned."),
-  planned("clickup", "ClickUp", "teamwork", ["tasks.read"], "Open and overdue tasks in ClickUp.", "ClickUp has a public API. Direct connection is planned."),
   // Money
   planned("truelayer", "Bank accounts (open banking)", "accounting", ["accounts.read"], "Read-only bank balances and transactions.", "Open banking must go through a regulated provider such as TrueLayer or GoCardless Bank Account Data; the provider holds the regulatory licence. Planned, with a pricing check first.", ["GB", "IE", "FR", "DE", "ES"]),
   planned("wise", "Wise", "payments", ["sales.read"], "Wise balances and transfers.", "Wise has a public API with a read-only personal token. Direct connection is planned."),

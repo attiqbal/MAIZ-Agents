@@ -130,7 +130,7 @@ function render(): void {
       : c.connect === "bridge" ? `<button class="btn btn-ghost btn-sm" data-connect="webhook">Connect through Zapier or Make</button>`
       : c.connect === "api_key" ? `<button class="btn btn-primary btn-sm" data-key="${esc(c.key)}">Connect</button>`
       : `<button class="btn btn-primary btn-sm" data-upload="${esc(c.key)}">Upload file</button>`;
-    const waiting = c.availability === "approval" ? `<p class="xs muted">Coming soon. Until then, connect it through Zapier or Make.</p>` : "";
+    const waiting = c.availability === "approval" && c.connect === "bridge" ? `<p class="xs muted">Coming soon. Until then, connect it through Zapier or Make.</p>` : "";
     return `<article class="app-card card card-flat"><div class="app-card-h"><b>${esc(c.name)}</b><span class="xs muted">${CATEGORY[c.category]}</span></div>
       <p class="small">${esc(c.summary)}</p><span class="status ${tone}"><span class="dot"></span>${label}</span>
       ${c.note ? `<p class="xs muted">${esc(c.note)}</p>` : ""}${waiting}<div class="acts">${cta}</div></article>`;

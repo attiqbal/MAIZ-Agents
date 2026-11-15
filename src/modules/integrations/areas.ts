@@ -32,10 +32,10 @@ export const AREAS: Record<ActivityArea, AreaDef> = {
     ],
   },
   inbox: {
-    area: "inbox", title: "Email inbox", capability: "inbox.read", employees: ["business-consultant"],
+    area: "inbox", title: "Inbox and messages", capability: "inbox.read", employees: ["business-consultant"],
     figures: [
-      { key: "received", label: "emails received", kind: "count" },
-      { key: "unread", label: "unread emails", kind: "count", level: true },
+      { key: "received", label: "messages received", kind: "count" },
+      { key: "unread", label: "unread messages", kind: "count", level: true },
     ],
   },
   bookings: {

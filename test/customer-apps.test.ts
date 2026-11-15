@@ -41,7 +41,7 @@ async function setup(http: typeof fetch) {
   const ledger = new Ledger(identity, audit);
   const ws = await identity.createWorkspace("owner", { name: "Kestrel", baseCurrency: "GBP" });
   ledger.open("owner", ws.id);
-  const apps = Object.fromEntries(["hubspot", "quickbooks", "outlook", "calendly"].map((k) => [k, APP]));
+  const apps = Object.fromEntries(["hubspot", "quickbooks", "outlook", "calendly", "salesforce", "intercom", "helpscout", "constant-contact"].map((k) => [k, APP]));
   const ig = new IntegrationService(identity, audit, ledger, defaultRegistry(), { http, now: () => NOW, oauthApps: apps });
   return { ig, ws: ws.id, identity };
 }
@@ -54,7 +54,7 @@ describe("the catalogue", () => {
   it("lists live, approval and planned customer apps honestly", () => {
     const r = defaultRegistry();
     for (const k of ["hubspot", "pipedrive", "zendesk", "freshdesk", "shopify", "woocommerce", "quickbooks", "outlook", "calendly", "cal-com", "mailchimp", "brevo", "trello", "asana"]) expect(r.get(k)?.availability, k).toBe("live");
-    for (const k of ["gmail", "linkedin-pages", "tiktok", "google-ads", "amazon-seller"]) {
+    for (const k of ["linkedin-pages", "tiktok", "google-ads", "amazon-seller"]) {
       expect(r.get(k)?.availability, k).toBe("approval");
       expect(r.get(k)?.setup?.steps.length, k).toBeGreaterThan(0);
       expect(r.get(k)?.setup?.approval, k).toBeTruthy();
@@ -65,13 +65,14 @@ describe("the catalogue", () => {
   it("gives every OAuth app and every approval app an owner card, with the redirect address and no SSH", () => {
     const defs = clientAppDefs(["xero", "square"]);
     const keys = defs.map((d) => d.key);
-    for (const k of ["hubspot", "quickbooks", "outlook", "calendly", "gmail", "tiktok"]) expect(keys).toContain(k);
+    for (const k of ["hubspot", "quickbooks", "outlook", "calendly", "gmail", "tiktok", "salesforce"]) expect(keys).toContain(k);
     const hub = defs.find((d) => d.key === "hubspot")!;
     expect(hub.editable).toBe(true);
     expect(hub.copies?.[0]?.path).toBe("/api/integrations/callback");
     expect(hub.fields.map((f) => f.key)).toEqual(["clientId", "clientSecret"]);
     expect(hub.fields.find((f) => f.key === "clientSecret")?.secret).toBe(true);
-    expect(defs.find((d) => d.key === "gmail")!.editable).toBe(false);
+    expect(defs.find((d) => d.key === "gmail")!.editable).toBe(true);
+    expect(defs.find((d) => d.key === "tiktok")!.editable).toBe(false);
     for (const d of defs) expect(JSON.stringify(d.guide)).not.toMatch(/\bssh\b/i);
   });
 
@@ -275,8 +276,8 @@ describe("Outlook, Calendly, Cal.com", () => {
     const conn = await ig.completeOAuth("owner", ws, "outlook", "code");
     await sync(ig, ws, conn.id);
     const ctx = ig.contextFor(ws, "business-consultant")!;
-    expect(ctx).toContain("2 emails received");
-    expect(ctx).toContain("12 unread emails");
+    expect(ctx).toContain("2 messages received");
+    expect(ctx).toContain("12 unread messages");
     expect(seen.some((s) => s.url.includes("evil.test"))).toBe(false);
     expect(seen.some((s) => /body/i.test(s.url))).toBe(false);
     expect(ig.contextFor(ws, "marketing-manager")).toBeUndefined();
@@ -425,5 +426,125 @@ describe("review fixes", () => {
     expect(sameHttpsHost("http://a.zendesk.com/x", "a.zendesk.com")).toBeUndefined();
     expect(sameHttpsHost("https://a.zendesk.com:8443/x", "a.zendesk.com")).toBeUndefined();
     expect(sameHttpsHost("garbage", "a.zendesk.com")).toBeUndefined();
+  });
+});
+
+describe("second batch of connectors", () => {
+  it("Salesforce: counts records, trusts only Salesforce addresses, and keeps the instance address", async () => {
+    const q = (u: URL) => decodeURIComponent(u.searchParams.get("q") ?? "");
+    const { http, seen } = fake([
+      [/login\.salesforce\.com.*token/, () => ({ access_token: "sf-a", refresh_token: "sf-r", instance_url: "https://kestrel.my.salesforce.com" })],
+      [/query\?/, (u) => {
+        const s = q(u);
+        if (s.includes("FROM Lead")) return { records: [{ CreatedDate: "2026-11-04T10:00:00.000+0000" }], done: true };
+        if (s.includes("FROM Contact")) return { records: [{ CreatedDate: "2026-11-05T10:00:00.000+0000" }, { CreatedDate: "2026-11-05T11:00:00.000+0000" }], done: true };
+        if (s.includes("IsClosed = true")) return { records: [{ CloseDate: "2026-11-06", Amount: 200, IsWon: true }, { CloseDate: "2026-11-07", Amount: 50, IsWon: false }], done: true };
+        return { records: [{ Amount: 10 }, { Amount: null }], done: true };
+      }],
+    ]);
+    const { ig, ws } = await setup(http);
+    const conn = await ig.completeOAuth("owner", ws, "salesforce", "code");
+    expect(conn.externalAccount).toBe("kestrel.my.salesforce.com");
+    await sync(ig, ws, conn.id);
+    const ctx = ig.contextFor(ws, "marketing-manager")!;
+    expect(ctx).toContain("3 new contacts");
+    expect(ctx).toContain("1 deals won");
+    expect(ctx).toContain("2 open deals");
+    expect(seen.filter((s) => /query\?/.test(s.url)).every((s) => s.url.startsWith("https://kestrel.my.salesforce.com/"))).toBe(true);
+    const evil = fake([[/token/, () => ({ access_token: "x", instance_url: "https://evil.example.com" })]]);
+    const b = await setup(evil.http);
+    await expect(b.ig.completeOAuth("owner", b.ws, "salesforce", "code")).rejects.toThrow(/trust/);
+  });
+  it("Intercom and Help Scout: conversations opened, closed and open", async () => {
+    const now = Date.parse("2026-11-09T10:00:00Z") / 1000;
+    const ic = fake([
+      [/auth\/eagle\/token/, () => ({ token: "ic-token" })],
+      [/conversations\/search/, (_u, init) => String(init.body).includes('"state"') ? { total_count: 4, conversations: [] } : { conversations: [{ created_at: now, updated_at: now + 3600, state: "closed" }, { created_at: now, updated_at: now, state: "open" }] }],
+    ]);
+    const a = await setup(ic.http);
+    const c1 = await a.ig.completeOAuth("owner", a.ws, "intercom", "code");
+    await sync(a.ig, a.ws, c1.id);
+    const t1 = a.ig.contextFor(a.ws, "business-consultant")!;
+    expect(t1).toContain("2 tickets opened"); expect(t1).toContain("1 tickets solved"); expect(t1).toContain("4 tickets open");
+    const hs = fake([
+      [/oauth2\/token/, () => ({ access_token: "hs", refresh_token: "r", expires_in: 7200 })],
+      [/status=active/, () => ({ page: { totalElements: 3 } })],
+      [/status=pending/, () => ({ page: { totalElements: 2 } })],
+      [/status=all/, () => ({ _embedded: { conversations: [{ createdAt: "2026-11-08T10:00:00Z", status: "closed", closedAt: "2026-11-08T12:00:00Z" }] }, page: { totalPages: 1 } })],
+    ]);
+    const b = await setup(hs.http);
+    // Help Scout is not in the default test app list: add its keys.
+    (b.ig as any).opts.oauthApps.helpscout = APP;
+    const c2 = await b.ig.completeOAuth("owner", b.ws, "helpscout", "code");
+    await sync(b.ig, b.ws, c2.id);
+    const t2 = b.ig.contextFor(b.ws, "business-consultant")!;
+    expect(t2).toContain("1 tickets opened"); expect(t2).toContain("3 tickets waiting for a reply"); expect(t2).toContain("5 tickets open");
+  });
+  it("BigCommerce and Squarespace orders become sales days", async () => {
+    const bc = fake([[/v2\/orders/, () => [
+      { date_created: "Thu, 05 Nov 2026 10:00:00 +0000", total_inc_tax: "120.00", total_tax: "20.00", currency_code: "GBP", refunded_amount: "10.00", status_id: 10 },
+      { date_created: "Thu, 05 Nov 2026 11:00:00 +0000", total_inc_tax: "999", status_id: 5 },
+    ]]]);
+    const a = await setup(bc.http);
+    const c1 = a.ig.connectWithKey("owner", a.ws, "bigcommerce", { storeHash: "abc123", accessToken: "T".repeat(30) });
+    await sync(a.ig, a.ws, c1.id);
+    expect(bc.seen[0]!.headers["x-auth-token"]).toBe("T".repeat(30));
+    expect(a.ig.pending("owner", a.ws)[0]!.data).toMatchObject({ date: "2026-11-05", gross: 12000, tax: 2000, refunds: 1000, transactions: 1 });
+    const sq = fake([[/commerce\/orders/, () => ({ result: [{ createdOn: "2026-11-06T10:00:00Z", grandTotal: { value: "50.00", currency: "GBP" }, taxTotal: { value: "8.33" }, refundedTotal: { value: "0.00" }, fulfillmentStatus: "FULFILLED" }, { createdOn: "2026-11-06T11:00:00Z", grandTotal: { value: "70.00", currency: "GBP" }, fulfillmentStatus: "CANCELED" }], pagination: { hasNextPage: true, nextPageUrl: "https://evil.test/next" } })]]);
+    const b = await setup(sq.http);
+    const c2 = b.ig.connectWithKey("owner", b.ws, "squarespace", { apiKey: "k".repeat(30) });
+    await sync(b.ig, b.ws, c2.id);
+    expect(b.ig.pending("owner", b.ws)[0]!.data).toMatchObject({ gross: 5000, tax: 833, transactions: 1 });
+    expect(sq.seen.some((s) => s.url.includes("evil.test"))).toBe(false);
+  });
+  it("ClickUp, Constant Contact and Twilio", async () => {
+    const cu = fake([
+      [/\/team\?|\/team$/, () => ({ teams: [{ id: "9001" }] })],
+      [/team\/9001\/task/, () => ({ tasks: [{ due_date: "1700000000000", status: { type: "open" } }, { due_date: String(Date.parse("2026-12-30")), status: { type: "open" } }, { status: { type: "closed" }, date_closed: String(Date.parse("2026-11-05T10:00:00Z")) }] })],
+    ]);
+    const a = await setup(cu.http);
+    const c1 = a.ig.connectWithKey("owner", a.ws, "clickup", { token: "pk_" + "a".repeat(30) });
+    await sync(a.ig, a.ws, c1.id);
+    const t = a.ig.contextFor(a.ws, "business-consultant")!;
+    expect(t).toContain("2 open tasks"); expect(t).toContain("1 overdue tasks"); expect(t).toContain("1 tasks completed");
+    const cc = fake([
+      [/oauth2\/default\/v1\/token/, () => ({ access_token: "cc", refresh_token: "r", expires_in: 7200 })],
+      [/v3\/contacts/, () => ({ contacts_count: 321 })],
+      [/v3\/emails/, () => ({ campaigns: [{ current_status: "Done", updated_at: "2026-11-06T10:00:00Z" }, { current_status: "Draft", updated_at: "2026-11-06T10:00:00Z" }] })],
+    ]);
+    const b = await setup(cc.http);
+    const c2 = await b.ig.completeOAuth("owner", b.ws, "constant-contact", "code");
+    await sync(b.ig, b.ws, c2.id);
+    const t2 = b.ig.contextFor(b.ws, "marketing-manager")!;
+    expect(t2).toContain("321 subscribers"); expect(t2).toContain("1 campaigns sent");
+    expect(cc.seen.find((s) => /v1\/token/.test(s.url))!.headers.authorization).toMatch(/^Basic /);
+    const sid = "AC" + "a".repeat(32);
+    const tw = fake([[/Messages\.json/, () => ({ messages: [{ date_sent: "2026-11-08T10:00:00Z", direction: "inbound" }, { date_sent: "2026-11-08T10:05:00Z", direction: "outbound-api" }], next_page_uri: "/evil" })]]);
+    const d = await setup(tw.http);
+    const c3 = d.ig.connectWithKey("owner", d.ws, "twilio", { accountSid: sid, authToken: "b".repeat(32) });
+    await sync(d.ig, d.ws, c3.id);
+    expect(d.ig.contextFor(d.ws, "business-consultant")).toContain("1 messages received");
+    expect(tw.seen).toHaveLength(1);
+  });
+});
+
+describe("Gmail", () => {
+  it("counts inbox mail with the metadata scope only, and works once keys exist even before Google approves", async () => {
+    const t = Date.parse("2026-11-09T10:00:00Z");
+    const { http, seen } = fake([
+      [/oauth2\.googleapis\.com\/token/, () => ({ access_token: "g-a", refresh_token: "g-r", expires_in: 3600 })],
+      [/labels\/INBOX/, () => ({ messagesUnread: 7 })],
+      [/messages\?labelIds/, () => ({ messages: [{ id: "abcdef1234567890" }, { id: "bad id/../x" }] })],
+      [/messages\/abcdef1234567890\?format=minimal/, () => ({ internalDate: String(t) })],
+    ]);
+    const { ig, ws } = await setup(http);
+    (ig as any).opts.oauthApps.gmail = APP;
+    const url = new URL(ig.authorizeUrl("owner", ws, "gmail", "s"));
+    expect(url.searchParams.get("scope")).toBe("https://www.googleapis.com/auth/gmail.metadata");
+    const conn = await ig.completeOAuth("owner", ws, "gmail", "code");
+    await sync(ig, ws, conn.id);
+    const ctx = ig.contextFor(ws, "business-consultant")!;
+    expect(ctx).toContain("1 messages received"); expect(ctx).toContain("7 unread messages");
+    expect(seen.some((s) => s.url.includes("bad id"))).toBe(false);
   });
 });

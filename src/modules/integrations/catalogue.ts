@@ -12,6 +12,10 @@ import { shopify, woocommerce } from "./connectors/shops.js";
 import { quickbooks } from "./connectors/quickbooks.js";
 import { outlook, calendly, calcom, mailchimp, brevo } from "./connectors/people.js";
 import { trello, asana } from "./connectors/work.js";
+import { salesforce, intercom, helpscout } from "./connectors/more-crm.js";
+import { bigcommerce, squarespace } from "./connectors/more-shops.js";
+import { clickup, constantContact, twilio } from "./connectors/more-work.js";
+import { gmail } from "./connectors/gmail.js";
 import { APPROVAL_APPS, PLANNED_CUSTOMER_APPS } from "./more-apps.js";
 import { IntegrationError, type Availability, type Capability, type Category, type Connector } from "./types.js";
 
@@ -22,7 +26,7 @@ export class ConnectorRegistry {
   register(c: Connector): void {
     if (!/^[a-z0-9-]{2,40}$/.test(c.key)) throw new IntegrationError(`bad connector key ${c.key}`);
     if (this.byKey.has(c.key)) throw new IntegrationError(`connector ${c.key} is already registered`);
-    if (c.availability === "live" && c.auth.kind !== "webhook" && !c.read) throw new IntegrationError(`${c.key} is live but cannot read`);
+    if ((c.availability === "live" || c.read) && c.auth.kind !== "webhook" && !c.read) throw new IntegrationError(`${c.key} is live but cannot read`);
     if (c.auth.kind === "file" && !c.parseFile) throw new IntegrationError(`${c.key} takes files but cannot parse them`);
     this.byKey.set(c.key, c);
   }
@@ -88,7 +92,7 @@ export const COMMON_APPS: readonly Connector[] = [
 /** The registry the platform uses, with every connector we ship. */
 export function defaultRegistry(): ConnectorRegistry {
   const r = new ConnectorRegistry();
-  const live = [hubspot, pipedrive, zendesk, freshdesk, shopify, woocommerce, quickbooks, outlook, calendly, calcom, mailchimp, brevo, trello, asana];
+  const live = [hubspot, pipedrive, zendesk, freshdesk, shopify, woocommerce, quickbooks, outlook, calendly, calcom, mailchimp, brevo, trello, asana, salesforce, intercom, helpscout, bigcommerce, squarespace, clickup, constantContact, twilio, gmail];
   for (const c of [xero, square, stripe, ga4, searchConsole, brightpay, tillFile, webhookBridge, ...live, ...PLANNED, ...COMMON_APPS, ...APPROVAL_APPS, ...PLANNED_CUSTOMER_APPS]) r.register(c);
   return r;
 }

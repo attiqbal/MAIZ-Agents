@@ -11,12 +11,12 @@ Code: `src/modules/integrations` (connectors), `src/modules/connections/client-a
 | Group | Direct (live) | Waiting for the provider's approval | Listed, Zapier or Make meanwhile |
 |---|---|---|---|
 | Accounting | QuickBooks Online (OAuth, profit and loss) | | Sage, FreeAgent, Zoho Books, MYOB, FreshBooks, open banking (TrueLayer / GoCardless) |
-| Sales and customers | HubSpot (OAuth), Pipedrive (key), Calendly (OAuth), Cal.com (key) | Google Business Profile, Trustpilot | Salesforce, Zoho CRM, Freshsales |
-| Support | Zendesk (key), Freshdesk (key) | | Intercom, Help Scout |
-| Shops | Shopify (Dev Dashboard app), WooCommerce (REST key) | Amazon Seller, Etsy, eBay | Wix, Squarespace, BigCommerce, PayPal |
-| Email and messaging | Outlook mail (OAuth, `Mail.ReadBasic`), Mailchimp (key), Brevo (key) | Gmail | Klaviyo, Constant Contact, Teams, Telegram, Discord, Twilio |
+| Sales and customers | HubSpot (OAuth), Salesforce (OAuth), Pipedrive (key), Calendly (OAuth), Cal.com (key) | Google Business Profile, Trustpilot | Zoho CRM (separate sign-in address per country), Freshsales (needs a per-account view id) |
+| Support | Zendesk (key), Freshdesk (key), Intercom (OAuth), Help Scout (OAuth) | | |
+| Shops | Shopify (Dev Dashboard app), WooCommerce (REST key), BigCommerce (token), Squarespace (key) | Amazon Seller, Etsy, eBay | Wix, PayPal |
+| Email and messaging | Outlook mail (OAuth, `Mail.ReadBasic`), Twilio texts (key), Mailchimp (key), Brevo (key), Constant Contact (OAuth) | Gmail: **built**; test users connect now, everyone after Google's verification | Klaviyo (needs its reporting API), Teams, Telegram, Discord (these three are **employee channels** like Slack, a separate build) |
 | Marketing | (existing) Google Analytics, Search Console | LinkedIn Pages, TikTok, Google Ads, Meta Ads, Pinterest | Buffer, Canva, WordPress, Bing Webmaster, Semrush, Ahrefs |
-| Teamwork | Trello (key), Asana (token) | DocuSign, Indeed | monday.com, ClickUp, Airtable |
+| Teamwork | Trello (key), Asana (token), ClickUp (token) | DocuSign, Indeed | monday.com, Airtable |
 | Documents | | | Google Drive/Docs/Sheets, OneDrive, Notion, Dropbox: these need a **knowledge-base feature** (a file picker and a document store), not a figures connector. Not built. |
 | Anything else | Zapier / Make / n8n link (accepts `sales`, `payroll`, `accounts` and now `activity`) | | |
 
@@ -48,3 +48,13 @@ Dropped as not feasible: reading LinkedIn profiles or posts (no public API, scra
 ## Owner to-do per approval app
 
 Each approval card on the owner Connections page lists the steps and the usual wait. Nothing else is needed until the provider says yes; then tell the build thread and the connector is added the same way as the live ones.
+
+## What an OAuth connection lets the agents do
+
+Connecting an app gives **MAIZ's server** a read-only token for that one client's account. It does **not** hand the agents the service.
+
+- The token is stored encrypted, per client, and only the server uses it. Agents never see it and cannot call the app.
+- Scopes are the smallest read set we found for each app (for example `crm.objects.contacts.read`, `Mail.ReadBasic`, `gmail.metadata`). Nothing writes, sends, posts, deletes or spends.
+- The server turns what it reads into counts and totals. Only those lines reach the instructions of the employees the client allowed on that connection (default access per kind is in `access.ts`; the client changes it with the chips on the Apps screen).
+- The client can disconnect at any time; the stored token is deleted and, for Google, revoked.
+- Sending an email, posting, updating a deal or booking would be a separate feature behind the sign-off gate; none exists here.
