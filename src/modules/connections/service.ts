@@ -7,6 +7,8 @@ import { clientAppEnv } from "./client-apps.js";
 import { CATALOG, defOf, type ConnDef, type ConnKey, type GuideStep } from "./catalog.js";
 import { probeApp, probeGeneric, ProbeUnreachable, type ProbeKind } from "./probes.js";
 import { deskKeyWorks } from "../research/desk.js";
+import { keyWorks, RenderError } from "../paid-services/render.js";
+import { isPaidListing } from "./paid-apps.js";
 import { redditToken, ResearchError, xTokenWorks, youtubeKeyWorks } from "../research/sources.js";
 
 /**
@@ -82,6 +84,8 @@ const ENV: Record<string, { vars: Record<string, string>; required: string[]; ex
   fred: { vars: { apiKey: "FRED_API_KEY" }, required: ["apiKey"] },
   alphavantage: { vars: { apiKey: "ALPHAVANTAGE_API_KEY" }, required: ["apiKey"] },
   companieshouse: { vars: { apiKey: "COMPANIES_HOUSE_API_KEY" }, required: ["apiKey"] },
+  creatomate: { vars: { apiKey: "CREATOMATE_API_KEY" }, required: ["apiKey"] },
+  shotstack: { vars: { apiKey: "SHOTSTACK_API_KEY" }, required: ["apiKey"] },
 };
 // Client apps made from the integrations registry (QuickBooks, HubSpot, Outlook...) read their keys from <PREFIX>_CLIENT_ID and _SECRET.
 for (const [key, v] of Object.entries(clientAppEnv())) ENV[key] = { vars: v, required: ["clientId", "clientSecret"] };
@@ -102,6 +106,8 @@ const APP_TEXT: Partial<Record<ConnKey, [string, string]>> = {
   fred: ["Your team can look up economic series.", "Not set: no economic series look-ups."],
   alphavantage: ["Your team can look up share prices.", "Not set: no share price look-ups."],
   companieshouse: ["Your team can look up UK companies.", "Not set: no UK company look-ups."],
+  creatomate: ["Your promotion agent can render videos from your Creatomate templates. Each one uses paid-service energy.", "Not set: videos are practice renders that cost nothing."],
+  shotstack: ["Your promotion agent can render videos from your Shotstack templates. Each one uses paid-service energy.", "Not set: videos are practice renders that cost nothing."],
 };
 
 const TEST_GAP_MS = 2_000;
@@ -133,6 +139,8 @@ const RULES: Record<string, [RegExp, string]> = {
   "alphavantage.apiKey": [/^[A-Za-z0-9]{8,40}$/, "An Alpha Vantage key is letters and numbers with no spaces. Copy it again in full."],
   "companieshouse.apiKey": [/^[A-Za-z0-9-]{20,60}$/, "A Companies House key is letters, numbers and dashes with no spaces. Copy it again in full."],
   "x.bearerToken": [/^[A-Za-z0-9%_.~=+-]{30,500}$/, "An X bearer token is one long code with no spaces. Copy it again in full."],
+  "creatomate.apiKey": [/^[A-Za-z0-9_-]{20,200}$/, "A Creatomate API key is one long code with no spaces. Copy it again in full."],
+  "shotstack.apiKey": [/^[A-Za-z0-9_-]{20,200}$/, "A Shotstack API key is one long code with no spaces. Copy it again in full."],
   "youtube.apiKey": [/^AIza[\w-]{30,60}$/, "A YouTube API key starts with AIza and has no spaces. Copy it again in full."],
   "microsoft.clientId": [/^[0-9a-f]{8}-([0-9a-f]{4}-){3}[0-9a-f]{12}$/i, "The Application (client) ID is a long id with dashes, from the app's Overview page."],
   "microsoft.tenant": [/^(common|organizations|consumers|[a-z0-9][a-z0-9.-]{0,79})$/i, "Leave it empty, or use common, organizations, consumers, or your tenant's id or domain."],
@@ -289,6 +297,10 @@ export class ConnectionsService {
   }
   /** YouTube Data API key for market research, typed on this page (or the server's). */
   youtubeKey(): string | undefined { return this.complete("youtube")?.apiKey; }
+  /** Keys for the paid video template services, typed on this page (or the server's). Empty means practice renders. */
+  videoKeys(): { creatomate?: string; shotstack?: string } {
+    return { creatomate: this.complete("creatomate")?.apiKey, shotstack: this.complete("shotstack")?.apiKey };
+  }
   /** X bearer token for market research, typed on this page (or the server's). */
   xToken(): string | undefined { return this.complete("x")?.bearerToken; }
   /** Keys for the data desk (economic series, share prices, UK companies). */
@@ -352,13 +364,14 @@ export class ConnectionsService {
         const ok = !!v("ANTHROPIC_API_KEY");
         return { ok, missing: ok ? [] : ["ANTHROPIC_API_KEY on the server"], text: ok ? "Claude is set up." : "Not set: no quality checking by Claude." };
       }
-      case "google": case "microsoft": case "slack": case "xero": case "square": case "google-data": case "reddit": case "youtube": case "x": case "fred": case "alphavantage": case "companieshouse": {
+      case "google": case "microsoft": case "slack": case "xero": case "square": case "google-data": case "reddit": case "youtube": case "x": case "fred": case "alphavantage": case "companieshouse": case "creatomate": case "shotstack": {
         const ok = !!this.complete(key);
         return { ok, missing: this.missingOf(key), text: APP_TEXT[key]![ok ? 0 : 1] };
       }
       default: {
         // A generated client-app card: OAuth keys typed here, or an app that waits for the provider's approval.
         const def = defOf(key);
+        if (isPaidListing(key)) return { ok: false, missing: [], text: "Nothing to connect: used by hand for now." };
         if (!def?.editable) return { ok: false, missing: [], text: "Waiting for the provider's approval. Clients use Zapier or Make for now." };
         const ok = !!this.complete(key);
         return { ok, missing: this.missingOf(key), text: ok ? `Clients can connect ${def.title} with one click.` : `Not set: clients cannot connect ${def.title} with one click yet.` };
@@ -634,7 +647,19 @@ export class ConnectionsService {
         }
         return { ok: true, message: "YouTube accepted the key.", details: ["The test read one public list (about 1 unit of today's 10,000)."] };
       }
+      case "creatomate": case "shotstack": {
+        const k = this.complete(key)?.apiKey;
+        if (!k) return this.notReady(key);
+        const name = key === "creatomate" ? "Creatomate" : "Shotstack";
+        try {
+          await keyWorks(this.http, key, k);
+        } catch (e) {
+          return { ok: false, message: e instanceof RenderError ? redact(e.message, k) : `${name} could not be reached.`, details: [] };
+        }
+        return { ok: true, message: `${name} accepted the key.`, details: ["The test listed your templates. Nothing was rendered and nothing was spent."] };
+      }
       default: {
+        if (isPaidListing(key)) return { ok: false, message: "Nothing to test: this service is used by hand for now.", details: [] };
         const def = defOf(key);
         const connector = defaultRegistry().get(key);
         if (!def?.editable || connector?.auth.kind !== "oauth2") return { ok: false, message: "Nothing to test yet: this app is waiting for the provider's approval.", details: [] };

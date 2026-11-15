@@ -9,6 +9,7 @@ import { IntegrationError } from "../modules/integrations/index.js";
 import { ReviewError } from "../modules/review/index.js";
 import { PricingError } from "../modules/pricing/index.js";
 import { OWNER_SPECIALISTS, PromoterError } from "../modules/promoter/index.js";
+import { PaidServiceError, RenderError } from "../modules/paid-services/index.js";
 import { GROWTH_ROLE, GrowthError, discoveryQueries } from "../modules/growth/index.js";
 import { ResearchError } from "../modules/research/index.js";
 import { DEFAULT_COMMISSION, DEFAULT_HOLD_DAYS, PromoError, describeCommission } from "../modules/promotions/index.js";
@@ -667,6 +668,27 @@ export function createApp(p: Platform) {
     if (method === "POST" && path === "/api/notifications/seen") { p.notices.markSeen(userId, org.id); return json(200, p.notices.list(userId, org.id)); }
     if (method === "GET" && path === "/api/suggestions") return json(200, { suggestions: suggestionsFor(p, userId, org.id) });
 
+    // ---- paid services (video rendering): the cost is shown first, then confirmed, then taken from the team pool ----
+    if (method === "GET" && path === "/api/paid-services") {
+      p.identity.require(userId, org.id, "task.read");
+      return json(200, { services: p.paid.list().filter((s) => s.kind === "api"), recent: p.paid.recent({ kind: "client", workspaceId: org.id, employeeId: "" }) });
+    }
+    const paidRun = /^\/api\/paid-services\/([a-z0-9-]{2,40})\/(render)$/.exec(path);
+    if (method === "POST" && paidRun) {
+      p.identity.require(userId, org.id, "task.create");
+      const b = body();
+      const emp = p.workforce.team(userId, org.id).find((e) => e.id === b.employeeId);
+      if (!emp) throw new BadRequest("pick one of your employees");
+      const use = await p.paid.render({ kind: "client", workspaceId: org.id, employeeId: emp.id }, paidRun[1]!, { templateId: b.templateId, fields: b.fields }, b.confirmEnergy);
+      return json(201, { use: { ...use, payer: undefined }, team: p.energy.teamEnergyOf(org.id) });
+    }
+    const paidStatus = /^\/api\/paid-services\/uses\/([\w-]{1,64})$/.exec(path);
+    if (method === "GET" && paidStatus) {
+      p.identity.require(userId, org.id, "task.read");
+      const use = await p.paid.status({ kind: "client", workspaceId: org.id, employeeId: "" }, paidStatus[1]!);
+      return json(200, { use: { ...use, payer: undefined } });
+    }
+
     // The app calls this when it opens or the ask box is focused, so a sleeping GPU is awake by the time the question is sent.
     if (method === "POST" && path === "/api/warm") {
       p.identity.require(userId, org.id, "task.create");
@@ -910,8 +932,9 @@ export function createApp(p: Platform) {
     }
     const lead = /^\/api\/owner\/promoter\/leads\/([\w-]{1,64})\/replied$/.exec(path);
     if (method === "POST" && lead) { pr.markReplied(userId, lead[1]!); return json(200, overview()); }
+    if (method === "GET" && path === "/api/owner/promoter/video-services") return json(200, { services: p.paid.list() });
     if (method === "GET" && path === "/api/owner/promoter/channels") return json(200, { ...pr.channels(userId), whatsapp: p.ownerWhatsApp?.status() ?? { connected: false } });
-    const d = /^\/api\/owner\/promoter\/drafts\/([\w-]{1,64})\/(approve|reject|edit|send|posted|preview|publish|stats)$/.exec(path);
+    const d = /^\/api\/owner\/promoter\/drafts\/([\w-]{1,64})\/(approve|reject|edit|send|posted|preview|publish|stats|video|video-status)$/.exec(path);
     if (d) {
       const id = d[1]!;
       if (method === "GET" && d[2] === "preview") return json(200, { preview: pr.preview(userId, id) });
@@ -923,6 +946,8 @@ export function createApp(p: Platform) {
       else if (d[2] === "send") await pr.send(userId, id);
       else if (d[2] === "publish") await pr.publishToMeta(userId, id, b);
       else if (d[2] === "stats") await pr.refreshStats(userId, id);
+      else if (d[2] === "video") await pr.renderVideo(userId, id, b);
+      else if (d[2] === "video-status") await pr.refreshVideo(userId, id);
       else pr.markPosted(userId, id, b.url);
       return json(200, overview());
     }
@@ -1073,6 +1098,9 @@ export function createApp(p: Platform) {
       return renewed(req, await route(req));
     } catch (err) {
       if (err instanceof BadRequest || err instanceof SetupError || err instanceof SignupError || err instanceof LedgerError || err instanceof ChannelError || err instanceof IntegrationError || err instanceof ReviewError || err instanceof PeopleError || err instanceof PricingError || err instanceof PromoError || err instanceof PromoterError || err instanceof GrowthError || err instanceof ResearchError || err instanceof EnergyError || err instanceof SettingsError || err instanceof BatchError || err instanceof PaymentError || err instanceof RotaError || err instanceof MetaClientError) return json(400, { error: err.message });
+      // A paid service that has not been confirmed answers 409 with the quote, so the screen can show the cost and ask.
+      if (err instanceof PaidServiceError) return json(err.quote ? 409 : 400, { error: err.message, quote: err.quote });
+      if (err instanceof RenderError) return json(400, { error: err.message });
       if (err instanceof PermissionError) return json(403, { error: "you don't have permission to do that" });
       console.error(`${req.method} ${req.path} failed:`, err);
       return json(500, { error: "something went wrong" });

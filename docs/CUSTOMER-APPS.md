@@ -20,6 +20,17 @@ Code: `src/modules/integrations` (connectors), `src/modules/connections/client-a
 | Documents | | | Google Drive/Docs/Sheets, OneDrive, Notion, Dropbox: these need a **knowledge-base feature** (a file picker and a document store), not a figures connector. Not built. |
 | Anything else | Zapier / Make / n8n link (accepts `sales`, `payroll`, `accounts` and now `activity`) | | |
 
+### The wider list (added 2026-11-15)
+
+About 200 more apps a small business is likely to use are listed in `src/modules/integrations/business-apps.ts`: more CRMs and help desks, review sites, booking and reservation systems (salons, clinics, restaurants, gyms, events, short lets), trades and field-service tools, delivery platforms, payment providers and business bank accounts, accounting and expense tools, payroll, rotas and HR, more shop platforms, courses, stock and parcels, email marketing, forms, social tools, calls and meetings, task boards, spreadsheets, document signing and time tracking.
+
+**None of these is built.** Each is shown on the Apps screen with one of two honest labels and a "Connect through Zapier or Make" button, which works today for any app that can send data to a web address:
+
+- "Direct connection coming": the vendor documents a public API (from general knowledge of their developer pages, not tested).
+- "API is partner-only": partner-only, paid, limited, or not confirmed. Its terms are read before anything is built.
+
+The Apps screen now has a search box, because the list is long. Ask for the ones clients actually use and they are built next, one connector file each. Video template services (Creatomate, Shotstack and the rest) are a different kind of thing and live in `docs/PAID-SERVICES.md`.
+
 Dropped as not feasible: reading LinkedIn profiles or posts (no public API, scraping breaks its terms), X post search for clients (paid, price unverified).
 
 ## How it works

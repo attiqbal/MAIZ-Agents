@@ -489,6 +489,41 @@ export class EnergyMeter {
     return rec;
   }
 
+  /**
+   * Can this workspace spend `energy` in one go (a paid service costs a known amount up front)? Changes nothing.
+   * The ordinary checks apply (trial, daily ceiling, an agent's own cap, monthly cost cap); on top of that the
+   * pool plus bought top-ups must cover the whole amount, because a paid call cannot be half done.
+   */
+  canAfford(workspaceId: string, employeeId: string, energy: number): Verdict {
+    const v = this.check(workspaceId, employeeId);
+    if (!v.allowed) return v;
+    const team = this.teamEnergyOf(workspaceId);
+    if (!team) return v;
+    if (team.left + this.topUpLeft(workspaceId) < energy) return { allowed: false, reason: "weekly_pool_used" };
+    // The daily safety limit applies to the part taken from the pool.
+    if (team.dailyCeiling !== null && team.leftToday < Math.min(energy, team.left)) return { allowed: false, reason: "daily_ceiling_reached" };
+    return v;
+  }
+
+  /**
+   * Record one use of a paid service (video rendering and the like). `realCostMicro` is what it really cost us and is what
+   * the hidden monthly cost cap counts; `energy` is what the client is charged, already multiplied by the owner's rule.
+   * It does not feed the next task's estimate, because a render is not like a drafted document.
+   */
+  recordPaid(workspaceId: string, employeeId: string, service: string, realCostMicro: number, energy: number, overtime: boolean): UsageRecord[] {
+    const total = Math.max(0, Math.ceil(energy));
+    const team = this.teamEnergyOf(workspaceId);
+    // With a shared pool, what the pool still has is used first and only the rest comes from bought top-ups.
+    const fromPool = team ? Math.min(total, team.left) : overtime ? 0 : total;
+    const base = { workspaceId, employeeId, day: this.today(workspaceId), provider: service, inputTokens: 0, outputTokens: 0 };
+    const cost = Math.max(0, Math.ceil(realCostMicro));
+    const rows: UsageRecord[] = [];
+    if (fromPool > 0 || total === 0) rows.push({ ...base, costMicro: cost, energy: fromPool, overtime: false });
+    if (total - fromPool > 0) rows.push({ ...base, costMicro: rows.length ? 0 : cost, energy: total - fromPool, overtime: true });
+    for (const rec of rows) { this.addRow(rec); this.sink?.usage(rec); }
+    return rows;
+  }
+
   /** What the customer sees: energy left today for one employee. Can go negative only through overtime. */
   remainingToday(userId: string, workspaceId: string, employeeId: string): number {
     this.identity.require(userId, workspaceId, "task.read");

@@ -43,6 +43,8 @@ const DEMO: AppsData = {
 let data: AppsData = DEMO;
 let live = false;
 let filter = "all";
+/** What is typed in the search box, lower-cased. */
+let search = "";
 let uploading: CatalogueItem | undefined;
 let keying: CatalogueItem | undefined;
 let growth: Growth | undefined;
@@ -119,9 +121,15 @@ function render(): void {
       <div class="acts">${actions}</div></div>`;
   }).join("");
 
-  // Store
+  renderStore();
+}
+
+/** The list of apps to add. Separate from the rest so typing in the search box redraws only this. */
+function renderStore(): void {
   document.querySelectorAll<HTMLElement>("#apps-filter [data-filter]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.filter === filter)));
-  const shown = data.catalogue.filter((c) => filter === "all" || GROUP[c.category] === filter);
+  const inType = data.catalogue.filter((c) => filter === "all" || GROUP[c.category] === filter);
+  const shown = search ? inType.filter((c) => `${c.name} ${c.summary}`.toLowerCase().includes(search)) : inType;
+  $("apps-count").textContent = shown.length ? `Showing ${shown.length} of ${data.catalogue.length} apps.` : "No app with that name yet. Zapier or Make can still connect it through a private link.";
   $("apps-grid").innerHTML = shown.map((c) => {
     // A live connector whose app keys are not set up yet is not "direct" for this owner today.
     const [tone, label] = c.availability === "live" && (c.connect === "bridge" || c.connect === "file") ? BADGE.planned : BADGE[c.availability];
@@ -168,6 +176,7 @@ function showResult(r: ImportResult): void {
 }
 
 export function initApps(): void {
+  document.getElementById("apps-search")?.addEventListener("input", (e) => { search = (e.target as HTMLInputElement).value.trim().toLowerCase().slice(0, 60); renderStore(); });
   document.addEventListener("click", async (e) => {
     const t = e.target as HTMLElement;
     const f = t.closest<HTMLElement>("#apps-filter [data-filter]");

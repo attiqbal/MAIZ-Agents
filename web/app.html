@@ -300,6 +300,8 @@
         <div class="chips" role="group" aria-label="Show apps by type" id="apps-filter">
           <button type="button" class="chip" data-filter="all">All</button><button type="button" class="chip" data-filter="accounting">Accounting</button><button type="button" class="chip" data-filter="marketing">Marketing and websites</button><button type="button" class="chip" data-filter="customers">Customers, email and teamwork</button><button type="button" class="chip" data-filter="till">Tills</button><button type="button" class="chip" data-filter="payments">Payments and shops</button><button type="button" class="chip" data-filter="payroll">Payroll</button><button type="button" class="chip" data-filter="bridge">Any other app</button>
         </div>
+        <div class="field apps-search"><label for="apps-search">Find an app by name</label><input class="input" id="apps-search" type="search" autocomplete="off" spellcheck="false" maxlength="60" placeholder="For example: Jobber, Klarna, Typeform"></div>
+        <p class="xs muted" id="apps-count" role="status"></p>
         <div class="apps-grid" id="apps-grid"></div>
         <p class="xs muted">Don't see your app? Zapier or Make can send data from thousands more apps through a private link, and any till that exports a CSV works with "Any till".</p></section>
       <dialog class="apps-dialog card" id="apps-dialog" aria-labelledby="apps-dlg-h">

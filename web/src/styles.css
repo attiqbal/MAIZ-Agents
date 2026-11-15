@@ -1824,3 +1824,8 @@ h1, .sec-head h2, .final h2, .stage-band h2, .article-head h1, .sec-title, .bent
 .arrival .av { width: 44px; height: 44px; border-radius: 15px; font-size: 0; }
 .arrival p { margin: 4px 0 0; font-size: 14px; color: var(--text-2); line-height: 1.45; }
 .arrival .first { font-size: 13px; color: var(--accent-text); }
+
+/* Promotion agent: make a video from an approved draft (paid service, cost shown first) */
+.pm-video { margin-top: 12px; border-top: 1px solid var(--line); padding-top: 8px; }
+.pm-video summary { cursor: pointer; padding: 10px 0; font-weight: 600; }
+.apps-search { max-width: 420px; margin-top: 16px; }

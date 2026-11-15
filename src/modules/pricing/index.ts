@@ -32,6 +32,11 @@ export interface GeneralPrices {
   addOnWeeklyEnergy: number;
   specialistStandardWeeklyEnergy: number;
   specialistPremiumWeeklyEnergy: number;
+  /**
+   * Anything that costs us money each time it runs (video rendering and other paid services) uses this many times the
+   * energy of its plain cost. One setting for every paid service. 1 makes them cost their plain price in energy.
+   */
+  paidServiceMultiplier: number;
 }
 
 export interface ItemSetting {
@@ -98,6 +103,7 @@ export const DEFAULT_GENERAL: GeneralPrices = {
   addOnWeeklyEnergy: 2_000,
   specialistStandardWeeklyEnergy: 2_000,
   specialistPremiumWeeklyEnergy: 2_000,
+  paidServiceMultiplier: 2,
 };
 
 const GENERAL_LIMITS: Record<keyof GeneralPrices, [number, number, boolean]> = {
@@ -114,6 +120,7 @@ const GENERAL_LIMITS: Record<keyof GeneralPrices, [number, number, boolean]> = {
   addOnWeeklyEnergy: [0, 1_000_000, true],
   specialistStandardWeeklyEnergy: [0, 1_000_000, true],
   specialistPremiumWeeklyEnergy: [0, 1_000_000, true],
+  paidServiceMultiplier: [1, 10, false],
 };
 const MAX_PRICE = 100_000;
 const MAX_ENERGY = 10_000_000;

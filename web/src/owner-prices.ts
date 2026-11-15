@@ -27,13 +27,14 @@ const GENERAL: [keyof GeneralPrices, string, string, string][] = [
   ["addOnWeeklyEnergy", "Add-on employee adds, per week", "energy", "Added to the team pool"],
   ["specialistStandardWeeklyEnergy", "Specialist (standard) adds, per week", "energy", "Added to the team pool"],
   ["specialistPremiumWeeklyEnergy", "Specialist (premium) adds, per week", "energy", "Added to the team pool"],
+  ["paidServiceMultiplier", "Paid services use this many times the energy", "×", "Video rendering and other things that cost us money each time. 2 means double"],
 ];
 
 function demo(): Book {
   // Demo copy of the launch defaults (src/modules/pricing DEFAULT_GENERAL); importing that module would pull server code in.
   const general: GeneralPrices = {
     basicPackageMonthlyGbp: 150, addOnEmployeeMonthlyGbp: 25, specialistStandardMonthlyGbp: 35, specialistPremiumMonthlyGbp: 35, overageGbpPer100Energy: 1,
-    trialDays: 7, trialTeamEnergy: 3_000, weeklyTeamEnergy: 8_000, dailyTeamCeiling: 3_000, addOnWeeklyEnergy: 2_000, specialistStandardWeeklyEnergy: 2_000, specialistPremiumWeeklyEnergy: 2_000,
+    trialDays: 7, trialTeamEnergy: 3_000, weeklyTeamEnergy: 8_000, dailyTeamCeiling: 3_000, addOnWeeklyEnergy: 2_000, specialistStandardWeeklyEnergy: 2_000, specialistPremiumWeeklyEnergy: 2_000, paidServiceMultiplier: 2,
   };
   return {
     general,
@@ -55,7 +56,7 @@ const numIn = (k: string, value: number | string, label: string, step = "1") =>
 function renderGeneral(): void {
   $("pr-general").innerHTML = GENERAL.map(([k, label, unit, hint]) => {
     const id = `pr-g-${k}`;
-    return `<div class="field"><label for="${id}">${esc(label)}${unit === "£" ? " (£)" : unit === "days" ? " (days)" : ""}</label><input class="input" id="${id}" type="number" min="0" step="${unit === "£" ? "0.01" : "1"}" inputmode="decimal" data-k="general.${k}" value="${book.general[k]}"><span class="hint">${esc(hint)}</span></div>`;
+    return `<div class="field"><label for="${id}">${esc(label)}${unit === "£" ? " (£)" : unit === "days" ? " (days)" : unit === "×" ? " (times)" : ""}</label><input class="input" id="${id}" type="number" min="0" step="${unit === "£" ? "0.01" : unit === "×" ? "0.1" : "1"}" inputmode="decimal" data-k="general.${k}" value="${book.general[k]}"><span class="hint">${esc(hint)}</span></div>`;
   }).join("");
 }
 
