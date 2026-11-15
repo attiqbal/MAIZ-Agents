@@ -430,7 +430,10 @@ export function createApp(p: Platform) {
       const home = state.r === "firstday" ? "#firstday" : "#apps";
       if (!code || !org) return { status: 302, headers: { location: `/app.html${home}` } }; // owner pressed Cancel in the app
       try {
-        await p.integrations.completeOAuth(state.u, org.id, state.a, code);
+        // Some apps return an account id beside the code (QuickBooks realmId). Short plain values only.
+        const extra: Record<string, string> = {};
+        for (const k of ["realmId"]) { const v = req.query.get(k); if (v && /^[\w.-]{1,64}$/.test(v)) extra[k] = v; }
+        await p.integrations.completeOAuth(state.u, org.id, state.a, code, extra);
       } catch (e) {
         if (!(e instanceof IntegrationError)) throw e;
         return { status: 302, headers: { location: `/app.html?connect=failed${home}` } };
@@ -995,6 +998,7 @@ export function createApp(p: Platform) {
     if (method === "GET" && path === "/api/integrations") {
       return json(200, { catalogue: ig.catalogue(), connections: ig.list(userId, orgId), pending: ig.pending(userId, orgId) });
     }
+    if (method === "GET" && path === "/api/integrations/activity") return json(200, { activity: ig.activitySummary(userId, orgId) });
     if (method === "POST" && path === "/api/integrations/post") return json(200, ig.post(userId, orgId));
     if (method === "GET" && path === "/api/integrations/growth") return json(200, ig.growth(userId, orgId));
     const app = /^\/api\/integrations\/apps\/([a-z0-9-]{2,40})\/(connect|import)$/.exec(path);

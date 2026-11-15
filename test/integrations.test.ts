@@ -303,7 +303,7 @@ describe("Xero", () => {
     const ig = new IntegrationService(identity, audit, new Ledger(identity, audit), defaultRegistry());
     const cat = ig.catalogue();
     expect(cat.find((c) => c.key === "xero")!.connect).toBe("bridge");
-    expect(cat.find((c) => c.key === "quickbooks")).toMatchObject({ connect: "bridge", availability: "planned" });
+    expect(cat.find((c) => c.key === "quickbooks")).toMatchObject({ connect: "bridge", availability: "live" });
     for (const k of ["sage", "shopify", "paypal", "gusto", "stripe", "sumup"]) expect(cat.some((c) => c.key === k)).toBe(true);
   });
 });

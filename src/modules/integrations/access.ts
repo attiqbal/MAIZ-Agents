@@ -11,6 +11,14 @@ export const DEFAULT_ACCESS: Record<Capability, readonly string[]> = {
   "accounts.read": ["finance-manager", "business-consultant", "compliance-manager"],
   "traffic.read": ["marketing-manager", "business-consultant"],
   "search.read": ["marketing-manager", "business-consultant"],
+  // Customer-facing areas (see areas.ts): counts only, never the content of a message or a ticket.
+  "crm.read": ["marketing-manager", "business-consultant"],
+  "support.read": ["business-consultant", "marketing-manager"],
+  "inbox.read": ["business-consultant"],
+  "bookings.read": ["business-consultant", "marketing-manager"],
+  "audience.read": ["marketing-manager", "business-consultant"],
+  "tasks.read": ["business-consultant", "supply-chain-manager"],
+  "reviews.read": ["marketing-manager", "business-consultant"],
 };
 
 /** Employees that may never be given app data (the Admin manager runs setup, not the business). */

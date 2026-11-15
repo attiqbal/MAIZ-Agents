@@ -2,6 +2,7 @@ import { randomBytes } from "node:crypto";
 import { createServer } from "node:http";
 import { join } from "node:path";
 import { createApp } from "./app.js";
+import { clientAppEnv } from "../modules/connections/client-apps.js";
 import { checkEnv, integrationAppsFromEnv, metaClientsFromEnv, metaFromEnv, platformOwnersFromEnv, whatsappFromEnv } from "./config.js";
 import { loginAppsFromEnv } from "./social-login.js";
 import { QueuedEmailSender, ResendEmailSender } from "./email.js";
@@ -39,7 +40,7 @@ const platform = createPlatform({
   meta: metaFromEnv(env),
   whatsapp: whatsappFromEnv(env),
   // Only to show the owner's Connections page whether each server-set service is set, and to test it. Never sent out.
-  connectionEnv: Object.fromEntries(["RESEND_API_KEY", "EMAIL_FROM", "PAYMENTS_PROVIDER", "STRIPE_SECRET_KEY", "STRIPE_WEBHOOK_SECRET", "RUNPOD_API_KEY", "RUNPOD_ENDPOINT_ID", "ANTHROPIC_API_KEY", "SLACK_CLIENT_ID", "SLACK_CLIENT_SECRET", "SLACK_SIGNING_SECRET", "SLACK_REDIRECT_URI", "META_GRAPH_VERSION", "GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", "MICROSOFT_CLIENT_ID", "MICROSOFT_CLIENT_SECRET", "MICROSOFT_TENANT", "XERO_CLIENT_ID", "XERO_CLIENT_SECRET", "SQUARE_CLIENT_ID", "SQUARE_CLIENT_SECRET", "SQUARE_BASE_URL", "GOOGLE_DATA_CLIENT_ID", "GOOGLE_DATA_CLIENT_SECRET", "REDDIT_CLIENT_ID", "REDDIT_CLIENT_SECRET", "REDDIT_USERNAME", "YOUTUBE_API_KEY", "X_BEARER_TOKEN", "FRED_API_KEY", "ALPHAVANTAGE_API_KEY", "COMPANIES_HOUSE_API_KEY"].map((k) => [k, env[k]])),
+  connectionEnv: Object.fromEntries(["RESEND_API_KEY", "EMAIL_FROM", "PAYMENTS_PROVIDER", "STRIPE_SECRET_KEY", "STRIPE_WEBHOOK_SECRET", "RUNPOD_API_KEY", "RUNPOD_ENDPOINT_ID", "ANTHROPIC_API_KEY", "SLACK_CLIENT_ID", "SLACK_CLIENT_SECRET", "SLACK_SIGNING_SECRET", "SLACK_REDIRECT_URI", "META_GRAPH_VERSION", "GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", "MICROSOFT_CLIENT_ID", "MICROSOFT_CLIENT_SECRET", "MICROSOFT_TENANT", "XERO_CLIENT_ID", "XERO_CLIENT_SECRET", "SQUARE_CLIENT_ID", "SQUARE_CLIENT_SECRET", "SQUARE_BASE_URL", "GOOGLE_DATA_CLIENT_ID", "GOOGLE_DATA_CLIENT_SECRET", "REDDIT_CLIENT_ID", "REDDIT_CLIENT_SECRET", "REDDIT_USERNAME", "YOUTUBE_API_KEY", "X_BEARER_TOKEN", "FRED_API_KEY", "ALPHAVANTAGE_API_KEY", "COMPANIES_HOUSE_API_KEY", ...Object.values(clientAppEnv()).flatMap((v) => [v.clientId, v.clientSecret])].map((k) => [k, env[k]])),
   metaClients: metaClientsFromEnv(env),
   // The feature flag: unset means checkout is refused and nothing is charged. "mock" (development only) charges nobody.
   payments:

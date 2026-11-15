@@ -3,14 +3,15 @@ import { api, getToken } from "./api";
 import { toast } from "./common";
 
 interface CatalogueItem {
-  key: string; name: string; category: "till" | "payroll" | "accounting" | "payments" | "ecommerce" | "marketing" | "bridge"; summary: string;
-  availability: "live" | "file" | "partner" | "planned"; note?: string;
+  key: string; name: string; category: "till" | "payroll" | "accounting" | "payments" | "ecommerce" | "marketing" | "bridge" | "customers" | "messaging" | "teamwork"; summary: string;
+  availability: "live" | "file" | "partner" | "planned" | "approval"; note?: string;
   connect: "oauth" | "api_key" | "webhook" | "file" | "bridge"; howToExport?: string[]; fields?: { key: string; label: string; help?: string }[]; acceptsFiles: boolean; defaultAccess: string[];
 }
 interface Connection { id: string; connectorKey: string; status: string; lastSyncAt?: string; lastError?: string; access: string[]; needsChoice?: boolean; externalAccount?: string }
 interface Growth { connected: boolean; waiting: string[]; lines: string[]; growth: { alerts: { severity: "bad" | "good"; title: string; detail: string }[] } }
 interface Pending { id: string; kind: "sales" | "payroll"; date: string; data: { currency: string; gross: number; net?: number; transactions?: number; headcount?: number } }
 interface AppsData { catalogue: CatalogueItem[]; connections: Connection[]; pending: Pending[] }
+interface ActivityLines { connectionId: string; app: string; lines: string[] }
 interface ImportResult { added: number; updated: number; unchanged: number; conflicts: string[]; warnings: string[]; unmapped: string[] }
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -18,11 +19,11 @@ const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&
 const money = (n: number, cur: string) => { try { return new Intl.NumberFormat(undefined, { style: "currency", currency: cur }).format(n / 100); } catch { return `${(n / 100).toFixed(2)} ${cur}`; } };
 
 const EMPLOYEES: [string, string][] = [["finance-manager", "Finance"], ["business-consultant", "Consultant"], ["marketing-manager", "Marketing"], ["hr-manager", "HR"]];
-const CATEGORY: Record<CatalogueItem["category"], string> = { till: "Tills", payroll: "Payroll", accounting: "Accounting", payments: "Payments", ecommerce: "Online shop", marketing: "Website and Google", bridge: "Any other app" };
+const CATEGORY: Record<CatalogueItem["category"], string> = { till: "Tills", payroll: "Payroll", accounting: "Accounting", payments: "Payments", ecommerce: "Online shop", marketing: "Website and Google", bridge: "Any other app", customers: "Customers", messaging: "Email and messaging", teamwork: "Teamwork" };
 /** Filter chips: payments and online shops share one. */
-const GROUP: Record<CatalogueItem["category"], string> = { till: "till", payroll: "payroll", accounting: "accounting", payments: "payments", ecommerce: "payments", marketing: "marketing", bridge: "bridge" };
+const GROUP: Record<CatalogueItem["category"], string> = { till: "till", payroll: "payroll", accounting: "accounting", payments: "payments", ecommerce: "payments", marketing: "marketing", bridge: "bridge", customers: "customers", messaging: "customers", teamwork: "customers" };
 const BADGE: Record<CatalogueItem["availability"], [string, string]> = {
-  live: ["good", "Connects directly"], file: ["info", "File upload"], planned: ["info", "Direct connection coming"], partner: ["warn", "API is partner-only"],
+  live: ["good", "Connects directly"], file: ["info", "File upload"], planned: ["info", "Direct connection coming"], partner: ["warn", "API is partner-only"], approval: ["warn", "Waiting for the provider's approval"],
 };
 
 /** Shown when the API is not reachable, so the screen still explains itself. */
@@ -45,6 +46,8 @@ let filter = "all";
 let uploading: CatalogueItem | undefined;
 let keying: CatalogueItem | undefined;
 let growth: Growth | undefined;
+/** Plain-words lines for connected customer apps (leads, tickets, bookings), by connection. */
+let activity = new Map<string, string[]>();
 /** Options Google offered for a connection that still needs a property or site picked. */
 const choicesFor = new Map<string, { id: string; name: string }[]>();
 
@@ -54,6 +57,11 @@ export async function loadApps(): Promise<void> {
   live = r.ok && !!r.data;
   data = live ? r.data! : DEMO;
   growth = undefined;
+  activity = new Map();
+  if (live && data.connections.length) {
+    const a = await api<{ activity: ActivityLines[] }>("/integrations/activity");
+    if (a.ok && a.data) activity = new Map(a.data.activity.map((x) => [x.connectionId, x.lines]));
+  }
   if (live && data.connections.some((c) => c.connectorKey === "ga4" || c.connectorKey === "search-console")) {
     const g = await api<Growth>("/integrations/growth");
     if (g.ok && g.data) growth = g.data;
@@ -107,7 +115,7 @@ function render(): void {
       `<button class="btn btn-quiet btn-sm" data-disconnect="${esc(c.id)}">Disconnect</button>`,
     ].join("");
     return `<div class="app-conn"><div class="app-conn-h"><b>${esc(item?.name ?? c.connectorKey)}</b>${state}</div>
-      ${choose}<div class="field"><span class="label" id="acc-${esc(c.id)}">Who on your team can see it</span><div class="chips" role="group" aria-labelledby="acc-${esc(c.id)}">${chips}</div></div>
+      ${(activity.get(c.id) ?? []).map((l) => `<p class="small">${esc(l)}</p>`).join("")}${choose}<div class="field"><span class="label" id="acc-${esc(c.id)}">Who on your team can see it</span><div class="chips" role="group" aria-labelledby="acc-${esc(c.id)}">${chips}</div></div>
       <div class="acts">${actions}</div></div>`;
   }).join("");
 
@@ -122,9 +130,10 @@ function render(): void {
       : c.connect === "bridge" ? `<button class="btn btn-ghost btn-sm" data-connect="webhook">Connect through Zapier or Make</button>`
       : c.connect === "api_key" ? `<button class="btn btn-primary btn-sm" data-key="${esc(c.key)}">Connect</button>`
       : `<button class="btn btn-primary btn-sm" data-upload="${esc(c.key)}">Upload file</button>`;
+    const waiting = c.availability === "approval" && c.connect === "bridge" ? `<p class="xs muted">Coming soon. Until then, connect it through Zapier or Make.</p>` : "";
     return `<article class="app-card card card-flat"><div class="app-card-h"><b>${esc(c.name)}</b><span class="xs muted">${CATEGORY[c.category]}</span></div>
       <p class="small">${esc(c.summary)}</p><span class="status ${tone}"><span class="dot"></span>${label}</span>
-      ${c.note ? `<p class="xs muted">${esc(c.note)}</p>` : ""}<div class="acts">${cta}</div></article>`;
+      ${c.note ? `<p class="xs muted">${esc(c.note)}</p>` : ""}${waiting}<div class="acts">${cta}</div></article>`;
   }).join("");
 }
 
@@ -266,6 +275,7 @@ const VIEWS: Record<string, { title: string; intro: string }> = {
   till: { title: "Tills and sales", intro: "Connect Square or upload your till's export. Sales flow to your Finance manager." },
   payments: { title: "Payments", intro: "Connect Stripe or your online shop to see card payments, refunds and fees." },
   payroll: { title: "Payroll", intro: "Upload your payroll summary after each pay run. Totals only, nothing personal." },
+  customers: { title: "Customer apps", intro: "Connect your CRM, support desk, bookings, shop, email and task apps. Your team reads counts only, never messages or customer details." },
   bridge: { title: "Zapier and Make", intro: "Send data from thousands of other apps through a private link." },
 };
 let view = "";
