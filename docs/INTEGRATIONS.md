@@ -54,6 +54,8 @@ No changes to the server, storage, website or employees are needed.
 | GET | `/api/integrations/callback` | public, signed state: OAuth return |
 | POST | `/api/integrations/hooks/:id/:secret` | public, secret link: `{ sales | payroll | accounts: [...], amountsIn?: "major" }` |
 
+> More apps (CRM, support, bookings, shops, email, task boards) and the approval-gated ones are in `docs/CUSTOMER-APPS.md`.
+
 ## What each app actually offers (checked November 2026)
 
 | App | What exists | What we do |

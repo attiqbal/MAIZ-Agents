@@ -1,9 +1,11 @@
 import type { Sink } from "../../core/persistence.js";
 import { MetaGraph, MetaRejected, MetaUncertain, type MetaConfig } from "../meta/index.js";
 import { normalizeNumber, WhatsAppError, type WhatsAppConfig } from "../whatsapp/index.js";
+import { defaultRegistry } from "../integrations/catalogue.js";
 import type { OAuthApp } from "../integrations/index.js";
+import { clientAppEnv } from "./client-apps.js";
 import { CATALOG, defOf, type ConnDef, type ConnKey, type GuideStep } from "./catalog.js";
-import { probeApp, ProbeUnreachable, type ProbeKind } from "./probes.js";
+import { probeApp, probeGeneric, ProbeUnreachable, type ProbeKind } from "./probes.js";
 import { deskKeyWorks } from "../research/desk.js";
 import { redditToken, ResearchError, xTokenWorks, youtubeKeyWorks } from "../research/sources.js";
 
@@ -66,7 +68,7 @@ export interface StoredSlackApp { clientId: string; clientSecret: string; signin
  * The server variables behind each browser-editable platform card. When every required one is set on the server,
  * the server's values win and the card says so; otherwise what was typed on the page is used.
  */
-const ENV: Partial<Record<ConnKey, { vars: Record<string, string>; required: string[]; extra?: string[] }>> = {
+const ENV: Record<string, { vars: Record<string, string>; required: string[]; extra?: string[] }> = {
   resend: { vars: { apiKey: "RESEND_API_KEY", from: "EMAIL_FROM" }, required: ["apiKey", "from"] },
   google: { vars: { clientId: "GOOGLE_CLIENT_ID", clientSecret: "GOOGLE_CLIENT_SECRET" }, required: ["clientId", "clientSecret"] },
   microsoft: { vars: { clientId: "MICROSOFT_CLIENT_ID", clientSecret: "MICROSOFT_CLIENT_SECRET", tenant: "MICROSOFT_TENANT" }, required: ["clientId", "clientSecret"] },
@@ -81,6 +83,8 @@ const ENV: Partial<Record<ConnKey, { vars: Record<string, string>; required: str
   alphavantage: { vars: { apiKey: "ALPHAVANTAGE_API_KEY" }, required: ["apiKey"] },
   companieshouse: { vars: { apiKey: "COMPANIES_HOUSE_API_KEY" }, required: ["apiKey"] },
 };
+// Client apps made from the integrations registry (QuickBooks, HubSpot, Outlook...) read their keys from <PREFIX>_CLIENT_ID and _SECRET.
+for (const [key, v] of Object.entries(clientAppEnv())) ENV[key] = { vars: v, required: ["clientId", "clientSecret"] };
 /** Secrets set only on the server, so a test message can never carry one back. */
 const SERVER_SECRETS = ["STRIPE_SECRET_KEY", "STRIPE_WEBHOOK_SECRET", "RUNPOD_API_KEY", "ANTHROPIC_API_KEY"];
 const PROBED: readonly ConnKey[] = ["google", "microsoft", "slack", "xero", "square", "google-data"];
@@ -166,7 +170,7 @@ export function explainMeta(message: string): string {
 
 export class ConnectionsService {
   private stored: Stored = {};
-  private tests = new Map<ConnKey, TestResult>();
+  private tests = new Map<string, TestResult>();
   private lastRun = new Map<string, number>();
   private webhookSeenAt?: string;
   private sink?: Sink;
@@ -268,6 +272,11 @@ export class ConnectionsService {
       const v = this.typed(k);
       if (v) out[k] = { clientId: v.clientId!, clientSecret: v.clientSecret!, redirectUri: `${this.base}/api/integrations/callback` };
     }
+    // Every other OAuth client app (QuickBooks, HubSpot, Outlook...) has a generated card with the same two boxes.
+    for (const k of Object.keys(clientAppEnv())) {
+      const v = this.typed(k);
+      if (v) out[k] = { clientId: v.clientId!, clientSecret: v.clientSecret!, redirectUri: `${this.base}/api/integrations/callback` };
+    }
     // One Google app serves both Analytics and Search Console.
     const g = this.typed("google-data");
     if (g) for (const k of ["ga4", "search-console"]) out[k] = { clientId: g.clientId!, clientSecret: g.clientSecret!, redirectUri: `${this.base}/api/integrations/callback` };
@@ -346,6 +355,13 @@ export class ConnectionsService {
       case "google": case "microsoft": case "slack": case "xero": case "square": case "google-data": case "reddit": case "youtube": case "x": case "fred": case "alphavantage": case "companieshouse": {
         const ok = !!this.complete(key);
         return { ok, missing: this.missingOf(key), text: APP_TEXT[key]![ok ? 0 : 1] };
+      }
+      default: {
+        // A generated client-app card: OAuth keys typed here, or an app that waits for the provider's approval.
+        const def = defOf(key);
+        if (!def?.editable) return { ok: false, missing: [], text: "Waiting for the provider's approval. Clients use Zapier or Make for now." };
+        const ok = !!this.complete(key);
+        return { ok, missing: this.missingOf(key), text: ok ? `Clients can connect ${def.title} with one click.` : `Not set: clients cannot connect ${def.title} with one click yet.` };
       }
     }
   }
@@ -617,6 +633,15 @@ export class ConnectionsService {
           return { ok: false, message: e instanceof ResearchError ? `${e.message} Check the key is allowed to use the YouTube Data API v3.` : "YouTube could not be reached.", details: [] };
         }
         return { ok: true, message: "YouTube accepted the key.", details: ["The test read one public list (about 1 unit of today's 10,000)."] };
+      }
+      default: {
+        const def = defOf(key);
+        const connector = defaultRegistry().get(key);
+        if (!def?.editable || connector?.auth.kind !== "oauth2") return { ok: false, message: "Nothing to test yet: this app is waiting for the provider's approval.", details: [] };
+        const v = this.complete(key);
+        if (!v) return this.notReady(key);
+        const tokenUrl = connector.auth.tokenUrl;
+        return probeGeneric(def.title, tokenUrl, connector.auth.tokenAuth === "basic", { clientId: v.clientId!, clientSecret: v.clientSecret!, redirectUri: `${this.base}/api/integrations/callback` }, this.http);
       }
     }
   }

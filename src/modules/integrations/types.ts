@@ -8,9 +8,11 @@
  */
 
 /** What a connection can be used for. Employees are granted capabilities, never raw app access. */
-export type Capability = "sales.read" | "payroll.read" | "accounts.read" | "traffic.read" | "search.read";
+export type Capability =
+  | "sales.read" | "payroll.read" | "accounts.read" | "traffic.read" | "search.read"
+  | "crm.read" | "support.read" | "inbox.read" | "bookings.read" | "audience.read" | "tasks.read" | "reviews.read";
 
-export type Category = "till" | "payroll" | "accounting" | "payments" | "ecommerce" | "marketing" | "bridge";
+export type Category = "till" | "payroll" | "accounting" | "payments" | "ecommerce" | "marketing" | "bridge" | "customers" | "messaging" | "teamwork";
 
 /**
  * How honest we can be about an app today.
@@ -18,8 +20,10 @@ export type Category = "till" | "payroll" | "accounting" | "payments" | "ecommer
  * - file: the app only exports files (CSV/Excel); the owner uploads them.
  * - partner: an API exists but only for approved partners; file import until we are approved.
  * - planned: public API exists, connector not written yet; file import works meanwhile.
+ * - approval: a public API exists but the provider must review and approve MAIZ first (days to weeks). The owner
+ *   follows `setup.approval` on the Connections page; clients use Zapier or Make until it is approved.
  */
-export type Availability = "live" | "file" | "partner" | "planned";
+export type Availability = "live" | "file" | "partner" | "planned" | "approval";
 
 export type AuthSpec =
   | {
@@ -31,6 +35,8 @@ export type AuthSpec =
       envPrefix: string;
       /** Extra query parameters some apps want on the authorize URL. */
       authorizeParams?: Record<string, string>;
+      /** How the app wants our id and secret at its token address. Default: in the form body. */
+      tokenAuth?: "basic" | "body";
     }
   | { kind: "api_key"; fields: readonly { key: string; label: string; help?: string }[] }
   | { kind: "file"; accepts: string; howToExport: readonly string[] }
@@ -113,12 +119,28 @@ export interface SearchDay {
   topQueries?: { query: string; clicks: number; impressions: number; position: number }[];
 }
 
+/**
+ * One day of customer-facing activity from an app that is not about money: leads and deals (CRM), support
+ * tickets, the inbox, bookings, subscribers, tasks, reviews. `figures` are plain counts (or money in minor units,
+ * or a rating times 100); `areas.ts` says what each figure is called. Numbers only, so nothing a customer typed
+ * can ever reach an employee's instructions.
+ */
+export type ActivityArea = "crm" | "support" | "inbox" | "bookings" | "audience" | "tasks" | "reviews";
+export interface ActivityDay {
+  /** YYYY-MM-DD */
+  date: string;
+  area: ActivityArea;
+  currency: string;
+  figures: Record<string, number>;
+}
+
 export interface Records {
   sales?: SalesDay[];
   payroll?: PayrollRun[];
   accounts?: AccountsMonth[];
   traffic?: TrafficDay[];
   search?: SearchDay[];
+  activity?: ActivityDay[];
 }
 
 export interface ParsedFile extends Records {
@@ -148,6 +170,16 @@ export interface DateRange {
   to: string;
 }
 
+/** What the platform owner does once so every client can connect this app with one click (shown on the Connections page). */
+export interface ProviderSetup {
+  /** The provider's developer console, where the owner registers MAIZ. */
+  console: { href: string; label: string };
+  /** Plain steps, in order. Say what to look for, because provider screens change. */
+  steps: readonly string[];
+  /** Approval the provider wants before other businesses can connect, and how long it usually takes. */
+  approval?: string;
+}
+
 export interface Connector {
   /** Stable id, lower-case, used in URLs and storage. */
   key: string;
@@ -160,6 +192,8 @@ export interface Connector {
   auth: AuthSpec;
   /** Honest note shown on the card, e.g. "BrightPay has no public API yet". */
   note?: string;
+  /** Owner-side registration steps. Every OAuth connector and every `approval` entry has them. */
+  setup?: ProviderSetup;
   /** Countries the app mainly serves (ISO codes); empty means global. */
   regions?: readonly string[];
   /** Pull data from the app's API. Only for live connectors. */
@@ -167,7 +201,7 @@ export interface Connector {
   /** Turn an exported file (CSV text) into records. */
   parseFile?(text: string, opts: FileOptions): ParsedFile;
   /** Exchange an OAuth code for credentials. Defaults to the standard form-encoded exchange. */
-  exchangeCode?(http: typeof fetch, app: OAuthApp, code: string): Promise<{ credentials: Credentials; externalAccount?: string }>;
+  exchangeCode?(http: typeof fetch, app: OAuthApp, code: string, params?: Record<string, string>): Promise<{ credentials: Credentials; externalAccount?: string }>;
   /** Check API-key values before saving them. Returns a plain-language problem, or undefined when fine. */
   validate?(values: Record<string, string>): string | undefined;
   /**

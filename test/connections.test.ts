@@ -51,7 +51,9 @@ describe("Connections page API", () => {
     const { call } = setup();
     const r = await call("GET", "/api/owner/connections");
     const keys = (r.body as any).connections.map((c: any) => c.key);
-    expect(keys).toEqual(["facebook", "instagram", "whatsapp", "resend", "google", "microsoft", "slack", "xero", "square", "google-data", "reddit", "youtube", "x", "fred", "alphavantage", "companieshouse", "stripe", "runpod", "anthropic"]);
+    // The built-in cards come first and in this order; one generated card per client app follows (see customer-apps.test.ts).
+    expect(keys.slice(0, 19)).toEqual(["facebook", "instagram", "whatsapp", "resend", "google", "microsoft", "slack", "xero", "square", "google-data", "reddit", "youtube", "x", "fred", "alphavantage", "companieshouse", "stripe", "runpod", "anthropic"]);
+    expect(keys.slice(19)).toContain("quickbooks");
     for (const c of (r.body as any).connections) { expect(c.guide.length).toBeGreaterThan(1); expect(c.status).toBe("not_connected"); }
     expect((r.body as any).persistent).toBe(false);
   });
@@ -270,5 +272,31 @@ describe("explainMeta", () => {
     expect(explainMeta("Meta said no: Invalid OAuth access token")).toMatch(/Copy it again/);
     expect(explainMeta("Meta said no: (#100) Object with ID '1' does not exist")).toMatch(/assigned to your system user/);
     expect(explainMeta("something else")).toBe("something else");
+  });
+});
+
+describe("generated client-app cards", () => {
+  it("saves HubSpot keys in the browser, tests them, never returns the secret, and turns on one-click connect for clients", async () => {
+    const { call, card, platform, calls } = setup({ answer: (c) => (c.url.includes("api.hubapi.com/oauth") ? { status: 400, json: { status: "BAD_AUTH_CODE", error: "invalid_grant" } } : { json: {} }) });
+    const SECRET = "hs-secret-0123456789abcdef";
+    expect((await card("hubspot")).status).toBe("not_connected");
+    const save = await call("PUT", "/api/owner/connections/hubspot", { fields: { clientId: "hs-client-id-1", clientSecret: SECRET } });
+    expect(save.status).toBe(200);
+    expect(JSON.stringify(save.body)).not.toContain(SECRET);
+    const t = await call("POST", "/api/owner/connections/hubspot/test");
+    expect(t.status).toBe(200);
+    expect(JSON.stringify(t.body)).not.toContain(SECRET);
+    expect((await card("hubspot")).lastTest.ok).toBe(true);
+    expect(calls.some((c) => c.url.includes("api.hubapi.com/oauth/v1/token"))).toBe(true);
+    // Clients now see HubSpot as a one-click connection.
+    expect(platform.integrations.catalogue().find((c) => c.key === "hubspot")!.connect).toBe("oauth");
+  });
+
+  it("shows approval-only apps with their steps and nothing to type", async () => {
+    const { call, card } = setup();
+    const g = await card("tiktok");
+    expect(g.editable).toBe(false);
+    expect(g.guide.some((s: any) => /Approval:/.test(s.text))).toBe(true);
+    expect((await call("PUT", "/api/owner/connections/tiktok", { fields: { clientId: "x" } })).status).toBeGreaterThanOrEqual(400);
   });
 });

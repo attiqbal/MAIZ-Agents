@@ -123,3 +123,24 @@ export async function probeApp(kind: ProbeKind, app: ProbeApp, http: typeof fetc
       return { ok: false, message: `${name} answered in a way this test does not recognise${ref}, so it could not tell whether the details are right.`, details: [note, "Try signing in or connecting once yourself to be sure."] };
   }
 }
+
+/**
+ * Test for a generated client-app card (QuickBooks, HubSpot, Outlook...). Offers the provider's token address a
+ * made-up code with the app's keys. A provider that knows the app answers about the code ("invalid grant"); one that
+ * does not answers about the client. This follows the standard OAuth error codes and has NOT been run live for
+ * each provider, so the message says what it can and cannot prove.
+ */
+const KEYS_BAD = /^(invalid_client|unauthorized_client|invalid_client_id|bad_client_id|bad_client_secret|client_not_found|access_denied)$/i;
+const CODE_BAD = /^(invalid_grant|invalid_request|bad_auth_code|bad_verification_code|invalid_code|redirect_uri_mismatch|invalid_redirect_uri|bad_redirect_uri|unsupported_grant_type)$/i;
+
+export async function probeGeneric(name: string, tokenUrl: string, basic: boolean, app: ProbeApp, http: typeof fetch): Promise<ProbeResult> {
+  const common = { grant_type: "authorization_code", code: MADE_UP_CODE, redirect_uri: app.redirectUri };
+  const headers: Record<string, string> = { ...FORM };
+  const body = basic ? form(common) : form({ ...common, client_id: app.clientId, client_secret: app.clientSecret });
+  if (basic) headers.authorization = `Basic ${Buffer.from(`${app.clientId}:${app.clientSecret}`).toString("base64")}`;
+  const r = await post(http, tokenUrl, { headers, body });
+  const c = code(r.json?.error) || code(r.json?.status) || code(r.json?.error_code);
+  if (r.status === 401 || KEYS_BAD.test(c)) return { ok: false, message: `${name} did not recognise the Client ID and secret. Copy them again in full from the developer console.`, details: [] };
+  if (CODE_BAD.test(c)) return { ok: true, message: `${name} knows the app and accepted the secret (it only rejected the made-up code, as it should).`, details: ["This follows the standard sign-in error codes. The real proof is connecting one account from the Apps page."] };
+  return { ok: false, message: `${name} answered in a way we did not expect${c ? ` (${c})` : ` (error ${r.status})`}. Check the Client ID, secret and redirect address.`, details: [] };
+}

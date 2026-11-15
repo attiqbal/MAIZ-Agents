@@ -6,6 +6,13 @@ import { parseTillCsv, tillFile } from "./connectors/till-csv.js";
 import { webhookBridge } from "./connectors/webhook.js";
 import { stripe } from "./connectors/stripe.js";
 import { xero } from "./connectors/xero.js";
+import { hubspot, pipedrive } from "./connectors/crm.js";
+import { zendesk, freshdesk } from "./connectors/support.js";
+import { shopify, woocommerce } from "./connectors/shops.js";
+import { quickbooks } from "./connectors/quickbooks.js";
+import { outlook, calendly, calcom, mailchimp, brevo } from "./connectors/people.js";
+import { trello, asana } from "./connectors/work.js";
+import { APPROVAL_APPS, PLANNED_CUSTOMER_APPS } from "./more-apps.js";
 import { IntegrationError, type Availability, type Capability, type Category, type Connector } from "./types.js";
 
 /** Holds every connector. A new app is one `register()` call; nothing else in core changes. */
@@ -64,7 +71,6 @@ const viaBridge = (key: string, name: string, category: Category, capabilities: 
 /** The apps most small businesses use, beyond the ones we connect directly. Checked 2026-11. */
 export const COMMON_APPS: readonly Connector[] = [
   // Accounting
-  viaBridge("quickbooks", "QuickBooks Online", "accounting", ["accounts.read"], "planned", "Your books in QuickBooks: profit and loss month by month.", "QuickBooks has a public OAuth API with a Profit and Loss report. Direct connection is next after Xero."),
   viaBridge("sage", "Sage Accounting", "accounting", ["accounts.read"], "planned", "Your books in Sage Accounting (Sage Business Cloud).", "Sage Accounting has a public OAuth API. Direct connection is planned.", ["GB", "IE", "US", "CA", "ES", "FR", "DE"]),
   viaBridge("freeagent", "FreeAgent", "accounting", ["accounts.read"], "planned", "Your books in FreeAgent.", "FreeAgent has a public OAuth API. Direct connection is planned.", ["GB"]),
   viaBridge("zoho-books", "Zoho Books", "accounting", ["accounts.read"], "planned", "Your books in Zoho Books.", "Zoho Books has a public OAuth API. Direct connection is planned."),
@@ -72,8 +78,6 @@ export const COMMON_APPS: readonly Connector[] = [
   viaBridge("freshbooks", "FreshBooks", "accounting", ["accounts.read"], "planned", "Invoices and expenses in FreshBooks.", "FreshBooks has a public OAuth API. Direct connection is planned."),
   // Payments and online shops
   viaBridge("paypal", "PayPal", "payments", ["sales.read"], "planned", "PayPal payments, refunds and fees.", "PayPal has a public Transaction Search API. Direct connection is planned."),
-  viaBridge("shopify", "Shopify", "ecommerce", ["sales.read"], "planned", "Online shop orders, refunds and payouts from Shopify.", "Shopify has a public Admin API for apps. Direct connection is planned."),
-  viaBridge("woocommerce", "WooCommerce", "ecommerce", ["sales.read"], "planned", "Orders from your WooCommerce shop.", "WooCommerce has a REST API with keys from your site. Direct connection is planned."),
   viaBridge("gocardless", "GoCardless", "payments", ["sales.read"], "planned", "Direct Debit payments collected by GoCardless.", "GoCardless has a public API. Direct connection is planned.", ["GB", "IE", "FR", "DE", "AU"]),
   // Payroll and HR
   viaBridge("gusto", "Gusto", "payroll", ["payroll.read"], "partner", "US payroll from Gusto.", "Gusto's API is for approved partners.", ["US"]),
@@ -84,6 +88,7 @@ export const COMMON_APPS: readonly Connector[] = [
 /** The registry the platform uses, with every connector we ship. */
 export function defaultRegistry(): ConnectorRegistry {
   const r = new ConnectorRegistry();
-  for (const c of [xero, square, stripe, ga4, searchConsole, brightpay, tillFile, webhookBridge, ...PLANNED, ...COMMON_APPS]) r.register(c);
+  const live = [hubspot, pipedrive, zendesk, freshdesk, shopify, woocommerce, quickbooks, outlook, calendly, calcom, mailchimp, brevo, trello, asana];
+  for (const c of [xero, square, stripe, ga4, searchConsole, brightpay, tillFile, webhookBridge, ...live, ...PLANNED, ...COMMON_APPS, ...APPROVAL_APPS, ...PLANNED_CUSTOMER_APPS]) r.register(c);
   return r;
 }

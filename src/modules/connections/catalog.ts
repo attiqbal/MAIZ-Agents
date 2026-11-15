@@ -2,7 +2,11 @@
  * What the owner can connect, and the plain-English steps for each. Pure data: the service turns it into the
  * Connections page. Screens at Meta change often, so each step says what to look for, not just where to click.
  */
-export type ConnKey = "facebook" | "instagram" | "whatsapp" | "resend" | "google" | "microsoft" | "slack" | "xero" | "square" | "google-data" | "reddit" | "youtube" | "x" | "fred" | "alphavantage" | "companieshouse" | "stripe" | "runpod" | "anthropic";
+import { clientAppDefs } from "./client-apps.js";
+
+export type BuiltInKey = "facebook" | "instagram" | "whatsapp" | "resend" | "google" | "microsoft" | "slack" | "xero" | "square" | "google-data" | "reddit" | "youtube" | "x" | "fred" | "alphavantage" | "companieshouse" | "stripe" | "runpod" | "anthropic";
+/** The built-in cards, plus one generated card per client app in the integrations registry (see client-apps.ts). */
+export type ConnKey = string;
 
 export interface FieldDef {
   key: string;
@@ -37,7 +41,7 @@ const META_APPS = { href: "https://developers.facebook.com/apps/", label: "Meta 
 const BUSINESS_SETTINGS = { href: "https://business.facebook.com/settings/", label: "Meta Business settings" };
 const SYSTEM_USERS = { href: "https://business.facebook.com/settings/system-users", label: "Business settings: System users" };
 
-export const CATALOG: readonly ConnDef[] = [
+const BUILT_IN: readonly ConnDef[] = [
   {
     key: "facebook", title: "Facebook Page", group: "social", editable: true,
     summary: "Lets the promotion agent publish approved posts to your Facebook Page and read their likes and comments.",
@@ -337,6 +341,9 @@ export const CATALOG: readonly ConnDef[] = [
     ],
   },
 ] as const;
+
+/** Built-in cards first, then one generated card for each client app (QuickBooks, HubSpot, Outlook...). */
+export const CATALOG: readonly ConnDef[] = [...BUILT_IN, ...clientAppDefs(BUILT_IN.map((d) => d.key))];
 
 export const CONN_KEYS = CATALOG.map((c) => c.key) as ConnKey[];
 export const defOf = (key: string): ConnDef | undefined => CATALOG.find((c) => c.key === key);
