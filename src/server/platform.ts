@@ -41,6 +41,7 @@ import { userIdFor } from "./identity.js";
 import { ExpiringSet, SendLog } from "./expiring.js";
 import { AffiliateService, CouponService } from "../modules/promotions/index.js";
 import { PromoterService } from "../modules/promoter/index.js";
+import { DEFAULT_PAID_MULTIPLIER, PaidServices, type Payer } from "../modules/paid-services/index.js";
 import { GrowthService } from "../modules/growth/index.js";
 import { ResearchService } from "../modules/research/index.js";
 import { MetaGraph, MetaRejected, type MetaConfig } from "../modules/meta/index.js";
@@ -220,12 +221,19 @@ export function createPlatform(cfg: PlatformConfig) {
     if (!live.graph) throw new MetaRejected("Facebook and Instagram are not connected yet: connect them on the Connections page");
     return live.graph;
   };
+  /** Services that cost money each time (video rendering). One owner setting multiplies their energy; see docs/PAID-SERVICES.md. */
+  const paid = new PaidServices({
+    meter: energy, multiplier: () => prices.general().paidServiceMultiplier ?? DEFAULT_PAID_MULTIPLIER, keys: () => connections.videoKeys(), http: cfg.http ?? fetch, now,
+    onUse: (u) => { if (u.payer.kind === "client") audit.record({ workspaceId: u.payer.workspaceId, actor: `employee:${u.payer.employeeId}`, action: "paid_service.used", data: { service: u.service, energy: u.energy, simulated: u.simulated } }); },
+  });
+  const OWNER_PROMOTER: Payer = { kind: "owner", agent: "promotion-agent" };
   const promoter = new PromoterService((userId) => ownerIdSet.has(userId), {
     now, completer: gateway, send: (mail) => email.send(mail),
     meta: { status: () => live.graph?.status() ?? { facebook: false, instagram: false }, publish: (i) => graphNow().publish(i), stats: (t, id, at) => graphNow().stats(t, id, at) },
     unsubscribeUrl: (token) => `${base}/unsubscribe.html#t=${encodeURIComponent(token)}`,
     sender: { name: COMPANY.name, address: COMPANY.registeredOffice },
     notifyOwner: () => { decisionDigest.poke(); void live.wa?.notifyWaiting(); },
+    video: { quote: (service) => paid.quote(service), render: (service, input, confirm) => paid.render(OWNER_PROMOTER, service, input, confirm), status: (useId) => paid.status(OWNER_PROMOTER, useId) },
   });
   /**
    * Clients' own Facebook Pages, Instagram accounts and WhatsApp numbers, connected through the Meta app MAIZ applied for as a
@@ -599,6 +607,6 @@ export function createPlatform(cfg: PlatformConfig) {
     slack: { enumerable: true, get: () => cfg.slack ?? connections.slackApp() },
     loginApps: { enumerable: true, get: (): LoginApps => ({ ...connections.loginApps(), ...cfg.loginApps }) },
   });
-  return { conversations, notices, warm, ownerDecisions, decisionDigest, dashboard, reconciliation, rota, people, payments, batch, email, usedLinks, sends, loginFails, resets, credentials, formHits, codeFails, coupons, affiliates, promoter, growth, research, connections, growthTick, metaClients, metaSettings, get ownerWhatsApp() { return live.wa; }, admin, reviews, prices, specialists, ai, clients, isPlatformOwner, healthy, hasStore, cfg: liveCfg, now, audit, bus, identity, energy, workforce, ledger, onboarding, router, integrations, slackTokens, saveSlackToken, attachStore };
+  return { conversations, notices, warm, ownerDecisions, decisionDigest, dashboard, reconciliation, rota, people, payments, batch, email, usedLinks, sends, loginFails, resets, credentials, formHits, codeFails, coupons, affiliates, promoter, paid, growth, research, connections, growthTick, metaClients, metaSettings, get ownerWhatsApp() { return live.wa; }, admin, reviews, prices, specialists, ai, clients, isPlatformOwner, healthy, hasStore, cfg: liveCfg, now, audit, bus, identity, energy, workforce, ledger, onboarding, router, integrations, slackTokens, saveSlackToken, attachStore };
 }
 export type Platform = ReturnType<typeof createPlatform>;

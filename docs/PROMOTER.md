@@ -17,6 +17,10 @@ Not visible from outside, so the owner must supply them: Search Console and Bing
 - **Outreach**: a list of named people, each with a lawful basis and a source. Follow-up sequence of at most two, at least five days apart, stopping on a reply or an opt-out.
 - **Tracking**: the owner records spend (never beyond the approved budget) and results (visits, sign-ups, replies) per campaign; the report shows totals and cost per result.
 
+## Video from templates
+
+On an approved draft the owner can ask for a video made from a template at Creatomate or Shotstack. The energy cost is shown first and must be confirmed; paid services use double energy by default (one setting on the Prices page). With no key saved it is a practice render that costs nothing. The other services Atif listed (Canva, Adobe Express, VEED, Kapwing, InVideo, Envato, Motion Array) are listed on the Connections page as used by hand for now. See `docs/PAID-SERVICES.md`.
+
 ## The sign-off gate
 
 Everything outward-facing waits for the owner. New drafts and campaign plans appear on the owner **Decisions** page (kind "Promotion") and count in the same email digest as quality reviews. A draft goes `awaiting_approval` to `approved` only when the owner presses Approve; editing sends it back. The agent never publishes or spends on its own: the owner publishes posts, articles and ads (or presses "Publish for me" for Facebook and Instagram once connected) and marks them posted. Only emails are sent from the platform, one at a time, by the owner pressing "Send email now" on an approved draft. The agent cannot approve its own work.

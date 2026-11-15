@@ -74,7 +74,29 @@ function draftCard(d: Draft): string {
     <p class="muted small">${to}${esc(d.writtenBy === "template" ? "Template (no AI model answered)" : `Written by ${d.writtenBy}`)}${d.step ? ` · follow-up ${d.step}` : ""}</p>
     ${d.subject !== undefined ? `<div class="field"><label for="${esc(d.id)}-s">Subject</label><input class="input" id="${esc(d.id)}-s" value="${esc(d.subject)}" maxlength="140"></div>` : ""}
     <div class="field"><label for="${esc(d.id)}-b">Draft</label><textarea class="input" id="${esc(d.id)}-b" rows="7" maxlength="6000">${esc(d.body)}</textarea></div>
-    ${flags}<div class="acts">${buttons}</div><pre class="mono small" id="${esc(d.id)}-pv" hidden style="white-space:pre-wrap"></pre></article>`;
+    ${flags}<div class="acts">${buttons}</div>${videoBox(d)}<pre class="mono small" id="${esc(d.id)}-pv" hidden style="white-space:pre-wrap"></pre></article>`;
+}
+
+/** Energy figures the owner has been shown for a draft's video, waiting for the confirming press. */
+const videoQuotes = new Map<string, number>();
+
+/** An approved post can be made into a video from a template. The cost is shown first; the second press confirms it. */
+function videoBox(d: Draft): string {
+  if (d.status !== "approved" || d.channel === "email") return "";
+  const v = d.video;
+  const state = !v ? "" : v.simulated
+    ? `<p class="small" role="status"><b>Practice video made.</b> No service is connected, so nothing was rendered and no energy was used. <a href="/owner-connections.html#c-creatomate">Connect Creatomate or Shotstack</a> to make real ones.</p>`
+    : v.status === "done" && v.url && /^https:\/\//.test(v.url)
+      ? `<p class="small" role="status"><b>Video ready.</b> <a href="${esc(v.url)}" target="_blank" rel="noopener noreferrer">Open the video<span class="sr-only"> (opens in a new tab)</span></a> · used <span class="tnum">${v.energy}</span> energy</p>`
+      : `<p class="small" role="status"><b>Video is being made.</b> Used <span class="tnum">${v.energy}</span> energy. <button type="button" class="btn btn-quiet btn-sm" data-act="video-status" data-id="${esc(d.id)}">Check if it is ready</button></p>`;
+  return `<details class="pm-video"><summary class="small">Make a video from this draft (paid service)</summary>
+    <div class="acts">
+      <select class="input" data-vservice="${esc(d.id)}" aria-label="Video service for ${esc(d.title)}"><option value="creatomate">Creatomate</option><option value="shotstack">Shotstack</option></select>
+      <input class="input" data-vtemplate="${esc(d.id)}" placeholder="Template id from the service" aria-label="Template id for ${esc(d.title)}" maxlength="64" style="min-width:220px">
+      <input class="input" data-vslot="${esc(d.id)}" placeholder="Text slot name (default: Text)" aria-label="Name of the template's text slot for ${esc(d.title)}" maxlength="64">
+      <button type="button" class="btn btn-ghost btn-sm" data-act="video" data-id="${esc(d.id)}">${videoQuotes.has(d.id) ? "Confirm and make the video" : "See what it costs"}</button>
+    </div>
+    <p class="small" id="${esc(d.id)}-vq" role="status">${videoQuotes.has(d.id) ? "" : "Paid services use more energy than ordinary work. You see the cost before anything is made."}</p></details>${state}`;
 }
 
 function renderDrafts(): void {
@@ -158,6 +180,27 @@ $("dr-list").addEventListener("click", async (e) => {
     const ok = await act(`/drafts/${id}/publish`, { target: val_(`[data-target="${id}"]`), imageUrl: val_(`[data-image="${id}"]`), scheduleAt: when ? new Date(when).toISOString() : undefined }, null);
     if (ok) toast(when ? "Scheduled." : "Published."); else b.disabled = false;
   }
+  else if (act_ === "video") {
+    if (!live) { toast("This is example data. Log in as the platform owner to use it."); return; }
+    b.disabled = true;
+    const r = await api<Overview & { error?: string; quote?: { energy: number; charge: number } }>(`/owner/promoter/drafts/${id}/video`, { body: { service: val_(`[data-vservice="${id}"]`), templateId: val_(`[data-vtemplate="${id}"]`), textSlot: val_(`[data-vslot="${id}"]`) || undefined, confirmEnergy: videoQuotes.get(id) } });
+    b.disabled = false;
+    const note = $(`${id}-vq`);
+    if (r.status === 409 && r.data?.quote) {
+      // The server refused because the cost has not been confirmed: show it and let the next press confirm.
+      videoQuotes.set(id, r.data.quote.charge);
+      note.textContent = r.data.error ?? `This uses ${r.data.quote.energy} energy.`;
+      b.textContent = "Confirm and make the video";
+    } else if (!r.ok) {
+      note.textContent = r.data?.error ?? "That did not work. Nothing was made and no energy was used.";
+    } else {
+      videoQuotes.delete(id);
+      data = { ...data, ...(r.data as Overview) };
+      render();
+      toast("Video requested.");
+    }
+  }
+  else if (act_ === "video-status") { if (await act(`/drafts/${id}/video-status`, {}, null)) toast("Checked."); }
   else if (act_ === "stats") { if (await act(`/drafts/${id}/stats`, {}, null)) toast("Numbers updated."); }
   else if (act_ === "posted") { if (await act(`/drafts/${id}/posted`, { url: val_(`[data-url="${id}"]`) }, null)) toast("Marked as posted."); }
   else if (act_ === "preview") {

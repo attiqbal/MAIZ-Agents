@@ -57,8 +57,29 @@ export interface DraftItem {
   scheduledFor?: string;
   stats?: PostStats;
   error?: string;
+  /** A video made from this draft by a paid template service, after the owner saw the energy cost and confirmed. */
+  video?: DraftVideo;
   /** How it was written: the model that drafted it, or "template" when no model was available. */
   writtenBy: string;
+}
+
+export interface DraftVideo {
+  service: string;
+  /** Our id for the paid request, used to ask whether the render has finished. */
+  useId: string;
+  status: "done" | "pending";
+  url?: string;
+  /** A practice render: no service was called and nothing was spent. */
+  simulated: boolean;
+  energy: number;
+  at: string;
+}
+
+/** What the promotion agent needs from the paid-services desk. Kept as a small shape so this module does not know about energy. */
+export interface VideoDesk {
+  quote(service: string): { service: string; baseEnergy: number; multiplier: number; energy: number; simulated: boolean; charge: number };
+  render(service: string, input: { templateId: unknown; fields: Record<string, unknown> }, confirmEnergy: unknown): Promise<{ id: string; energy: number; simulated: boolean; render: { status: "done" | "pending"; url?: string } }>;
+  status(useId: string): Promise<{ render: { status: "done" | "pending"; url?: string } }>;
 }
 
 export interface Lead {
@@ -87,11 +108,15 @@ export interface PromoterOptions {
   sender: Sender;
   /** Facebook and Instagram, when connected. Only ever called for a draft the owner approved. */
   meta?: { status(): { facebook: boolean; instagram: boolean }; publish(i: PublishInput): Promise<Published>; stats(t: MetaTarget, id: string, now: Date): Promise<PostStats> };
+  /** Paid video template services (Creatomate, Shotstack). Only ever called for a draft the owner approved, with the cost confirmed. */
+  video?: VideoDesk;
   /** Called whenever something new waits for the owner. */
   notifyOwner?: () => void;
 }
 
 const MAX_TEXT = 6000;
+/** Most of a draft that goes into a video template's text slot. */
+const VIDEO_TEXT_MAX = 500;
 const MAX_ITEMS = 2000;
 const MAX_LEADS = 5000;
 const KIND_FOR_CHANNEL: Record<Channel, ItemKind> = { email: "email", social: "post", content: "article", seo: "seo_fix", partnership: "partner_pitch", affiliate: "affiliate_invite", community: "post", paid_ads: "ad" };
@@ -428,6 +453,44 @@ export class PromoterService {
       this.saveItem({ ...i, status: "failed", target, error: msg });
       throw new PromoterError(msg);
     }
+  }
+
+  /** What a video would cost right now, shown before the owner confirms. */
+  videoQuote(userId: string, service: unknown): ReturnType<VideoDesk["quote"]> {
+    this.require(userId);
+    if (!this.opts.video) throw new PromoterError("video services are not set up on this server");
+    return this.opts.video.quote(String(service ?? ""));
+  }
+
+  /**
+   * Makes a video from one approved draft by filling a template at a paid service. The same gate as publishing: only a
+   * draft the owner approved. The energy cost must be sent back as `confirmEnergy`, so it has been seen first; without it
+   * the desk refuses and says the figure. The draft's words go into the template's text slot; nothing is published.
+   */
+  async renderVideo(userId: string, id: string, raw: unknown): Promise<DraftItem> {
+    this.require(userId);
+    const desk = this.opts.video;
+    if (!desk) throw new PromoterError("video services are not set up on this server");
+    const i = this.item(id);
+    if (i.status !== "approved") throw new PromoterError("only drafts you approved can be made into a video");
+    if (i.video?.status === "pending") throw new PromoterError("a video for this draft is still being made. Check it first");
+    const r = (raw ?? {}) as Record<string, unknown>;
+    const extra = r.fields && typeof r.fields === "object" && !Array.isArray(r.fields) ? (r.fields as Record<string, unknown>) : {};
+    const textSlot = typeof r.textSlot === "string" && r.textSlot.trim() ? r.textSlot.trim() : "Text";
+    // The owner's approved words, re-read now, fill the template's main text slot unless they gave that slot themselves.
+    const fields = { [textSlot]: i.body.slice(0, VIDEO_TEXT_MAX), ...extra };
+    const use = await desk.render(String(r.service ?? ""), { templateId: r.templateId, fields }, r.confirmEnergy);
+    return this.saveItem({ ...this.item(id), video: { service: String(r.service), useId: use.id, status: use.render.status, url: use.render.url, simulated: use.simulated, energy: use.energy, at: this.now().toISOString() } });
+  }
+
+  /** Asks the service whether the draft's video has finished. Reading is free. */
+  async refreshVideo(userId: string, id: string): Promise<DraftItem> {
+    this.require(userId);
+    const i = this.item(id);
+    if (!i.video || !this.opts.video) throw new PromoterError("this draft has no video yet");
+    if (i.video.status === "done") return i;
+    const use = await this.opts.video.status(i.video.useId);
+    return this.saveItem({ ...this.item(id), video: { ...i.video, status: use.render.status, url: use.render.url } });
   }
 
   /** Reads likes, comments and shares for a post published through Meta. */

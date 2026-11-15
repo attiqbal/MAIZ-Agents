@@ -3,6 +3,7 @@
  * Connections page. Screens at Meta change often, so each step says what to look for, not just where to click.
  */
 import { clientAppDefs } from "./client-apps.js";
+import { paidAppDefs } from "./paid-apps.js";
 
 export type BuiltInKey = "facebook" | "instagram" | "whatsapp" | "resend" | "google" | "microsoft" | "slack" | "xero" | "square" | "google-data" | "reddit" | "youtube" | "x" | "fred" | "alphavantage" | "companieshouse" | "stripe" | "runpod" | "anthropic";
 /** The built-in cards, plus one generated card per client app in the integrations registry (see client-apps.ts). */
@@ -342,8 +343,9 @@ const BUILT_IN: readonly ConnDef[] = [
   },
 ] as const;
 
-/** Built-in cards first, then one generated card for each client app (QuickBooks, HubSpot, Outlook...). */
-export const CATALOG: readonly ConnDef[] = [...BUILT_IN, ...clientAppDefs(BUILT_IN.map((d) => d.key))];
+const PAID = paidAppDefs();
+/** Built-in cards, then the paid video services, then one generated card for each client app. */
+export const CATALOG: readonly ConnDef[] = [...BUILT_IN, ...PAID, ...clientAppDefs([...BUILT_IN, ...PAID].map((d) => d.key))];
 
 export const CONN_KEYS = CATALOG.map((c) => c.key) as ConnKey[];
 export const defOf = (key: string): ConnDef | undefined => CATALOG.find((c) => c.key === key);
