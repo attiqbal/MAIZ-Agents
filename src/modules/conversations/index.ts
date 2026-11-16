@@ -24,11 +24,21 @@ export interface Turn {
   /** Queued turns: the batch job that will fill in the answer, and when it runs. */
   jobId?: string;
   runsAt?: string;
+  /** Employee turns: something the client is asked to confirm before anything runs (a market data search and its energy). */
+  offer?: TurnOffer;
+  /** Employee turns: a page on this site the reply points to, for example the dataset a search made. */
+  link?: TurnLink;
 }
+
+/** A search the Data mining agent has quoted and not started. Kept with the turn, so confirming never trusts the browser. */
+export interface TurnOffer { kind: "mining"; topic: string; sources: string[]; total: number }
+export interface TurnLink { href: string; label: string }
+/** Only pages of this site can be linked from a turn. */
+const onSite = (l: TurnLink | undefined): TurnLink | undefined => (l && /^\/[\w\-./#?=&]*$/.test(l.href) && !l.href.startsWith("//") ? { href: l.href, label: clip(l.label, 80) } : undefined);
 
 export interface Conversation { workspaceId: string; employeeId: string; turns: Turn[]; updatedAt: string }
 
-export interface Reply { text: string; status: TurnStatus; checked?: boolean; jobId?: string; runsAt?: string }
+export interface Reply { text: string; status: TurnStatus; checked?: boolean; jobId?: string; runsAt?: string; offer?: TurnOffer; link?: TurnLink }
 
 const clip = (t: string, n: number): string => (t.length > n ? `${t.slice(0, n - 1)}…` : t);
 
@@ -78,6 +88,7 @@ export class ConversationService {
     const employee: Turn = {
       id: newId("turn"), role: "employee", text: clip(reply.text, MAX_STORED_CHARS), at, status: reply.status,
       ...(reply.checked ? { checked: true } : {}), ...(reply.jobId ? { jobId: reply.jobId } : {}), ...(reply.runsAt ? { runsAt: reply.runsAt } : {}),
+      ...(reply.offer ? { offer: { ...reply.offer, sources: [...reply.offer.sources] } } : {}), ...(onSite(reply.link) ? { link: onSite(reply.link) } : {}),
     };
     const before = this.mine(workspaceId, employeeId)?.turns ?? [];
     this.save({ workspaceId, employeeId, turns: [...before, you, employee].slice(-MAX_TURNS), updatedAt: at });

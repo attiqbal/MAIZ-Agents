@@ -1,4 +1,5 @@
 import { DatasetNotFound, MiningError, viewOf } from "../modules/data-mining/index.js";
+import { miningChatRoute } from "./mining-chat.js";
 import type { Platform } from "./platform.js";
 import type { Req, Res } from "./app.js";
 
@@ -26,6 +27,8 @@ export async function miningRoute(req: Req, userId: string, p: Platform, workspa
       throw e;
     }
   }
+  // A search offered in a conversation: "Confirm and start" and "Not now".
+  if (path.startsWith("/api/mining/chat/")) return miningChatRoute(req, userId, p, workspaceId);
   const one = DATASET.exec(path);
   if (!one) return json(404, { error: "not found" });
   const [, id, action] = one;
