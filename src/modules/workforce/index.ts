@@ -26,6 +26,18 @@ export interface Employee {
   name: string;
 }
 
+/** The six employees every client has: the core team and the Admin manager. They can never be taken off a team. */
+export const CORE_TEMPLATE_KEYS: ReadonlySet<string> = new Set(["finance-manager", "marketing-manager", "business-consultant", "hr-manager", "compliance-manager", "admin-manager"]);
+
+export class WorkforceError extends Error {}
+
+/** Stored when an add-on employee leaves a team (its monthly order ended). The employee's work is kept. */
+export interface EmployeeRemoval {
+  employeeId: string;
+  name: string;
+  at: string;
+}
+
 export type TaskStatus = "ready_for_review" | "failed" | "no_energy" | "queued";
 
 export interface TaskResult {
@@ -240,6 +252,41 @@ export class WorkforceService {
     });
     await this.bus.publish({ type: "employee.hired", workspaceId, payload: { employeeId: employee.id }, at: new Date() });
     return employee;
+  }
+
+  /** Employees who have left a team, by id. Kept so the work they did still carries their name. */
+  private former = new Map<string, EmployeeRemoval>();
+
+  /**
+   * Takes an add-on employee off a team: the exact opposite of `hire`. The team, its headcount and the weekly energy
+   * the employee brought all follow, because they are worked out from who is on the team. Tasks, conversations and
+   * energy records stay as they are. Returns false, and changes nothing, when the employee is not on this team (already
+   * removed, another client's, or never existed), so calling it twice is safe. Platform-level, no user check: it is
+   * called when a monthly order has ended, never by a client directly.
+   */
+  remove(workspaceId: string, employeeId: string, by: string): boolean {
+    const employee = this.employees.get(employeeId);
+    if (!employee || employee.workspaceId !== workspaceId) return false;
+    if (CORE_TEMPLATE_KEYS.has(employee.templateKey)) throw new WorkforceError("the core team cannot be removed");
+    const removal: EmployeeRemoval = { employeeId, name: employee.name, at: new Date().toISOString() };
+    this.employees.delete(employeeId);
+    this.former.set(employeeId, removal);
+    this.sink?.record(workspaceId, "employee_removed", employeeId, removal);
+    this.audit.record({ workspaceId, actor: by, action: "employee.removed", target: employeeId, data: { template: employee.templateKey } });
+    void this.bus.publish({ type: "employee.removed", workspaceId, payload: { employeeId }, at: new Date() }).catch(() => undefined);
+    return true;
+  }
+
+  /** At start-up, after the employees are loaded: an employee who had left stays off the team. */
+  restoreRemoved(r: EmployeeRemoval): void {
+    const employee = this.employees.get(r.employeeId);
+    this.employees.delete(r.employeeId);
+    this.former.set(r.employeeId, { ...r, name: r.name ?? employee?.name });
+  }
+
+  /** The name of an employee who has left a team, for labelling the work they did. Platform-level, no user check. */
+  formerName(employeeId: string): string | undefined {
+    return this.former.get(employeeId)?.name;
   }
 
   /** Platform-level (no user check): how many employees a client has. */
