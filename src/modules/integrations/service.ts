@@ -126,6 +126,19 @@ export class IntegrationService {
     return [...this.records.values()].filter((r) => r.workspaceId === workspaceId && r.status === "pending").sort((a, b) => a.date.localeCompare(b.date));
   }
 
+  /**
+   * Connections whose sign-in has a real end date: the app gave one and cannot renew it by itself, so the owner
+   * must connect again. Only the date leaves here, never the sign-in details.
+   */
+  signInExpiries(userId: string, workspaceId: string): { connectionId: string; app: string; expiresAt: string }[] {
+    return this.list(userId, workspaceId).flatMap((c) => {
+      const creds = this.secrets.get(c.id);
+      const connector = this.registry.get(c.connectorKey);
+      if (!connector || connector.refresh || creds?.kind !== "oauth2" || !creds.expiresAt || Number.isNaN(Date.parse(creds.expiresAt))) return [];
+      return [{ connectionId: c.id, app: connector.name, expiresAt: creds.expiresAt }];
+    });
+  }
+
   // ---------- connecting ----------
 
   /** Where to send the owner to approve an OAuth app. `state` is signed by the caller and comes back to the callback. */

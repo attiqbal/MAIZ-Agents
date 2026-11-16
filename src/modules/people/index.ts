@@ -10,6 +10,7 @@ import {
   type ContractType, type DeskSettings, type DocStatus, type HrSummary, type LeaveKind,
   type PensionStatus, type ReviewKind, type RtwRoute, type StaffDetail, type StaffMember,
 } from "./rules.js";
+import { leaveWaiting, staffDates, type LeaveWaiting, type StaffDated } from "./dated.js";
 import { FORM_LINK_DAYS, PeopleError, SECTOR_QUESTIONS, availabilityLines, mergeProfile, readProfile, type DayAvailability, type SectorQuestion, type StaffProfile } from "./profile.js";
 
 export * from "./rules.js";
@@ -258,6 +259,17 @@ export class PeopleService {
     const today = this.today();
     const summary = hrSummary(staff, settings.sector, today);
     return { settings, summary: { ...summary, actions: summary.actions.slice(0, MAX_ACTIONS_LISTED), actionsTotal: summary.actions.length }, offToday: offOn(staff, today) };
+  }
+
+  /**
+   * For the client's calendar and approvals list: every dated item in the staff records and the leave still
+   * waiting for an answer. Names, dates and what the date is for; no other personal detail.
+   */
+  dated(userId: string, ws: string): { dates: StaffDated[]; leave: LeaveWaiting[] } {
+    const { sector } = this.settings(userId, ws);
+    const staff = this.inWorkspace(ws);
+    const today = this.today();
+    return { dates: staff.flatMap((m) => staffDates(m, sector, today)), leave: leaveWaiting(staff, today) };
   }
 
   /** One person's full record. Opening it is audited, since it holds personal data. */

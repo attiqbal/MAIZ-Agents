@@ -140,6 +140,11 @@ server.listen(port, () => console.log(`listening on :${port}`));
 const BATCH_TICK_MS = 60_000;
 const batchTimer = setInterval(() => { void platform.decisionDigest.tick(); void platform.agents.tick().catch((e) => console.error("agents tick failed:", e instanceof Error ? e.message : e)); void platform.batch.tick(); void platform.reconciliation.tick(); void platform.metaClients.maintenance().catch((e) => console.error("meta maintenance failed:", e instanceof Error ? e.message : e)); void platform.growthTick().catch((e) => console.error("growth tick failed:", e instanceof Error ? e.name : "error")); }, BATCH_TICK_MS);
 batchTimer.unref();
+// Once a minute: reminders for the dates clients put on their own Compliance calendar (each goes once, in their daytime).
+const calendarTimer = setInterval(() => {
+  try { platform.overview.dates.tick(); } catch (e) { console.error("calendar reminders failed:", e instanceof Error ? e.message : "error"); }
+}, BATCH_TICK_MS);
+calendarTimer.unref();
 
 // Hosts send SIGTERM before replacing the instance: stop taking requests and write pending changes to Postgres.
 let stopping = false;

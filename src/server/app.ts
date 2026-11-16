@@ -42,6 +42,7 @@ import { miningRoute } from "./mining-routes.js";
 import { MiningError } from "../modules/data-mining/index.js";
 import { PushError } from "../modules/push/index.js";
 import { agentOwnerRoute, agentPublicRoute } from "./agent-routes.js";
+import { overviewRoute } from "./overview-routes.js";
 import { AgentError } from "../modules/agents/index.js";
 import { LOGIN_PROVIDERS, attemptSecrets, authorizeUrl, completeLogin, isLoginProvider, loginRedirectUri } from "./social-login.js";
 
@@ -543,6 +544,8 @@ export function createApp(p: Platform) {
     if (!org) return json(404, { error: "no organisation yet" });
     // Outside agents, the owner's side: connections, keys, limits and jobs waiting for approval (docs/EXTERNAL-AGENTS.md).
     { const r = await agentOwnerRoute(req, userId, p, org.id, body); if (r) return r; }
+    // The client's Approvals, Books and cash and Compliance calendar screens, from real records (docs/OVERVIEW-DATA.md).
+    { const r = overviewRoute(req, userId, p, org.id, body); if (r) return r; }
 
     // ---- coupons on the account page ----
     if (method === "GET" && path === "/api/coupons") return json(200, { used: p.coupons.forClient(org.id).map((r) => ({ code: r.code, at: r.at, applied: r.applied })) });
