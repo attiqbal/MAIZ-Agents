@@ -138,6 +138,35 @@ describe("push subscriptions", () => {
     expect(push.count("u_ann")).toBe(MAX_SUBSCRIPTIONS_PER_USER);
   });
 
+  it("moves a shared browser to whoever logged in on it last, so the last person's alerts stop arriving there", async () => {
+    const { push, sent } = service();
+    const shared = browser().sub();
+    push.subscribe("u_ann", "ws_ann", shared);
+    push.subscribe("u_ben", "ws_ben", shared);
+
+    const toAnn = await push.sendToWorkspace("ws_ann", { title: "Ann's work is ready" });
+    const toBen = await push.sendToWorkspace("ws_ben", { title: "Ben's work is ready" });
+
+    expect(push.count("u_ann")).toBe(0);
+    expect(toAnn).toBe(0);
+    expect(toBen).toBe(1);
+    expect(sent).toHaveLength(1);
+  });
+
+  it("does not tell someone who has left the team", async () => {
+    const sent: string[] = [];
+    const http = (async (url: string) => { sent.push(url); return new Response(null, { status: 201 }); }) as unknown as typeof fetch;
+    const onTeam = new Set(["u_ann"]);
+    const push = new PushService({ subject: "https://maiz.test", now: () => new Date("2026-11-16T12:00:00Z"), http, member: (userId) => onTeam.has(userId) });
+    push.subscribe("u_ann", "ws_1", browser().sub());
+    push.subscribe("u_gone", "ws_1", browser().sub());
+
+    const told = await push.sendToWorkspace("ws_1", { title: "Work is ready" });
+
+    expect(told).toBe(1);
+    expect(sent).toHaveLength(1);
+  });
+
   it("lets only the person who subscribed a browser remove it", () => {
     const { push } = service();
     const one = browser().sub();

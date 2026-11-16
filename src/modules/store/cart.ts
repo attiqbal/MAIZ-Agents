@@ -1,7 +1,7 @@
 /**
- * The agent store's catalogue and cart. Everything a business can add on top
- * of its package, with how it is billed:
- *  - "monthly": ready-made add-on employees and custom specialists (recurring)
+ * The agent store's catalogue and cart. The Team package itself, and everything a business can add on top
+ * of it, with how it is billed:
+ *  - "monthly": the Team package, ready-made add-on employees and custom specialists (recurring)
  *  - "once": consultant passes (7 or 30 days with an energy pool, paid once)
  *
  * Pure: no payments happen here. These are the launch defaults; the platform owner changes prices,
@@ -14,7 +14,12 @@ import { CONSULTANTS } from "../workforce/consultants.js";
 import { STANDARD_TEAM } from "../onboarding/index.js";
 
 export type Billing = "monthly" | "once";
-export type ItemKind = "employee" | "specialist" | "consultant";
+export type ItemKind = "package" | "employee" | "specialist" | "consultant";
+
+/** The plan every client is on after the free trial: the whole core team and the weekly energy. Bought once, never twice. */
+export const TEAM_PACKAGE_KEY = "team-package";
+/** Launch price of the Team package; the platform owner changes it on the Prices page ("Basic package, per month"). */
+export const TEAM_PACKAGE_MONTHLY_GBP = 150;
 
 /**
  * How each kind of item is paid for, in the words shown next to the price and in the cart.
@@ -34,6 +39,7 @@ export const BILLING_INFO: Record<Billing, { label: string; short: string; note:
 };
 
 export const KIND_LABEL: Record<ItemKind, string> = {
+  package: "Your plan",
   employee: "Ready-made employee",
   specialist: "Custom specialist",
   consultant: "Consultant pass",
@@ -64,6 +70,10 @@ export const MAX_QTY = 10;
 const IN_PACKAGE: ReadonlySet<string> = new Set(STANDARD_TEAM);
 
 export const CATALOGUE: readonly CatalogueItem[] = [
+  {
+    key: TEAM_PACKAGE_KEY, title: "Team package", kind: "package", billing: "monthly", priceGbp: TEAM_PACKAGE_MONTHLY_GBP, group: "Your plan",
+    summary: "Your whole team after the free trial: Finance, Marketing, Business consultant, HR, Compliance and the Admin manager, sharing one weekly energy allowance that refills every Monday.",
+  },
   ...EMPLOYEE_TEMPLATES.filter((t) => !IN_PACKAGE.has(t.key)).map((t) => ({
     key: t.key, title: t.title, kind: "employee" as const, billing: "monthly" as const,
     priceGbp: MONTHLY_PRICE_GBP.employee, group: "Ready-made employees", summary: t.summary,
@@ -130,7 +140,8 @@ export function quote(lines: readonly unknown[], catalogue: readonly CatalogueIt
     const n = l?.qty ?? 1;
     if (!getItem(key)) { rejected.push({ key, reason: "not in the store" }); continue; }
     if (!Number.isInteger(n) || n < 1) { rejected.push({ key, reason: "quantity must be a whole number of 1 or more" }); continue; }
-    qty.set(key, Math.min(MAX_QTY, (qty.get(key) ?? 0) + n));
+    // One business has one Team package, however many times it was added.
+    qty.set(key, key === TEAM_PACKAGE_KEY ? 1 : Math.min(MAX_QTY, (qty.get(key) ?? 0) + n));
   }
   const priced: PricedLine[] = [...qty].map(([key, n]) => {
     const item = getItem(key)!;
@@ -140,4 +151,23 @@ export function quote(lines: readonly unknown[], catalogue: readonly CatalogueIt
   const monthlyGbp = sum("monthly");
   const onceGbp = sum("once");
   return { lines: priced, monthlyGbp, onceGbp, dueTodayGbp: monthlyGbp + onceGbp, rejected };
+}
+
+/**
+ * Makes a cart fit where the client is with their plan, then prices it:
+ *  - still on the free trial: a first monthly order starts the paid plan, so the Team package is added to it
+ *    (a consultant pass alone needs no plan);
+ *  - already on the Team package: it cannot be bought a second time.
+ */
+export function quoteForPlan(lines: readonly unknown[], hasTeamPackage: boolean, catalogue: readonly CatalogueItem[] = CATALOGUE): Quote {
+  const plain = quote(lines, catalogue);
+  const asked = plain.lines.some((l) => l.key === TEAM_PACKAGE_KEY);
+  if (hasTeamPackage) {
+    if (!asked) return plain;
+    const rest = quote(plain.lines.filter((l) => l.key !== TEAM_PACKAGE_KEY), catalogue);
+    return { ...rest, rejected: [...plain.rejected, { key: TEAM_PACKAGE_KEY, reason: "you already have the Team package" }] };
+  }
+  if (asked || plain.monthlyGbp === 0 || !catalogue.some((i) => i.key === TEAM_PACKAGE_KEY)) return plain;
+  const withPlan = quote([{ key: TEAM_PACKAGE_KEY, qty: 1 }, ...plain.lines], catalogue);
+  return { ...withPlan, rejected: plain.rejected };
 }

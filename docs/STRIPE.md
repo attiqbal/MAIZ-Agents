@@ -11,6 +11,17 @@ Payments are behind one flag. `PAYMENTS_PROVIDER` empty = checkout refused, noth
 - **Promotions**: buyers can type a Stripe promotion code at checkout. The provider also accepts an agreed discount (`CheckoutRequest.discount`) and makes a one-use Stripe coupon; wire the promotions module (PR #45, `applyDiscount`) to it once that merges.
 - Terminal (card readers) is not used: this is an online service.
 
+## The Team package and plan changes (added 2026-11-16)
+
+- The **Team package** (`team-package` in the store catalogue, priced by "Basic package, per month" on the owner's Prices page, £150 at launch) is what a client buys to keep their team after the free trial. Before this it could not be bought at all: the only way to become a paying client was to add a £25 or £35 extra, which then started the whole paid plan.
+- A client still on the trial who buys any monthly item gets the Team package added to that first order (`quoteForPlan`), shown in the cart and on Stripe's page before they pay. A consultant pass on its own needs no plan. A client already on a paid plan cannot buy the package twice; clients who went paid before this change keep their plan as it is.
+- Cancelling the Team package order (from the client's billing page, or when Stripe ends the subscription) ends the plan: the team works to the end of the month paid for when the client cancelled in MAIZ, or stops at once when Stripe ended the subscription, then pauses exactly like an ended trial. Buying the package again restarts it (`EnergyMeter.endPaidPlan`).
+- Two open checkouts never both hold the Team package: starting a new one closes the older unpaid one, the same way a discount code is released.
+- Extras bought after the package are separate monthly orders. Cancelling the package does not cancel them: the client is told so in the notice and can cancel each one on Stripe's page from Settings, Plan and billing. Stopping them automatically waits for the item below, because today a cancelled extra leaves its employee on the team.
+- Top-up energy a client bought is kept when a cancelled plan is started again.
+- Not built yet: removing an add-on employee when its own monthly order is cancelled. The order is marked cancelled and Stripe stops charging, but the employee stays on the team until this is added.
+- Discount codes come off the first monthly order (docs/PROMOTIONS.md).
+
 ## Settings (server secrets, never chat or git)
 | Variable | Meaning |
 |---|---|

@@ -15,6 +15,7 @@ const TYPES: Record<string, string> = {
   ".txt": "text/plain; charset=utf-8",
   ".xml": "application/xml",
   ".woff2": "font/woff2",
+  ".webmanifest": "application/manifest+json",
 };
 
 export interface HeaderRule { pattern: string; headers: Record<string, string> }

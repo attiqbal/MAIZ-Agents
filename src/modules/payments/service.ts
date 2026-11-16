@@ -44,8 +44,8 @@ export interface OrderDiscount {
 
 export interface PaymentDeps {
   provider?: PaymentProvider;
-  /** Prices a cart from the live price book. The client never supplies a price. */
-  quote: (lines: readonly unknown[]) => Quote;
+  /** Prices a cart from the live price book, for this client's plan. The client never supplies a price. */
+  quote: (lines: readonly unknown[], workspaceId: string) => Quote;
   /** Hires what an order bought. Throws if it cannot. */
   fulfil: (order: Order) => Promise<string[]>;
   /** Public address for return links. */
@@ -58,6 +58,13 @@ export interface PaymentDeps {
   discountFor?: (workspaceId: string, monthlyMinor: number) => OrderDiscount | undefined;
   /** Told when an order that carried a discount is paid, so the same code is never applied twice. */
   discountUsed?: (workspaceId: string, discountId: string, orderId: string) => void;
+  /**
+   * Told when a paid monthly order stops: "client" when they cancelled here (they keep the month they paid for),
+   * "provider" when the payment provider ended the subscription (the paid time is already over).
+   */
+  stopped?: (order: Order, by: "client" | "provider") => void;
+  /** True for an item a client can only hold once (the Team package). An older unpaid checkout holding it is closed when a new one opens. */
+  onceOnly?: (key: string) => boolean;
 }
 
 export const MAX_PENDING_ORDERS = 20;
@@ -88,7 +95,7 @@ export class PaymentService {
     const provider = this.d.provider;
     if (!provider) throw new PaymentError("payments are not switched on yet, so nothing can be bought");
     if (!Array.isArray(rawLines) || rawLines.length === 0 || rawLines.length > 100) throw new PaymentError("your cart is empty");
-    const q = this.d.quote(rawLines);
+    const q = this.d.quote(rawLines, workspaceId);
     if (q.rejected.length) throw new PaymentError(`some items cannot be bought: ${q.rejected.map((r) => `${r.key || "unknown"} (${r.reason})`).join(", ")}`);
     if (!q.lines.length) throw new PaymentError("your cart is empty");
     const pending = [...this.orders.values()].filter((o) => o.workspaceId === workspaceId && o.status === "pending").length;
@@ -99,7 +106,10 @@ export class PaymentService {
     const onceMinor = lines.filter((l) => l.billing === "once").reduce((n, l) => n + l.unitMinor * l.qty, 0);
     const discount = this.d.discountFor?.(workspaceId, monthlyMinor);
     // One code discounts one subscription: an unpaid checkout that was holding it is closed before a new one opens.
-    if (discount) await this.releaseDiscount(workspaceId, discount.id);
+    if (discount) await this.releasePending(workspaceId, (o) => o.discount?.id === discount.id);
+    // The same for a once-only item (the Team package): two open checkouts must never both be paid for it.
+    const onceOnly = new Set(lines.filter((l) => this.d.onceOnly?.(l.key)).map((l) => l.key));
+    if (onceOnly.size) await this.releasePending(workspaceId, (o) => o.lines.some((l) => onceOnly.has(l.key)));
     const order: Order = {
       id: newId("order"), workspaceId, userId, lines, monthlyMinor, dueTodayMinor: monthlyMinor + onceMinor - (discount?.amountOffMinor ?? 0), currency: "GBP",
       status: "pending", provider: provider.name, createdAt: this.d.now().toISOString(), employeeIds: [], ...(discount ? { discount } : {}),
@@ -119,8 +129,8 @@ export class PaymentService {
   }
 
   /** Closes any unpaid checkout of this client that carries the discount, so it cannot be paid alongside a newer one. */
-  private async releaseDiscount(workspaceId: string, discountId: string): Promise<void> {
-    const holding = [...this.orders.values()].filter((o) => o.workspaceId === workspaceId && o.status === "pending" && o.discount?.id === discountId);
+  private async releasePending(workspaceId: string, holds: (o: Order) => boolean): Promise<void> {
+    const holding = [...this.orders.values()].filter((o) => o.workspaceId === workspaceId && o.status === "pending" && holds(o));
     for (const o of holding) {
       if (o.providerRef) await this.d.provider?.cancelSubscription(o.providerRef);
       this.markFailed(o.id, "replaced by a newer checkout");
@@ -143,6 +153,7 @@ export class PaymentService {
     const next = { ...o, status: "cancelled" as const };
     this.save(next);
     this.audit.record({ workspaceId, actor: `user:${userId}`, action: "order.cancelled", target: `order:${o.id}` });
+    if (o.status === "paid") this.d.stopped?.(next, "client");
     return next;
   }
 
@@ -185,8 +196,10 @@ export class PaymentService {
     else if (event.type === "payment.failed") this.markFailed(o.id, "the payment failed");
     else if (event.type === "payment.renewal_failed") await this.renewalFailed(o);
     else if (o.status === "paid") {
-      this.save({ ...this.orders.get(o.id)!, status: "cancelled" });
+      const stopped = { ...this.orders.get(o.id)!, status: "cancelled" as const };
+      this.save(stopped);
       this.audit.record({ workspaceId: o.workspaceId, actor: `payment:${o.provider}`, action: "order.cancelled", target: `order:${o.id}` });
+      this.d.stopped?.(stopped, "provider");
     }
     return "ok";
   }

@@ -31,6 +31,8 @@ export interface PushOptions {
   subject: string;
   now: () => Date;
   http?: typeof fetch;
+  /** Whether a person is still on a client's team. Left out, everyone who subscribed is told. */
+  member?: (userId: string, workspaceId: string) => boolean;
 }
 
 /** The name the sender's key pair is stored under, alongside the owner's other encrypted connection details. */
@@ -112,6 +114,8 @@ export class PushService {
     if (typeof p256dh !== "string" || typeof auth !== "string" || !B64U.test(p256dh) || !B64U.test(auth) || Buffer.from(p256dh, "base64url").length !== 65 || Buffer.from(auth, "base64url").length !== 16) {
       throw new PushError("this browser did not send its notification keys");
     }
+    // One browser belongs to one person at a time: when someone else logs in on it, the last person's alerts stop arriving there.
+    for (const other of [...this.subs.values()]) if (other.endpoint === s.endpoint && other.userId !== userId) this.drop(other);
     const mine = this.of(userId);
     const same = mine.find((x) => x.endpoint === s.endpoint);
     if (!same && mine.length >= MAX_SUBSCRIPTIONS_PER_USER) this.drop(mine.sort((a, b) => a.createdAt.localeCompare(b.createdAt))[0]!);
@@ -136,7 +140,9 @@ export class PushService {
 
   /** Tells every subscribed browser of everyone in a workspace. Never throws: push is a courtesy on top of the bell. */
   async sendToWorkspace(workspaceId: string, m: PushMessage): Promise<number> {
-    return this.sendAll([...this.subs.values()].filter((s) => s.workspaceId === workspaceId), m);
+    // Someone who has left the team since they turned alerts on is not told about its work.
+    const still = this.o.member ?? (() => true);
+    return this.sendAll([...this.subs.values()].filter((s) => s.workspaceId === workspaceId && still(s.userId, workspaceId)), m);
   }
 
   /** Tells one person's browsers (the platform owner's decisions, or a test from Settings). */

@@ -10,7 +10,7 @@ const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as 
 
 interface Client {
   id: string; name: string; ownerEmail: string | null; createdAt: string | null; trialEndsAt: string | null;
-  status: "trial" | "trial_ended" | "active"; setup: string; employees: number;
+  status: "trial" | "trial_ended" | "active" | "cancelled" | "plan_ended"; setup: string; employees: number;
   energyToday: number; energyMonth: number; aiCostUsdMonth: number; openReviews: number; specialistsToReview: number;
 }
 
@@ -25,7 +25,7 @@ const SETUP: Record<string, [string, string]> = {
   ready: ["good", "Set up"], awaiting_form: ["", "Waiting for setup form"], setting_up: ["info", "Setting up"],
   needs_attention: ["warn", "Needs you: setup stuck"], not_started: ["", "Not started"],
 };
-const STATUS: Record<Client["status"], [string, string]> = { trial: ["info", "On trial"], trial_ended: ["warn", "Trial ended"], active: ["good", "Paying"] };
+const STATUS: Record<Client["status"], [string, string]> = { trial: ["info", "On trial"], trial_ended: ["warn", "Trial ended"], active: ["good", "Paying"], cancelled: ["warn", "Cancelled, still paid for"], plan_ended: ["warn", "Plan ended"] };
 const pill = ([tone, text]: [string, string]) => `<span class="status ${tone}"><span class="dot"></span>${esc(text)}</span>`;
 const date = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString("en-GB", { day: "numeric", month: "short" }) : "–");
 const needsYou = (c: Client) => c.setup === "needs_attention" || c.openReviews > 0 || c.specialistsToReview > 0;
@@ -52,7 +52,7 @@ function render(): void {
   const rows = shown.map((c) => `<tr>
       <td class="ow-title"><b>${esc(c.name)}</b><span>${c.ownerEmail ? `<a class="link" href="mailto:${esc(c.ownerEmail)}">${esc(c.ownerEmail)}</a>` : "No email on file"}</span></td>
       <td>${date(c.createdAt)}</td>
-      <td>${pill(STATUS[c.status])}<span class="xs muted" style="display:block">${c.trialEndsAt ? `${c.status === "trial_ended" ? "Ended" : "Ends"} ${date(c.trialEndsAt)}` : ""}</span></td>
+      <td>${pill(STATUS[c.status])}<span class="xs muted" style="display:block">${c.trialEndsAt ? `${c.status === "trial_ended" || c.status === "plan_ended" ? "Ended" : "Ends"} ${date(c.trialEndsAt)}` : ""}</span></td>
       <td>${pill(SETUP[c.setup] ?? ["", c.setup])}</td>
       <td class="num">${c.employees}</td>
       <td class="num">${c.energyToday.toLocaleString("en-GB")}</td>

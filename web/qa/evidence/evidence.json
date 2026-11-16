@@ -474,6 +474,61 @@
       "viewport": "1440x900",
       "artifact": "firstday-1440x900.png",
       "observation": "First day: roster of the team on the left, conversation thread with employee and owner bubbles on the right, reply controls pinned under the thread."
+    },
+    {
+      "viewport": "1440x900",
+      "artifact": "audit-overview-new-client-1440.png",
+      "observation": "2026-11-16 audit, signed in as a brand new client against a local server: the Overview shows the client's own figures (all zero, 0% of the trial's 3,000 energy) and plain 'nothing yet' lines where it used to show an invented cash, revenue and customer row. The trial chip sits top right. The sidebar is 16 entries in three groups and the compact trial box with 'Choose your plan' is fully visible at 900 high. People today says 'No staff records yet' instead of '100% complete' for nobody."
+    },
+    {
+      "viewport": "375x812",
+      "artifact": "audit-overview-new-client-375.png",
+      "observation": "Same Overview at 375: tiles in two columns, team cards in one column, trial chip under the heading, no sideways scroll. The old trial pop-up that covered the tiles is gone."
+    },
+    {
+      "viewport": "1440x900",
+      "artifact": "audit-store-team-package-cart-1440.png",
+      "observation": "Store for a trial client: 'Keep your team after the trial' card at £150 a month on top; adding the Data mining agent puts the Team package in the cart by itself with the line 'Starts your plan', and the totals read £175 every month, due today £175."
+    },
+    {
+      "viewport": "1440x900",
+      "artifact": "audit-settings-billing-1440.png",
+      "observation": "Settings: Account, the new Plan and billing panel (free trial end date in words and 'Choose your plan'), Alerts on this device (this headless browser blocks notifications, so it shows the 'blocked' wording), Energy top-ups and the code box. The stale 'payments open soon' lines are gone."
+    },
+    {
+      "viewport": "1440x900",
+      "artifact": "audit-apps-own-tools-1440.png",
+      "observation": "Apps and connections: four tiles, Chat and social cards, the new 'Your own AI tools' panel in its empty state, then 12 apps with type filters, a search box and 'Show all 281 apps'. The page is about 2,450 pixels tall; before it listed all 281 cards and was about 26,000."
+    },
+    {
+      "viewport": "1440x900",
+      "artifact": "audit-own-tools-waiting-1440.png",
+      "observation": "'Your own AI tools' panel only: a job from a connected tool waits for the owner with 'Let it run' and 'Refuse'; the brief contains a script tag typed as text and it is shown as text. Below it the connection card with its limits, the first letters of its key and Change, Pause, New key and Remove."
+    },
+    {
+      "viewport": "375x812",
+      "artifact": "audit-own-tools-change-375.png",
+      "observation": "'Your own AI tools' at 375 with the Change form open: fields stack in one column, the buttons wrap, nothing is cut off. The search bar across the top of the picture is the page's sticky bar caught by the element screenshot while scrolled, not part of the panel."
+    },
+    {
+      "viewport": "1440x900",
+      "artifact": "audit-market-data-quote-1440.png",
+      "observation": "Market data for a client who hired the Data mining agent: topic box, the three sources that are switched on as tick cards with their energy, a line naming the sources that are not switched on yet, and the energy quote with 'Confirm and start' and 'Not now' before anything runs. 'Market data' is in the sidebar because the agent is hired."
+    },
+    {
+      "viewport": "375x812",
+      "artifact": "audit-market-data-dataset-375.png",
+      "observation": "Market data at 375 after a search: the dataset with its summary, where it looked, who it is shared with and what was found (news links, economy figures). The search result itself is a pretend one because this machine cannot reach the outside sources. The top bar appears in the middle of the picture because the full-page screenshot was taken while scrolled."
+    },
+    {
+      "viewport": "1440x900",
+      "artifact": "audit-energy-spend-1440.png",
+      "observation": "Energy and spend for a new client: four real tiles, an empty seven-day chart, each employee's share of the week (0%), 'No tasks have used energy yet this week' and the real top-up, monthly cap and auto-reload values. The made-up wallet and the invented biggest tasks are gone."
+    },
+    {
+      "viewport": "375x812",
+      "artifact": "audit-signup-reads-website-375.png",
+      "observation": "Signup step 1 at 375 after pressing 'Read my website' (the reading is answered by a pretend page in this run): the panel shows the name, kind of business, what it does, the apps the site uses and its social pages, and the sector tile and business name are filled in."
     }
   ]
 }

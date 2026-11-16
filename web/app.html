@@ -7,6 +7,8 @@
 <meta name="robots" content="noindex">
 <meta name="theme-color" content="#ffffff">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="manifest" href="/manifest.webmanifest">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght,SOFT@0,9..144,400..700,0..100;1,9..144,400..700,0..100&family=Inter:wght@400;500;600&display=swap">
@@ -23,31 +25,24 @@
     <a class="ni" href="#approvals" data-nav="approvals"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>Approvals<span class="count" id="appr-count">3</span></a>
     <a class="ni" href="#work" data-nav="work"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="5" height="16" rx="1.5"/><rect x="10" y="4" width="5" height="10" rx="1.5"/></svg>Tasks</a>
     <a class="ni" href="#chat" data-nav="chat"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h16v11H9l-5 4z"/><path d="M8 9.5h8M8 12.5h5"/></svg>Conversations</a>
-    <div class="group" id="g-team">Departments</div>
+    <div class="group" id="g-team">Your team</div>
     <a class="ni" href="#desk/admin-manager" data-nav="desk/admin-manager" data-dept="admin"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="3.2"/><path d="M5 20c0-3.3 3.1-5.500 7-5.500s7 2.200 7 5.500"/></svg>Admin manager</a>
     <a class="ni" href="#desk/finance-manager" data-nav="desk/finance-manager" data-dept="finance"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19V9M10 19V5M16 19v-7M22 19H2"/></svg>Finance</a>
     <a class="ni" href="#desk/marketing-manager" data-nav="desk/marketing-manager" data-dept="marketing"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="3.2"/><path d="M5 20c0-3.3 3.1-5.500 7-5.500s7 2.200 7 5.500"/></svg>Marketing</a>
     <a class="ni" href="#desk/business-consultant" data-nav="desk/business-consultant" data-dept="consultant"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="3.2"/><path d="M5 20c0-3.3 3.1-5.500 7-5.500s7 2.200 7 5.500"/></svg>Business consultant</a>
     <a class="ni" href="#desk/hr-manager" data-nav="desk/hr-manager" data-dept="hr"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.3 2.7-5.5 6-5.5s6 2.200 6 5.500"/></svg>HR<span class="count" id="hr-count" hidden></span></a>
     <a class="ni" href="#desk/compliance-manager" data-nav="desk/compliance-manager" data-dept="compliance"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="5" width="16" height="15" rx="2.5"/><path d="M4 10h16M8 3v4M16 3v4M9 15l2 2 4-4"/></svg>Compliance</a>
+    <a class="ni" href="#mining" data-nav="mining" id="mining-link" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><ellipse cx="12" cy="6" rx="7" ry="3"/><path d="M5 6v6c0 1.700 3.100 3 7 3s7-1.300 7-3V6M5 12v6c0 1.700 3.100 3 7 3s7-1.300 7-3v-6"/></svg>Market data</a>
     <a class="ni" href="#team" data-nav="team"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.3 2.7-5.5 6-5.5s6 2.200 6 5.500"/></svg>Whole team</a>
-    <div class="group">Services</div>
-    <a class="ni" href="#slack" data-nav="slack"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h16v11H9l-5 4z"/><path d="M8 9.5h8M8 12.5h5"/></svg>Slack and chat<span class="count" id="slack-state">Off</span></a>
-    <a class="ni" href="/connect-social.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="6" cy="12" r="2.5"/><circle cx="18" cy="6" r="2.5"/><circle cx="18" cy="18" r="2.5"/><path d="M8.2 10.8l7.6-3.6M8.2 13.2l7.6 3.6"/></svg>Social accounts</a>
-    <a class="ni" href="#apps/accounting" data-nav="apps/accounting"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19V9M10 19V5M16 19v-7M22 19H2"/></svg>Accounting</a>
-    <a class="ni" href="#apps/till" data-nav="apps/till"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="6" width="18" height="12" rx="2"/><path d="M3 10h18"/></svg>Tills and sales</a>
-    <a class="ni" href="#apps/payments" data-nav="apps/payments"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="6" width="18" height="12" rx="2"/><path d="M3 10h18"/></svg>Payments</a>
-    <a class="ni" href="#apps/payroll" data-nav="apps/payroll"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.3 2.7-5.5 6-5.5s6 2.200 6 5.500"/></svg>Payroll</a>
-    <a class="ni" href="#apps/customers" data-nav="apps/customers"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.3 2.7-5.5 6-5.5s6 2.2 6 5.5M17 6a3 3 0 010 6M21 20c0-2.4-1.4-4.200-3.500-5"/></svg>Customer apps</a>
-    <a class="ni" href="#apps/bridge" data-nav="apps/bridge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 7V3M15 7V3M7 7h10v4a5 5 0 01-10 0zM12 16v5"/></svg>Zapier and Make</a>
+    <a class="ni" href="#store" data-nav="store"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8l2-4h12l2 4M4 8v11h16V8M4 8h16M9 12h6"/></svg>Hire more help</a>
     <div class="group">Account</div>
+    <a class="ni" href="#apps" data-nav="apps"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 7V3M15 7V3M7 7h10v4a5 5 0 01-10 0zM12 16v5"/></svg>Apps and connections<span class="count" id="apps-on" hidden></span></a>
     <a class="ni" href="#usage" data-nav="usage"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 2L4 14h7l-1 8 9-12h-7z"/></svg>Energy and spend</a>
-    <a class="ni" href="#store" data-nav="store"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8l2-4h12l2 4M4 8v11h16V8M4 8h16M9 12h6"/></svg>Hire from the store</a>
     <a class="ni" href="#firstday" data-nav="firstday"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h16v11H9l-5 4z"/><path d="M8 9.5h8M8 12.5h5"/></svg>First day<span class="count" id="setup-badge">1</span></a>
     <a class="ni" href="#settings" data-nav="settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3"/></svg>Settings</a>
     <a class="ni" href="/owner-decisions.html" id="owner-admin-link" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l8 3v6c0 4.5-3.2 8-8 9-4.8-1-8-4.5-8-9V6z"/></svg>Owner admin</a>
     </nav>
-    <div class="trial" id="trial-box"><b id="trial-left">Trial: 5 days left</b><span class="muted" id="trial-note">No card needed until day 7</span><div class="energy"><i id="trial-bar" style="width:29%"></i></div></div>
+    <div class="trial" id="trial-box"><b id="trial-left">Trial: 5 days left</b><span class="muted" id="trial-note"></span><a class="btn btn-sm btn-primary" href="#store" id="trial-cta">Choose your plan</a></div>
   </aside>
   <div class="scrim" id="scrim"></div>
 
@@ -55,7 +50,7 @@
     <div class="topbar">
       <button class="menu-btn" id="menu-btn" aria-label="Open menu"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
       <form class="ask" id="ask"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4-4"/></svg><input id="ask-in" placeholder="Ask your team anything…" aria-label="Ask your team"><span class="kbd hide-sm">/</span></form>
-      <div class="right"><div id="bell-wrap" class="bell-wrap"><button type="button" class="bell-btn" id="bell-btn" aria-label="Notifications" aria-expanded="false" aria-controls="bell-panel" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 17V11a6 6 0 0112 0v6l1.5 2h-15zM10 21h4"/></svg><span class="bell-count" id="bell-count" hidden>0</span></button><div class="bell-panel" id="bell-panel" role="region" aria-label="Notifications" hidden><div class="panel-h"><h2>Notifications</h2></div><ul class="bell-list" id="bell-list"></ul></div></div><a class="status warn hide-sm" href="#approvals"><span class="dot"></span><span id="need-count">3 need you</span></a><a class="badge badge-dark mono hide-sm" href="#usage">Wallet £0.00</a><button class="av av-sm av-me" id="me-av" aria-label="Account and settings" title="Account and settings" style="border:0;cursor:pointer">AI</button></div>
+      <div class="right"><div id="bell-wrap" class="bell-wrap"><button type="button" class="bell-btn" id="bell-btn" aria-label="Notifications" aria-expanded="false" aria-controls="bell-panel" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 17V11a6 6 0 0112 0v6l1.5 2h-15zM10 21h4"/></svg><span class="bell-count" id="bell-count" hidden>0</span></button><div class="bell-panel" id="bell-panel" role="region" aria-label="Notifications" hidden><div class="panel-h"><h2>Notifications</h2></div><ul class="bell-list" id="bell-list"></ul><div class="bell-perm" id="bell-push"></div></div></div><a class="status warn hide-sm" href="#approvals"><span class="dot"></span><span id="need-count">3 need you</span></a><a class="badge badge-dark mono hide-sm" href="#usage" id="energy-chip">Energy 38% left</a><button class="av av-sm av-me" id="me-av" aria-label="Account and settings" title="Account and settings" style="border:0;cursor:pointer">AI</button></div>
     </div>
 
     <div id="ask-when" class="ask-when" role="group" aria-label="When do you need your next answer?" hidden><span class="ask-when-l">When do you need it?</span><button type="button" class="chip" data-when="now" aria-pressed="false">Now</button><button type="button" class="chip" data-when="tonight" aria-pressed="false">Tonight, uses less energy</button><span class="ask-when-h">Not chosen: we decide. New accounts get answers at once.</span></div>
@@ -68,7 +63,7 @@
 
     <!-- HOME -->
     <div class="content" data-screen="home">
-      <div class="page-h"><div><h1 id="greet">Good afternoon</h1><p>What needs you, how your team is doing, and how the business is doing.</p></div><span class="badge badge-dark eg">Example data</span></div>
+      <div class="page-h"><div><h1 id="greet">Good afternoon</h1><p>What needs you, how your team is doing, and how the business is doing.</p></div><span class="badge badge-dark eg">Example data</span><a class="badge badge-dark trial-chip" id="trial-chip" href="#store" hidden></a></div>
       <div class="kpis" id="ov-kpis" aria-label="Today at a glance"></div>
       <section class="panel" id="suggest" aria-labelledby="suggest-h" hidden>
         <div class="panel-h"><h2 id="suggest-h">Suggested for you</h2><span class="r">From your records, no energy used</span></div>
@@ -97,15 +92,15 @@
       </section>
 
       <div class="grid2">
-        <section class="panel" aria-labelledby="pulse-h" data-example>
+        <section class="panel" aria-labelledby="pulse-h">
           <div class="panel-h"><h2 id="pulse-h">Business pulse</h2><a class="r link" href="#finance">Open books and cash</a></div>
-          <div class="grid3">
+          <div class="grid3" id="ov-pulse">
             <div class="kpi"><span class="l">Cash in bank</span><span class="v">£18,420</span><span class="dl">Runway 7.5 months</span><svg class="spark" viewBox="0 0 120 36" preserveAspectRatio="none" aria-hidden="true"><path d="M0 22 L20 20 L40 24 L60 18 L80 16 L100 19 L120 14" fill="none" stroke="#202020" stroke-width="2" vector-effect="non-scaling-stroke"/></svg></div>
             <div class="kpi"><span class="l">Revenue this month</span><span class="v">£6,210</span><span class="dl up">+9% vs last month</span><svg class="spark" viewBox="0 0 120 36" preserveAspectRatio="none" aria-hidden="true"><path d="M0 28 L20 26 L40 24 L60 25 L80 18 L100 15 L120 10" fill="none" stroke="#ff682c" stroke-width="2" vector-effect="non-scaling-stroke"/></svg></div>
             <div class="kpi"><span class="l">Active customers</span><span class="v">412</span><span class="dl up">+23 this month</span><svg class="spark" viewBox="0 0 120 36" preserveAspectRatio="none" aria-hidden="true"><path d="M0 26 L20 25 L40 22 L60 22 L80 19 L100 16 L120 13" fill="none" stroke="#816729" stroke-width="2" vector-effect="non-scaling-stroke"/></svg></div>
           </div>
           <div class="panel-h" style="margin-top:4px"><h2>Activity today</h2><a class="r link" href="#work">Open tasks</a></div>
-          <ul class="feed">
+          <ul class="feed" id="ov-activity">
             <li><span class="tm">14:02</span><span class="av av-sm av-mm">MM</span><span>Started the November subscriber email <span class="muted">· 6 energy</span></span></li>
             <li><span class="tm">13:40</span><span class="av av-sm av-bc">BC</span><span>Finished supplier cost check, found 2 cheaper packaging suppliers <span class="handoff">→ Finance</span></span></li>
             <li><span class="tm">13:15</span><span class="av av-sm av-fm">FM</span><span>Asked you about VAT before closing October</span></li>
@@ -114,18 +109,20 @@
           </ul>
         </section>
         <div class="stack">
-          <section class="panel" data-example><div class="panel-h"><h2>Today's briefing</h2><span class="r">Admin manager · 9:00</span></div>
-            <ul class="brief"><li>Growth is on track for the 3-month goal.</li><li>Packaging costs jumped. Options are ready.</li><li>October books close once VAT is answered.</li></ul></section>
-          <section class="panel" data-example><div class="panel-h"><h2>Energy this week</h2><a class="r link" href="#usage">62% of 8,000 used</a></div>
+          <section class="panel"><div class="panel-h"><h2>Today's briefing</h2><span class="r" id="ov-brief-r">Admin manager · 9:00</span></div>
+            <ul class="brief" id="ov-brief"><li>Growth is on track for the 3-month goal.</li><li>Packaging costs jumped. Options are ready.</li><li>October books close once VAT is answered.</li></ul></section>
+          <section class="panel"><div class="panel-h"><h2>Energy this week</h2><a class="r link" href="#usage" id="ov-energy-r">62% of 8,000 used</a></div>
+            <div id="ov-energy">
             <div class="ubar"><span>Finance</span><div class="energy"><i style="width:11%"></i></div><span class="mono">11%</span></div>
             <div class="ubar"><span>Marketing</span><div class="energy"><i style="width:22%"></i></div><span class="mono">22%</span></div>
             <div class="ubar"><span>Consultant</span><div class="energy"><i style="width:14%"></i></div><span class="mono">14%</span></div>
             <div class="ubar"><span>HR</span><div class="energy"><i style="width:5%"></i></div><span class="mono">5%</span></div>
             <div class="ubar"><span>Compliance</span><div class="energy"><i style="width:10%"></i></div><span class="mono">10%</span></div>
+            </div>
             <p class="small muted">Shares of the team's weekly energy. It refills on Monday; urgent work is never held back.</p></section>
           <section class="panel" aria-labelledby="ovp-h"><div class="panel-h"><h2 id="ovp-h">People today</h2><a class="r link" href="#people">Open staff records</a></div>
             <div id="ov-people"></div></section>
-          <section class="panel" data-example><div class="panel-h"><h2>Coming up</h2><a class="r link" href="#compliance">Compliance calendar</a></div>
+          <section class="panel"><div class="panel-h"><h2>Coming up</h2><a class="r link" href="#compliance">Compliance calendar</a></div>
             <ul class="brief" id="ov-next"></ul></section>
         </div>
       </div>
@@ -280,13 +277,13 @@
       <div class="page-h"><div><h1>Slack and chat</h1><p>Message your team and approve work with a button, right where you already chat.</p></div><span class="status" id="slack-status"><span class="dot"></span><span id="slack-status-t">Off</span></span></div>
       <section class="panel">
         <div class="panel-h"><h2>Slack</h2><span class="r" id="slack-note">Not connected</span></div>
-        <p class="small muted">Connect once, then message the Admin manager, mention a role to go direct, and approve with a button. Teams and WhatsApp are coming soon.</p>
+        <p class="small muted">Connect once, then message the Admin manager, mention a role to go direct, and approve with a button. WhatsApp connects from Social accounts.</p>
         <div class="acts"><button type="button" class="btn btn-primary" id="slack-connect">Connect Slack</button></div>
       </section>
     </div>
 
     <div class="content" data-screen="apps" hidden>
-      <div class="page-h"><div><h1 id="apps-h1">Services</h1><p id="apps-intro">Connect your till, payroll and accounts. Your team only reads them, and you choose who sees what.</p></div><span class="status" id="svc-status" hidden><span class="dot"></span><span id="svc-status-t"></span></span></div>
+      <div class="page-h"><div><h1 id="apps-h1">Apps and connections</h1><p id="apps-intro">Connect your till, payroll and accounts. Your team only reads them, and you choose who sees what.</p></div><span class="status" id="svc-status" hidden><span class="dot"></span><span id="svc-status-t"></span></span></div>
       <div class="kpis kpis-4" id="apps-kpis"></div>
       <section class="panel" id="apps-pending-panel" hidden><div class="panel-h"><h2>Waiting to go into your books</h2><span class="r" id="apps-pending-count"></span></div>
         <div id="apps-pending"></div>
@@ -295,6 +292,14 @@
       <section class="panel" id="apps-growth-panel" hidden aria-labelledby="apps-growth-h"><div class="panel-h"><h2 id="apps-growth-h">Your growth this week</h2><span class="r" id="apps-growth-who"></span></div>
         <div id="apps-growth" class="ow-stack" aria-live="polite"></div>
         <p class="xs muted">Worked out from your own Google Analytics and Search Console. Google's figures run a day or three behind. Your Marketing manager sends this to you every Monday and warns you sooner if something changes a lot.</p></section>
+      <section class="panel" aria-labelledby="apps-chat-h"><div class="panel-h"><h2 id="apps-chat-h">Chat and social</h2><span class="r">Where your team talks to you and posts for you</span></div>
+        <div class="apps-chat">
+          <a href="#slack"><span><b>Slack and chat</b><span class="d">Message your team and approve work where you already chat</span></span><span class="badge badge-dark" id="slack-state">Off</span></a>
+          <a href="/connect-social.html"><span><b>Social accounts</b><span class="d">Facebook, Instagram and WhatsApp, connected in your browser</span></span><span aria-hidden="true">→</span></a>
+        </div></section>
+      <section class="panel" id="agents-panel" aria-labelledby="agents-h"><div class="panel-h"><h2 id="agents-h">Your own AI tools</h2><span class="r">Claude, ChatGPT, Zapier, Make, n8n</span></div>
+        <p class="small ag-lead">Already use an AI tool or an automation? Give it a key and it can hand work to your employees and get the answer back. It reaches only the employees you choose, and it can never use more of your energy than you allow.</p>
+        <div id="agents-body" class="ag-body"><p class="small muted">Loading…</p></div></section>
       <section class="panel" id="apps-connected-panel" hidden><div class="panel-h"><h2>Connected</h2></div><div id="apps-connected" class="app-conns"></div></section>
       <section class="panel"><div class="panel-h"><h2>Add an app</h2></div>
         <div class="chips" role="group" aria-label="Show apps by type" id="apps-filter">
@@ -303,6 +308,7 @@
         <div class="field apps-search"><label for="apps-search">Find an app by name</label><input class="input" id="apps-search" type="search" autocomplete="off" spellcheck="false" maxlength="60" placeholder="For example: Jobber, Klarna, Typeform"></div>
         <p class="xs muted" id="apps-count" role="status"></p>
         <div class="apps-grid" id="apps-grid"></div>
+        <p class="apps-more-row"><button type="button" class="btn btn-ghost" id="apps-more" hidden>Show all apps</button></p>
         <p class="xs muted">Don't see your app? Zapier or Make can send data from thousands more apps through a private link, and any till that exports a CSV works with "Any till".</p></section>
       <dialog class="apps-dialog card" id="apps-dialog" aria-labelledby="apps-dlg-h">
         <form id="apps-dlg-form" novalidate>
@@ -373,6 +379,12 @@
       <div id="desk-body" class="desk-body"></div>
     </div>
 
+    <!-- MARKET DATA: the Data mining agent's own screen -->
+    <div class="content" data-screen="mining" hidden>
+      <div class="page-h"><div><h1>Market data</h1><p>Your Data mining agent gathers what is public about a topic, keeps it as a small dataset and shares it with the employees you choose.</p></div><a class="btn btn-ghost btn-sm" href="#team">All employees</a></div>
+      <div id="mine-body" class="mine-body"><p class="small muted">Loading…</p></div>
+    </div>
+
     <!-- CONVERSATIONS -->
     <div class="content" data-screen="chat" hidden>
       <div class="page-h"><div><h1 id="chat-title">Conversations</h1><p>Each employee remembers what you talked about, so you can follow up.</p></div></div>
@@ -398,22 +410,28 @@
         <div class="ubar ubar-2"><span>Company</span><span id="set-biz" class="mono"></span></div>
         <div class="ubar ubar-2"><span>Email</span><span id="set-email" class="mono"></span></div>
         <div class="ubar ubar-2"><span>Sign out of this device</span><button class="btn btn-sm btn-ghost" data-signout>Sign out</button></div></section>
+      <section class="panel" aria-labelledby="bill-h"><div class="panel-h"><h2 id="bill-h">Plan and billing</h2><span class="r" id="bill-state"></span></div>
+        <p id="bill-plan" class="muted small">Log in to see your plan.</p>
+        <div class="acts set-acts"><a class="btn btn-primary btn-sm" href="#store" id="bill-choose" hidden>Choose your plan</a><button class="btn btn-ghost btn-sm" type="button" id="bill-portal" hidden>Manage card, invoices and cancellation</button><span class="muted small" id="bill-msg" role="status"></span></div>
+        <div class="tbl-wrap" tabindex="0" role="region" aria-label="Your orders" id="bill-orders-wrap" hidden><table class="tbl" id="bill-orders"></table></div></section>
+      <section class="panel" aria-labelledby="al-h"><div class="panel-h"><h2 id="al-h">Alerts on this device</h2><span class="r" id="set-push-msg" role="status"></span></div>
+        <p class="muted small">Get a notification on this phone or computer when a batch finishes, a review passes or something needs your approval, even when MAIZ is closed. Each device is switched on separately.</p>
+        <div id="set-push"></div></section>
       <section class="panel" aria-labelledby="tu-h"><div class="panel-h"><h2 id="tu-h">Energy top-ups</h2><span class="r" id="tu-left">Top-up energy left: 0</span></div>
         <p class="muted small">When the week's energy runs out, work pauses and nothing is charged. You can buy a top-up pack (£5, £10 or £25). Top-ups roll over and never expire, and the weekly energy is always used first.</p>
         <form id="tu-form" class="rd-form" novalidate>
           <label class="ow-check"><input type="checkbox" id="tu-on"> Auto-reload when the team runs out</label>
           <div class="field"><label for="tu-pack">Pack to buy</label><select class="input" id="tu-pack"><option value="5">£5 for 500 energy</option><option value="10">£10 for 1,000 energy</option><option value="25">£25 for 2,500 energy</option></select></div>
           <div class="field"><label for="tu-cap">Most to spend in a month (£)</label><input class="input" id="tu-cap" type="number" min="0" step="1" inputmode="numeric" value="25"><span class="hint">Auto-reload stops at this amount until next month.</span></div>
-          <div class="acts"><button class="btn btn-primary btn-sm" type="submit">Save</button><span class="muted small" id="tu-msg" role="status">Off unless you turn it on. Payments open soon; until then a saved setting cannot charge you.</span></div>
+          <div class="acts"><button class="btn btn-primary btn-sm" type="submit">Save</button><span class="muted small" id="tu-msg" role="status">Off unless you turn it on. It never spends more than the monthly amount you set.</span></div>
         </form></section>
       <section class="panel" aria-labelledby="cp-h"><div class="panel-h"><h2 id="cp-h">Gift or discount code</h2></div>
-        <p class="muted small">Have a code? Free trial days and free energy are added straight away. A discount is saved on your account and comes off your bill once payments open.</p>
+        <p class="muted small">Have a code? Free trial days and free energy are added straight away. A discount is saved on your account and comes off your next monthly order at checkout.</p>
         <form id="cp-form" class="rd-form" novalidate>
           <div class="field"><label for="cp-code">Your code</label><input class="input" id="cp-code" autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="32" aria-describedby="cp-msg"></div>
           <div class="acts"><button class="btn btn-primary btn-sm" type="submit">Apply code</button><span class="muted small" id="cp-msg" role="status"></span></div>
         </form>
         <ul class="ow-list" id="cp-used" aria-label="Codes you have used"></ul></section>
-      <section class="panel"><div class="panel-h"><h2>Coming next</h2></div><p class="muted">Billing, privacy options and inviting teammates will live here.</p></section>
     </div>
 
     <!-- USAGE -->
@@ -427,19 +445,21 @@
         <div class="tbl-wrap" tabindex="0" role="region" aria-label="Energy and price by employee"><table class="tbl" id="usage-table"></table></div></section>
       <div class="grid2">
         <section class="panel"><div class="panel-h"><h2>Biggest tasks this week</h2></div>
+          <div id="usage-big">
           <div class="ubar ubar-2"><span>Supplier cost check · Consultant</span><span class="mono">30</span></div>
           <div class="ubar ubar-2"><span>Competitor deep dive · Marketing</span><span class="mono">30</span></div>
           <div class="ubar ubar-2"><span>Compliance health check · Compliance</span><span class="mono">22</span></div>
-          <div class="ubar ubar-2"><span>Weekly cash report · Finance</span><span class="mono">10</span></div></section>
-        <section class="panel"><div class="panel-h"><h2>Wallet and spending cap</h2></div>
-          <div class="ubar ubar-2"><span>Wallet balance</span><span class="mono">£0.00</span></div>
-          <div class="ubar ubar-2"><span>Monthly spending cap</span><span class="mono">£25</span></div>
-          <div class="ubar ubar-2"><span>Auto-refill</span><span class="mono">Off</span></div>
-          <p class="small muted">Payments are not open yet. Nothing is charged during the trial, and top-ups will only ever come from your wallet, up to your cap.</p></section>
+          <div class="ubar ubar-2"><span>Weekly cash report · Finance</span><span class="mono">10</span></div></div></section>
+        <section class="panel"><div class="panel-h"><h2>Top-ups and spending cap</h2><a class="r link" href="#settings">Change in Settings</a></div>
+          <div class="ubar ubar-2"><span>Top-up energy saved</span><span class="mono" id="wal-top">0</span></div>
+          <div class="ubar ubar-2"><span>Most to spend in a month</span><span class="mono" id="wal-cap">£25</span></div>
+          <div class="ubar ubar-2"><span>Auto-reload</span><span class="mono" id="wal-auto">Off</span></div>
+          <p class="small muted">Nothing is charged during the trial. A top-up is only ever the pack you choose, and auto-reload stops at your monthly cap.</p></section>
       </div>
     </div>
     <div class="content" data-screen="store" hidden>
-      <div class="page-h"><div><h1>Hire from the store</h1><p>Your Team package already includes Finance, Marketing, Business consultant, HR, Compliance and the Admin manager. Hire more here: add an employee or one of 12 specialist hires, billed monthly, or a consultant for 7 or 30 days, paid once. Each employee you add tops up the team energy.</p></div></div>
+      <div class="page-h"><div><h1>Hire from the store</h1><p>The Team package is your whole core team: Finance, Marketing, Business consultant, HR, Compliance and the Admin manager. Hire more here: add an employee or one of 12 specialist hires, billed monthly, or a consultant for 7 or 30 days, paid once. Each employee you add tops up the team energy.</p></div></div>
+      <section class="panel store-plan" id="store-plan" aria-label="Your plan" hidden></section>
       <div class="store">
         <section class="panel store-pick" aria-label="Choose what to add">
           <label class="label" for="store-pick">What do you want to add?</label>

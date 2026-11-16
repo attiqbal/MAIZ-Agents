@@ -65,13 +65,14 @@ describe("a discount code at checkout", () => {
     const ann = await s.signUp("ann@kestrel.co", "Kestrel Coffee");
     await s.call("POST", "/api/coupons/redeem", { code: "TENOFF" }, ann);
     const monthly = (await s.catalogue()).find((i) => i.billing === "monthly")!;
+    const addOn = (await s.catalogue()).find((i) => (i as any).kind === "employee")!;
 
     const first = (await s.call("POST", "/api/checkout", { lines: [{ key: monthly.key }] }, ann)).body as any;
-    const second = (await s.call("POST", "/api/checkout", { lines: [{ key: monthly.key }] }, ann)).body as any;
+    const second = (await s.call("POST", "/api/checkout", { lines: [{ key: addOn.key }] }, ann)).body as any;
 
     expect(first.order.discount.amountOffMinor).toBe(1_000);
     expect(second.order.discount).toBeUndefined();
-    expect(second.order.dueTodayMinor).toBe(monthly.priceGbp * 100);
+    expect(second.order.dueTodayMinor).toBe(addOn.priceGbp * 100);
   });
 
   it("stays waiting when the cart has nothing monthly, and the quote says what it will take off", async () => {

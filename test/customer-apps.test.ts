@@ -398,6 +398,9 @@ describe("review fixes", () => {
     const { setHostResolver, isPrivateIp } = await import("../src/modules/integrations/connectors/util.js");
     for (const ip of ["10.0.0.5", "127.0.0.1", "169.254.169.254", "192.168.1.1", "172.16.0.9", "100.64.0.1", "::1", "fd00::1", "::ffff:10.0.0.1"]) expect(isPrivateIp(ip), ip).toBe(true);
     expect(isPrivateIp("93.184.216.34")).toBe(false);
+    // The same inside addresses written as IPv6 are caught too, however they are spelled.
+    for (const ip of ["::ffff:7f00:1", "::ffff:a9fe:a9fe", "::ffff:127.0.0.1", "64:ff9b::7f00:1", "::127.0.0.1", "2002:7f00:1::", "0000:0000:0000:0000:0000:0000:0000:0001", "fe80::1%eth0", "fec0::1", "ff02::1", "not-an-address"]) expect(isPrivateIp(ip), ip).toBe(true);
+    for (const ip of ["2606:4700:4700::1111", "::ffff:93.184.216.34", "64:ff9b::5db8:d822", "2a00:1450:4009:81f::200e"]) expect(isPrivateIp(ip), ip).toBe(false);
     setHostResolver(async () => ["10.0.0.5"]);
     const { http, seen } = fake([[/./, () => []]]);
     const { ig, ws } = await setup(http);

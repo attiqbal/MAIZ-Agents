@@ -27,7 +27,7 @@ import { PriceBook, paidTeamPlan } from "../modules/pricing/index.js";
 import { SpecialistReviewService, type SpecialistRequest } from "../modules/review/specialists.js";
 import { templateFromRole } from "../modules/workforce/templates.js";
 import { MockPaymentProvider, PaymentService, type OrderDiscount, type PaymentProvider } from "../modules/payments/index.js";
-import { quote } from "../modules/store/cart.js";
+import { TEAM_PACKAGE_KEY, quoteForPlan } from "../modules/store/cart.js";
 import { ReconciliationService } from "../modules/reconciliation/index.js";
 import { localParts } from "../modules/batch/schedule.js";
 import { RotaService, RotaError } from "../modules/rota/index.js";
@@ -44,6 +44,7 @@ import { PromoterService } from "../modules/promoter/index.js";
 import { DEFAULT_PAID_MULTIPLIER, PaidServices, type Payer } from "../modules/paid-services/index.js";
 import { GrowthService } from "../modules/growth/index.js";
 import { ResearchService } from "../modules/research/index.js";
+import { DataMiningService } from "../modules/data-mining/index.js";
 import { MetaGraph, MetaRejected, type MetaConfig } from "../modules/meta/index.js";
 import { LiveProvider, MetaClientService, SandboxProvider } from "../modules/meta-clients/index.js";
 import type { MetaClientSettings } from "./config.js";
@@ -53,6 +54,7 @@ import { isoWeek } from "../modules/integrations/insights.js";
 import { COMPANY } from "../company.js";
 import { CredentialStore } from "../modules/credentials/index.js";
 import { PushService, VAPID_STORE_KEY } from "../modules/push/index.js";
+import { AGENT_SECRET_PREFIX, AgentService } from "../modules/agents/index.js";
 
 export interface PlatformConfig {
   anthropicApiKey?: string;
@@ -101,6 +103,21 @@ export interface PlatformConfig {
 }
 
 /** Wires every module together. One place, so the server and tests build the same system. */
+/** The end of the month a client has paid for: the next monthly anniversary of their payment after `at`. */
+export function paidThrough(paidAt: string, at: Date): Date {
+  const start = new Date(paidAt);
+  if (Number.isNaN(start.getTime())) return at;
+  let end = start;
+  for (let months = 1; end <= at && months <= 1200; months++) {
+    // The same day of a later month, or that month's last day when it is shorter (31 January to 28 February).
+    const first = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth() + months, 1, start.getUTCHours(), start.getUTCMinutes(), start.getUTCSeconds(), start.getUTCMilliseconds()));
+    const lastDay = new Date(Date.UTC(first.getUTCFullYear(), first.getUTCMonth() + 1, 0)).getUTCDate();
+    first.setUTCDate(Math.min(start.getUTCDate(), lastDay));
+    end = first;
+  }
+  return end;
+}
+
 export function createPlatform(cfg: PlatformConfig) {
   const now = cfg.now ?? (() => new Date());
   const audit = new AuditLog();
@@ -131,7 +148,8 @@ export function createPlatform(cfg: PlatformConfig) {
   energy.setPoolBonusResolver((ws) => workforce.templatesIn(ws).reduce((sum, key) => sum + prices.weeklyEnergyFor(key), 0));
   /** Discount coupons: trial days and free energy work today; discounts on the bill are recorded for when billing starts. */
   const coupons = new CouponService((userId) => ownerIdSet.has(userId), {
-    isTrial: (ws) => energy.onTrial(ws),
+    // A cancelled paid plan is not a free trial: trial codes do not extend it, and "paying clients only" codes are not refused for it.
+    isTrial: (ws) => energy.onTrial(ws) && !energy.planOf(ws).endedPaid,
     extendTrial: (ws, days, by) => { energy.extendTrial(ws, days, by); },
     grantEnergy: (ws, n, by) => energy.grantEnergy(ws, n, by),
   }, now);
@@ -167,7 +185,7 @@ export function createPlatform(cfg: PlatformConfig) {
    * Real push notifications to people's browsers and installed apps. The sender's key pair is made on first use and
    * stored encrypted with the owner's other connection details, so nothing has to be configured.
    */
-  const push = new PushService({ subject: /^https:\/\//.test(cfg.appUrl ?? "") ? cfg.appUrl! : "https://maizagents.com", now, http: cfg.http });
+  const push = new PushService({ subject: /^https:\/\//.test(cfg.appUrl ?? "") ? cfg.appUrl! : "https://maizagents.com", now, http: cfg.http, member: (userId, ws) => identity.roleOf(userId, ws) !== undefined });
   // Whatever rings the bell is also pushed, so the client hears about it with MAIZ closed.
   notices.onAdd((ws, n) => { void push.sendToWorkspace(ws, { title: n.title, body: n.body, link: n.link ?? "/app.html", tag: n.kind }); });
   /** Tells the client in the Admin manager's inbox (and their chat app), and rings the bell once. */
@@ -294,6 +312,12 @@ export function createPlatform(cfg: PlatformConfig) {
   const growth = new GrowthService((userId) => ownerIdSet.has(userId), { now, completer: gateway, notifyOwner: () => decisionDigest.poke() });
   /** Read-only market research on Reddit, Hacker News and YouTube. Owner only; keys come from the Connections page. */
   const research = new ResearchService({ isOwner: (userId) => ownerIdSet.has(userId), reddit: () => connections.redditApp(), youtubeKey: () => connections.youtubeKey(), xToken: () => connections.xToken(), deskKeys: () => connections.deskKeys(), http: cfg.http, now });
+  /** The Data mining agent (a client add-on): public data on a topic, saved as a small dataset and shared with chosen employees. See docs/DATA-MINING.md. */
+  const mining = new DataMiningService({
+    identity, meter: energy, audit, http: cfg.http, now, team: (userId, ws) => workforce.team(userId, ws), titleOf: (key, ws) => workforce.templateFor(key, ws)?.title, countryOf: (ws) => workforce.countryOf(ws),
+    multiplier: () => prices.general().paidServiceMultiplier ?? DEFAULT_PAID_MULTIPLIER, keys: () => ({ reddit: connections.redditApp(), youtube: connections.youtubeKey(), x: connections.xToken(), ...connections.deskKeys() }),
+  });
+  workforce.addContext((ws, templateKey) => mining.contextFor(ws, templateKey));
   /** MAIZ quality review: every client's specialised tasks wait here for the platform owner's sign-off. */
   const reviews = new QualityReviewService(identity, audit, isPlatformOwner, {
     now,
@@ -327,6 +351,15 @@ export function createPlatform(cfg: PlatformConfig) {
     },
   });
 
+  /**
+   * Outside agents: a client's own AI tool or automation sends jobs to their MAIZ employees with a key, inside limits
+   * the owner set. Off until the owner makes a connection. See docs/EXTERNAL-AGENTS.md.
+   */
+  const agents = new AgentService({
+    identity, audit, workforce, energy, now, http: cfg.http,
+    timezone: (ws) => batch.scheduleOf(ws).timezone,
+    notify: (ws, n) => { notices.add(ws, { kind: "info", title: n.title, body: n.body, link: "/app.html#apps" }); },
+  });
   let alertOwnersLate: (subject: string, text: string) => Promise<void> = async () => undefined;
   /** Staff and shifts, so rota questions are answered from real records. */
   const rota = new RotaService(identity, audit);
@@ -362,9 +395,14 @@ export function createPlatform(cfg: PlatformConfig) {
   });
   workforce.addContext((ws, templateKey) => people.contextFor(ws, templateKey));
   /** Checkout and orders. What a paid order buys is hired here, from the same templates the store sells. */
+  /** A client has the Team package once they are on a paid plan (clients who went paid before it was sold keep theirs). */
+  const hasTeamPackage = (ws: string): boolean => !energy.onTrial(ws);
+  /** Prices a cart for this client's plan: a first monthly order includes the Team package, and it is never sold twice. */
+  const quoteFor = (ws: string | undefined, lines: readonly unknown[]): ReturnType<typeof quoteForPlan> => quoteForPlan(lines, ws ? hasTeamPackage(ws) : false, prices.catalogue());
   const payments = new PaymentService(identity, audit, {
     provider: cfg.payments ?? (cfg.allowDevAuth ? new MockPaymentProvider() : undefined),
-    quote: (lines) => quote(lines, prices.catalogue()),
+    quote: (lines, ws) => quoteFor(ws, lines),
+    onceOnly: (key) => key === TEAM_PACKAGE_KEY,
     appUrl: base,
     customerEmail: (userId) => identity.workspacesFor(userId).map((w) => w.ownerEmail).find(Boolean),
     now,
@@ -377,6 +415,8 @@ export function createPlatform(cfg: PlatformConfig) {
       for (const line of order.lines) {
         // A consultant line is "consultant:pass"; the employee template is the part before the colon.
         const templateKey = line.key.split(":")[0]!;
+        // The Team package is the plan itself: the core team was hired at signup, so there is nobody new to hire.
+        if (templateKey === TEAM_PACKAGE_KEY) continue;
         for (let i = 0; i < line.qty; i++) ids.push((await workforce.hire(order.userId, order.workspaceId, templateKey)).id);
       }
       // A recurring line makes the client a paying one: they leave the free trial and start the paid plan with a full
@@ -386,6 +426,16 @@ export function createPlatform(cfg: PlatformConfig) {
       if (order.lines.some((l) => l.billing === "monthly")) affiliates.recordPayment(order.workspaceId, order.dueTodayMinor / 100, order.id);
       if (order.lines.some((l) => l.billing === "monthly")) energy.switchToPaid(order.workspaceId, paidTeamPlan(prices.general()), `user:${order.userId}`);
       return ids;
+    },
+    // The Team package stopping ends the plan: at the end of the month paid for when the client cancelled here,
+    // at once when the payment provider ended the subscription (the paid time is over by then).
+    stopped: (order, by) => {
+      if (!order.lines.some((l) => l.key === TEAM_PACKAGE_KEY)) return;
+      const endsAt = by === "client" ? paidThrough(order.paidAt ?? order.createdAt, now()) : now();
+      if (!energy.endPaidPlan(order.workspaceId, endsAt.toISOString(), `payment:${by}`)) return;
+      // Extras bought later are separate monthly orders. They are not stopped for the client, so they are told.
+      const extras = payments.all().some((o) => o.workspaceId === order.workspaceId && o.id !== order.id && o.status === "paid" && o.monthlyMinor > 0);
+      notices.add(order.workspaceId, { kind: "info", title: "Your Team package has been cancelled", body: `Your team keeps working until ${endsAt.toLocaleDateString("en-GB", { day: "numeric", month: "long" })}. You can start it again any time from the store.${extras ? " Extras you added later are billed separately: cancel those too in Settings, Plan and billing, if you no longer want them." : ""}`, link: extras ? "/app.html#settings" : "/app.html#store" });
     },
   });
 
@@ -492,7 +542,7 @@ export function createPlatform(cfg: PlatformConfig) {
         ownerEmail: w.ownerEmail ?? null,
         createdAt: w.createdAt ?? null,
         trialEndsAt: plan.expiresAt ?? null,
-        status: plan.expiresAt && plan.expiresAt < nowIso ? "trial_ended" : plan.expiresAt ? "trial" : "active",
+        status: plan.endedPaid ? (plan.expiresAt && plan.expiresAt < nowIso ? "plan_ended" : "cancelled") : plan.expiresAt && plan.expiresAt < nowIso ? "trial_ended" : plan.expiresAt ? "trial" : "active",
         setup: admin.setupStateOf(w.id) ?? "not_started",
         employees: workforce.countIn(w.id),
         energyToday: use.energyToday,
@@ -571,6 +621,8 @@ export function createPlatform(cfg: PlatformConfig) {
       else if (x.kind === "task") workforce.restoreTask(x.data);
       else if (x.kind === "rota_staff") rota.restoreStaff(x.data);
       else if (x.kind === "rota_shift" && !x.data.removed) rota.restoreShift(x.data);
+      else if (x.kind === "agent_conn" || x.kind === "agent_job" || x.kind === "agent_delivery") agents.restore(x.kind, x.data);
+      else if (x.kind === "dataset") mining.restore(x.data);
     }
     for (const r of specialists.approved()) workforce.registerCustomTemplate(r.workspaceId, customTemplateOf(r));
     if (s.aiSettings) aiSettings.restore(s.aiSettings);
@@ -582,7 +634,7 @@ export function createPlatform(cfg: PlatformConfig) {
     for (const r of s.batchRuns ?? []) batch.restoreRun(r);
     for (const c of s.credentials ?? []) credentials.restore(c.userId, c);
     for (const c of s.connectionSecrets ?? []) {
-      if (c.key === VAPID_STORE_KEY) push.restoreKeys(c.secret); else connections.restore(c.key, c.secret);
+      if (c.key === VAPID_STORE_KEY) push.restoreKeys(c.secret); else if (c.key.startsWith(AGENT_SECRET_PREFIX)) agents.restoreSecret(c.key, c.secret); else connections.restore(c.key, c.secret);
     }
     rebuildChannels();
     for (const x of s.promoRecords ?? []) {
@@ -596,7 +648,7 @@ export function createPlatform(cfg: PlatformConfig) {
       else affiliates.restore(x.kind, x.data);
     }
     sink = store;
-    for (const part of [audit, identity, energy, workforce, ledger, router, admin, integrations, reviews, prices, specialists, aiSettings, spend, batch, payments, rota, reconciliation, people, conversations, notices, credentials, coupons, affiliates, promoter, growth, connections, metaClients, push]) part.useSink(store);
+    for (const part of [audit, identity, energy, workforce, ledger, router, admin, integrations, reviews, prices, specialists, aiSettings, spend, batch, payments, rota, reconciliation, people, conversations, notices, credentials, coupons, affiliates, promoter, growth, connections, metaClients, push, mining, agents]) part.useSink(store);
     live.sink = store;
     live.wa?.useSink(store);
   }
@@ -641,6 +693,6 @@ export function createPlatform(cfg: PlatformConfig) {
     slack: { enumerable: true, get: () => cfg.slack ?? connections.slackApp() },
     loginApps: { enumerable: true, get: (): LoginApps => ({ ...connections.loginApps(), ...cfg.loginApps }) },
   });
-  return { orderDiscountFor, push, conversations, notices, warm, ownerDecisions, decisionDigest, dashboard, reconciliation, rota, people, payments, batch, email, usedLinks, sends, loginFails, resets, credentials, formHits, codeFails, coupons, affiliates, promoter, paid, growth, research, connections, growthTick, metaClients, metaSettings, get ownerWhatsApp() { return live.wa; }, admin, reviews, prices, specialists, ai, clients, isPlatformOwner, healthy, hasStore, cfg: liveCfg, now, audit, bus, identity, energy, workforce, ledger, onboarding, router, integrations, slackTokens, saveSlackToken, attachStore };
+  return { agents, mining, orderDiscountFor, quoteFor, hasTeamPackage, push, conversations, notices, warm, ownerDecisions, decisionDigest, dashboard, reconciliation, rota, people, payments, batch, email, usedLinks, sends, loginFails, resets, credentials, formHits, codeFails, coupons, affiliates, promoter, paid, growth, research, connections, growthTick, metaClients, metaSettings, get ownerWhatsApp() { return live.wa; }, admin, reviews, prices, specialists, ai, clients, isPlatformOwner, healthy, hasStore, cfg: liveCfg, now, audit, bus, identity, energy, workforce, ledger, onboarding, router, integrations, slackTokens, saveSlackToken, attachStore };
 }
 export type Platform = ReturnType<typeof createPlatform>;

@@ -28,7 +28,7 @@ const save = () => { try { localStorage.setItem(KEY, JSON.stringify(profile)); }
 const SIZES: Record<string, SignupSize> = { "Just me": "solo", "2–10": "2-10", "11–50": "11-50", "50+": "51+" };
 const AVATAR: Record<string, [string, string]> = {
   "admin-manager": ["AM", "av-tl"], "finance-manager": ["FM", "av-fm"], "marketing-manager": ["MM", "av-mm"], "business-consultant": ["BC", "av-bc"],
-  "hr-manager": ["HR", "av-hr"], "compliance-manager": ["CM", "av-cm"], "supply-chain-manager": ["SC", "av-sc"],
+  "hr-manager": ["HR", "av-hr"], "compliance-manager": ["CM", "av-cm"], "supply-chain-manager": ["SC", "av-sc"], "data-mining-agent": ["DM", "av-dm"],
 };
 const HOW: Record<AppHow, string> = { direct: "Connects directly", file: "Upload an export", bridge: "Through Zapier or Make", chat: "One scan" };
 
@@ -119,6 +119,53 @@ $("biz-go").addEventListener("click", () => {
   save(); show(2);
 });
 
+// ---- Step 1, optional shortcut: read the business's own website and fill the answers in ----
+interface SiteReading { read: boolean; reason?: string; site?: string; name?: string; about?: string; sector?: string; apps?: string[]; socials?: string[] }
+if (profile.site) $<HTMLInputElement>("site-first").value = profile.site;
+async function readMySite(): Promise<void> {
+  const input = $<HTMLInputElement>("site-first");
+  const raw = input.value.trim();
+  if (!raw) { input.focus(); return; }
+  const btn = $<HTMLButtonElement>("site-read-go"), out = $("site-read");
+  btn.disabled = true; btn.textContent = "Reading…";
+  const r = await api<SiteReading>("/signup/read-site", { body: { website: raw } });
+  btn.disabled = false; btn.textContent = "Read my website";
+  out.hidden = false;
+  profile.site = raw;
+  const d = r.data;
+  if (!r.ok || !d?.read) {
+    out.textContent = `${r.status === 429 ? "That is enough tries for now." : d?.reason ?? "I could not read that website just now."} No problem: tap your answers below.`;
+    save(); return;
+  }
+  // Everything found is a suggestion: it fills only what is still empty, and every field stays editable.
+  const found: string[] = [];
+  const biz = $<HTMLInputElement>("biz");
+  if (d.name && !biz.value.trim()) biz.value = d.name;
+  if (d.name) found.push(`Name: ${d.name}`);
+  const sector = SECTORS.find((x) => x.key === d.sector && x.key !== OTHER_SECTOR);
+  if (sector && !profile.sector) {
+    profile.sector = sector.key;
+    $("sectors").querySelectorAll<HTMLElement>("button").forEach((c) => c.setAttribute("aria-pressed", String(c.dataset.v === sector.key)));
+    $("sells-f").toggleAttribute("hidden", true);
+  }
+  if (sector) found.push(`Kind of business: ${sector.label}`);
+  const sells = $<HTMLInputElement>("sells");
+  if (d.about && !sells.value.trim()) sells.value = d.about.slice(0, 300);
+  if (d.about) found.push(`What you do: ${d.about}`);
+  const spotted = APPS.filter((a) => (d.apps ?? []).includes(a.key));
+  if (spotted.length) {
+    profile.apps = [...new Set([...(profile.apps ?? []), ...spotted.map((a) => a.key)])];
+    found.push(`Apps your site uses: ${spotted.map((a) => a.name).join(", ")}`);
+  }
+  if (d.socials?.length) found.push(`Social pages: ${d.socials.slice(0, 6).join(", ")}`);
+  save();
+  out.innerHTML = found.length
+    ? `<b>Here is what I understood from ${esc(d.site ?? raw)}</b><ul>${found.map((f) => `<li>${esc(f)}</li>`).join("")}</ul><span class="hint">I filled in what was empty. Change anything that is wrong.</span>`
+    : "I read your website, but it did not tell me much. No problem: tap your answers below.";
+}
+$("site-read-go").addEventListener("click", () => void readMySite());
+$("site-first").addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); void readMySite(); } });
+
 // ---- Step 2: needs (ticked for the sector) and team size ----
 /** The tapped sector, or the one guessed from the few words typed under "Something else". */
 const sectorNow = () => getSector(resolveSector(profile.sector, profile.sells));
@@ -163,6 +210,10 @@ function renderApps(): void {
   };
   $("apps").innerHTML = sector.apps.map(chip).join("");
   $("apps-more").innerHTML = offered.filter((a) => !sector.apps.includes(a.key)).map((a) => chip(a.key)).join("");
+  // An app found on the owner's website may sit under "Show more apps": open it so a ticked app is never hidden.
+  if ($("apps-more").querySelector("[aria-pressed='true']")) document.querySelector<HTMLDetailsElement>(".more-apps")?.setAttribute("open", "");
+  const site = $<HTMLInputElement>("site");
+  if (!site.value && profile.site) site.value = profile.site;
 }
 for (const id of ["apps", "apps-more"]) {
   $(id).addEventListener("click", (e) => {

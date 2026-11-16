@@ -80,6 +80,12 @@ export const PERSONAS: readonly Persona[] = [
     never: "I recommend orders. I never place one or pay a supplier myself.",
     wantsCategories: [],
   },
+  {
+    key: "data-mining-agent", name: "Dara", role: "Data mining agent", avatar: "av-dm", initials: "DM",
+    intro: ["Hi, I'm Dara, your Data mining agent. Give me a topic and I gather what's public about it: what people are saying, the news, market figures and company records.", "You see what a search will use in energy before it runs. I keep a short summary with every link, and share it with whoever on the team you choose."],
+    never: "I only read public sources. Nothing behind a login or paywall, nothing about private individuals, and a handful of posts is never the whole picture.",
+    wantsCategories: [],
+  },
 ];
 
 const BY_KEY = new Map(PERSONAS.map((p) => [p.key, p]));

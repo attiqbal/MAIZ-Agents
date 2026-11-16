@@ -147,9 +147,9 @@ export class ChannelRouter {
 
   /** "finance: how much runway do we have?" goes to the Finance manager; otherwise the default employee. */
   private pickEmployee(userId: string, conn: Connection, text: string) {
-    const m = /^\s*(finance|marketing|consultant|hr|compliance|supply|admin)\s*[:,-]\s*(.+)$/is.exec(text);
+    const m = /^\s*(finance|marketing|consultant|hr|compliance|supply|data|admin)\s*[:,-]\s*(.+)$/is.exec(text);
     if (m) {
-      const key = { finance: "finance-manager", marketing: "marketing-manager", consultant: "business-consultant", hr: "hr-manager", compliance: "compliance-manager", supply: "supply-chain-manager", admin: "admin-manager" }[m[1]!.toLowerCase() as "finance"];
+      const key = { finance: "finance-manager", marketing: "marketing-manager", consultant: "business-consultant", hr: "hr-manager", compliance: "compliance-manager", supply: "supply-chain-manager", data: "data-mining-agent", admin: "admin-manager" }[m[1]!.toLowerCase() as "finance"];
       const emp = this.workforce.team(userId, conn.workspaceId).find((e) => e.templateKey === key);
       if (emp) return { employeeId: emp.id as string, brief: m[2]!.trim() };
     }
@@ -162,6 +162,8 @@ export function noEnergyMessage(reason: string | undefined): string {
   switch (reason) {
     case "trial_ended":
       return "Your free trial has ended. Choose a plan to keep your team working.";
+    case "plan_ended":
+      return "Your plan has ended, so your team is paused. Your work is kept. Start the Team package again from the store to carry on.";
     case "weekly_pool_used":
       return "The team has used this week's energy. It refills on Monday, or you can add a top-up now.";
     case "overtime_cap_reached":

@@ -56,7 +56,7 @@ Builds and fixes websites and landing pages, automates repeated work between you
 
 - Your Admin manager tells you when the pass has used 80% of its included energy, and re-plans the remaining tasks to fit.
 - When it is all used, work pauses. Nothing extra is charged until you choose: approve more energy up to a cap you set, drop a task, or stop and keep what is done.
-- Approved extra energy costs £1 per 100 energy, taken from your wallet.
+- Approved extra energy costs £1 per 100 energy, and never more than the cap you set.
 - Redoing work because the consultant got it wrong never counts against the pass.
 
 ## Works with
