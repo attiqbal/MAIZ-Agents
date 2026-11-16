@@ -36,6 +36,8 @@ import { suggestionsFor } from "./suggestions.js";
 import type { Reply } from "../modules/conversations/index.js";
 import type { TaskResult } from "../modules/workforce/index.js";
 import { passwordRoutes } from "./password-auth.js";
+import { pushRoute } from "./push-routes.js";
+import { PushError } from "../modules/push/index.js";
 import { LOGIN_PROVIDERS, attemptSecrets, authorizeUrl, completeLogin, isLoginProvider, loginRedirectUri } from "./social-login.js";
 
 const OAUTH_STATE_SECONDS = 600;
@@ -99,7 +101,7 @@ export interface Res {
 }
 
 /** What a client sees of an order: never the provider's reference. */
-const orderView = (o: Order) => ({ id: o.id, status: o.status, lines: o.lines, dueTodayMinor: o.dueTodayMinor, monthlyMinor: o.monthlyMinor, currency: o.currency, createdAt: o.createdAt, paidAt: o.paidAt, employeeIds: o.employeeIds, ...(o.problem && !o.fulfilledAt && o.status === "paid" ? { problem: "We took your payment but could not finish setting up. MAIZ has been alerted." } : {}) });
+const orderView = (o: Order) => ({ id: o.id, status: o.status, lines: o.lines, dueTodayMinor: o.dueTodayMinor, monthlyMinor: o.monthlyMinor, currency: o.currency, createdAt: o.createdAt, paidAt: o.paidAt, employeeIds: o.employeeIds, ...(o.discount ? { discount: { code: o.discount.code, amountOffMinor: o.discount.amountOffMinor, months: o.discount.months } } : {}), ...(o.problem && !o.fulfilledAt && o.status === "paid" ? { problem: "We took your payment but could not finish setting up. MAIZ has been alerted." } : {}) });
 
 const json = (status: number, body: unknown): Res => ({ status, body });
 
@@ -192,7 +194,13 @@ export function createApp(p: Platform) {
     if (method === "POST" && path === "/api/cart/quote") {
       const lines = body().lines;
       if (!Array.isArray(lines) || lines.length > 100) throw new BadRequest("lines must be a list of up to 100 items");
-      return json(200, quote(lines, p.prices.catalogue()));
+      const q = quote(lines, p.prices.catalogue());
+      // A signed-in client holding a discount code sees what it takes off, exactly as checkout will charge it.
+      const viewer = session(req);
+      const viewerOrg = viewer ? orgOf(viewer) : undefined;
+      const d = viewerOrg && p.identity.can(viewer!, viewerOrg.id, "task.read") ? p.orderDiscountFor(viewerOrg.id, Math.round(q.monthlyGbp * 100)) : undefined;
+      if (!d) return json(200, q);
+      return json(200, { ...q, dueTodayGbp: Math.round(q.dueTodayGbp * 100 - d.amountOffMinor) / 100, discount: { code: d.code, amountOffGbp: d.amountOffMinor / 100, months: d.months } });
     }
 
     // ---- a member of staff filling in their own details from their form link (no account) ----
@@ -504,6 +512,8 @@ export function createApp(p: Platform) {
       return json(404, { error: "not found" });
     }
     if (method === "GET" && path === "/api/me") return json(200, { platformOwner: p.isPlatformOwner(userId), hasOrganisation: !!orgOf(userId) });
+    // Push notifications: a client's devices hear the bell; the platform owner's hear about decisions waiting.
+    { const r = await pushRoute(req, userId, p, orgOf(userId)?.id, body); if (r) return r; }
 
     // ---- affiliate: whoever logs in with an affiliate's email sees their own results ----
     if (method === "GET" && path === "/api/affiliate/me") return json(200, { affiliate: affiliateView(sessionClaims(req)?.e) });
@@ -1097,7 +1107,7 @@ export function createApp(p: Platform) {
     try {
       return renewed(req, await route(req));
     } catch (err) {
-      if (err instanceof BadRequest || err instanceof SetupError || err instanceof SignupError || err instanceof LedgerError || err instanceof ChannelError || err instanceof IntegrationError || err instanceof ReviewError || err instanceof PeopleError || err instanceof PricingError || err instanceof PromoError || err instanceof PromoterError || err instanceof GrowthError || err instanceof ResearchError || err instanceof EnergyError || err instanceof SettingsError || err instanceof BatchError || err instanceof PaymentError || err instanceof RotaError || err instanceof MetaClientError) return json(400, { error: err.message });
+      if (err instanceof BadRequest || err instanceof SetupError || err instanceof SignupError || err instanceof LedgerError || err instanceof ChannelError || err instanceof IntegrationError || err instanceof ReviewError || err instanceof PeopleError || err instanceof PricingError || err instanceof PromoError || err instanceof PromoterError || err instanceof GrowthError || err instanceof ResearchError || err instanceof PushError || err instanceof EnergyError || err instanceof SettingsError || err instanceof BatchError || err instanceof PaymentError || err instanceof RotaError || err instanceof MetaClientError) return json(400, { error: err.message });
       // A paid service that has not been confirmed answers 409 with the quote, so the screen can show the cost and ask.
       if (err instanceof PaidServiceError) return json(err.quote ? 409 : 400, { error: err.message, quote: err.quote });
       if (err instanceof RenderError) return json(400, { error: err.message });

@@ -2,7 +2,7 @@ import { newId } from "../../core/ids.js";
 import type { Sink } from "../../core/persistence.js";
 import { PermissionError } from "../identity/index.js";
 import {
-  CODE_PATTERN, COUPON_KINDS, PromoError, checkCouponValue, checkDuration, describeCoupon, discountOf, normaliseCouponCode,
+  CODE_PATTERN, COUPON_KINDS, PromoError, checkCouponValue, checkDuration, describeCoupon, discountEndsAt, discountOf, normaliseCouponCode,
   type CouponKind, type Discount, type Duration,
 } from "./rules.js";
 
@@ -35,8 +35,11 @@ export interface Redemption {
   at: string;
   /** What was given, in words. */
   applied: string;
-  /** Set for discounts on the bill: applied once billing is live. */
+  /** Set for discounts on the bill. It waits until the client's next paid monthly order, then runs on that order. */
   discount?: Discount;
+  /** The paid order the discount came off, and when. Unset while the discount is still waiting to be used. */
+  usedOnOrder?: string;
+  usedAt?: string;
 }
 
 /** What a coupon does to a client's account. Supplied by the platform so this module knows nothing of energy. */
@@ -190,9 +193,29 @@ export class CouponService {
     return r;
   }
 
-  /** The discount on this client's bill, if one is waiting for billing to start (or running). */
+  /** The discount on this client's bill, if one is waiting for their next monthly order or still running. */
   activeDiscount(workspaceId: string): Redemption | undefined {
-    return this.redemptions.find((r) => r.workspaceId === workspaceId && r.discount);
+    const t = this.now().toISOString();
+    return this.redemptions.find((r) => {
+      if (r.workspaceId !== workspaceId || !r.discount) return false;
+      if (!r.usedAt) return true;
+      const ends = discountEndsAt(r.discount, r.usedAt);
+      return ends === undefined || ends > t;
+    });
+  }
+
+  /** A discount the client holds that has not come off an order yet. Checkout applies it to the next monthly order. */
+  waitingDiscount(workspaceId: string): Redemption | undefined {
+    return this.redemptions.find((r) => r.workspaceId === workspaceId && r.discount && !r.usedOnOrder);
+  }
+
+  /** A paid order used the discount: it now runs on that order only and is never applied to another. */
+  markDiscountUsed(workspaceId: string, redemptionId: string, orderId: string): void {
+    const i = this.redemptions.findIndex((r) => r.id === redemptionId && r.workspaceId === workspaceId && r.discount && !r.usedOnOrder);
+    if (i < 0) return;
+    const next: Redemption = { ...this.redemptions[i]!, usedOnOrder: orderId, usedAt: this.now().toISOString() };
+    this.redemptions = this.redemptions.map((r, j) => (j === i ? next : r));
+    this.sink?.promo("redemption", next.id, next);
   }
 
   /** Everything a client has used, for their account page. */

@@ -70,7 +70,7 @@ export interface Sink {
   connectionSecret(key: string, secret: string): void;
 }
 
-export const PROMO_KINDS = ["coupon", "redemption", "affiliate", "referral", "accrual", "payout", "campaign", "draft", "lead", "optout", "fact", "opportunity", "post", "publication", "account", "approval", "channel", "meta_review", "meta_deletion"] as const;
+export const PROMO_KINDS = ["coupon", "redemption", "affiliate", "referral", "accrual", "payout", "campaign", "draft", "lead", "optout", "fact", "opportunity", "post", "publication", "account", "approval", "channel", "meta_review", "meta_deletion", "push_sub"] as const;
 export type PromoKind = (typeof PROMO_KINDS)[number];
 
 /** Kinds stored through Sink.record. The database accepts any kind; this list is what load() hands back. */

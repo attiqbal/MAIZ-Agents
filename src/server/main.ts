@@ -37,6 +37,7 @@ const platform = createPlatform({
   integrationApps: integrationAppsFromEnv(env, env.APP_URL ?? "http://localhost:5173"),
   loginApps: loginAppsFromEnv(env),
   platformOwners: platformOwnersFromEnv(env),
+  ownerTimezone: env.OWNER_TIMEZONE || undefined,
   meta: metaFromEnv(env),
   whatsapp: whatsappFromEnv(env),
   // Only to show the owner's Connections page whether each server-set service is set, and to test it. Never sent out.
@@ -128,10 +129,10 @@ server.headersTimeout = 15_000;
 const port = Number(env.PORT ?? 8787);
 server.listen(port, () => console.log(`listening on :${port}`));
 
-// Once a minute: the batch dispatcher, and the nightly books check (each client once, after their own midnight).
+// Once a minute: the hourly sign-off reminder to the owner, the batch dispatcher, and the nightly books check (each client once, after their own midnight).
 // The batch dispatcher: once a minute, runs any client whose closing time has passed or whose queue is big enough.
 const BATCH_TICK_MS = 60_000;
-const batchTimer = setInterval(() => { void platform.batch.tick(); void platform.reconciliation.tick(); void platform.metaClients.maintenance().catch((e) => console.error("meta maintenance failed:", e instanceof Error ? e.message : e)); void platform.growthTick().catch((e) => console.error("growth tick failed:", e instanceof Error ? e.name : "error")); }, BATCH_TICK_MS);
+const batchTimer = setInterval(() => { void platform.decisionDigest.tick(); void platform.batch.tick(); void platform.reconciliation.tick(); void platform.metaClients.maintenance().catch((e) => console.error("meta maintenance failed:", e instanceof Error ? e.message : e)); void platform.growthTick().catch((e) => console.error("growth tick failed:", e instanceof Error ? e.name : "error")); }, BATCH_TICK_MS);
 batchTimer.unref();
 
 // Hosts send SIGTERM before replacing the instance: stop taking requests and write pending changes to Postgres.

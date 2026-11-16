@@ -30,8 +30,12 @@ const safeLink = (l: string | undefined): string | undefined => (l && /^\/[\w\-.
 export class NotificationService {
   private boxes = new Map<string, Box>();
   private sink?: Sink;
+  private listeners: ((workspaceId: string, notice: Notice) => void)[] = [];
 
   constructor(private identity: IdentityService, private now: () => Date = () => new Date()) {}
+
+  /** Called for every new notice, so it can also be pushed to people's devices. A listener must not throw. */
+  onAdd(listener: (workspaceId: string, notice: Notice) => void): void { this.listeners.push(listener); }
 
   useSink(sink: Sink): void { this.sink = sink; }
 
@@ -42,6 +46,7 @@ export class NotificationService {
     const notice: Notice = { id: newId("notice"), kind: n.kind, title: clip(n.title, 120), ...(n.body ? { body: clip(n.body, 400) } : {}), ...(safeLink(n.link) ? { link: safeLink(n.link) } : {}), at: this.now().toISOString() };
     const box = this.box(workspaceId);
     this.save({ ...box, notices: [notice, ...box.notices].slice(0, MAX_NOTICES) });
+    for (const tell of this.listeners) tell(workspaceId, notice);
     return notice;
   }
 

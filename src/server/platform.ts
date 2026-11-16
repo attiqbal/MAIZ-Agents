@@ -21,12 +21,12 @@ import { BatchService } from "../modules/batch/service.js";
 import { WorkforceService } from "../modules/workforce/index.js";
 import { IntegrationService, defaultRegistry, type OAuthApp } from "../modules/integrations/index.js";
 import { QualityReviewService } from "../modules/review/index.js";
-import { DecisionDigest, openDecisions, type OpenDecision } from "./decisions.js";
+import { DecisionDigest, inQuietHours, openDecisions, type OpenDecision } from "./decisions.js";
 import type { LoginApps } from "./social-login.js";
 import { PriceBook, paidTeamPlan } from "../modules/pricing/index.js";
 import { SpecialistReviewService, type SpecialistRequest } from "../modules/review/specialists.js";
 import { templateFromRole } from "../modules/workforce/templates.js";
-import { MockPaymentProvider, PaymentService, type PaymentProvider } from "../modules/payments/index.js";
+import { MockPaymentProvider, PaymentService, type OrderDiscount, type PaymentProvider } from "../modules/payments/index.js";
 import { quote } from "../modules/store/cart.js";
 import { ReconciliationService } from "../modules/reconciliation/index.js";
 import { localParts } from "../modules/batch/schedule.js";
@@ -36,10 +36,10 @@ import { ConversationService } from "../modules/conversations/index.js";
 import { NotificationService } from "../modules/notifications/index.js";
 
 import { ConsoleEmailSender, QueuedEmailSender, ResendEmailSender, type EmailSender } from "./email.js";
-import { brandFrom, decisionsWaitingEmail, ownerAlertEmail } from "./email-templates.js";
+import { brandFrom, decisionsWaitingEmail, ownerAlertEmail, signOffReminderEmail } from "./email-templates.js";
 import { userIdFor } from "./identity.js";
 import { ExpiringSet, SendLog } from "./expiring.js";
-import { AffiliateService, CouponService } from "../modules/promotions/index.js";
+import { AffiliateService, CouponService, billDiscount } from "../modules/promotions/index.js";
 import { PromoterService } from "../modules/promoter/index.js";
 import { DEFAULT_PAID_MULTIPLIER, PaidServices, type Payer } from "../modules/paid-services/index.js";
 import { GrowthService } from "../modules/growth/index.js";
@@ -52,6 +52,7 @@ import { ConnectionsService } from "../modules/connections/index.js";
 import { isoWeek } from "../modules/integrations/insights.js";
 import { COMPANY } from "../company.js";
 import { CredentialStore } from "../modules/credentials/index.js";
+import { PushService, VAPID_STORE_KEY } from "../modules/push/index.js";
 
 export interface PlatformConfig {
   anthropicApiKey?: string;
@@ -77,6 +78,8 @@ export interface PlatformConfig {
    * queue and sign off specialised tasks. Clients can never approve their own.
    */
   platformOwners?: readonly string[];
+  /** The platform owner's time zone (OWNER_TIMEZONE), so hourly sign-off reminders are not sent at night. Default Europe/London. */
+  ownerTimezone?: string;
   /**
    * Takes payments. Leave out for no charging: checkout is then refused. Development (allowDevAuth) defaults to a
    * mock provider that charges nobody. A real provider (Stripe) is a class implementing PaymentProvider.
@@ -132,6 +135,12 @@ export function createPlatform(cfg: PlatformConfig) {
     extendTrial: (ws, days, by) => { energy.extendTrial(ws, days, by); },
     grantEnergy: (ws, n, by) => energy.grantEnergy(ws, n, by),
   }, now);
+  /** The discount code a client is holding, priced against the monthly part of an order. Undefined when there is none. */
+  const orderDiscountFor = (ws: string, monthlyMinor: number): OrderDiscount | undefined => {
+    const r = coupons.waitingDiscount(ws);
+    const bill = r?.discount ? billDiscount(r.discount, monthlyMinor) : undefined;
+    return r && bill ? { id: r.id, code: r.code, ...bill } : undefined;
+  };
   /** Referral partners: links, signups, commission earned and payouts the owner marks as paid by hand. */
   const affiliates = new AffiliateService((userId) => ownerIdSet.has(userId), now);
   const onboarding = new OnboardingService(identity, workforce, ledger, energy, audit, now, () => {
@@ -154,6 +163,13 @@ export function createPlatform(cfg: PlatformConfig) {
   const conversations = new ConversationService(identity, now);
   /** The bell: one notice per event, with a read marker per person. */
   const notices = new NotificationService(identity, now);
+  /**
+   * Real push notifications to people's browsers and installed apps. The sender's key pair is made on first use and
+   * stored encrypted with the owner's other connection details, so nothing has to be configured.
+   */
+  const push = new PushService({ subject: /^https:\/\//.test(cfg.appUrl ?? "") ? cfg.appUrl! : "https://maizagents.com", now, http: cfg.http });
+  // Whatever rings the bell is also pushed, so the client hears about it with MAIZ closed.
+  notices.onAdd((ws, n) => { void push.sendToWorkspace(ws, { title: n.title, body: n.body, link: n.link ?? "/app.html", tag: n.kind }); });
   /** Tells the client in the Admin manager's inbox (and their chat app), and rings the bell once. */
   const tellClient = async (ws: string, title: string, text: string, kind: "batch_done" | "review" | "specialist", link: string) => {
     notices.add(ws, { kind, title, body: text, link });
@@ -193,6 +209,10 @@ export function createPlatform(cfg: PlatformConfig) {
     if (!owner) return [];
     return openDecisions({ reviews: reviews.queue(owner), specialists: specialists.queue(owner), promotions: promoter.waiting(owner), growth: growth.waiting(owner) }, now().getTime());
   };
+  /** The owner's devices hear about waiting decisions at the same moments the email goes out. */
+  const pushOwners = (count: number): void => {
+    for (const id of ownerIdSet) void push.sendToUser(id, { title: count === 1 ? "1 decision is waiting for you" : `${count} decisions are waiting for you`, body: "A client's work is paused until you decide.", link: "/owner-decisions.html", tag: "decisions" });
+  };
   // One email for any number of waiting decisions, with a button to the page that lists them all.
   const decisionDigest = new DecisionDigest({
     now: () => now().getTime(),
@@ -201,7 +221,15 @@ export function createPlatform(cfg: PlatformConfig) {
       for (const to of ownerEmails) {
         await email.send({ to, ...decisionsWaitingEmail(count, `${base}/owner-decisions.html`, brandFrom(cfg)) });
       }
+      pushOwners(count);
     },
+    // Once an hour while anything is still open, by day in the owner's own time zone.
+    remind: async (count) => {
+      const items = ownerDecisions();
+      for (const to of ownerEmails) await email.send({ to, ...signOffReminderEmail(items, count, base, brandFrom(cfg)) });
+      pushOwners(count);
+    },
+    quiet: () => inQuietHours(now(), cfg.ownerTimezone ?? "Europe/London"),
   });
   /**
    * The promotion agent for the owner's three websites. Everything it drafts waits for the owner (the same decisions
@@ -341,6 +369,9 @@ export function createPlatform(cfg: PlatformConfig) {
     customerEmail: (userId) => identity.workspacesFor(userId).map((w) => w.ownerEmail).find(Boolean),
     now,
     alert: (subject, text) => alertOwnersLate(subject, text),
+    // A discount code the client is holding comes off their next monthly order, once (docs/PROMOTIONS.md).
+    discountFor: (ws, monthlyMinor) => orderDiscountFor(ws, monthlyMinor),
+    discountUsed: (ws, id, orderId) => coupons.markDiscountUsed(ws, id, orderId),
     fulfil: async (order) => {
       const ids: string[] = [];
       for (const line of order.lines) {
@@ -550,11 +581,14 @@ export function createPlatform(cfg: PlatformConfig) {
     for (const x of s.peopleSettings ?? []) people.restoreSettings(x.workspaceId, x.settings);
     for (const r of s.batchRuns ?? []) batch.restoreRun(r);
     for (const c of s.credentials ?? []) credentials.restore(c.userId, c);
-    for (const c of s.connectionSecrets ?? []) connections.restore(c.key, c.secret);
+    for (const c of s.connectionSecrets ?? []) {
+      if (c.key === VAPID_STORE_KEY) push.restoreKeys(c.secret); else connections.restore(c.key, c.secret);
+    }
     rebuildChannels();
     for (const x of s.promoRecords ?? []) {
       if (x.kind === "coupon") coupons.restoreCoupon(x.data);
       else if (x.kind === "redemption") coupons.restoreRedemption(x.data);
+      else if (x.kind === "push_sub") push.restore(x.data);
       else if (x.kind === "meta_review" || x.kind === "meta_deletion") metaClients.restorePlatform(x.kind, x.data);
       else if (x.kind === "channel") { live.waState = x.data; live.wa?.restore(x.data); }
       else if (["campaign", "draft", "lead", "optout", "fact"].includes(x.kind)) promoter.restore(x.kind, x.data);
@@ -562,7 +596,7 @@ export function createPlatform(cfg: PlatformConfig) {
       else affiliates.restore(x.kind, x.data);
     }
     sink = store;
-    for (const part of [audit, identity, energy, workforce, ledger, router, admin, integrations, reviews, prices, specialists, aiSettings, spend, batch, payments, rota, reconciliation, people, conversations, notices, credentials, coupons, affiliates, promoter, growth, connections, metaClients]) part.useSink(store);
+    for (const part of [audit, identity, energy, workforce, ledger, router, admin, integrations, reviews, prices, specialists, aiSettings, spend, batch, payments, rota, reconciliation, people, conversations, notices, credentials, coupons, affiliates, promoter, growth, connections, metaClients, push]) part.useSink(store);
     live.sink = store;
     live.wa?.useSink(store);
   }
@@ -607,6 +641,6 @@ export function createPlatform(cfg: PlatformConfig) {
     slack: { enumerable: true, get: () => cfg.slack ?? connections.slackApp() },
     loginApps: { enumerable: true, get: (): LoginApps => ({ ...connections.loginApps(), ...cfg.loginApps }) },
   });
-  return { conversations, notices, warm, ownerDecisions, decisionDigest, dashboard, reconciliation, rota, people, payments, batch, email, usedLinks, sends, loginFails, resets, credentials, formHits, codeFails, coupons, affiliates, promoter, paid, growth, research, connections, growthTick, metaClients, metaSettings, get ownerWhatsApp() { return live.wa; }, admin, reviews, prices, specialists, ai, clients, isPlatformOwner, healthy, hasStore, cfg: liveCfg, now, audit, bus, identity, energy, workforce, ledger, onboarding, router, integrations, slackTokens, saveSlackToken, attachStore };
+  return { orderDiscountFor, push, conversations, notices, warm, ownerDecisions, decisionDigest, dashboard, reconciliation, rota, people, payments, batch, email, usedLinks, sends, loginFails, resets, credentials, formHits, codeFails, coupons, affiliates, promoter, paid, growth, research, connections, growthTick, metaClients, metaSettings, get ownerWhatsApp() { return live.wa; }, admin, reviews, prices, specialists, ai, clients, isPlatformOwner, healthy, hasStore, cfg: liveCfg, now, audit, bus, identity, energy, workforce, ledger, onboarding, router, integrations, slackTokens, saveSlackToken, attachStore };
 }
 export type Platform = ReturnType<typeof createPlatform>;

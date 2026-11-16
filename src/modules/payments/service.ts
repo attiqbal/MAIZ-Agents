@@ -30,6 +30,16 @@ export interface Order {
   employeeIds: string[];
   /** Why it failed or could not be fulfilled, in words for the platform owner. */
   problem?: string;
+  /** A discount code that came off this order's monthly part. Already taken off `dueTodayMinor`. */
+  discount?: OrderDiscount;
+}
+
+/** A client's waiting discount, priced for one order. `id` names the redemption so it is used once. */
+export interface OrderDiscount {
+  id: string;
+  code: string;
+  amountOffMinor: number;
+  months: number | "forever";
 }
 
 export interface PaymentDeps {
@@ -44,6 +54,10 @@ export interface PaymentDeps {
   now: () => Date;
   /** Told when a paid order could not be fulfilled, so a person can fix it. */
   alert?: (subject: string, text: string) => Promise<void>;
+  /** The discount code this client is holding, priced for an order with this monthly amount. */
+  discountFor?: (workspaceId: string, monthlyMinor: number) => OrderDiscount | undefined;
+  /** Told when an order that carried a discount is paid, so the same code is never applied twice. */
+  discountUsed?: (workspaceId: string, discountId: string, orderId: string) => void;
 }
 
 export const MAX_PENDING_ORDERS = 20;
@@ -83,21 +97,34 @@ export class PaymentService {
     const lines: CheckoutLine[] = q.lines.map((l) => ({ key: l.key, title: l.title, qty: l.qty, unitMinor: pence(l.unitGbp), billing: l.billing }));
     const monthlyMinor = lines.filter((l) => l.billing === "monthly").reduce((n, l) => n + l.unitMinor * l.qty, 0);
     const onceMinor = lines.filter((l) => l.billing === "once").reduce((n, l) => n + l.unitMinor * l.qty, 0);
+    const discount = this.d.discountFor?.(workspaceId, monthlyMinor);
+    // One code discounts one subscription: an unpaid checkout that was holding it is closed before a new one opens.
+    if (discount) await this.releaseDiscount(workspaceId, discount.id);
     const order: Order = {
-      id: newId("order"), workspaceId, userId, lines, monthlyMinor, dueTodayMinor: monthlyMinor + onceMinor, currency: "GBP",
-      status: "pending", provider: provider.name, createdAt: this.d.now().toISOString(), employeeIds: [],
+      id: newId("order"), workspaceId, userId, lines, monthlyMinor, dueTodayMinor: monthlyMinor + onceMinor - (discount?.amountOffMinor ?? 0), currency: "GBP",
+      status: "pending", provider: provider.name, createdAt: this.d.now().toISOString(), employeeIds: [], ...(discount ? { discount } : {}),
     };
     this.save(order);
     this.audit.record({ workspaceId, actor: `user:${userId}`, action: "order.created", target: `order:${order.id}`, data: { dueTodayMinor: order.dueTodayMinor, monthlyMinor } });
     const base = this.d.appUrl.replace(/\/$/, "");
     const session = await provider.createCheckout({
       orderId: order.id, workspaceId, customerEmail: this.d.customerEmail(userId), currency: "GBP", lines,
-      dueTodayMinor: order.dueTodayMinor, monthlyMinor, successUrl: `${base}/app.html?order=${order.id}#team`, cancelUrl: `${base}/pricing.html?cancelled=1`,
+      dueTodayMinor: order.dueTodayMinor, monthlyMinor, successUrl: `${base}/app.html?order=${order.id}#team`, cancelUrl: `${base}/app.html?cancelled=1#store`,
+      ...(discount ? { discount: { amountOffMinor: discount.amountOffMinor }, discountMonths: discount.months } : {}),
     }).catch((e) => { this.save({ ...order, status: "failed", problem: "the payment provider could not start the payment" }); throw e; });
     this.save({ ...this.orders.get(order.id)!, providerRef: session.providerRef });
     if (session.status === "paid") await this.markPaid(order.id);
     else if (session.status === "failed") this.markFailed(order.id, "the payment was declined");
     return { order: this.orders.get(order.id)!, ...(session.url ? { url: session.url } : {}) };
+  }
+
+  /** Closes any unpaid checkout of this client that carries the discount, so it cannot be paid alongside a newer one. */
+  private async releaseDiscount(workspaceId: string, discountId: string): Promise<void> {
+    const holding = [...this.orders.values()].filter((o) => o.workspaceId === workspaceId && o.status === "pending" && o.discount?.id === discountId);
+    for (const o of holding) {
+      if (o.providerRef) await this.d.provider?.cancelSubscription(o.providerRef);
+      this.markFailed(o.id, "replaced by a newer checkout");
+    }
   }
 
   mine(userId: string, workspaceId: string): Order[] {
@@ -208,7 +235,8 @@ export class PaymentService {
     try {
       const paid: Order = { ...o, status: "paid", paidAt: o.paidAt ?? this.d.now().toISOString() };
       this.save(paid);
-      this.audit.record({ workspaceId: o.workspaceId, actor: `payment:${o.provider}`, action: "order.paid", target: `order:${o.id}`, data: { dueTodayMinor: o.dueTodayMinor } });
+      this.audit.record({ workspaceId: o.workspaceId, actor: `payment:${o.provider}`, action: "order.paid", target: `order:${o.id}`, data: { dueTodayMinor: o.dueTodayMinor, ...(o.discount ? { discountCode: o.discount.code, discountMinor: o.discount.amountOffMinor } : {}) } });
+      if (o.discount) this.d.discountUsed?.(o.workspaceId, o.discount.id, o.id);
       try {
         const employeeIds = await this.d.fulfil(paid);
         this.save({ ...paid, employeeIds, fulfilledAt: this.d.now().toISOString() });

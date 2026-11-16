@@ -47,9 +47,30 @@ export interface DigestOptions {
   gapMs?: number;
   /** Runs `fn` after `ms`. Tests pass their own. */
   later?: (fn: () => void, ms: number) => void;
+  /** Sends the hourly reminder that lists what is still waiting. Left out: no reminders. */
+  remind?: (count: number) => Promise<void>;
+  /** True during the owner's night, when reminders are held back. */
+  quiet?: () => boolean;
+  /** Fewest milliseconds between two reminders, and between any email and the next reminder. */
+  reminderGapMs?: number;
 }
 
 export const DIGEST_GAP_MS = 30 * 60_000;
+export const REMINDER_GAP_MS = 60 * 60_000;
+/** Reminders are held between these local hours (22:00 up to, not including, 07:00). */
+export const QUIET_FROM_HOUR = 22;
+export const QUIET_UNTIL_HOUR = 7;
+
+/** True between 22:00 and 07:00 in the given time zone. An unknown zone is read as UTC. */
+export function inQuietHours(at: Date, timeZone: string): boolean {
+  let hour: number;
+  try {
+    hour = Number(new Intl.DateTimeFormat("en-GB", { hour: "2-digit", hourCycle: "h23", timeZone }).format(at));
+  } catch {
+    hour = at.getUTCHours();
+  }
+  return hour >= QUIET_FROM_HOUR || hour < QUIET_UNTIL_HOUR;
+}
 
 /**
  * Call `poke()` whenever a decision opens. The first goes out at once; any more inside the gap are folded
@@ -58,7 +79,9 @@ export const DIGEST_GAP_MS = 30 * 60_000;
 export class DecisionDigest {
   private lastSent = Number.NEGATIVE_INFINITY;
   private waiting = false;
-  readonly stats = { sent: 0 };
+  /** When the reminder clock started: the first tick that found something waiting. */
+  private waitingSince: number | undefined;
+  readonly stats = { sent: 0, reminded: 0 };
 
   constructor(private readonly o: DigestOptions) {}
 
@@ -70,6 +93,29 @@ export class DecisionDigest {
     this.waiting = true;
     const later = this.o.later ?? ((fn, ms) => { setTimeout(fn, ms).unref?.(); });
     later(() => { this.waiting = false; void this.fire(); }, wait);
+  }
+
+  /**
+   * Call once a minute. While anything is still waiting for sign-off, the owner gets one reminder an hour (never at
+   * night), each listing what is open. The hour is counted from the last email of either kind, and from the first
+   * tick that sees something waiting, so a restart never sends a reminder straight away.
+   */
+  async tick(): Promise<void> {
+    if (!this.o.remind) return;
+    const count = this.o.count();
+    if (count === 0) { this.waitingSince = undefined; return; }
+    const t = this.o.now();
+    // An email already sent in this process starts the hour; otherwise this first sighting does.
+    this.waitingSince ??= Number.isFinite(this.lastSent) ? this.lastSent : t;
+    const gap = this.o.reminderGapMs ?? REMINDER_GAP_MS;
+    if (t - Math.max(this.lastSent, this.waitingSince) < gap || this.o.quiet?.()) return;
+    this.lastSent = t;
+    try {
+      await this.o.remind(count);
+      this.stats.reminded++;
+    } catch (e) {
+      console.error("sign-off reminder failed:", e instanceof Error ? e.message : e);
+    }
   }
 
   private async fire(): Promise<void> {

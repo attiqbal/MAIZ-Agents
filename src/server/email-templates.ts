@@ -17,6 +17,7 @@ const SERIF = "Georgia, 'Times New Roman', serif";
 const SANS = "Helvetica, Arial, sans-serif";
 
 import { COMPANY } from "../company.js";
+import type { OpenDecision } from "./decisions.js";
 
 export interface Mail {
   to: string;
@@ -174,6 +175,38 @@ export const decisionsWaitingEmail = (count: number, url: string, brand: EmailBr
     ],
     button: { label: "See all decisions", url },
   }, brand);
+
+/** How long something has waited, in words: "under an hour", "3 hours", "2 days". */
+export const waitedFor = (hours: number): string => {
+  if (hours < 1) return "under an hour";
+  if (hours < 24) return `${hours} hour${hours === 1 ? "" : "s"}`;
+  const days = Math.floor(hours / 24);
+  return `${days} day${days === 1 ? "" : "s"}`;
+};
+
+/** How many waiting sign-offs the hourly reminder lists by name. The rest are counted. */
+export const REMINDER_LIST_MAX = 8;
+
+/**
+ * The hourly reminder while sign-offs are still open: the oldest few by name, with the client and how long each has
+ * waited, so the owner can see from the inbox what is holding a client's work up. Not sent at night.
+ */
+export const signOffReminderEmail = (items: readonly OpenDecision[], count: number, baseUrl: string, brand: EmailBrand) => {
+  const heading = `Still waiting for your sign-off: ${count === 1 ? "1 decision" : `${count} decisions`}`;
+  const more = count - Math.min(items.length, REMINDER_LIST_MAX);
+  return build(heading, {
+    audience: "owner",
+    preheader: "Clients' work is paused until you decide. The oldest are listed here.",
+    heading,
+    paragraphs: ["These are still waiting for you, oldest first. A client's specialised work does not start until you sign it off."],
+    list: [
+      ...items.slice(0, REMINDER_LIST_MAX).map((i) => `${i.title} (${i.clientName}), waiting ${waitedFor(i.ageHours)}`),
+      ...(more > 0 ? [`and ${more} more`] : []),
+    ],
+    button: { label: "Open your decisions", url: `${baseUrl.replace(/\/$/, "")}/owner-decisions.html` },
+    fineprint: ["You get this once an hour while anything is waiting, and never between 22:00 and 07:00. It stops as soon as everything is decided."],
+  }, brand);
+};
 
 /** Owner alert for things that need a person (a setup that could not undo itself, a books check that found problems). */
 export const ownerAlertEmail = (subject: string, body: string, brand: EmailBrand) => build(subject, {
