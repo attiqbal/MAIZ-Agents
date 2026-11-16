@@ -4,6 +4,8 @@ import "./styles.css";
 import { initNav } from "./common";
 import { esc, initOwnerNav, markDemo, ownerLoad } from "./owner-common";
 import { renderNeeds } from "./owner-needs";
+import { getToken } from "./api";
+import { mountPushControls, syncPush } from "./push";
 
 initNav();
 initOwnerNav();
@@ -38,5 +40,6 @@ void (async () => {
   if (!data) return;
   void renderNeeds($("needs"), "decisions", { name: "Your decisions desk", avatar: "av-tl", initials: "DD", asks: "I tell you when something waits for your yes: a daily email, and a WhatsApp message if you connect it. Email needs the sending service working; WhatsApp needs your line connected." });
   if (data === "demo") { markDemo(); render(DEMO); return; }
+  if (getToken()) { mountPushControls($("dc-push"), (m) => { $("dc-push-msg").textContent = m; }); void syncPush(); }
   render(data.items);
 })();

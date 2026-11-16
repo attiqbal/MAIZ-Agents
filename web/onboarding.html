@@ -27,6 +27,9 @@
     <h1>Hi, I'm Maya. I'll set up your team. What kind of business do you run?</h1>
     <p class="sub">A few taps and they're ready to meet you. Free for 7 days, no card.</p>
     <div class="ob-panel">
+      <div class="field site-first"><label for="site-first">Have a website? I'll read it and fill this in for you <span class="hint">(optional)</span></label>
+        <div class="site-first-row"><input class="input" id="site-first" maxlength="200" placeholder="kestrelcoffee.co.uk" inputmode="url" autocomplete="url" autocapitalize="none" spellcheck="false" aria-describedby="site-read"><button type="button" class="btn btn-ghost" id="site-read-go">Read my website</button></div>
+        <div class="site-read" id="site-read" role="status" hidden></div></div>
       <div class="sectors" role="group" aria-label="Kind of business" id="sectors"></div>
       <div class="field" id="sells-f" hidden><label for="sells">What do you do, in a few words?</label><input class="input" id="sells" maxlength="300" placeholder="Mobile dog grooming"></div>
       <div class="field"><label for="biz">Business name</label><input class="input" id="biz" maxlength="120" aria-describedby="biz-err" aria-required="true" placeholder="Kestrel Coffee" autocomplete="organization"></div>
@@ -122,8 +125,8 @@
       </div>
       <div style="display:flex;flex-direction:column;gap:8px">
         <div class="app-row"><span class="lg"><svg viewBox="0 0 24 24"><rect x="9.5" y="2" width="3" height="8" rx="1.5" fill="#36c5f0"/><rect x="14" y="9.5" width="8" height="3" rx="1.5" fill="#2eb67d"/><rect x="11.5" y="14" width="3" height="8" rx="1.5" fill="#ecb22e"/><rect x="2" y="11.5" width="8" height="3" rx="1.5" fill="#e01e5a"/></svg></span><div><div class="nm">Slack</div><div class="ds" id="slack-ds">Opens Slack to approve MAIZ Agents</div></div><button class="btn btn-sm btn-ghost" id="slack-sim">Connect Slack</button></div>
-        <div class="app-row" style="opacity:.55"><span class="lg" style="font-weight:600">T</span><div><div class="nm">Microsoft Teams</div><div class="ds">Coming soon</div></div><span class="badge badge-dark">Soon</span></div>
-        <div class="app-row" style="opacity:.55"><span class="lg" style="font-weight:600">W</span><div><div class="nm">WhatsApp</div><div class="ds">Coming soon</div></div><span class="badge badge-dark">Soon</span></div>
+        <div class="app-row"><span class="lg" style="font-weight:600">W</span><div><div class="nm">WhatsApp</div><div class="ds">Connect after signup, under Social accounts</div></div><span class="badge badge-dark">After signup</span></div>
+        <div class="app-row"><span class="lg" style="font-weight:600">A</span><div><div class="nm">Alerts on your phone or computer</div><div class="ds">Turn on from the bell in your control centre</div></div><span class="badge badge-dark">After signup</span></div>
       </div>
       <div class="field"><span class="label" id="contact-l">Where should your Admin manager message you?</span>
         <div class="chips" role="group" aria-labelledby="contact-l" id="contact">

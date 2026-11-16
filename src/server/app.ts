@@ -20,6 +20,7 @@ import { affiliatePaidEmail, affiliateWelcomeEmail, brandFrom, couponGiftEmail, 
 import { SignupError, type SignupChoices } from "../modules/onboarding/index.js";
 import { planSignup, readSignupAnswers } from "../modules/onboarding/recommend.js";
 import { OTHER_SECTOR, getSector } from "../modules/onboarding/sectors.js";
+import { readSite } from "../modules/onboarding/site-reader.js";
 import { getTemplate, TEMPLATES } from "../modules/workforce/templates.js";
 import { getJobDescription } from "../modules/workforce/job-descriptions.js";
 import { CUSTOM_SPECIALIST, DEPARTMENTS } from "../modules/workforce/blueprints.js";
@@ -36,6 +37,12 @@ import { suggestionsFor } from "./suggestions.js";
 import type { Reply } from "../modules/conversations/index.js";
 import type { TaskResult } from "../modules/workforce/index.js";
 import { passwordRoutes } from "./password-auth.js";
+import { pushRoute } from "./push-routes.js";
+import { miningRoute } from "./mining-routes.js";
+import { MiningError } from "../modules/data-mining/index.js";
+import { PushError } from "../modules/push/index.js";
+import { agentOwnerRoute, agentPublicRoute } from "./agent-routes.js";
+import { AgentError } from "../modules/agents/index.js";
 import { LOGIN_PROVIDERS, attemptSecrets, authorizeUrl, completeLogin, isLoginProvider, loginRedirectUri } from "./social-login.js";
 
 const OAUTH_STATE_SECONDS = 600;
@@ -99,7 +106,7 @@ export interface Res {
 }
 
 /** What a client sees of an order: never the provider's reference. */
-const orderView = (o: Order) => ({ id: o.id, status: o.status, lines: o.lines, dueTodayMinor: o.dueTodayMinor, monthlyMinor: o.monthlyMinor, currency: o.currency, createdAt: o.createdAt, paidAt: o.paidAt, employeeIds: o.employeeIds, ...(o.problem && !o.fulfilledAt && o.status === "paid" ? { problem: "We took your payment but could not finish setting up. MAIZ has been alerted." } : {}) });
+const orderView = (o: Order) => ({ id: o.id, status: o.status, lines: o.lines, dueTodayMinor: o.dueTodayMinor, monthlyMinor: o.monthlyMinor, currency: o.currency, createdAt: o.createdAt, paidAt: o.paidAt, employeeIds: o.employeeIds, ...(o.discount ? { discount: { code: o.discount.code, amountOffMinor: o.discount.amountOffMinor, months: o.discount.months } } : {}), ...(o.problem && !o.fulfilledAt && o.status === "paid" ? { problem: "We took your payment but could not finish setting up. MAIZ has been alerted." } : {}) });
 
 const json = (status: number, body: unknown): Res => ({ status, body });
 
@@ -188,11 +195,19 @@ export function createApp(p: Platform) {
         prices: p.prices.general(),
       });
     }
-    // Prices a cart. Public and pure: nothing is charged or stored (payments are not connected yet).
+    // Prices a cart. Nothing is charged or stored. A signed-in client gets the price for their own plan: the Team
+    // package is added to a first monthly order, and a discount code they hold is taken off, exactly as checkout will.
     if (method === "POST" && path === "/api/cart/quote") {
       const lines = body().lines;
       if (!Array.isArray(lines) || lines.length > 100) throw new BadRequest("lines must be a list of up to 100 items");
-      return json(200, quote(lines, p.prices.catalogue()));
+      const viewer = session(req);
+      const viewerOrg = viewer ? orgOf(viewer) : undefined;
+      const mine = viewerOrg && p.identity.can(viewer!, viewerOrg.id, "task.read") ? viewerOrg.id : undefined;
+      const q = mine ? p.quoteFor(mine, lines) : quote(lines, p.prices.catalogue());
+      const plan = mine ? { hasTeamPackage: p.hasTeamPackage(mine) } : {};
+      const d = mine ? p.orderDiscountFor(mine, Math.round(q.monthlyGbp * 100)) : undefined;
+      if (!d) return json(200, { ...q, ...plan });
+      return json(200, { ...q, ...plan, dueTodayGbp: Math.round(q.dueTodayGbp * 100 - d.amountOffMinor) / 100, discount: { code: d.code, amountOffGbp: d.amountOffMinor / 100, months: d.months } });
     }
 
     // ---- a member of staff filling in their own details from their form link (no account) ----
@@ -307,6 +322,15 @@ export function createApp(p: Platform) {
       // Signed in: wrong tries count against the person. Anonymous: only the per-address limit applies, so a made-up email cannot reset or poison a counter.
       if (claims) return codeAttempt(`u:${claims.u}`, () => json(200, p.coupons.check(b.code, ctx)));
       try { return json(200, p.coupons.check(b.code, ctx)); } catch (e) { if (e instanceof PromoError) return json(400, { error: e.message }); throw e; }
+    }
+
+    // Reads the business's own home page so signup can fill itself in. Public and tightly rate limited; the page is a
+    // stranger's, so the answer is plain clipped text, and a failure never says why (no probing of what we can reach).
+    if (method === "POST" && path === "/api/signup/read-site") {
+      const website = body().website;
+      if (typeof website !== "string" || !website.trim() || website.length > 200) return json(200, { read: false, reason: "That does not look like a website address." });
+      try { return json(200, { read: true, ...(await readSite(website, { http: p.cfg.http })) }); }
+      catch { return json(200, { read: false, reason: "We could not read that website just now." }); }
     }
 
     // ---- sign up: needs a verified email (or the development shortcut) ----
@@ -453,6 +477,9 @@ export function createApp(p: Platform) {
     const metaCtx: MetaRouteCtx = { p, makeToken: (claims, ttl) => makeToken(secret, claims, ttl, p.now().getTime()), readToken: (t) => readToken(secret, t, p.now().getTime()), readCookie, orgOf, body };
     if (path.startsWith("/api/meta/")) { const r = await metaPublicRoute(req, metaCtx); if (r) return r; }
 
+    // ---- outside agents: a client's own AI tool sends jobs with its connection key (no session) ----
+    if (path.startsWith("/api/agent/v1/")) { const r = await agentPublicRoute(req, p, body); if (r) return r; }
+
     // ---- everything below needs a signed-in user ----
     const userId = session(req);
     if (!userId) return json(401, { error: "sign in first" });
@@ -504,12 +531,18 @@ export function createApp(p: Platform) {
       return json(404, { error: "not found" });
     }
     if (method === "GET" && path === "/api/me") return json(200, { platformOwner: p.isPlatformOwner(userId), hasOrganisation: !!orgOf(userId) });
+    // Push notifications: a client's devices hear the bell; the platform owner's hear about decisions waiting.
+    { const r = await pushRoute(req, userId, p, orgOf(userId)?.id, body); if (r) return r; }
+    // The Data mining agent: quote, run, datasets and sharing (docs/DATA-MINING.md).
+    { const r = await miningRoute(req, userId, p, orgOf(userId)?.id, body); if (r) return r; }
 
     // ---- affiliate: whoever logs in with an affiliate's email sees their own results ----
     if (method === "GET" && path === "/api/affiliate/me") return json(200, { affiliate: affiliateView(sessionClaims(req)?.e) });
 
     const org = orgOf(userId);
     if (!org) return json(404, { error: "no organisation yet" });
+    // Outside agents, the owner's side: connections, keys, limits and jobs waiting for approval (docs/EXTERNAL-AGENTS.md).
+    { const r = await agentOwnerRoute(req, userId, p, org.id, body); if (r) return r; }
 
     // ---- coupons on the account page ----
     if (method === "GET" && path === "/api/coupons") return json(200, { used: p.coupons.forClient(org.id).map((r) => ({ code: r.code, at: r.at, applied: r.applied })) });
@@ -595,6 +628,9 @@ export function createApp(p: Platform) {
         id: org.id,
         name: org.name,
         trialEndsAt: plan.expiresAt,
+        /** True when `trialEndsAt` is the end of a cancelled paid plan, so the page words it as that. */
+        planEnded: plan.endedPaid === true,
+        hasTeamPackage: p.hasTeamPackage(org.id),
         dailyQuotaPerEmployee: plan.dailyQuotaPerEmployee,
         /** The team's shared energy: pool, left, left today, daily ceiling, refill time. Absent on older plans. */
         teamEnergy: p.energy.teamEnergy(userId, org.id) ?? null,
@@ -1097,7 +1133,7 @@ export function createApp(p: Platform) {
     try {
       return renewed(req, await route(req));
     } catch (err) {
-      if (err instanceof BadRequest || err instanceof SetupError || err instanceof SignupError || err instanceof LedgerError || err instanceof ChannelError || err instanceof IntegrationError || err instanceof ReviewError || err instanceof PeopleError || err instanceof PricingError || err instanceof PromoError || err instanceof PromoterError || err instanceof GrowthError || err instanceof ResearchError || err instanceof EnergyError || err instanceof SettingsError || err instanceof BatchError || err instanceof PaymentError || err instanceof RotaError || err instanceof MetaClientError) return json(400, { error: err.message });
+      if (err instanceof BadRequest || err instanceof SetupError || err instanceof SignupError || err instanceof LedgerError || err instanceof ChannelError || err instanceof IntegrationError || err instanceof ReviewError || err instanceof PeopleError || err instanceof PricingError || err instanceof PromoError || err instanceof PromoterError || err instanceof GrowthError || err instanceof ResearchError || err instanceof PushError || err instanceof AgentError || err instanceof MiningError || err instanceof EnergyError || err instanceof SettingsError || err instanceof BatchError || err instanceof PaymentError || err instanceof RotaError || err instanceof MetaClientError) return json(400, { error: err.message });
       // A paid service that has not been confirmed answers 409 with the quote, so the screen can show the cost and ask.
       if (err instanceof PaidServiceError) return json(err.quote ? 409 : 400, { error: err.message, quote: err.quote });
       if (err instanceof RenderError) return json(400, { error: err.message });

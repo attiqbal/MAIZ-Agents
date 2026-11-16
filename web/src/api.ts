@@ -59,6 +59,10 @@ export interface Org {
   id: string;
   name: string;
   trialEndsAt?: string;
+  /** True when `trialEndsAt` is the end of a cancelled paid plan and not of the free trial. */
+  planEnded?: boolean;
+  /** False while the client is on the free trial and has not bought the Team package yet. */
+  hasTeamPackage?: boolean;
   dailyQuotaPerEmployee: number;
   /** The team's shared energy pool; null on older plans that still have a per-employee daily amount. */
   teamEnergy: { pool: number; used: number; left: number; percentUsed: number; topUpLeft: number; leftToday: number; dailyCeiling: number | null; refillsAt: string | null } | null;

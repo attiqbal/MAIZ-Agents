@@ -53,8 +53,10 @@ export interface EnergyPlan {
   autoReloadSpent?: { month: string; gbp: number };
   /** Hard stop for total real provider cost per month, in micro-dollars. Protects margin. */
   monthlyCostCapMicro: number;
-  /** ISO timestamp after which no work is allowed (end of free trial). */
+  /** ISO timestamp after which no work is allowed (end of free trial, or of a paid plan that was cancelled). */
   expiresAt?: string;
+  /** Set when `expiresAt` is the end of a cancelled paid plan and not of a free trial, so the client is told the right thing. */
+  endedPaid?: boolean;
   /**
    * Set when a client moves from the free trial to a paid plan: how many usage rows the workspace had then.
    * Those rows (the trial's) do not count against the paid pool or its daily ceiling, so the client starts
@@ -154,7 +156,7 @@ const RECENT_TASKS = 20;
 
 export type Verdict =
   | { allowed: true; overtime: boolean }
-  | { allowed: false; reason: "daily_quota_used" | "weekly_pool_used" | "daily_ceiling_reached" | "overtime_cap_reached" | "monthly_cost_cap_reached" | "trial_ended" };
+  | { allowed: false; reason: "daily_quota_used" | "weekly_pool_used" | "daily_ceiling_reached" | "overtime_cap_reached" | "monthly_cost_cap_reached" | "trial_ended" | "plan_ended" };
 
 export interface UsageRecord {
   workspaceId: string;
@@ -387,9 +389,26 @@ export class EnergyMeter {
     if (!current.expiresAt && current.paidFromRow !== undefined) return false;
     const rows = this.rowsOf(workspaceId).length;
     const { expiresAt: _ends, ...rest } = paid;
-    const plan: EnergyPlan = { ...rest, startedAt: this.now().toISOString(), paidFromRow: rows, ...(current.autoReload ? { autoReload: current.autoReload } : {}) };
+    // Top-up energy the client bought is theirs: it survives a cancelled plan being started again.
+    const kept = { ...(current.autoReload ? { autoReload: current.autoReload } : {}), ...(current.topUpEnergyBought ? { topUpEnergyBought: current.topUpEnergyBought } : {}), ...(current.autoReloadSpent ? { autoReloadSpent: current.autoReloadSpent } : {}) };
+    const plan: EnergyPlan = { ...rest, startedAt: this.now().toISOString(), paidFromRow: rows, ...kept };
     this.savePlan(workspaceId, plan);
     this.audit.record({ workspaceId, actor: by, action: "energy.switched_to_paid", data: { trialEnergyUsed: this.rowsOf(workspaceId).filter((u) => !u.overtime).reduce((s, u) => s + u.energy, 0), weeklyTeamEnergy: plan.weeklyTeamEnergy ?? null } });
+    return true;
+  }
+
+  /**
+   * The paid plan stops (the client cancelled, or the payment provider ended the subscription). Work is allowed
+   * until `endsAt` with one more pool for that time, then pauses exactly as an ended trial does, and buying the
+   * Team package again restarts it. Returns false, and changes nothing, for a client who is not on a paid plan.
+   * Platform-level, no user check.
+   */
+  endPaidPlan(workspaceId: string, endsAt: string, by: string): boolean {
+    const current = this.planOf(workspaceId);
+    if (current.expiresAt || current.paidFromRow === undefined) return false;
+    const { autoReload: _off, ...rest } = current;
+    this.savePlan(workspaceId, { ...rest, startedAt: this.now().toISOString(), paidFromRow: this.rowsOf(workspaceId).length, expiresAt: endsAt, endedPaid: true });
+    this.audit.record({ workspaceId, actor: by, action: "energy.paid_plan_ended", data: { endsAt } });
     return true;
   }
 
@@ -400,7 +419,7 @@ export class EnergyMeter {
   /** Ask before doing work. Changes nothing, except buying a pack when the client turned auto-reload on. */
   check(workspaceId: string, employeeId: string): Verdict {
     const plan = this.planOf(workspaceId);
-    if (plan.expiresAt && this.now().toISOString() > plan.expiresAt) return { allowed: false, reason: "trial_ended" };
+    if (plan.expiresAt && this.now().toISOString() > plan.expiresAt) return { allowed: false, reason: plan.endedPaid ? "plan_ended" : "trial_ended" };
     const day = this.today(workspaceId);
     const month = day.slice(0, 7);
     const mine = this.rowsOf(workspaceId);

@@ -10,9 +10,16 @@ The owner makes a code that gives one of:
 |---|---|---|
 | `trial_days` | Adds days to the end of the free trial (`EnergyMeter.extendTrial`, up to 90). Trial energy stays the same. | Yes |
 | `energy_credit` | Adds energy once (`EnergyMeter.grantEnergy`): raises the trial pool, or on a paid plan is added as a roll-over top-up. | Yes |
-| `percent_off`, `fixed_off`, `free_months` | Saved on the client as a `Redemption.discount` `{type, value, months \| null}`. | **Recorded only.** Checkout does not read it yet. |
+| `percent_off`, `fixed_off`, `free_months` | Saved on the client as a `Redemption.discount` `{type, value, months \| null}`. | Yes: taken off the client's next monthly order at checkout (see below). |
 
-Billing discounts last once, for N months or for ever (`Duration`). A client may hold one billing discount at a time. When checkout starts charging, call `applyDiscount(redemption.discount, monthlyGbp, monthIndex)` from `rules.ts` (month 0 is the first bill after the code was used) and read the active one with `CouponService.activeDiscount(workspaceId)`.
+Billing discounts last once, for N months or for ever (`Duration`). A client may hold one billing discount at a time.
+
+How a billing discount is charged (built 2026-11-16):
+
+- It comes off the client's **next order that has a monthly line**, on the monthly part only, never on a one-off consultant pass, and never more than the monthly amount (`billDiscount` in `rules.ts`). A cart with nothing monthly leaves the code waiting.
+- `POST /api/cart/quote` shows a signed-in client the discount line and the reduced amount due today, and the cart in the control centre shows the same. Checkout sends the amount and the number of months to the payment provider (Stripe makes a one-use coupon on that subscription), and the order records the code and the amount.
+- A code discounts one subscription: when it is paid the redemption is marked used (`CouponService.markDiscountUsed`), and an older unpaid checkout that was holding the same code is closed first.
+- While the discounted months run the client cannot add a second code; once it has run out they can (`discountEndsAt`).
 
 Limits on a coupon: most uses in total, an expiry date, only trial or only paying clients, only one email. Owner can turn a code on or off, see every use, and email a code to someone (branded email). Codes are normalised to upper case; a client may type them in any case.
 

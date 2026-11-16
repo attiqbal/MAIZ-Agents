@@ -33,7 +33,7 @@ export function parseSse(buffer: string): { events: SseEvent[]; rest: string } {
 
 /** What to show for a finished ask: plain words, never a blank. */
 export function describeOutcome(who: string, d: AskDone): { kind: "answer" | "queued" | "note"; text: string } {
-  if (d.status === "no_energy") return { kind: "note", text: d.message ?? (d.reason === "trial_ended" ? "Your free trial has ended" : "Your team is out of energy for now") };
+  if (d.status === "no_energy") return { kind: "note", text: d.message ?? (d.reason === "trial_ended" ? "Your free trial has ended" : d.reason === "plan_ended" ? "Your plan has ended, so your team is paused" : "Your team is out of energy for now") };
   if (d.status === "queued") return { kind: "queued", text: d.runsAt ?? "" };
   if (d.status === "failed" || !d.answer) return { kind: "note", text: d.message ?? `${who} couldn't answer just now. Try again in a few minutes.` };
   return { kind: "answer", text: d.answer };

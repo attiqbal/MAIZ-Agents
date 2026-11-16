@@ -33,6 +33,7 @@ const EMPLOYEE_TITLE: Record<string, string> = {
   "admin-manager": "Admin manager", "finance-manager": "Finance manager", "marketing-manager": "Marketing manager",
   "business-consultant": "Business consultant", "hr-manager": "HR manager", "compliance-manager": "Compliance manager",
   "supply-chain-manager": "Supply chain manager (add-on)",
+  "data-mining-agent": "Data mining agent (add-on)",
 };
 const escHtml = (s: string) => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
 // How each sector reads in a heading ("AI employees for ...").
@@ -229,7 +230,7 @@ function llmsTxt(): string {
 - Optional add-ons: an extra ready-made employee £25 a month, a specialist £35 a month (each adds 2,000 energy a week), and consultant passes for 7 or 30 days.
 - Energy is the team's weekly allowance. Each task shows its energy cost before it starts; redoing a task returns its energy. It refills every Monday.
 - Control: nothing leaves the business without the owner's approval. Finance figures come from tested accounting code, not AI guesses; estimates are labelled.
-- Works in Slack and in the MAIZ control centre (web). Accounting connections such as Xero and Square are coming soon.
+- Works in Slack and in the MAIZ control centre (web). It reads accounts, tills, payments, payroll and website figures from more than 200 apps (Xero, Square and Stripe connect directly; the rest by file upload or through Zapier or Make), read-only.
 - Security: each business's data is kept apart at the database level, sign-in uses one-time email links, and every action is written to an audit trail. No outside security audit or certification yet.
 
 ## Pages

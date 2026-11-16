@@ -81,6 +81,35 @@ export function applyDiscount(d: Discount | undefined, monthlyGbp: number, month
 
 export const round2 = (n: number): number => Math.round(n * 100) / 100;
 
+/** What a discount takes off an order, as the payment provider needs it. */
+export interface BillDiscount {
+  /** Pence off each discounted month. Never more than the monthly amount. */
+  amountOffMinor: number;
+  /** How many monthly bills it comes off, counting the first. */
+  months: number | "forever";
+}
+
+/**
+ * Turns a coupon's discount into a fixed amount off the monthly part of one order. A percentage is worked out here,
+ * on the monthly lines only, so a one-off consultant pass bought in the same cart is never discounted by a code that
+ * promises money off "your monthly bill". Returns undefined when there is nothing monthly to discount.
+ */
+export function billDiscount(d: Discount, monthlyMinor: number): BillDiscount | undefined {
+  if (!Number.isFinite(monthlyMinor) || monthlyMinor <= 0) return undefined;
+  const raw = d.type === "percent" ? Math.round((monthlyMinor * d.value) / 100) : Math.round(d.value * 100);
+  const amountOffMinor = Math.min(monthlyMinor, Math.max(0, raw));
+  if (amountOffMinor <= 0) return undefined;
+  return { amountOffMinor, months: d.months ?? "forever" };
+}
+
+/** The moment a discount that started at `usedAt` stops coming off the bill, or undefined when it never stops. */
+export function discountEndsAt(d: Discount, usedAt: string): string | undefined {
+  if (d.months === null) return undefined;
+  const end = new Date(usedAt);
+  end.setUTCMonth(end.getUTCMonth() + d.months);
+  return end.toISOString();
+}
+
 const durationWords = (d: Duration): string => (d.kind === "once" ? "on the first bill" : d.kind === "forever" ? "for as long as you stay" : `for ${d.months} month${d.months === 1 ? "" : "s"}`);
 
 /** One plain sentence for what a coupon gives, shown to the client and the owner. */

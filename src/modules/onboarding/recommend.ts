@@ -88,6 +88,7 @@ const TEAM: readonly { key: string; title: string; standbyJob: string }[] = [
 
 const ADD_ON_FOR_NEED: Partial<Record<NeedKey, PlanOffer>> = {
   stock: { key: "supply-chain-manager", title: "Supply chain and inventory manager", reason: "You asked for help with stock and suppliers. This employee watches stock levels, reorders and supplier prices." },
+  "know-my-market": { key: "data-mining-agent", title: "Data mining agent", reason: "You asked to know your market. This employee gathers public data on a topic (what people say, news, figures, company records) and shares it with your team." },
 };
 
 const CONSULTANT_FOR_NEED: Partial<Record<NeedKey, PlanOffer>> = {

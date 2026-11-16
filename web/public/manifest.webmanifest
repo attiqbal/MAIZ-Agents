@@ -1,0 +1,14 @@
+{
+  "name": "MAIZ Agents",
+  "short_name": "MAIZ",
+  "description": "Your AI employees: what needs you, what they are doing, and how the business is doing.",
+  "start_url": "/app.html",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f5f1e4",
+  "theme_color": "#f5f1e4",
+  "icons": [
+    { "src": "/apple-touch-icon.png", "sizes": "180x180", "type": "image/png" },
+    { "src": "/logo.png", "sizes": "512x512", "type": "image/png", "purpose": "any" }
+  ]
+}

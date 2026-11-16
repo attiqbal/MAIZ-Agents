@@ -52,6 +52,7 @@ const REASONS: Record<string, string> = {
   overtime_cap_reached: "this month's extra energy is used up",
   monthly_cost_cap_reached: "this month's limit has been reached. Please contact MAIZ",
   trial_ended: "the free trial has ended",
+  plan_ended: "the plan has ended",
 };
 
 export class PaidServices {

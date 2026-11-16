@@ -19,6 +19,8 @@ const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&
 const money = (n: number, cur: string) => { try { return new Intl.NumberFormat(undefined, { style: "currency", currency: cur }).format(n / 100); } catch { return `${(n / 100).toFixed(2)} ${cur}`; } };
 
 const EMPLOYEES: [string, string][] = [["finance-manager", "Finance"], ["business-consultant", "Consultant"], ["marketing-manager", "Marketing"], ["hr-manager", "HR"]];
+/** A client who hired the Data mining agent can also let it read an app (app.ts marks the page when it is on the team). */
+const employeesWithAccess = (): [string, string][] => (document.getElementById("app")?.classList.contains("has-dm") ? [...EMPLOYEES, ["data-mining-agent", "Data"]] : EMPLOYEES);
 const CATEGORY: Record<CatalogueItem["category"], string> = { till: "Tills", payroll: "Payroll", accounting: "Accounting", payments: "Payments", ecommerce: "Online shop", marketing: "Website and Google", bridge: "Any other app", customers: "Customers", messaging: "Email and messaging", teamwork: "Teamwork" };
 /** Filter chips: payments and online shops share one. */
 const GROUP: Record<CatalogueItem["category"], string> = { till: "till", payroll: "payroll", accounting: "accounting", payments: "payments", ecommerce: "payments", marketing: "marketing", bridge: "bridge", customers: "customers", messaging: "customers", teamwork: "customers" };
@@ -45,6 +47,11 @@ let live = false;
 let filter = "all";
 /** What is typed in the search box, lower-cased. */
 let search = "";
+/** The full list is long, so it opens on the apps that connect in one step; the rest are one press away. */
+const FIRST_SHOWN = 12;
+let showAll = false;
+/** Apps that connect directly come first, then file uploads, then the ones that go through Zapier or Make. */
+const rank = (c: CatalogueItem): number => (c.availability === "live" && c.connect !== "bridge" && c.connect !== "file" ? 0 : c.connect === "file" ? 1 : 2);
 let uploading: CatalogueItem | undefined;
 let keying: CatalogueItem | undefined;
 let growth: Growth | undefined;
@@ -101,12 +108,14 @@ function render(): void {
   }
 
   // Connected
+  const railCount = document.getElementById("apps-on");
+  if (railCount) { railCount.hidden = data.connections.length === 0; railCount.textContent = String(data.connections.length); }
   $("apps-connected-panel").hidden = data.connections.length === 0;
   $("apps-connected").innerHTML = data.connections.map((c) => {
     const item = byKey.get(c.connectorKey);
     const state = c.status === "error" ? `<span class="status crit"><span class="dot"></span>${esc(c.lastError ?? "Needs attention")}</span>`
       : `<span class="status good"><span class="dot"></span>${c.lastSyncAt ? `Updated ${esc(new Date(c.lastSyncAt).toLocaleString())}` : "Connected"}</span>`;
-    const chips = EMPLOYEES.map(([k, label]) => `<button type="button" class="chip" aria-pressed="${c.access.includes(k)}" data-access="${esc(c.id)}" data-emp="${k}">${label}</button>`).join("");
+    const chips = employeesWithAccess().map(([k, label]) => `<button type="button" class="chip" aria-pressed="${c.access.includes(k)}" data-access="${esc(c.id)}" data-emp="${k}">${label}</button>`).join("");
     const options = choicesFor.get(c.id);
     const choose = !c.needsChoice ? (c.externalAccount && item?.category === "marketing" ? `<p class="xs muted">Reading: ${esc(c.externalAccount)}</p>` : "")
       : options ? `<div class="field"><label for="pick-${esc(c.id)}">Which one should your team read?</label><select class="input" id="pick-${esc(c.id)}">${options.map((o) => `<option value="${esc(o.id)}">${esc(o.name)}</option>`).join("")}</select></div><div class="acts"><button class="btn btn-primary btn-sm" data-pick="${esc(c.id)}">Use this one</button></div>`
@@ -128,14 +137,19 @@ function render(): void {
 function renderStore(): void {
   document.querySelectorAll<HTMLElement>("#apps-filter [data-filter]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.filter === filter)));
   const inType = data.catalogue.filter((c) => filter === "all" || GROUP[c.category] === filter);
-  const shown = search ? inType.filter((c) => `${c.name} ${c.summary}`.toLowerCase().includes(search)) : inType;
-  $("apps-count").textContent = shown.length ? `Showing ${shown.length} of ${data.catalogue.length} apps.` : "No app with that name yet. Zapier or Make can still connect it through a private link.";
+  const found = (search ? inType.filter((c) => `${c.name} ${c.summary}`.toLowerCase().includes(search)) : inType).slice().sort((a, b) => rank(a) - rank(b));
+  const short = !search && filter === "all" && !showAll && found.length > FIRST_SHOWN;
+  const shown = short ? found.slice(0, FIRST_SHOWN) : found;
+  $("apps-count").textContent = shown.length ? `Showing ${shown.length} of ${data.catalogue.length} apps.${short ? " Type a name to find yours, or pick a type." : ""}` : "No app with that name yet. Zapier or Make can still connect it through a private link.";
+  const more = $("apps-more");
+  more.hidden = !short;
+  more.textContent = `Show all ${found.length} apps`;
   $("apps-grid").innerHTML = shown.map((c) => {
     // A live connector whose app keys are not set up yet is not "direct" for this owner today.
     const [tone, label] = c.availability === "live" && (c.connect === "bridge" || c.connect === "file") ? BADGE.planned : BADGE[c.availability];
     const cta = c.connect === "oauth" ? `<button class="btn btn-primary btn-sm" data-connect="${esc(c.key)}">Connect</button>`
       : c.connect === "webhook" ? `<button class="btn btn-primary btn-sm" data-connect="${esc(c.key)}">Get a private link</button>`
-      : c.connect === "bridge" ? `<button class="btn btn-ghost btn-sm" data-connect="webhook">Connect through Zapier or Make</button>`
+      : c.connect === "bridge" ? `<button class="btn btn-ghost btn-sm" data-connect="webhook">Use Zapier or Make</button>`
       : c.connect === "api_key" ? `<button class="btn btn-primary btn-sm" data-key="${esc(c.key)}">Connect</button>`
       : `<button class="btn btn-primary btn-sm" data-upload="${esc(c.key)}">Upload file</button>`;
     const waiting = c.availability === "approval" && c.connect === "bridge" ? `<p class="xs muted">Coming soon. Until then, connect it through Zapier or Make.</p>` : "";
@@ -177,6 +191,7 @@ function showResult(r: ImportResult): void {
 
 export function initApps(): void {
   document.getElementById("apps-search")?.addEventListener("input", (e) => { search = (e.target as HTMLInputElement).value.trim().toLowerCase().slice(0, 60); renderStore(); });
+  $("apps-more").addEventListener("click", () => { showAll = true; renderStore(); document.querySelector<HTMLElement>("#apps-grid .app-card:nth-child(" + (FIRST_SHOWN + 1) + ") button")?.focus(); });
   document.addEventListener("click", async (e) => {
     const t = e.target as HTMLElement;
     const f = t.closest<HTMLElement>("#apps-filter [data-filter]");
@@ -292,7 +307,7 @@ export function setAppsView(sub: string): void {
   view = sub;
   const v = VIEWS[sub];
   filter = v ? sub : "all";
-  $("apps-h1").textContent = v?.title ?? "Services";
+  $("apps-h1").textContent = v?.title ?? "Apps and connections";
   $("apps-intro").textContent = v?.intro ?? "Connect your till, payroll and accounts. Your team only reads them, and you choose who sees what.";
   const chip = $("svc-status");
   chip.hidden = !v;

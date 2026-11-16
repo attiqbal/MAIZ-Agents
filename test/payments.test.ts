@@ -33,10 +33,12 @@ describe("checkout with a mock provider", () => {
     const r = await s.call("POST", "/api/checkout", { lines: [{ key: item.key, qty: 2, priceGbp: 0 }] }, ann);
     expect(r.status).toBe(201);
     const order = (r.body as any).order;
-    expect(order).toMatchObject({ status: "paid", dueTodayMinor: item.priceGbp * 200, monthlyMinor: item.priceGbp * 200 });
+    // A first monthly order starts the paid plan, so the Team package is on it too (test/team-package.test.ts).
+    const due = item.priceGbp * 200 + 15_000;
+    expect(order).toMatchObject({ status: "paid", dueTodayMinor: due, monthlyMinor: due });
     expect(order.employeeIds).toHaveLength(2);
     expect(JSON.stringify(order)).not.toContain("mock_");
-    expect(provider.requests[0]).toMatchObject({ currency: "GBP", dueTodayMinor: item.priceGbp * 200 });
+    expect(provider.requests[0]).toMatchObject({ currency: "GBP", dueTodayMinor: due });
     expect(((await s.call("GET", "/api/org", undefined, ann)).body as any).team.length).toBe(before + 2);
     expect(((await s.call("GET", "/api/orders", undefined, ann)).body as any).orders).toHaveLength(1);
   });

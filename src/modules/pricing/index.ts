@@ -335,7 +335,8 @@ export class PriceBook {
 function priced(i: CatalogueItem, s: State): CatalogueItem & { available: boolean } {
   const g = s.general;
   const base =
-    i.kind === "employee" ? g.addOnEmployeeMonthlyGbp
+    i.kind === "package" ? g.basicPackageMonthlyGbp
+    : i.kind === "employee" ? g.addOnEmployeeMonthlyGbp
     : i.kind === "specialist" ? (i.tier === "premium" ? g.specialistPremiumMonthlyGbp : g.specialistStandardMonthlyGbp)
     : i.priceGbp;
   const o = s.items[i.key] ?? {};

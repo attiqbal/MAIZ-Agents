@@ -109,15 +109,48 @@ export class DayBook {
 
 export const toMinor = (v: unknown): number => { const n = typeof v === "string" ? Number(v) : typeof v === "number" ? v : 0; return Number.isFinite(n) ? Math.round(n * 100) : 0; };
 
-/** True for loopback, private, link-local, carrier-grade NAT, multicast and other non-public addresses (IPv4 and IPv6). */
-export function isPrivateIp(ip: string): boolean {
-  const v4 = /^::ffff:(\d+\.\d+\.\d+\.\d+)$/i.exec(ip)?.[1] ?? (/^\d+\.\d+\.\d+\.\d+$/.test(ip) ? ip : undefined);
-  if (v4) {
-    const [a, b] = v4.split(".").map(Number) as [number, number];
-    return a === 0 || a === 10 || a === 127 || a >= 224 || (a === 100 && b >= 64 && b <= 127) || (a === 169 && b === 254) || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168) || (a === 192 && b === 0) || (a === 198 && (b === 18 || b === 19));
+const privateV4 = (a: number, b: number): boolean =>
+  a === 0 || a === 10 || a === 127 || a >= 224 || (a === 100 && b >= 64 && b <= 127) || (a === 169 && b === 254) || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168) || (a === 192 && b === 0) || (a === 198 && (b === 18 || b === 19));
+
+/** An IPv6 address as its eight 16-bit groups ("::" expanded, a dotted IPv4 tail folded in), or undefined when it is not one. */
+function ipv6Groups(ip: string): number[] | undefined {
+  let text = ip.toLowerCase().replace(/%.*$/, "");
+  const tail = /(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(text);
+  if (tail) {
+    const [a, b, c, d] = tail.slice(1).map(Number) as [number, number, number, number];
+    if (a > 255 || b > 255 || c > 255 || d > 255) return undefined;
+    text = `${text.slice(0, tail.index)}${((a << 8) | b).toString(16)}:${((c << 8) | d).toString(16)}`;
   }
-  const l = ip.toLowerCase();
-  return l === "::" || l === "::1" || /^f[cd]/.test(l) || /^fe[89ab]/.test(l) || l.startsWith("ff");
+  const halves = text.split("::");
+  if (halves.length > 2) return undefined;
+  const groups = (part: string): number[] => (part === "" ? [] : part.split(":").map((h) => (/^[0-9a-f]{1,4}$/.test(h) ? parseInt(h, 16) : NaN)));
+  const head = groups(halves[0]!);
+  const rest = halves.length === 2 ? groups(halves[1]!) : [];
+  if ([...head, ...rest].some(Number.isNaN)) return undefined;
+  if (halves.length === 1) return head.length === 8 ? head : undefined;
+  const gap = 8 - head.length - rest.length;
+  return gap < 1 ? undefined : [...head, ...new Array<number>(gap).fill(0), ...rest];
+}
+
+/**
+ * True for loopback, private, link-local, carrier-grade NAT, multicast and other non-public addresses (IPv4 and IPv6).
+ * An IPv6 address that carries an IPv4 one inside it (mapped, compatible, NAT64, 6to4) is judged by that inner address,
+ * however it is written, and anything that is not an address at all counts as not public.
+ */
+export function isPrivateIp(ip: string): boolean {
+  if (/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(ip)) {
+    const [a, b] = ip.split(".").map(Number) as [number, number];
+    return privateV4(a, b);
+  }
+  const g = ipv6Groups(ip) as [number, number, number, number, number, number, number, number] | undefined;
+  if (!g) return true;
+  const inner = (group: number): boolean => privateV4(group >> 8, group & 255);
+  const zero = (count: number): boolean => g.slice(0, count).every((x) => x === 0);
+  if (zero(6)) return g[6] === 0 ? true : inner(g[6]); // "::", "::1" and the old "::a.b.c.d" form
+  if (zero(5) && g[5] === 0xffff) return inner(g[6]); // IPv4-mapped
+  if (g[0] === 0x64 && g[1] === 0xff9b) return g[2] !== 0 || inner(g[6]); // NAT64, and its local-use range
+  if (g[0] === 0x2002) return inner(g[1]); // 6to4
+  return (g[0] & 0xfe00) === 0xfc00 || (g[0] & 0xff80) === 0xfe80 || (g[0] & 0xff00) === 0xff00; // unique local, link- and site-local, multicast
 }
 
 // Loaded on first use so the website bundle, which shares the app list, never pulls in Node-only modules.

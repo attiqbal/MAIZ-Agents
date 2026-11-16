@@ -17,7 +17,7 @@ interface Live {
 
 const LOOK: Record<string, [abbr: string, cls: string, color: string]> = {
   "finance-manager": ["FM", "av-fm", "#202020"], "marketing-manager": ["MM", "av-mm", "#ff682c"], "business-consultant": ["BC", "av-bc", "#816729"],
-  "hr-manager": ["HR", "av-hr", "#4d4d4d"], "compliance-manager": ["CM", "av-cm", "#828282"], "supply-chain-manager": ["SC", "av-sc", "#828282"], "admin-manager": ["AM", "av-tl", "#828282"],
+  "hr-manager": ["HR", "av-hr", "#4d4d4d"], "compliance-manager": ["CM", "av-cm", "#828282"], "supply-chain-manager": ["SC", "av-sc", "#828282"], "data-mining-agent": ["DM", "av-dm", "#2ba0ff"], "admin-manager": ["AM", "av-tl", "#828282"],
 };
 const look = (key: string): [string, string, string] => LOOK[key] ?? ["AI", "av-tl", "#828282"];
 const who = (e: LiveEmployee) => `<a class="who-cell desk-a" href="#desk/${esc(e.templateKey)}"><span class="av av-sm ${look(e.templateKey)[1]}" aria-hidden="true">${look(e.templateKey)[0]}</span>${esc(e.name)}</a>`;
@@ -52,6 +52,21 @@ function overview(d: Live): void {
   $("ov-next").innerHTML = planned.length
     ? planned.map((x) => `<li>${esc(x.employeeName ?? "")} · ${esc(x.title)}</li>`).join("")
     : `<li class="muted">Nothing is lined up. Ask your team for something with the bar at the top.</li>`;
+  // Each employee's share of this week's energy, and the latest work, from the client's own records.
+  const pool = d.teamEnergy?.pool ?? 0;
+  const energy = $("ov-energy");
+  energy.dataset.live = "1";
+  energy.innerHTML = d.team.some((e) => sum(e.week) > 0)
+    ? d.team.filter((e) => sum(e.week) > 0).map((e) => { const pct = pool > 0 ? Math.min(100, Math.round((sum(e.week) / pool) * 100)) : 0; return `<div class="ubar"><span>${esc(e.name)}</span><div class="energy"><i style="width:${pct}%"></i></div><span class="mono">${pct}%</span></div>`; }).join("")
+    : `<p class="muted small">No energy used yet this week.</p>`;
+  $("ov-energy-r").textContent = d.teamEnergy ? `${d.teamEnergy.percentUsed}% of ${n(d.teamEnergy.pool)} used` : "Open energy";
+  const STATE: Record<LiveTask["column"], string> = { planned: "Planned", in_progress: "Working", waiting: "Needs you", done: "Done" };
+  const recent = [...d.tasks.filter((x) => x.column !== "planned"), ...d.tasks.filter((x) => x.column === "planned")].slice(0, 5);
+  const activity = $("ov-activity");
+  activity.dataset.live = "1";
+  activity.innerHTML = recent.length
+    ? recent.map((x) => { const e = d.team.find((m) => m.id === x.employeeId); const [abbr, cls] = look(e?.templateKey ?? ""); return `<li><span class="tm">${STATE[x.column]}</span><span class="av av-sm ${cls}" aria-hidden="true">${abbr}</span><span>${esc(x.title)}${x.energy ? ` <span class="muted">· ${n(x.energy)} energy</span>` : ""}</span></li>`; }).join("")
+    : `<li class="muted">No work yet today. Ask your team for something with the bar at the top.</li>`;
   hideExampleTag("home");
 }
 
@@ -109,15 +124,21 @@ function usage(d: Live): void {
       : tile("Energy used today", `${t.energyToday} / ${t.allowanceToday}`, `${t.allowanceToday ? Math.round((t.energyToday / t.allowanceToday) * 100) : 0}% of today's allowance`),
     tile("Energy used, 7 days", t.energyWeek.toLocaleString(), `About ${Math.round(t.energyWeek / 7)} a day`),
     tile("Energy this month", t.energyMonth.toLocaleString(), "Across your whole team"),
-    tile("Spend this month", "£0.00", "Nothing is charged yet", "/pricing.html"),
+    tile("Extra spend this month", "£0.00", "Top-ups only: your plan is billed in Settings", "#settings"),
   ].join("");
-  $("usage-table").innerHTML = `<thead><tr><th scope="col">Employee</th><th scope="col">Energy left today</th><th scope="col" class="num">Used, 7 days</th></tr></thead><tbody>` +
-    d.team.map((e) => `<tr><td>${who(e)}</td><td>${energyBar(e.usedToday, Math.max(e.allowance, 1))}</td><td class="num">${sum(e.week).toLocaleString()}</td></tr>`).join("") + `<tr class="total"><td colspan="2">Total</td><td class="num">${t.energyWeek.toLocaleString()}</td></tr></tbody>`;
+  // With one shared pool, an employee has no allowance of their own: show each one's share of the week instead.
+  const shared = d.teamEnergy;
+  $("usage-table").innerHTML = `<thead><tr><th scope="col">Employee</th><th scope="col">${shared ? "Share of this week's energy" : "Energy left today"}</th><th scope="col" class="num">Used, 7 days</th></tr></thead><tbody>` +
+    d.team.map((e) => `<tr><td>${who(e)}</td><td>${shared ? share(sum(e.week), shared.pool) : energyBar(e.usedToday, Math.max(e.allowance, 1))}</td><td class="num">${sum(e.week).toLocaleString()}</td></tr>`).join("") + `<tr class="total"><td colspan="2">Total</td><td class="num">${t.energyWeek.toLocaleString()}</td></tr></tbody>`;
+  const biggest = d.tasks.filter((x) => (x.energy ?? 0) > 0).sort((a, b) => (b.energy ?? 0) - (a.energy ?? 0)).slice(0, 4);
+  $("usage-big").innerHTML = biggest.length
+    ? biggest.map((x) => `<div class="ubar ubar-2"><span>${esc(x.title)}${x.employeeName ? ` · ${esc(x.employeeName)}` : ""}</span><span class="mono">${n(x.energy ?? 0)}</span></div>`).join("")
+    : `<p class="muted small">No tasks have used energy yet this week.</p>`;
   $("bars-legend").innerHTML = d.team.map((e) => `<span><i style="background:${look(e.templateKey)[2]}"></i>${esc(e.name)}</span>`).join("");
   bars(d);
   const allowance = document.querySelector<HTMLElement>('[data-screen="usage"] .panel-h .r');
   if (allowance) allowance.textContent = d.teamEnergy
-    ? `This week: ${d.teamEnergy.percentUsed}% of the team's energy used${d.teamEnergy.dailyCeiling ? `, at most ${n(d.teamEnergy.dailyCeiling)} a day` : ""}`
+    ? `This week: ${d.teamEnergy.percentUsed}% of the team's energy used${d.teamEnergy.dailyCeiling && d.teamEnergy.dailyCeiling < d.teamEnergy.pool ? `, at most ${n(d.teamEnergy.dailyCeiling)} a day` : ""}`
     : `Daily allowance: ${t.allowanceToday.toLocaleString()} across the team`;
   hideExampleTag("usage");
 }

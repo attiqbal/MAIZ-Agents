@@ -18,6 +18,7 @@ export type NeedKey =
   | "stay-legal"
   | "staff"
   | "stock"
+  | "know-my-market"
   | "raise-money"
   | "online-presence"
   | "less-admin";
@@ -42,6 +43,7 @@ export const NEEDS: readonly Need[] = [
   { key: "stay-legal", label: "Stay on the right side of the rules", lead: "compliance-manager", firstJob: "A compliance health check for your kind of business", goal: "stay compliant" },
   { key: "staff", label: "Hire and look after staff", lead: "hr-manager", firstJob: "A people basics checklist: contracts, holiday, policies", goal: "hire and look after staff" },
   { key: "stock", label: "Keep stock and suppliers in order", lead: "supply-chain-manager", firstJob: "A stock and supplier health check", goal: "keep stock and suppliers in order" },
+  { key: "know-my-market", label: "Know my market", lead: "data-mining-agent", firstJob: "A market snapshot on a topic you choose: what people say, the news and the figures, with sources", goal: "understand the market and competitors" },
   { key: "raise-money", label: "Raise money or get a loan", lead: "finance-manager", firstJob: "A funding readiness check: what a lender or investor will ask for", goal: "raise money" },
   { key: "online-presence", label: "Look better online", lead: "marketing-manager", firstJob: "A review of your website and social pages with quick fixes", goal: "improve the website and social pages" },
   { key: "less-admin", label: "Spend less time on admin", lead: "admin-manager", firstJob: "A list of the admin your team can take over this week", goal: "spend less time on admin" },

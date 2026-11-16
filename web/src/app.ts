@@ -40,13 +40,18 @@ function route(): void {
   // "#desk/finance-manager" opens one employee's dashboard; every other hash is a screen.
   const [key = "home", sub = ""] = (location.hash.slice(1) || "home").split("/");
   const valid = screens.some((s) => s.dataset.screen === key) ? key : "home";
+  // The Data mining agent has its own working screen, not an example dashboard.
+  if (valid === "desk" && sub === "data-mining-agent") { location.replace("#mining"); return; }
   if (valid === "desk") showDesk(sub);
+  if (valid === "mining") void import("./mining").then((m) => m.showMining());
   if (valid === "chat") void showChat(sub);
   if (valid === "firstday") void import("./firstday").then((m) => m.showFirstDay());
   if (valid === "apps") void import("./apps").then((m) => m.setAppsView(sub));
+  if (valid === "apps") void import("./agents").then((m) => m.showAgents());
   if (valid === "slack") void import("./apps").then((m) => m.initSlackTab(Boolean(profile.slack)));
   screens.forEach((s) => s.toggleAttribute("hidden", s.dataset.screen !== valid));
-  const here = valid === "desk" ? `desk/${sub}` : valid === "apps" && sub ? `apps/${sub}` : valid;
+  // Slack lives inside Apps and connections, so the rail marks that entry for it.
+  const here = valid === "desk" ? `desk/${sub}` : valid === "slack" ? "apps" : valid;
   // Inside a department, the rail marks the department for every one of its tabs.
   const dept = renderDeptBar(here);
   const links = Array.from(document.querySelectorAll<HTMLAnchorElement>("[data-nav]"));
@@ -149,16 +154,24 @@ $("a-edit").addEventListener("click", () => toast("Editing opens in the web edit
 
 // Real data: when signed in and the API is running, replace the demo team with the real one.
 let realOrg: Org | undefined;
-const ROLE: Record<string, [string, string]> = { "finance-manager": ["FM", "av-fm"], "marketing-manager": ["MM", "av-mm"], "business-consultant": ["BC", "av-bc"], "hr-manager": ["HR", "av-hr"], "compliance-manager": ["CM", "av-cm"], "supply-chain-manager": ["SC", "av-sc"], "admin-manager": ["AM", "av-tl"] };
+const ROLE: Record<string, [string, string]> = { "finance-manager": ["FM", "av-fm"], "marketing-manager": ["MM", "av-mm"], "business-consultant": ["BC", "av-bc"], "hr-manager": ["HR", "av-hr"], "compliance-manager": ["CM", "av-cm"], "supply-chain-manager": ["SC", "av-sc"], "data-mining-agent": ["DM", "av-dm"], "admin-manager": ["AM", "av-tl"] };
 const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]!);
-/** The sidebar trial box from the real trial end; hidden once the client is on a paid plan. */
-function showTrial(endsAt: string | undefined): void {
-  if (!endsAt) { $("trial-box").hidden = true; return; }
-  const DAY = 86_400_000, TRIAL_DAYS = 7;
+/** The sidebar trial box and the Overview chip, from the real end date; hidden once the client is on a paid plan. */
+function showTrial(endsAt: string | undefined, planEnded = false): void {
+  const chip = $("trial-chip");
+  if (!endsAt) { $("trial-box").hidden = true; chip.hidden = true; return; }
+  const DAY = 86_400_000;
+  const over = new Date(endsAt).getTime() <= Date.now();
   const left = Math.max(0, Math.ceil((new Date(endsAt).getTime() - Date.now()) / DAY));
-  $("trial-left").textContent = left === 0 ? "Trial ends today" : `Trial: ${left} day${left === 1 ? "" : "s"} left`;
-  $("trial-note").textContent = `Ends ${new Date(endsAt).toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" })}. No card needed until then.`;
-  $("trial-bar").style.width = `${Math.min(100, Math.round(((TRIAL_DAYS - left) / TRIAL_DAYS) * 100))}%`;
+  const what = planEnded ? "Plan" : "Trial";
+  const headline = over ? `${planEnded ? "Your plan" : "Your trial"} has ended` : left <= 1 ? `${what} ends ${left === 0 ? "today" : "tomorrow"}` : `${what}: ${left} days left`;
+  const date = new Date(endsAt).toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" });
+  $("trial-box").hidden = false;
+  $("trial-left").textContent = headline;
+  $("trial-note").textContent = over ? "Your team is paused and your work is kept. Start the Team package to carry on." : planEnded ? `Your team works until ${date}.` : "";
+  $("trial-cta").textContent = planEnded ? "Start your plan again" : "Choose your plan";
+  chip.hidden = false;
+  chip.textContent = `${headline}. ${planEnded ? "Start again" : "Choose your plan"}`;
 }
 
 const LOCAL_PREVIEW = ["localhost", "127.0.0.1"].includes(location.hostname);
@@ -168,7 +181,12 @@ async function meetNewHires(): Promise<void> {
   const { introduceNewHires } = await import("./firstday");
   if (await introduceNewHires()) location.hash = "#firstday";
 }
-if (new URLSearchParams(location.search).has("order")) void meetNewHires();
+if (new URLSearchParams(location.search).has("order")) {
+  // Back from the payment page after paying: the cart is emptied once, and the address is tidied so a reload does not empty it again.
+  try { localStorage.removeItem("maiz.cart"); } catch { /* storage unavailable */ }
+  history.replaceState(null, "", location.pathname + location.hash);
+  void meetNewHires();
+}
 
 async function loadOrg(): Promise<void> {
   // The control centre is for signed-in customers only; there is no public demo. Logged-out visitors
@@ -200,16 +218,30 @@ async function loadOrg(): Promise<void> {
   orgName = realOrg.name;
   $("set-biz").textContent = realOrg.name; // Settings shows the signed-in company, not this device's last signup.
   setPeopleBusiness(realOrg.name);
-  showTrial(realOrg.trialEndsAt);
+  showTrial(realOrg.trialEndsAt, realOrg.planEnded === true);
+  void loadBilling();
   app.classList.add("is-live");
+  const hasDataAgent = realOrg.team.some((e) => e.templateKey === "data-mining-agent");
+  $("mining-link").hidden = !hasDataAgent;
+  app.classList.toggle("has-dm", hasDataAgent);
   // A real client never sees the example business's requests, and example-only panels say so.
   document.querySelectorAll<HTMLElement>("[data-need]").forEach((el) => el.remove());
   pending.clear();
   refresh();
-  document.querySelectorAll<HTMLElement>("[data-example] .panel-h").forEach((h) => h.insertAdjacentHTML("beforeend", '<span class="badge badge-dark">Example until your apps are connected</span>'));
+  document.querySelectorAll<HTMLElement>("[data-example] .panel-h").forEach((h) => { if (!h.querySelector(".badge")) h.insertAdjacentHTML("beforeend", '<span class="badge badge-dark">Example until your apps are connected</span>'); });
+  // The Overview never shows a real client made-up figures: each panel says what will show there and how to get it.
+  // Energy and activity are filled from their own records a moment later (dash-live.ts).
+  const pulse = $("ov-pulse");
+  pulse.className = "ov-empty";
+  pulse.innerHTML = '<p class="muted">Your cash, revenue and customer figures show here once your accounts, till or payments are connected. Your team only reads them.</p><p><a class="btn btn-sm btn-ghost" href="#apps">Connect your apps</a></p>';
+  $("ov-brief").innerHTML = '<li class="muted">Your Admin manager writes a short briefing here each morning once your team has done its first work.</li>';
+  $("ov-brief-r").textContent = "Admin manager";
+  if (!$("ov-activity").dataset.live) $("ov-activity").innerHTML = '<li class="muted">No work yet today. Ask your team for something with the bar at the top.</li>';
+  if (!$("ov-energy").dataset.live) { $("ov-energy").innerHTML = '<p class="muted small">No energy used yet this week.</p>'; $("ov-energy-r").textContent = "Open energy"; }
   route();
   const quota = realOrg.dailyQuotaPerEmployee;
   const pool = realOrg.teamEnergy;
+  $("energy-chip").textContent = pool ? `Energy ${100 - pool.percentUsed}% left` : "Energy";
   const n = (x: number) => x.toLocaleString("en-GB");
   const bar = (left: number, of: number) => {
     const pct = of > 0 ? Math.round((left / of) * 100) : 0;
@@ -226,9 +258,41 @@ async function loadOrg(): Promise<void> {
       : `<div><div class="e-lab"><span>Energy</span><span>${e.energyLeft} / ${quota}</span></div>${bar(e.energyLeft, quota)}</div>`;
     return `<div class="ecard"><div class="who"><span class="av ${cls}">${abbr}</span><div><b><a class="desk-a" href="#desk/${esc(e.templateKey)}">${esc(e.name)}</a></b><span>Standard</span></div></div><span class="status good"><span class="dot"></span>Ready</span><div class="doing">Waiting for your first request</div>${energy}</div>`;
   }).join("");
-  if (realOrg.trialEndsAt) toast(`Free trial until ${new Date(realOrg.trialEndsAt).toLocaleDateString("en-GB", { day: "numeric", month: "long" })}`);
 }
 void loadOrg();
+
+// Settings: the plan, the provider's billing page (card, invoices, cancel) and what has been bought.
+interface OrderRow { id: string; status: string; lines: { title: string; qty: number }[]; dueTodayMinor: number; createdAt: string; paidAt?: string; discount?: { code: string; amountOffMinor: number }; problem?: string }
+const ORDER_STATE: Record<string, string> = { paid: "Paid", pending: "Waiting for payment", failed: "Not paid", cancelled: "Cancelled" };
+const pounds = (minor: number) => `£${(minor / 100).toLocaleString("en-GB", { minimumFractionDigits: minor % 100 ? 2 : 0, maximumFractionDigits: 2 })}`;
+async function loadBilling(): Promise<void> {
+  if (!getToken() || !realOrg) return;
+  const day = (iso: string) => new Date(iso).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
+  const ends = realOrg.trialEndsAt;
+  const over = !!ends && new Date(ends).getTime() <= Date.now();
+  $("bill-state").textContent = !ends ? "Team package" : realOrg.planEnded ? (over ? "Plan ended" : "Plan ending") : over ? "Trial ended" : "Free trial";
+  $("bill-plan").textContent = !ends ? "You are on the Team package. It renews every month until you cancel, and you keep the month you paid for."
+    : realOrg.planEnded ? (over ? `Your plan ended on ${day(ends)}. Your work is kept; start the Team package again to carry on.` : `Your plan was cancelled and your team works until ${day(ends)}. You can start it again any time.`)
+    : over ? `Your free trial ended on ${day(ends)}. Your work is kept; choose your plan to carry on.` : `Your free trial runs until ${day(ends)}. Nothing is charged unless you choose a plan.`;
+  $("bill-choose").hidden = !ends;
+  const r = await api<{ enabled: boolean; orders: OrderRow[] }>("/orders");
+  const orders = r.ok ? r.data?.orders ?? [] : [];
+  $("bill-portal").hidden = !orders.some((o) => o.paidAt);
+  $("bill-orders-wrap").hidden = orders.length === 0;
+  $("bill-orders").innerHTML = orders.length ? `<thead><tr><th scope="col">Date</th><th scope="col">What</th><th scope="col">Paid today</th><th scope="col">Status</th></tr></thead><tbody>${orders.slice(0, 12).map((o) =>
+    `<tr><td>${esc(day(o.paidAt ?? o.createdAt))}</td><td>${esc(o.lines.map((l) => (l.qty > 1 ? `${l.qty} × ${l.title}` : l.title)).join(", "))}${o.discount ? `<br><span class="small muted">Code ${esc(o.discount.code)}: ${pounds(o.discount.amountOffMinor)} off</span>` : ""}</td><td class="mono">${pounds(o.dueTodayMinor)}</td><td>${esc(ORDER_STATE[o.status] ?? o.status)}${o.problem ? `<br><span class="small muted">${esc(o.problem)}</span>` : ""}</td></tr>`).join("")}</tbody>` : "";
+}
+$("bill-portal").addEventListener("click", async () => {
+  const b = $<HTMLButtonElement>("bill-portal");
+  b.disabled = true;
+  $("bill-msg").textContent = "Opening your billing page…";
+  const r = await api<{ url?: string; error?: string }>("/billing/portal", { body: {} });
+  if (r.ok && r.data?.url) { location.assign(r.data.url); return; }
+  b.disabled = false;
+  $("bill-msg").textContent = r.data?.error ?? "Could not open your billing page. Please try again.";
+});
+if (getToken()) void import("./push").then((m) => m.mountPushControls($("set-push"), (text) => { $("set-push-msg").textContent = text; }));
+else $("set-push").innerHTML = '<p class="small muted">Log in to turn alerts on for this device.</p>';
 
 // Settings: auto-reload for top-ups. Off by default; it never spends more than the monthly cap the owner sets.
 type EnergyView = { team: Org["teamEnergy"] & { autoReload: { enabled: boolean; packGbp: number; monthlyCapGbp: number } | null; topUpLeft: number } | null };
@@ -238,6 +302,9 @@ async function loadTopUps(): Promise<void> {
   const t = r.ok ? r.data?.team : null;
   if (!t) return;
   $("tu-left").textContent = `Top-up energy left: ${t.topUpLeft.toLocaleString("en-GB")}`;
+  $("wal-top").textContent = t.topUpLeft.toLocaleString("en-GB");
+  $("wal-cap").textContent = `£${t.autoReload?.monthlyCapGbp ?? 25}`;
+  $("wal-auto").textContent = t.autoReload?.enabled ? "On" : "Off";
   if (t.autoReload) {
     $<HTMLInputElement>("tu-on").checked = t.autoReload.enabled;
     $<HTMLSelectElement>("tu-pack").value = String(t.autoReload.packGbp);
@@ -251,6 +318,7 @@ $("tu-form").addEventListener("submit", async (ev) => {
     enabled: $<HTMLInputElement>("tu-on").checked, packGbp: Number($<HTMLSelectElement>("tu-pack").value), monthlyCapGbp: Number($<HTMLInputElement>("tu-cap").value),
   } });
   $("tu-msg").textContent = r.ok ? "Saved." : (r.data as { error?: string } | undefined)?.error ?? "Could not save. Please try again.";
+  if (r.ok) void loadTopUps();
 });
 void loadTopUps();
 
@@ -275,8 +343,13 @@ $("cp-form").addEventListener("submit", async (ev) => {
 void loadCodes();
 
 // Account menu: sign out, and the Settings screen's account details.
-function signOut(): void { clearSession(); location.href = "/signin.html"; }
-document.querySelectorAll("[data-signout]").forEach((b) => b.addEventListener("click", signOut));
+/** Logging out also stops this device's alerts, so the next person to use it is not sent this account's news. */
+async function signOut(): Promise<void> {
+  try { await (await import("./push")).turnOffPush(); } catch { /* alerts were not on */ }
+  clearSession();
+  location.href = "/signin.html";
+}
+document.querySelectorAll("[data-signout]").forEach((b) => b.addEventListener("click", () => void signOut()));
 $("me-av").addEventListener("click", () => { location.hash = "#settings"; });
 $("set-biz").textContent = biz;
 $("set-email").textContent = profile.email || "The address you log in with";
@@ -306,8 +379,8 @@ $<HTMLFormElement>("ask").addEventListener("submit", async (e) => {
   const text = input.value.trim();
   if (!text) return;
   if (!realOrg) { toast("Admin manager got it and will route it (demo)"); input.value = ""; return; }
-  const m = /^(finance|marketing|consultant|hr|compliance|supply)\s*[:,-]\s*(.+)$/is.exec(text);
-  const key = m ? { finance: "finance-manager", marketing: "marketing-manager", consultant: "business-consultant", hr: "hr-manager", compliance: "compliance-manager", supply: "supply-chain-manager" }[m[1]!.toLowerCase() as "finance"] : "business-consultant";
+  const m = /^(finance|marketing|consultant|hr|compliance|supply|data)\s*[:,-]\s*(.+)$/is.exec(text);
+  const key = m ? { finance: "finance-manager", marketing: "marketing-manager", consultant: "business-consultant", hr: "hr-manager", compliance: "compliance-manager", supply: "supply-chain-manager", data: "data-mining-agent" }[m[1]!.toLowerCase() as "finance"] : "business-consultant";
   const emp = realOrg.team.find((x) => x.templateKey === key) ?? realOrg.team[0]!;
   if (asking) { toast("Still working on your last question"); return; }
   asking = true;

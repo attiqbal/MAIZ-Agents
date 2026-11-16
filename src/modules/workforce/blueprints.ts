@@ -244,6 +244,7 @@ export const DEPARTMENTS: readonly Department[] = [
     name: "Product and research",
     mission: "Decides what to build and sell, using research, markets and pricing.",
     roles: [
+      r({ key: "data-mining-agent", jd: "data-mining-agent", title: "Data mining agent", purpose: "Gathers public data on a topic into a small dataset with sources, and shares it with the team.", duties: [], skills: [], legal: [], records: [] }),
       r({
         key: "product-research", title: "Product and research",
         purpose: "Researches markets, competitors and prices and plans what to build and sell next.",

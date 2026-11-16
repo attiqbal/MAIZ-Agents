@@ -8,7 +8,7 @@ import { loginAppsFromEnv } from "./social-login.js";
 import { QueuedEmailSender, ResendEmailSender } from "./email.js";
 import { MockPaymentProvider, StripePaymentProvider } from "../modules/payments/index.js";
 import { createPlatform } from "./platform.js";
-import { clientIp, limitFor, RateLimiter } from "./rate-limit.js";
+import { AGENT_BAD_KEY_LIMIT, agentBadKeyBucket, clientIp, isAgentApi, limitFor, RateLimiter } from "./rate-limit.js";
 import { createStatic } from "./static.js";
 
 const env = process.env;
@@ -37,6 +37,7 @@ const platform = createPlatform({
   integrationApps: integrationAppsFromEnv(env, env.APP_URL ?? "http://localhost:5173"),
   loginApps: loginAppsFromEnv(env),
   platformOwners: platformOwnersFromEnv(env),
+  ownerTimezone: env.OWNER_TIMEZONE || undefined,
   meta: metaFromEnv(env),
   whatsapp: whatsappFromEnv(env),
   // Only to show the owner's Connections page whether each server-set service is set, and to test it. Never sent out.
@@ -92,6 +93,11 @@ const server = createServer(async (incoming, out) => {
       out.writeHead(429, { "content-type": "application/json", "Retry-After": "60", ...API_HEADERS }).end(JSON.stringify({ error: "too many requests, try again in a minute" }));
       return;
     }
+    // Outside-agent API: an address that keeps sending wrong keys is not answered again for a while.
+    if (isAgentApi(url.pathname) && limiter.isOver(agentBadKeyBucket(ip), AGENT_BAD_KEY_LIMIT)) {
+      out.writeHead(429, { "content-type": "application/json", "Retry-After": "600", ...API_HEADERS }).end(JSON.stringify({ error: "too many requests with a wrong key, try again later", reason: "rate_limit" }));
+      return;
+    }
     const chunks: Buffer[] = [];
     let size = 0;
     for await (const c of incoming) {
@@ -106,6 +112,7 @@ const server = createServer(async (incoming, out) => {
       headers: Object.fromEntries(Object.entries(incoming.headers).map(([k, v]) => [k, Array.isArray(v) ? v[0] : v])),
       rawBody: Buffer.concat(chunks).toString("utf8"),
     });
+    if (res.status === 401 && isAgentApi(url.pathname)) limiter.allow(agentBadKeyBucket(ip), AGENT_BAD_KEY_LIMIT);
     out.writeHead(res.status, { "content-type": "application/json", ...API_HEADERS, ...res.headers });
     if (res.stream) {
       // A live reply: each event is written as soon as it happens. If the person closes the page the work still finishes.
@@ -128,10 +135,10 @@ server.headersTimeout = 15_000;
 const port = Number(env.PORT ?? 8787);
 server.listen(port, () => console.log(`listening on :${port}`));
 
-// Once a minute: the batch dispatcher, and the nightly books check (each client once, after their own midnight).
+// Once a minute: the hourly sign-off reminder to the owner, the batch dispatcher, and the nightly books check (each client once, after their own midnight).
 // The batch dispatcher: once a minute, runs any client whose closing time has passed or whose queue is big enough.
 const BATCH_TICK_MS = 60_000;
-const batchTimer = setInterval(() => { void platform.batch.tick(); void platform.reconciliation.tick(); void platform.metaClients.maintenance().catch((e) => console.error("meta maintenance failed:", e instanceof Error ? e.message : e)); void platform.growthTick().catch((e) => console.error("growth tick failed:", e instanceof Error ? e.name : "error")); }, BATCH_TICK_MS);
+const batchTimer = setInterval(() => { void platform.decisionDigest.tick(); void platform.agents.tick().catch((e) => console.error("agents tick failed:", e instanceof Error ? e.message : e)); void platform.batch.tick(); void platform.reconciliation.tick(); void platform.metaClients.maintenance().catch((e) => console.error("meta maintenance failed:", e instanceof Error ? e.message : e)); void platform.growthTick().catch((e) => console.error("growth tick failed:", e instanceof Error ? e.name : "error")); }, BATCH_TICK_MS);
 batchTimer.unref();
 
 // Hosts send SIGTERM before replacing the instance: stop taking requests and write pending changes to Postgres.

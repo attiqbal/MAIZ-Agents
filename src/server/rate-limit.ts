@@ -21,10 +21,26 @@ export class RateLimiter {
     return cur.count <= limit.max;
   }
 
+  /** True when the caller has already gone over the limit in the current window. Records nothing. */
+  isOver(key: string, limit: Limit): boolean {
+    const cur = this.hits.get(key);
+    return !!cur && this.now() - cur.start < limit.windowMs && cur.count >= limit.max;
+  }
+
   private sweep(t: number, windowMs: number) {
     for (const [k, v] of this.hits) if (t - v.start >= windowMs) this.hits.delete(k);
   }
 }
+
+/** The outside-agent API (`/api/agent/v1/*`): calls carry a connection key and are limited per key in the service. */
+export const isAgentApi = (path: string): boolean => path.startsWith("/api/agent/v1/");
+/**
+ * Wrong keys one address may send before the outside-agent API stops answering it for the rest of the window, so keys
+ * cannot be guessed. Only refused calls (401) are counted: Zapier, Make and others send many clients' good calls from
+ * the same few addresses, and those must never be held back by a per-address count.
+ */
+export const AGENT_BAD_KEY_LIMIT: Limit = { max: 20, windowMs: 10 * 60_000 };
+export const agentBadKeyBucket = (ip: string): string => `agent-bad-key ${ip}`;
 
 /** Limits for the API. Sign-in and sign-up are tighter because they send email or create customers. */
 export function limitFor(method: string, path: string): Limit | undefined {
@@ -38,6 +54,10 @@ export function limitFor(method: string, path: string): Limit | undefined {
   if (path === "/api/slack/events") return undefined; // signed by Slack, and Slack retries on 429
   if (path === "/api/whatsapp/webhook") return undefined; // signed by Meta, which retries on 429
   if (path === "/api/payments/webhook") return undefined; // signed by the payment provider, which retries on 429
+  // Outside agents: jobs an hour and the daily energy ceiling are enforced per key; wrong keys are throttled per address (see AGENT_BAD_KEY_LIMIT).
+  if (isAgentApi(path)) return undefined;
+  // A webhook test makes the server call an address the owner typed: a few tries are plenty.
+  if (/^\/api\/agents\/[\w-]{1,64}\/test$/.test(path)) return { max: 10, windowMs: 10 * 60_000 };
   // Tasks are limited by energy (the team pool, the daily ceiling and the monthly cost cap), not by a request count:
   // a client who wants to spend a week's energy in an hour may. A refused task costs nothing.
   if (path === "/api/ask") return undefined;
@@ -45,6 +65,8 @@ export function limitFor(method: string, path: string): Limit | undefined {
   if (path === "/api/checkout") return { max: 20, windowMs: 10 * 60_000 };
   if (path.startsWith("/api/auth/")) return { max: 15, windowMs: 10 * 60_000 };
   if (path === "/api/signin/start" || path === "/api/signup") return { max: 10, windowMs: 10 * 60_000 };
+  // Reading a visitor's website makes our server call an address they typed: a few tries per address, no more.
+  if (path === "/api/signup/read-site") return { max: 6, windowMs: 10 * 60_000 };
   // Connection tests call Meta, Stripe, Resend and RunPod: enough to fix and retry, not enough to hammer them.
   if (path.startsWith("/api/owner/connections/") && /\/(test|send-test)$/.test(path)) return { max: 30, windowMs: 10 * 60_000 };
   // Run-now wakes the GPU pod, which is billed per second: keep it to a few presses an hour per address.

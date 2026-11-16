@@ -259,6 +259,7 @@ function renderHomeCard(): void {
   if (!el || !view) return;
   const s = view.summary;
   const top = s.actions[0];
+  if (s.headcount === 0) { el.innerHTML = `<p class="small muted">No staff records yet. Add your people and their time off and documents are tracked here.</p>`; return; }
   el.innerHTML = `<div class="ubar ubar-2"><span>Staff</span><span class="mono">${s.headcount}</span></div>
     <div class="ubar ubar-2"><span>Off today</span><span class="mono">${s.offToday}</span></div>
     <div class="ubar ubar-2"><span>Records complete</span><span class="mono">${s.recordsComplete}%</span></div>
