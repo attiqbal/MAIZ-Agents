@@ -39,6 +39,7 @@ import type { TaskResult } from "../modules/workforce/index.js";
 import { passwordRoutes } from "./password-auth.js";
 import { pushRoute } from "./push-routes.js";
 import { miningRoute } from "./mining-routes.js";
+import { backupHealthRoute, backupOwnerRoute } from "./backup-routes.js";
 import { MiningError } from "../modules/data-mining/index.js";
 import { PushError } from "../modules/push/index.js";
 import { agentOwnerRoute, agentPublicRoute } from "./agent-routes.js";
@@ -178,6 +179,8 @@ export function createApp(p: Platform) {
     };
 
     if (method === "GET" && path === "/api/health") return p.healthy() ? json(200, { ok: true }) : json(503, { ok: false, error: "storage is failing" });
+    // Are backups fresh? Public, yes or no only, for the uptime check (docs/BACKUPS.md).
+    { const r = backupHealthRoute(req, p); if (r) return r; }
     // Agent store: every employee with its full job description. Public, no sign-in needed.
     if (method === "GET" && path === "/api/store") {
       return json(200, {
@@ -507,6 +510,8 @@ export function createApp(p: Platform) {
     }
     if (path.startsWith("/api/owner/promoter")) return ownerPromoterRoutes(req, userId, body);
     if (path.startsWith("/api/owner/coupons") || path.startsWith("/api/owner/affiliates") || path === "/api/owner/promotions") return ownerPromoRoutes(req, userId, body);
+    // Off-server backups: set-up, status, back up now and the restore test (docs/BACKUPS.md). Platform owner only.
+    { const r = await backupOwnerRoute(req, userId, p, body); if (r) return r; }
     if (path.startsWith("/api/owner/")) {
       if (!p.isPlatformOwner(userId)) return json(403, { error: "only the MAIZ platform owner can see this" });
       if (method === "GET" && path === "/api/owner/batch") return json(200, p.batch.ownerView(userId));
