@@ -252,6 +252,11 @@ export class WorkforceService {
     return [...this.employees.values()].filter((e) => e.workspaceId === workspaceId).map((e) => e.templateKey);
   }
 
+  /** Platform-level (no user check): the id of the client's employee hired from this template, if they have one. */
+  employeeIn(workspaceId: string, templateKey: string): string | undefined {
+    return [...this.employees.values()].find((e) => e.workspaceId === workspaceId && e.templateKey === templateKey)?.id;
+  }
+
   /** Platform-level lookup (no user check): which template an employee was hired from. */
   templateOf(employeeId: string): string | undefined {
     return this.employees.get(employeeId)?.templateKey;
