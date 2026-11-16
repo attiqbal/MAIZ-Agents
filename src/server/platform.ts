@@ -18,7 +18,7 @@ import { AdminManager } from "../modules/admin-manager/index.js";
 import { InMemoryModelProvisioner, InMemoryStorageProvisioner } from "../modules/admin-manager/provisioning.js";
 import { OnboardingService } from "../modules/onboarding/index.js";
 import { BatchService } from "../modules/batch/service.js";
-import { WorkforceService } from "../modules/workforce/index.js";
+import { CORE_TEMPLATE_KEYS, WorkforceService } from "../modules/workforce/index.js";
 import { IntegrationService, defaultRegistry, type OAuthApp } from "../modules/integrations/index.js";
 import { QualityReviewService } from "../modules/review/index.js";
 import { DecisionDigest, inQuietHours, openDecisions, type OpenDecision } from "./decisions.js";
@@ -429,13 +429,32 @@ export function createPlatform(cfg: PlatformConfig) {
     },
     // The Team package stopping ends the plan: at the end of the month paid for when the client cancelled here,
     // at once when the payment provider ended the subscription (the paid time is over by then).
-    stopped: (order, by) => {
+    stopped: (order, by, also = []) => {
       if (!order.lines.some((l) => l.key === TEAM_PACKAGE_KEY)) return;
       const endsAt = by === "client" ? paidThrough(order.paidAt ?? order.createdAt, now()) : now();
       if (!energy.endPaidPlan(order.workspaceId, endsAt.toISOString(), `payment:${by}`)) return;
-      // Extras bought later are separate monthly orders. They are not stopped for the client, so they are told.
-      const extras = payments.all().some((o) => o.workspaceId === order.workspaceId && o.id !== order.id && o.status === "paid" && o.monthlyMinor > 0);
-      notices.add(order.workspaceId, { kind: "info", title: "Your Team package has been cancelled", body: `Your team keeps working until ${endsAt.toLocaleDateString("en-GB", { day: "numeric", month: "long" })}. You can start it again any time from the store.${extras ? " Extras you added later are billed separately: cancel those too in Settings, Plan and billing, if you no longer want them." : ""}`, link: extras ? "/app.html#settings" : "/app.html#store" });
+      // Extras bought later stop with the package, each at the end of its own paid month (docs/ONE-BILL.md). The client is told which.
+      const day = (d: Date | string) => new Date(d).toLocaleDateString("en-GB", { day: "numeric", month: "long" });
+      const stoppedToo = also.length ? ` These extras stop too and will not be charged again: ${also.map((l) => `${l.qty > 1 ? `${l.qty} × ` : ""}${l.title} (works until ${day(l.endsAt)})`).join(", ")}.` : "";
+      // An extra the payment provider could not be told about yet is tried again by itself; the client hears the truth meanwhile.
+      const stuck = payments.all().some((o) => o.workspaceId === order.workspaceId && o.id !== order.id && o.status === "paid" && !!o.stopWanted);
+      notices.add(order.workspaceId, { kind: "info", title: "Your Team package has been cancelled", body: `Your team keeps working until ${day(endsAt)}. You can start it again any time from the store.${stoppedToo}${stuck ? " One extra could not be stopped yet. We are trying again, and MAIZ has been told." : ""}`, link: also.length || stuck ? "/app.html#settings" : "/app.html#store" });
+    },
+    plan: (key) => key === TEAM_PACKAGE_KEY,
+    oneBill: () => prices.general().oneMonthlyBill === 1,
+    periodEnd: paidThrough,
+    // The exact inverse of `fulfil`: the employee a line hired leaves, and the weekly energy it added goes with it,
+    // because the pool is worked out from who is on the team. The six core employees are never touched.
+    release: (order, line, employeeIds) => {
+      const templateKey = line.key.split(":")[0]!;
+      if (CORE_TEMPLATE_KEYS.has(templateKey)) return [];
+      return employeeIds.filter((id) => workforce.templateOf(id) === templateKey && workforce.remove(order.workspaceId, id, "payment:line_ended"));
+    },
+    released: (ws, lines) => {
+      const names = lines.flatMap((l) => l.employeeIds.map((id) => workforce.formerName(id) ?? l.title));
+      const energyGone = lines.reduce((n, l) => n + prices.weeklyEnergyFor(l.key.split(":")[0]!) * l.employeeIds.length, 0);
+      const many = names.length > 1;
+      notices.add(ws, { kind: "info", title: many ? `${names.length} employees have left your team` : `${names[0]} has left your team`, body: `The month you paid for has ended, so ${many ? `${names.join(", ")} have` : `${names[0]} has`} left your team. The work ${many ? "they" : "it"} did is kept.${energyGone ? ` The weekly energy that came with ${many ? "them" : "it"} (${energyGone.toLocaleString("en-GB")}) has gone too.` : ""} You can add ${many ? "them" : "it"} again any time from the store.`, link: "/app.html#store" });
     },
   });
 
@@ -468,7 +487,7 @@ export function createPlatform(cfg: PlatformConfig) {
     const energyDays = energy.recentDays(userId, workspaceId, 7);
     const done = workforce.tasksSince(userId, workspaceId, weekAgo).filter((t) => t.status === "ready_for_review");
     const open = batch.openJobsOf(workspaceId);
-    const label = (id: string) => team.find((e) => e.id === id)?.name ?? "Employee";
+    const label = (id: string) => team.find((e) => e.id === id)?.name ?? workforce.formerName(id) ?? "Employee";
     const clip = (t: string, n: number) => (t.length > n ? `${t.slice(0, n - 1)}…` : t);
     const people = team.map((e) => {
       const allowance = energy.quotaOf(userId, workspaceId, e.id);
@@ -623,6 +642,7 @@ export function createPlatform(cfg: PlatformConfig) {
       else if (x.kind === "rota_shift" && !x.data.removed) rota.restoreShift(x.data);
       else if (x.kind === "agent_conn" || x.kind === "agent_job" || x.kind === "agent_delivery") agents.restore(x.kind, x.data);
       else if (x.kind === "dataset") mining.restore(x.data);
+      else if (x.kind === "employee_removed") workforce.restoreRemoved(x.data);
     }
     for (const r of specialists.approved()) workforce.registerCustomTemplate(r.workspaceId, customTemplateOf(r));
     if (s.aiSettings) aiSettings.restore(s.aiSettings);

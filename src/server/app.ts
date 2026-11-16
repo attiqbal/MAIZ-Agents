@@ -39,6 +39,7 @@ import type { TaskResult } from "../modules/workforce/index.js";
 import { passwordRoutes } from "./password-auth.js";
 import { pushRoute } from "./push-routes.js";
 import { miningRoute } from "./mining-routes.js";
+import { billingRoute } from "./billing-routes.js";
 import { MiningError } from "../modules/data-mining/index.js";
 import { PushError } from "../modules/push/index.js";
 import { agentOwnerRoute, agentPublicRoute } from "./agent-routes.js";
@@ -106,7 +107,7 @@ export interface Res {
 }
 
 /** What a client sees of an order: never the provider's reference. */
-const orderView = (o: Order) => ({ id: o.id, status: o.status, lines: o.lines, dueTodayMinor: o.dueTodayMinor, monthlyMinor: o.monthlyMinor, currency: o.currency, createdAt: o.createdAt, paidAt: o.paidAt, employeeIds: o.employeeIds, ...(o.discount ? { discount: { code: o.discount.code, amountOffMinor: o.discount.amountOffMinor, months: o.discount.months } } : {}), ...(o.problem && !o.fulfilledAt && o.status === "paid" ? { problem: "We took your payment but could not finish setting up. MAIZ has been alerted." } : {}) });
+const orderView = (o: Order, mayPay = false) => ({ id: o.id, status: o.status, lines: o.lines, dueTodayMinor: o.dueTodayMinor, monthlyMinor: o.monthlyMinor, currency: o.currency, createdAt: o.createdAt, paidAt: o.paidAt, employeeIds: o.employeeIds, ...(o.addedTo ? { addedToBill: true } : {}), ...(mayPay && o.status === "pending" && o.payUrl ? { payUrl: o.payUrl } : {}), ...(o.discount ? { discount: { code: o.discount.code, amountOffMinor: o.discount.amountOffMinor, months: o.discount.months } } : {}), ...(o.problem && !o.fulfilledAt && o.status === "paid" ? { problem: "We took your payment but could not finish setting up. MAIZ has been alerted." } : {}) });
 
 const json = (status: number, body: unknown): Res => ({ status, body });
 
@@ -535,6 +536,8 @@ export function createApp(p: Platform) {
     { const r = await pushRoute(req, userId, p, orgOf(userId)?.id, body); if (r) return r; }
     // The Data mining agent: quote, run, datasets and sharing (docs/DATA-MINING.md).
     { const r = await miningRoute(req, userId, p, orgOf(userId)?.id, body); if (r) return r; }
+    // Plan and billing: the monthly lines a client pays for, stopping one, and adding to the monthly bill (docs/ONE-BILL.md).
+    { const r = await billingRoute(req, userId, p, orgOf(userId)?.id, body); if (r) return r; }
 
     // ---- affiliate: whoever logs in with an affiliate's email sees their own results ----
     if (method === "GET" && path === "/api/affiliate/me") return json(200, { affiliate: affiliateView(sessionClaims(req)?.e) });
@@ -578,10 +581,12 @@ export function createApp(p: Platform) {
 
     // ---- buying from the store ----
     if (method === "POST" && path === "/api/checkout") {
-      const { order, url } = await p.payments.checkout(userId, org.id, body().lines);
-      return json(201, { order: orderView(order), ...(url ? { url } : {}) });
+      // `addToBill` is only ever true from a page that has just told the client their saved card will be charged.
+      const cart = body();
+      const { order, url, addedToBill, remaining } = await p.payments.checkout(userId, org.id, cart.lines, { addToBill: cart.addToBill === true });
+      return json(201, { order: orderView(order, true), ...(url ? { url } : {}), ...(addedToBill ? { addedToBill, remaining } : {}) });
     }
-    if (method === "GET" && path === "/api/orders") return json(200, { enabled: p.payments.enabled, orders: p.payments.mine(userId, org.id).map(orderView) });
+    if (method === "GET" && path === "/api/orders") { const mayPay = p.identity.can(userId, org.id, "employee.hire"); return json(200, { enabled: p.payments.enabled, orders: p.payments.mine(userId, org.id).map((o) => orderView(o, mayPay)) }); }
     if (method === "POST" && path === "/api/billing/portal") return json(200, { url: await p.payments.portalUrl(userId, org.id, `${(p.cfg.appUrl ?? "").replace(/\/$/, "")}/app.html#team`) });
     const cancelOrder = /^\/api\/orders\/([\w-]{1,64})\/cancel$/.exec(path);
     if (method === "POST" && cancelOrder) return json(200, { order: orderView(await p.payments.cancel(userId, org.id, cancelOrder[1]!)) });
