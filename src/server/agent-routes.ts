@@ -71,6 +71,9 @@ export async function agentOwnerRoute(req: Req, userId: string, p: Platform, wor
   try {
     if (method === "GET" && path === "/api/agents") return json(200, a.overview(userId, workspaceId));
     if (method === "POST" && path === "/api/agents") return json(201, await a.create(userId, workspaceId, body()));
+    // The Admin manager's planning interview: the questions, and a proposal from the answers. Proposes only (matched before a connection id).
+    if (method === "GET" && path === "/api/agents/plan") return json(200, a.planQuestions(userId, workspaceId));
+    if (method === "POST" && path === "/api/agents/plan") return json(200, { proposal: a.plan(userId, workspaceId, body()) });
     const decide = OWNER_JOB.exec(path);
     if (method === "POST" && decide) {
       const [, jobId, action] = decide as unknown as [string, string, string];

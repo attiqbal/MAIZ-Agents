@@ -8,6 +8,7 @@ import { AgentBudget } from "./budget.js";
 import { ConnectionBook, principalOf, type RosterEntry } from "./connections.js";
 import { JobStore } from "./jobs.js";
 import { fenceBrief, readJobInput } from "./keys.js";
+import { PLAN_QUESTIONS, profileContext, proposePlan, type AgentProposal, type PlanQuestion } from "./planner.js";
 import {
   AgentAuthError, AgentError, AgentRefusal, BRIEF_MAX_CHARS, DATA_MAX_BYTES, DEFAULT_LIMITS, KEY_EXPIRY_WARNING_DAYS, MAX_CONNECTIONS_PER_WORKSPACE,
   MAX_JOBS_LISTED, MAX_LIMITS, MAX_WAITING_JOBS, NEVER_ALLOWED, OWNER_RECENT_JOBS, READS_PER_MINUTE, STUCK_AFTER_MINUTES, WAITING_EXPIRES_DAYS, publicJob,
@@ -17,6 +18,7 @@ import { connectionView, ownerJobView, rosterOf } from "./views.js";
 import { WebhookQueue, type Delivery, type WebhookEvent } from "./webhooks.js";
 
 export * from "./types.js";
+export * from "./planner.js";
 export { AGENT_SECRET_PREFIX, principalOf } from "./connections.js";
 export { fenceBrief, hashKey } from "./keys.js";
 export { GIVE_UP_AFTER_MS, RETRY_AFTER_MS, SIGNATURE_HEADER, WEBHOOK_TIMEOUT_MS, signWebhook, verifyWebhookSignature, type Delivery, type WebhookEvent } from "./webhooks.js";
@@ -102,6 +104,23 @@ export class AgentService {
     };
   }
 
+  /** The Admin manager's questions about a tool, and the client's employees an outside tool may or may not be given. */
+  planQuestions(userId: string, workspaceId: string): { questions: readonly PlanQuestion[]; employees: { key: string; title: string; allowed: boolean }[] } {
+    this.d.identity.require(userId, workspaceId, "workspace.manage");
+    return { questions: PLAN_QUESTIONS, employees: this.roster(userId, workspaceId).map((e) => ({ key: e.key, title: e.title, allowed: e.allowed })) };
+  }
+
+  /**
+   * The Admin manager proposes a set-up from the owner's answers. It only proposes: nothing is created, switched on or
+   * changed here, no AI model is asked and no energy is used. The owner accepts by making the connection themselves.
+   */
+  plan(userId: string, workspaceId: string, answers: unknown): AgentProposal {
+    this.d.identity.require(userId, workspaceId, "workspace.manage");
+    const proposal = proposePlan(answers, this.roster(userId, workspaceId), { weeklyPool: this.budget.pool(workspaceId), perJob: this.d.energy.estimateFor(workspaceId) });
+    this.d.audit.record({ workspaceId, actor: "admin-manager", action: "agent.proposed", data: { by: userId, purpose: proposal.profile.purpose, volume: proposal.profile.volume, tool: proposal.tool, employees: proposal.employees.map((e) => e.key), limits: proposal.limits, needsApproval: proposal.needsApproval } });
+    return proposal;
+  }
+
   /** A new connection. The key and the webhook signing secret are returned here and never again. */
   async create(userId: string, workspaceId: string, input: unknown): Promise<{ connection: ConnectionView; key: string; signingSecret: string }> {
     const made = await this.book.create(userId, workspaceId, input);
@@ -172,6 +191,7 @@ export class AgentService {
       limits: { dailyEnergy: e.dailyCeiling, perJobEnergy: e.perJobCap, jobsPerHour: c.limits.jobsPerHour },
       today: { energyUsed: e.usedToday, energyLeft: e.leftToday, resetsAt: e.resetsAt },
       thisHour: { jobs: sent, jobsLeft: Math.max(0, c.limits.jobsPerHour - sent) },
+      examples: (c.profile?.examples ?? []).map((x) => ({ ...x })),
     };
   }
 
@@ -294,7 +314,7 @@ export class AgentService {
     const working = this.jobs.save({ ...job, status: "working", startedAt: this.now().toISOString() });
     let outcome: { status: "done" | "refused" | "failed"; reason?: AgentJobReason; patch: Partial<AgentJob> };
     try {
-      const task = await this.d.workforce.assign(principal, c.workspaceId, entry.employeeId, fenceBrief(c.name, job.brief, job.data), { when: "now", urgent: job.urgent });
+      const task = await this.d.workforce.assign(principal, c.workspaceId, entry.employeeId, fenceBrief(c.name, job.brief, job.data, profileContext(c.profile)), { when: "now", urgent: job.urgent });
       const used = { taskId: task.id, ...(task.energyUsed !== undefined ? { energyUsed: task.energyUsed, energyDay: this.budget.dayOf(c.workspaceId) } : {}) };
       // "ready_for_review" is a finished draft. Anything else never produced an answer, so no result is passed on.
       if (task.status === "ready_for_review" && task.deliverable !== undefined) outcome = { status: "done", patch: { ...used, result: task.deliverable } };

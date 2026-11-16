@@ -4,6 +4,8 @@
  * service, the webhook sender and the routes agree on them.
  */
 
+import type { AgentExample, AgentProfile } from "./planner.js";
+
 export const AGENT_TOOLS = ["claude", "chatgpt", "zapier", "make", "n8n", "other"] as const;
 export type AgentTool = (typeof AGENT_TOOLS)[number];
 
@@ -84,6 +86,8 @@ export interface AgentConnection {
   ceilingNoticeDay?: string;
   /** Set once the owner has been told this key is about to expire. */
   expiryWarned?: boolean;
+  /** What the owner told the Admin manager this tool is for, when the connection was planned with it. */
+  profile?: AgentProfile;
   /** A removed connection. Kept only so storage forgets the rest. */
   removed?: boolean;
 }
@@ -173,6 +177,8 @@ export interface ConnectionView {
   createdAt: string;
   updatedAt: string;
   lastUsedAt: string | null;
+  /** The set-up planned with the Admin manager, or null for a connection made by hand. */
+  profile: AgentProfile | null;
 }
 
 /** A job as the owner sees it: what the tool sees, plus what was asked and by which connection. */
@@ -208,6 +214,8 @@ export interface AgentSelf {
   limits: { dailyEnergy: number; perJobEnergy: number; jobsPerHour: number };
   today: { energyUsed: number; energyLeft: number; resetsAt: string };
   thisHour: { jobs: number; jobsLeft: number };
+  /** Example requests from the set-up the owner agreed, for whoever builds the tool. Empty when there are none. */
+  examples: AgentExample[];
 }
 
 /** Something the owner or the tool sent is not valid. Answered as 400. */
