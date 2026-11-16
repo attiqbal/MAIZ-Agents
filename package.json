@@ -11,6 +11,8 @@
     "db:test": "bash db/isolation-test.sh",
     "dev:api": "ALLOW_DEV_AUTH=1 tsx src/server/main.ts",
     "db:int": "bash db/with-postgres.sh npx vitest run test/postgres.int.test.ts",
+    "db:backup": "bash db/with-postgres.sh npx vitest run test/backup.int.test.ts",
+    "backup:open": "tsx scripts/open-backup.ts",
     "build": "npm run typecheck && cd web && npm run build",
     "start": "node --import tsx src/server/main.ts",
     "skills": "tsx scripts/build-skills.ts",
