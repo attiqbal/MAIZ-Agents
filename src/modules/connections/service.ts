@@ -5,6 +5,8 @@ import { defaultRegistry } from "../integrations/catalogue.js";
 import type { OAuthApp } from "../integrations/index.js";
 import { clientAppEnv } from "./client-apps.js";
 import { CATALOG, defOf, type ConnDef, type ConnKey, type GuideStep } from "./catalog.js";
+import { META_STORE_KEY, packMeta, unpackMeta } from "./meta.js";
+import { modeOf, tierOf, type Mode, type Tier } from "./tiers.js";
 import { probeApp, probeGeneric, ProbeUnreachable, type ProbeKind } from "./probes.js";
 import { deskKeyWorks } from "../research/desk.js";
 import { keyWorks, RenderError } from "../paid-services/render.js";
@@ -21,11 +23,18 @@ export class ConnectionsError extends Error {}
 
 export type Status = "connected" | "not_connected" | "error";
 export interface TestResult { ok: boolean; message: string; details: string[]; at: string }
-export interface FieldView { key: string; label: string; help: string; secret: boolean; required: boolean; placeholder?: string; generate?: boolean; set: boolean; value?: string; fallback?: string }
+export interface FieldView { key: string; label: string; help: string; secret: boolean; required: boolean; placeholder?: string; generate?: boolean; set: boolean; value?: string; fallback?: string; /** When this detail was last saved or replaced on the page. */ changedAt?: string }
 export interface ConnectionView {
   key: ConnKey; title: string; summary: string; group: ConnDef["group"]; usedBy: string[];
   /** The owner can type details here (false: set on the server, or a server-only service). */
   editable: boolean;
+  /** How much the site depends on it, with the reason in the owner's words. */
+  tier: Tier;
+  tierWhy: string;
+  /** How it is connected now: typed here, set on the server, waiting for the provider's approval, or used by hand. */
+  mode: Mode;
+  /** The latest time any detail was changed on the page. */
+  changedAt?: string;
   status: Status;
   /** Where the working settings come from. */
   source: "browser" | "server" | "none";
@@ -179,6 +188,8 @@ export function explainMeta(message: string): string {
 export class ConnectionsService {
   private stored: Stored = {};
   private tests = new Map<string, TestResult>();
+  /** When each typed detail was last changed: connection key, then field key, then the time. Never a value. */
+  private changed: Record<string, Record<string, string>> = {};
   private lastRun = new Map<string, number>();
   private webhookSeenAt?: string;
   private sink?: Sink;
@@ -188,6 +199,7 @@ export class ConnectionsService {
   useSink(sink: Sink): void { this.sink = sink; }
   /** Stored details for one connection, as the store decrypted them. */
   restore(key: string, secret: string): void {
+    if (key === META_STORE_KEY) { this.restoreMeta(secret); return; }
     if (!defOf(key)?.editable || !secret) return;
     try {
       const v = JSON.parse(secret);
@@ -198,6 +210,13 @@ export class ConnectionsService {
       this.stored[key as ConnKey] = Object.fromEntries(Object.entries(v).filter(([f, x]) => ok(f, x))) as Record<string, string>;
     } catch { /* an unreadable record is treated as not connected */ }
   }
+  /** Last-changed times and last test results from before a restart. Unknown services and fields are dropped. */
+  private restoreMeta(secret: string): void {
+    const m = unpackMeta(secret, (k) => defOf(k)?.fields.map((f) => f.key));
+    this.changed = m.changed;
+    this.tests = new Map(Object.entries(m.tests));
+  }
+  private saveMeta(): void { this.sink?.connectionSecret(META_STORE_KEY, packMeta({ changed: this.changed, tests: Object.fromEntries(this.tests) })); }
   /** True when something is stored for this connection (used by tests and the platform). */
   hasStored(key: ConnKey): boolean { return !!this.stored[key] && Object.keys(this.stored[key]!).length > 0; }
 
@@ -395,12 +414,14 @@ export class ConnectionsService {
     const fields: FieldView[] = def.fields.map((f) => {
       const value = this.field(def.key, f.key);
       const fallback = def.key === "whatsapp" && !value && ((f.key === "accessToken" && fbToken) || (f.key === "appSecret" && fbSecret)) ? "Using the one from the Facebook Page card" : undefined;
-      return { key: f.key, label: f.label, help: f.help, secret: f.secret, required: f.required, placeholder: f.placeholder, generate: f.generate, set: !!value, value: f.secret ? undefined : value, fallback };
+      return { key: f.key, label: f.label, help: f.help, secret: f.secret, required: f.required, placeholder: f.placeholder, generate: f.generate, set: !!value, value: f.secret ? undefined : value, fallback, changedAt: value ? this.changed[def.key]?.[f.key] : undefined };
     });
+    const t = tierOf(def);
+    const changedAt = fields.map((f) => f.changedAt).filter((x): x is string => !!x).sort().at(-1);
     const wa = def.key === "whatsapp" ? this.whatsappConfig() : undefined;
     return {
       key: def.key, title: def.title, summary: def.summary, group: def.group, usedBy: def.usedBy,
-      editable: def.editable && !server, status, source,
+      editable: def.editable && !server, tier: t.tier, tierWhy: t.why, mode: server && def.editable ? "server" : modeOf(def), changedAt, status, source,
       statusText: server && c.ok ? `${c.text} Set on the server, so it cannot be changed here.` : c.text,
       missing: c.missing,
       canTest: true,
@@ -454,10 +475,15 @@ export class ConnectionsService {
       next[f.key] = s;
     }
     if (problems.length) throw new ConnectionsError(problems.join(" "));
+    const before = this.stored[def.key] ?? {};
+    const at = this.opts.now().toISOString();
+    const times = Object.fromEntries(Object.keys(next).map((f) => [f, next[f] === before[f] ? this.changed[def.key]?.[f] ?? at : at]));
+    this.changed = { ...this.changed, [def.key]: times };
     this.stored = { ...this.stored, [def.key]: next };
     this.tests.delete(def.key);
     // The Facebook token and app secret are shared with Instagram and WhatsApp, so their last tests are stale too.
     if (def.key === "facebook") { this.tests.delete("instagram"); this.tests.delete("whatsapp"); }
+    this.saveMeta();
     this.sink?.connectionSecret(def.key, Object.keys(next).length ? JSON.stringify(next) : "");
     this.opts.onChange?.();
     return this.viewOf(def);
@@ -470,8 +496,11 @@ export class ConnectionsService {
     if (this.serverSet(def.key)) throw new ConnectionsError(`${def.title} is set on the server, so it cannot be removed here`);
     const { [def.key]: _gone, ...rest } = this.stored;
     this.stored = rest;
+    const { [def.key]: _times, ...otherTimes } = this.changed;
+    this.changed = otherTimes;
     this.tests.delete(def.key);
     if (def.key === "facebook") { this.tests.delete("instagram"); this.tests.delete("whatsapp"); }
+    this.saveMeta();
     this.sink?.connectionSecret(def.key, "");
     this.opts.onChange?.();
     return this.viewOf(def);
@@ -506,6 +535,7 @@ export class ConnectionsService {
     const secrets = this.allSecrets();
     result = { ...result, message: redact(result.message, ...secrets), details: result.details.map((d) => redact(d, ...secrets)) };
     this.tests.set(def.key, { ...result, at: this.opts.now().toISOString() });
+    this.saveMeta();
     return this.viewOf(def);
   }
 

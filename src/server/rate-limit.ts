@@ -69,6 +69,8 @@ export function limitFor(method: string, path: string): Limit | undefined {
   if (path === "/api/signup/read-site") return { max: 6, windowMs: 10 * 60_000 };
   // Connection tests call Meta, Stripe, Resend and RunPod: enough to fix and retry, not enough to hammer them.
   if (path.startsWith("/api/owner/connections/") && /\/(test|send-test)$/.test(path)) return { max: 30, windowMs: 10 * 60_000 };
+  // Disconnecting removes saved details for every client at once: a person does it a few times, never in a loop.
+  if (path.startsWith("/api/owner/connections/") && path.endsWith("/disconnect")) return { max: 30, windowMs: 10 * 60_000 };
   // Run-now wakes the GPU pod, which is billed per second: keep it to a few presses an hour per address.
   if (path === "/api/queue/run-now" || path === "/api/owner/batch/run-now") return { max: 6, windowMs: 60 * 60_000 };
   return { max: 60, windowMs: 60_000 };
