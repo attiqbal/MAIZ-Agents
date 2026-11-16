@@ -56,6 +56,10 @@ export function limitFor(method: string, path: string): Limit | undefined {
   if (path === "/api/payments/webhook") return undefined; // signed by the payment provider, which retries on 429
   // Outside agents: jobs an hour and the daily energy ceiling are enforced per key; wrong keys are throttled per address (see AGENT_BAD_KEY_LIMIT).
   if (isAgentApi(path)) return undefined;
+  // Teammates: opening or using an invite link, and sending invites (each one is an email to someone else's address).
+  // Invites are also limited per business and per invited address in the service.
+  if (path === "/api/invites/open" || path === "/api/invites/accept") return { max: 20, windowMs: 10 * 60_000 };
+  if (path === "/api/team/invites" || /^\/api\/team\/invites\/[\w-]{1,64}\/resend$/.test(path)) return { max: 20, windowMs: 10 * 60_000 };
   // A webhook test makes the server call an address the owner typed: a few tries are plenty.
   if (/^\/api\/agents\/[\w-]{1,64}\/test$/.test(path)) return { max: 10, windowMs: 10 * 60_000 };
   // Tasks are limited by energy (the team pool, the daily ceiling and the monthly cost cap), not by a request count:

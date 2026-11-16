@@ -91,7 +91,7 @@ export class PaymentService {
   get providerName(): string | undefined { return this.d.provider?.name; }
 
   async checkout(userId: string, workspaceId: string, rawLines: unknown): Promise<{ order: Order; url?: string }> {
-    this.identity.require(userId, workspaceId, "employee.hire");
+    this.identity.require(userId, workspaceId, "workspace.manage"); // paying, the card and cancelling are the owner's alone
     const provider = this.d.provider;
     if (!provider) throw new PaymentError("payments are not switched on yet, so nothing can be bought");
     if (!Array.isArray(rawLines) || rawLines.length === 0 || rawLines.length > 100) throw new PaymentError("your cart is empty");
@@ -138,13 +138,13 @@ export class PaymentService {
   }
 
   mine(userId: string, workspaceId: string): Order[] {
-    this.identity.require(userId, workspaceId, "task.read");
+    this.identity.require(userId, workspaceId, "workspace.manage"); // what was bought and paid is billing, so the owner's alone
     return [...this.orders.values()].filter((o) => o.workspaceId === workspaceId).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   }
 
   /** Stops future monthly charges. Employees already hired stay for the month that was paid. */
   async cancel(userId: string, workspaceId: string, orderId: string): Promise<Order> {
-    this.identity.require(userId, workspaceId, "employee.hire");
+    this.identity.require(userId, workspaceId, "workspace.manage"); // paying, the card and cancelling are the owner's alone
     const o = this.orders.get(orderId);
     if (!o || o.workspaceId !== workspaceId) throw new PaymentError("order not found");
     if (o.status !== "paid" && o.status !== "pending") throw new PaymentError("this order cannot be cancelled");
@@ -214,7 +214,7 @@ export class PaymentService {
 
   /** Opens the provider's own page where the client manages their card, invoices and cancellation. */
   async portalUrl(userId: string, workspaceId: string, returnUrl: string): Promise<string> {
-    this.identity.require(userId, workspaceId, "employee.hire");
+    this.identity.require(userId, workspaceId, "workspace.manage"); // paying, the card and cancelling are the owner's alone
     const provider = this.d.provider;
     if (!provider?.createPortalSession) throw new PaymentError("billing management is not available yet");
     const o = this.mine(userId, workspaceId).find((x) => x.customerRef);

@@ -43,6 +43,8 @@ import { MiningError } from "../modules/data-mining/index.js";
 import { PushError } from "../modules/push/index.js";
 import { agentOwnerRoute, agentPublicRoute } from "./agent-routes.js";
 import { AgentError } from "../modules/agents/index.js";
+import { teamPublicRoute, teamRoute, type TeamRouteCtx } from "./team-routes.js";
+import { roleGate } from "./route-policy.js";
 import { LOGIN_PROVIDERS, attemptSecrets, authorizeUrl, completeLogin, isLoginProvider, loginRedirectUri } from "./social-login.js";
 
 const OAUTH_STATE_SECONDS = 600;
@@ -259,6 +261,10 @@ export function createApp(p: Platform) {
     // ---- email and password: sign up, log in, forgot password ----
     const authed = await passwordRoutes(req, { p, makeToken: (claims, ttl) => makeToken(secret, claims, ttl, p.now().getTime()), readToken: (t) => readToken(secret, t, p.now().getTime()), issueSession: (e) => issueSession(e), sessionClaims, orgOf, body });
     if (authed) return authed;
+
+    // ---- teammates: what an invite link is for, and joining a business with it (docs/TEAMMATES.md) ----
+    const teamCtx: TeamRouteCtx = { p, issueSession: (e) => issueSession(e), sessionClaims, body };
+    { const r = await teamPublicRoute(req, teamCtx); if (r) return r; }
 
     // ---- sign in with Google or Microsoft: proves an email, then hands over the same one-time link as email sign-in ----
     if (method === "GET" && path === "/api/signin/providers") {
@@ -483,6 +489,8 @@ export function createApp(p: Platform) {
     // ---- everything below needs a signed-in user ----
     const userId = session(req);
     if (!userId) return json(401, { error: "sign in first" });
+    // ---- teammates: every request is checked against the caller's role before any route runs (src/server/route-policy.ts) ----
+    { const r = roleGate(req, userId, p, orgOf(userId)?.id) ?? (await teamRoute(req, userId, teamCtx, orgOf(userId)?.id)); if (r) return r; }
     { const r = (await metaOwnerRoute(req, userId, metaCtx)) ?? (await metaClientRoute(req, userId, metaCtx)); if (r) return r; }
     // ---- MAIZ quality review: the platform owner's queue across every client. Clients get 403. ----
     if (path === "/api/owner/reviews" || path.startsWith("/api/owner/reviews/")) return ownerReviewRoutes(req, userId, body);

@@ -55,6 +55,7 @@ import { COMPANY } from "../company.js";
 import { CredentialStore } from "../modules/credentials/index.js";
 import { PushService, VAPID_STORE_KEY } from "../modules/push/index.js";
 import { AGENT_SECRET_PREFIX, AgentService } from "../modules/agents/index.js";
+import { TeamService } from "../modules/teammates/index.js";
 
 export interface PlatformConfig {
   anthropicApiKey?: string;
@@ -360,6 +361,8 @@ export function createPlatform(cfg: PlatformConfig) {
     timezone: (ws) => batch.scheduleOf(ws).timezone,
     notify: (ws, n) => { notices.add(ws, { kind: "info", title: n.title, body: n.body, link: "/app.html#apps" }); },
   });
+  /** Teammates: the owner invites people into the business with limited rights. See docs/TEAMMATES.md. */
+  const team = new TeamService({ identity, audit, now, userIdFor, isPlatformOwner: (id) => ownerIdSet.has(id), onRemoved: (ws, userId) => { push.forget(userId, ws); } });
   let alertOwnersLate: (subject: string, text: string) => Promise<void> = async () => undefined;
   /** Staff and shifts, so rota questions are answered from real records. */
   const rota = new RotaService(identity, audit);
@@ -624,6 +627,11 @@ export function createPlatform(cfg: PlatformConfig) {
       else if (x.kind === "agent_conn" || x.kind === "agent_job" || x.kind === "agent_delivery") agents.restore(x.kind, x.data);
       else if (x.kind === "dataset") mining.restore(x.data);
     }
+    // Teammates: removals win over the stored membership rows, then the people and invites lists come back.
+    for (const x of s.records ?? []) {
+      if (x.kind === "member_gone") identity.restoreRemoval(x.data);
+      else if (x.kind === "team_invite" || x.kind === "team_member") team.restore(x.kind, x.data);
+    }
     for (const r of specialists.approved()) workforce.registerCustomTemplate(r.workspaceId, customTemplateOf(r));
     if (s.aiSettings) aiSettings.restore(s.aiSettings);
     for (const d of s.aiDays ?? []) spend.restore(d);
@@ -649,6 +657,7 @@ export function createPlatform(cfg: PlatformConfig) {
     }
     sink = store;
     for (const part of [audit, identity, energy, workforce, ledger, router, admin, integrations, reviews, prices, specialists, aiSettings, spend, batch, payments, rota, reconciliation, people, conversations, notices, credentials, coupons, affiliates, promoter, growth, connections, metaClients, push, mining, agents]) part.useSink(store);
+    team.useSink(store);
     live.sink = store;
     live.wa?.useSink(store);
   }
@@ -693,6 +702,6 @@ export function createPlatform(cfg: PlatformConfig) {
     slack: { enumerable: true, get: () => cfg.slack ?? connections.slackApp() },
     loginApps: { enumerable: true, get: (): LoginApps => ({ ...connections.loginApps(), ...cfg.loginApps }) },
   });
-  return { agents, mining, orderDiscountFor, quoteFor, hasTeamPackage, push, conversations, notices, warm, ownerDecisions, decisionDigest, dashboard, reconciliation, rota, people, payments, batch, email, usedLinks, sends, loginFails, resets, credentials, formHits, codeFails, coupons, affiliates, promoter, paid, growth, research, connections, growthTick, metaClients, metaSettings, get ownerWhatsApp() { return live.wa; }, admin, reviews, prices, specialists, ai, clients, isPlatformOwner, healthy, hasStore, cfg: liveCfg, now, audit, bus, identity, energy, workforce, ledger, onboarding, router, integrations, slackTokens, saveSlackToken, attachStore };
+  return { team, agents, mining, orderDiscountFor, quoteFor, hasTeamPackage, push, conversations, notices, warm, ownerDecisions, decisionDigest, dashboard, reconciliation, rota, people, payments, batch, email, usedLinks, sends, loginFails, resets, credentials, formHits, codeFails, coupons, affiliates, promoter, paid, growth, research, connections, growthTick, metaClients, metaSettings, get ownerWhatsApp() { return live.wa; }, admin, reviews, prices, specialists, ai, clients, isPlatformOwner, healthy, hasStore, cfg: liveCfg, now, audit, bus, identity, energy, workforce, ledger, onboarding, router, integrations, slackTokens, saveSlackToken, attachStore };
 }
 export type Platform = ReturnType<typeof createPlatform>;

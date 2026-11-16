@@ -134,6 +134,13 @@ export class PushService {
     return true;
   }
 
+  /** Forgets every device a person switched on for one workspace (they were removed from its team). */
+  forget(userId: string, workspaceId: string): number {
+    const gone = this.of(userId).filter((s) => s.workspaceId === workspaceId);
+    for (const s of gone) this.drop(s);
+    return gone.length;
+  }
+
   count(userId: string): number {
     return this.of(userId).length;
   }
