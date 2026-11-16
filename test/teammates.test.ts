@@ -270,6 +270,11 @@ describe("teammates: who may use an invite", () => {
 
     expect(viaLink).toMatchObject({ status: 409, body: { reason: "login" } });
     expect((await s.call("POST", "/api/auth/login", { email: "zoe@kestrel.co", password: GOOD })).status).toBe(401);
+    // The join page is told to show "log in" instead of "choose a password", and who is logged in on this device.
+    expect((await s.call("POST", "/api/invites/open", { token: link })).body).toMatchObject({ needsLogin: true });
+    expect((await s.call("POST", "/api/invites/open", { token: link }, zoe)).body).toMatchObject({ needsLogin: true, loggedInAs: "zoe@kestrel.co" });
+    const { link: fresh } = await s.invite(ann, "new@kestrel.co");
+    expect((await s.call("POST", "/api/invites/open", { token: fresh })).body).toMatchObject({ needsLogin: false });
     const login = await s.call("POST", "/api/auth/login", { email: "zoe@kestrel.co", password: "zoe's own long password" });
     const ok = await s.call("POST", "/api/invites/accept", { token: link }, (login.body as any).token);
     expect(ok.status).toBe(200);

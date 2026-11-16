@@ -210,6 +210,8 @@ async function loadOrg(): Promise<void> {
     $("demo-banner").hidden = false; return;
   }
   realOrg = r.data;
+  // Teammates: the "People with access" panel, and what a person who is not the owner sees (src/access.ts).
+  void import("./access").then((m) => m.initAccess(realOrg?.role));
   $("ask-when").hidden = false;
   warmUp();
   $("org-name").textContent = realOrg.name;
@@ -275,6 +277,7 @@ async function loadBilling(): Promise<void> {
     : realOrg.planEnded ? (over ? `Your plan ended on ${day(ends)}. Your work is kept; start the Team package again to carry on.` : `Your plan was cancelled and your team works until ${day(ends)}. You can start it again any time.`)
     : over ? `Your free trial ended on ${day(ends)}. Your work is kept; choose your plan to carry on.` : `Your free trial runs until ${day(ends)}. Nothing is charged unless you choose a plan.`;
   $("bill-choose").hidden = !ends;
+  if (realOrg.role && realOrg.role !== "owner") return; // billing is the owner's alone
   const r = await api<{ enabled: boolean; orders: OrderRow[] }>("/orders");
   const orders = r.ok ? r.data?.orders ?? [] : [];
   $("bill-portal").hidden = !orders.some((o) => o.paidAt);
@@ -368,7 +371,7 @@ function resetWhen(): void { chosenWhen = undefined; document.querySelectorAll("
 // limits this, so calling it often costs nothing; this just keeps us from asking more than every few minutes.
 let lastWarm = 0;
 function warmUp(): void {
-  if (!getToken() || Date.now() - lastWarm < 4 * 60_000) return;
+  if (!getToken() || realOrg?.role === "viewer" || Date.now() - lastWarm < 4 * 60_000) return;
   lastWarm = Date.now();
   void api("/warm", { method: "POST", body: {} });
 }

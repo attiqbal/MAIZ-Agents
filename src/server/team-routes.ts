@@ -57,10 +57,14 @@ export async function teamPublicRoute(req: Req, c: TeamRouteCtx): Promise<Res | 
   if (method !== "POST" || (path !== "/api/invites/open" && path !== "/api/invites/accept")) return undefined;
   try {
     const b = c.body() ?? {};
-    if (path === "/api/invites/open") return json(200, p.team.peek(b.token));
-
     const claims = c.sessionClaims(req);
     const sessionEmail = typeof claims?.e === "string" ? claims.e : undefined;
+    if (path === "/api/invites/open") {
+      // Only the holder of the emailed link gets this far, so saying "log in first" tells the inviter nothing.
+      const invite = p.team.peek(b.token);
+      return json(200, { ...invite, needsLogin: hasAccount(p, invite.email), ...(sessionEmail ? { loggedInAs: sessionEmail } : {}) });
+    }
+
     if (sessionEmail) {
       const joined = p.team.accept(b.inviteId !== undefined ? { inviteId: b.inviteId } : { token: b.token }, sessionEmail);
       return json(200, { email: sessionEmail, hasOrganisation: true, role: joined.role });

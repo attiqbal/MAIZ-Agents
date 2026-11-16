@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<head>
+<!--@include head title="Join a business · MAIZ Agents" description="Use your invite to join a business's AI team on MAIZ Agents."-->
+<meta name="robots" content="noindex">
+</head>
+<body>
+<div class="page-top">
+  <!--@include header-->
+  <main id="main">
+    <section class="section">
+      <div class="container" style="max-width:440px">
+        <div class="ob-panel auth-card" aria-live="polite">
+          <h1 id="jn-h" class="auth-h">Opening your invite…</h1>
+          <p id="jn-p" class="sub auth-sub" hidden></p>
+          <!-- What the invite gives: the business, the role and what that role can do -->
+          <dl class="join-what" id="jn-what" hidden>
+            <div><dt>Business</dt><dd id="jn-biz"></dd></div>
+            <div><dt>Your access</dt><dd><b id="jn-role"></b><span id="jn-can"></span></dd></div>
+            <div><dt>Invite sent to</dt><dd id="jn-email" class="mono"></dd></div>
+          </dl>
+          <p class="err" id="jn-err" role="alert" hidden></p>
+
+          <!-- New here: choose a password -->
+          <div id="v-new" hidden>
+            <div class="social" id="jn-social" hidden>
+              <div class="social-row" id="jn-social-btns"></div>
+              <p class="small muted social-or">or choose a password</p>
+            </div>
+            <form id="new-form" class="auth-form" novalidate>
+              <div class="field">
+                <label for="new-pw">Choose a password</label>
+                <div class="pw"><input class="input" id="new-pw" type="password" autocomplete="new-password" aria-describedby="new-hint" required><button type="button" class="pw-toggle" data-pw-toggle="new-pw" aria-pressed="false">Show</button></div>
+                <span class="hint" id="new-hint">At least 8 characters. A short sentence works well.</span>
+              </div>
+              <button class="btn btn-primary btn-block" type="submit" id="new-go">Join</button>
+            </form>
+            <p class="hint auth-alt">Joining is free for you. The business pays for its plan.</p>
+          </div>
+
+          <!-- This address already has an account: log in with it -->
+          <div id="v-login" hidden>
+            <div class="social" id="jn-social2" hidden>
+              <div class="social-row" id="jn-social2-btns"></div>
+              <p class="small muted social-or">or</p>
+            </div>
+            <form id="login-form" class="auth-form" novalidate>
+              <div class="field">
+                <div class="auth-label-row"><label for="login-pw">Password</label><a href="/signin.html#forgot">Forgot password?</a></div>
+                <div class="pw"><input class="input" id="login-pw" type="password" autocomplete="current-password" required><button type="button" class="pw-toggle" data-pw-toggle="login-pw" aria-pressed="false">Show</button></div>
+              </div>
+              <button class="btn btn-primary btn-block" type="submit" id="login-go">Log in and join</button>
+            </form>
+            <p class="hint auth-alt">No password yet? <a href="/signin.html">Log in another way</a>, and we bring you back here.</p>
+          </div>
+
+          <!-- Logged in with the invited address -->
+          <div id="v-ready" hidden>
+            <button class="btn btn-primary btn-block" type="button" id="ready-go">Join</button>
+          </div>
+
+          <!-- Logged in with another address -->
+          <div id="v-other" hidden>
+            <button class="btn btn-primary btn-block" type="button" id="other-out">Log out and use the invited address</button>
+          </div>
+
+          <!-- Logged in, no link: invites waiting for this address -->
+          <div id="v-mine" hidden>
+            <ul class="join-list" id="mine-list"></ul>
+            <p class="hint auth-alt"><a href="/app.html">Not now</a></p>
+          </div>
+
+          <!-- Message only -->
+          <div id="v-note" hidden><p class="hint auth-alt" id="note-links"><a href="/signin.html">Log in</a></p></div>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+<!--@include footer-->
+<script type="module" src="/src/join.ts"></script>
+</body>
+</html>

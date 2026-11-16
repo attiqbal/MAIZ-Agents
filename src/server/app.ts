@@ -635,6 +635,7 @@ export function createApp(p: Platform) {
       return json(200, {
         id: org.id,
         name: org.name,
+        role: p.identity.roleOf(userId, org.id), // teammates: the page hides what this role cannot do (docs/TEAMMATES.md)
         trialEndsAt: plan.expiresAt,
         /** True when `trialEndsAt` is the end of a cancelled paid plan, so the page words it as that. */
         planEnded: plan.endedPaid === true,

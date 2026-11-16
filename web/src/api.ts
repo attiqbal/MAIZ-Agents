@@ -41,6 +41,8 @@ export async function api<T = any>(path: string, init: { method?: string; body?:
     const data = res.headers.get("content-type")?.includes("json") ? await res.json() : undefined;
     // A 401 on a call that carried a login means the session ended.
     if (res.status === 401 && token) onSessionEnded();
+    // Teammates: a change refused because of the person's role carries the reason in plain words (src/access.ts shows it).
+    if (res.status === 403 && data?.reason === "role" && init.body !== undefined) window.dispatchEvent(new CustomEvent("maiz:role-refused", { detail: data.error }));
     return { ok: res.ok, status: res.status, data };
   } catch {
     return { ok: false, status: 0 };
@@ -58,6 +60,8 @@ function onSessionEnded(): void {
 export interface Org {
   id: string;
   name: string;
+  /** What the signed-in person may do in this business (docs/TEAMMATES.md). */
+  role?: "owner" | "admin" | "member" | "viewer";
   trialEndsAt?: string;
   /** True when `trialEndsAt` is the end of a cancelled paid plan and not of the free trial. */
   planEnded?: boolean;
