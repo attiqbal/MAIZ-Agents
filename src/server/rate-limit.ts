@@ -62,6 +62,8 @@ export function limitFor(method: string, path: string): Limit | undefined {
   if (path.startsWith("/api/overview/")) return method === "GET" ? { max: 120, windowMs: 60_000 } : { max: 30, windowMs: 60_000 };
   // What an employee can use: assembled from several services on each call, so kept to a steady pace per address.
   if (method === "GET" && (path.startsWith("/api/resources/") || path === "/api/owner/resources")) return { max: 60, windowMs: 60_000 };
+  // The voice list calls an outside service when it is not remembered yet.
+  if (method === "GET" && path === "/api/tools/voices") return { max: 30, windowMs: 10 * 60_000 };
   if (method !== "POST") return undefined;
   // Coupon codes can be guessed, so tries are few per address. Wrong tries are also counted per person.
   if (path === "/api/coupons/check" || path === "/api/coupons/redeem") return { max: 12, windowMs: 10 * 60_000 };

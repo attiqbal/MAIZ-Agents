@@ -12,7 +12,7 @@ export interface Needs { items: NeedItem[]; summary: { total: number; decideHere
 
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
 /** Only a screen of this app or a page of this site, so a link can never lead anywhere else. */
-export const safeHref = (h: string): string => (/^#[\w/-]*$/.test(h) || /^\/[\w./-]*$/.test(h) ? h : "#approvals");
+export const safeHref = (h: string): string => (/^#[\w/-]*$/.test(h) || /^\/[\w./-]*$/.test(h) && !h.startsWith("//") ? h : "#approvals");
 /** Cards shown on the Overview before it says how many more there are. */
 const OVERVIEW_CARDS = 5;
 const REFRESH_MS = 60_000;

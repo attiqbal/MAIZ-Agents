@@ -65,11 +65,16 @@ export function miningAsk(p: Platform, userId: string, workspaceId: string, ask:
   return { status: "ready_for_review", answer: reply.text, checked: false, energyUsed: 0, employee: agent.name, ...(reply.offer ? { offer: reply.offer } : {}) };
 }
 
+/** How long a quoted search can be confirmed. */
+const OFFER_LIFETIME_MS = 30 * 60_000;
+
 /** The offer waiting in the Data mining agent's conversation: only the last thing said counts, so an old one cannot be confirmed later. */
 function waiting(p: Platform, userId: string, workspaceId: string): { agentId: string; offer: TurnOffer } {
   const agent = p.workforce.team(userId, workspaceId).find((e) => e.templateKey === DATA_MINING_AGENT);
   const last = agent ? p.conversations.thread(userId, workspaceId, agent.id).at(-1) : undefined;
   if (!agent || last?.role !== "employee" || last.offer?.kind !== "mining") throw new MiningError(CHAT_NOTHING_WAITING);
+  // An offer is for the next few minutes, not for a click days later.
+  if (p.now().getTime() - Date.parse(last.at) > OFFER_LIFETIME_MS) throw new MiningError(CHAT_NOTHING_WAITING);
   return { agentId: agent.id, offer: last.offer };
 }
 

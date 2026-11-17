@@ -71,3 +71,15 @@ describe("signUp", () => {
     expect(a.workspaceId).not.toBe(b.workspaceId);
   });
 });
+
+describe("books currency at sign-up", () => {
+  it("uses the chosen currency, else the country's, else pounds", async () => {
+    const { currencyFor } = await import("../src/modules/onboarding/index.js");
+    expect(currencyFor({ country: "United Kingdom" })).toBe("GBP");
+    expect(currencyFor({ country: "GB" })).toBe("GBP");
+    expect(currencyFor({ country: "Ireland" })).toBe("EUR");
+    expect(currencyFor({ country: "Canada", currency: "usd" })).toBe("USD");
+    expect(currencyFor({ country: "Somewhere new" })).toBe("GBP");
+    expect(currencyFor({ country: "Canada", currency: "nonsense!" })).toBe("CAD");
+  });
+});

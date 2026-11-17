@@ -69,7 +69,7 @@ export class IdentityService {
       name: input.name,
       type: "business",
       language: input.language ?? "en",
-      baseCurrency: input.baseCurrency ?? "USD",
+      baseCurrency: input.baseCurrency ?? "GBP",
       timeZone: input.timeZone ?? "UTC",
       ...(input.ownerEmail ? { ownerEmail: input.ownerEmail } : {}),
       createdAt: new Date().toISOString(),

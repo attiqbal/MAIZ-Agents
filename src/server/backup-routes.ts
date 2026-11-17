@@ -2,7 +2,7 @@ import { BackupBusy, BackupError, MANUAL_KEEP, NIGHTLY_TIME, type JobKind } from
 import type { Platform } from "./platform.js";
 import type { Req, Res } from "./app.js";
 
-const json = (status: number, body: unknown): Res => ({ status, body });
+const json = (status: number, body: unknown): Res => ({ status, body, headers: { "cache-control": "no-store" } });
 
 /**
  * Public, for the uptime check (.github/workflows/uptime.yml): are backups fresh? Says only yes or no. It is "yes"

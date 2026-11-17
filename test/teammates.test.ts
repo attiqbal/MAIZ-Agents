@@ -63,7 +63,9 @@ describe("teammates: inviting", () => {
     expect((r.body as any).invite).toMatchObject({ email: "ben@kestrel.co", role: "member", roleLabel: ROLE_WORDS.member.label, status: "pending" });
     const sent = s.mail.sent.at(-1)!;
     expect(sent.to).toBe("ben@kestrel.co");
-    expect(sent.subject).toContain("Kestrel Coffee");
+    // The business name is free text anyone can choose, so it stays out of the subject and is quoted in the body.
+    expect(sent.subject).not.toContain("Kestrel Coffee");
+    expect(sent.text).toContain('"Kestrel Coffee"');
     expect(sent.text).toContain("https://app.test/join.html#i=");
     expect(sent.text).toContain(ROLE_WORDS.member.label);
     expect(link.length).toBeGreaterThan(40);

@@ -317,6 +317,8 @@ export class BackupService {
       }
       if (!this.configured() || this.running) return;
       const a = await this.available();
+      // A manual backup may have started while the check above was waiting.
+      if (this.running) return;
       const now = this.o.now();
       if (a.ok && nightlyDue(this.state, now, this.zone)) await this.nightly(now);
       else if (a.ok && restoreTestDue(this.state, now, this.zone)) await this.weeklyTest(now);

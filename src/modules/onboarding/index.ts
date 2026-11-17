@@ -6,6 +6,7 @@ import { PLANS, type EnergyMeter } from "../energy/index.js";
 import { EMPLOYEE_TEMPLATES } from "../workforce/templates.js";
 import type { ChannelKind } from "../channels/index.js";
 import type { SignupPlan } from "./recommend.js";
+import { COUNTRIES } from "./sectors.js";
 
 /** The basic package every customer gets. Everything else is an add-on. */
 export const STANDARD_TEAM = ["finance-manager", "marketing-manager", "business-consultant", "hr-manager", "compliance-manager"] as const;
@@ -69,6 +70,15 @@ export interface Organisation {
 
 export class SignupError extends Error {}
 
+/** The currency a business keeps its books in: the one it chose, else its country's, else pounds (prices here are in pounds). */
+export function currencyFor(c: Pick<SignupChoices, "country" | "currency">): string {
+  const chosen = (c.currency ?? "").trim().toUpperCase();
+  if (/^[A-Z]{3}$/.test(chosen)) return chosen;
+  const text = c.country.trim().toLowerCase();
+  const found = COUNTRIES.find((x) => x.code.toLowerCase() === text || x.name.toLowerCase() === text);
+  return found?.currency ?? "GBP";
+}
+
 /** Turns menu choices into a plan for the organisation. Pure: no side effects, easy to test. */
 export function buildBlueprint(c: SignupChoices): Blueprint {
   if (!c.businessName.trim()) throw new SignupError("business name is required");
@@ -123,7 +133,7 @@ export class OnboardingService {
 
   async signUp(userId: string, choices: SignupChoices): Promise<Organisation> {
     const blueprint = buildBlueprint(choices);
-    const ws = await this.identity.createWorkspace(userId, { name: blueprint.businessName, ...(choices.ownerEmail ? { ownerEmail: choices.ownerEmail } : {}) });
+    const ws = await this.identity.createWorkspace(userId, { name: blueprint.businessName, baseCurrency: currencyFor(choices), ...(choices.ownerEmail ? { ownerEmail: choices.ownerEmail } : {}) });
     this.workforce.setProfile(userId, ws.id, blueprint.profile);
     this.ledger.open(userId, ws.id);
     const adminManagerId = (await this.workforce.hire(userId, ws.id, ADMIN_MANAGER)).id;
