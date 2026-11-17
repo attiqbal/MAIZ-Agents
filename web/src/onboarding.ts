@@ -29,6 +29,7 @@ const SIZES: Record<string, SignupSize> = { "Just me": "solo", "2–10": "2-10",
 const AVATAR: Record<string, [string, string]> = {
   "admin-manager": ["AM", "av-tl"], "finance-manager": ["FM", "av-fm"], "marketing-manager": ["MM", "av-mm"], "business-consultant": ["BC", "av-bc"],
   "hr-manager": ["HR", "av-hr"], "compliance-manager": ["CM", "av-cm"], "supply-chain-manager": ["SC", "av-sc"], "data-mining-agent": ["DM", "av-dm"],
+  "online-shop-manager": ["EM", "av-ec"], "dropshipping-agent": ["DA", "av-ds"], "marketplace-manager": ["MP", "av-mp"], "shop-care-agent": ["CC", "av-sh"],
 };
 const HOW: Record<AppHow, string> = { direct: "Connects directly", file: "Upload an export", bridge: "Through Zapier or Make", chat: "One scan" };
 

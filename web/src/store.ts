@@ -2,7 +2,7 @@
 // platform owner's Prices page; with no API the launch defaults from the backend's cart module are used.
 // Either way the page prices with the same quote() function as /api/cart/quote.
 import { api, getToken } from "./api";
-import { BILLING_INFO, CATALOGUE, KIND_LABEL, MAX_QTY, TEAM_PACKAGE_KEY, quote as quoteWith, type Billing, type CartLine, type CatalogueItem, type Quote } from "../../src/modules/store/cart";
+import { BILLING_INFO, CATALOGUE, KIND_LABEL, MAX_QTY, ONE_PER_BUSINESS, TEAM_PACKAGE_KEY, quote as quoteWith, type Billing, type CartLine, type CatalogueItem, type Quote } from "../../src/modules/store/cart";
 import { OVERAGE_RULE } from "../../src/modules/workforce/task-roles";
 import { HOW_A_PASS_WORKS } from "../../src/modules/workforce/consultants";
 import { getJobDescription, jdHtml } from "./jd";
@@ -43,6 +43,9 @@ async function priceForMe(): Promise<void> {
   // Anything this client cannot buy (the Team package they already have) leaves the saved cart, so it cannot block checkout.
   const refused = new Set((mine?.rejected ?? []).map((x) => x.key));
   if (cart.some((l) => refused.has(l.key))) {
+    // Said politely, because it is not an error: the employee is already on the team.
+    const had = cart.filter((l) => refused.has(l.key) && ONE_PER_BUSINESS.has(l.key)).map((l) => getItem(l.key)?.title).filter(Boolean);
+    if (had.length) $("cart-note").textContent = `You already have ${had.join(" and ")} on your team, so it is not in your cart.`;
     cart = cart.filter((l) => !refused.has(l.key));
     try { localStorage.setItem(KEY, JSON.stringify(cart)); } catch { /* storage unavailable */ }
   }
@@ -73,7 +76,7 @@ function renderItem(): void {
     <p><span class="bill-tag bill-${item.billing}">${b.label}</span></p>
     <p class="desc">${esc(item.summary)}</p>
     <p class="jd-note">${esc(b.note)}</p>
-    <div class="store-add">${item.kind === "package" ? "" : `<label class="label" for="store-qty">Quantity</label><input class="input" id="store-qty" type="number" min="1" max="${MAX_QTY}" value="1" inputmode="numeric">`}<button class="btn btn-primary" id="store-add" type="button">Add to cart</button></div>
+    <div class="store-add">${item.kind === "package" || ONE_PER_BUSINESS.has(item.key) ? "" : `<label class="label" for="store-qty">Quantity</label><input class="input" id="store-qty" type="number" min="1" max="${MAX_QTY}" value="1" inputmode="numeric">`}<button class="btn btn-primary" id="store-add" type="button">Add to cart</button></div>
     ${jd ? `<details class="jd"><summary>Full job description</summary>${jdHtml(jd)}</details>` : ""}`;
   $("store-add").addEventListener("click", () => {
     const qty = Math.max(1, Math.min(MAX_QTY, Math.floor(Number(document.querySelector<HTMLInputElement>("#store-qty")?.value) || 1)));

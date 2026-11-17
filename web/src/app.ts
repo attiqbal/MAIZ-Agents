@@ -14,6 +14,7 @@ import { initDesk, showDesk } from "./desk";
 import { renderDeptBar } from "./dept";
 import { api, getToken, clearSession, type Org } from "./api";
 import { JOB_DESCRIPTIONS, getJobDescription, jdHtml } from "./jd";
+import { SHOP_EMPLOYEE_KEYS } from "../../src/modules/ecommerce/rules";
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const app = $("app");
@@ -42,6 +43,8 @@ function route(): void {
   const valid = screens.some((s) => s.dataset.screen === key) ? key : "home";
   // The Data mining agent has its own working screen, not an example dashboard.
   if (valid === "desk" && sub === "data-mining-agent") { location.replace("#mining"); return; }
+  // The online-shop employees have no example dashboard either. Their working view is the conversation.
+  if (valid === "desk" && SHOP_EMPLOYEE_KEYS.includes(sub)) { location.replace(`#chat/${sub}`); return; }
   if (valid === "desk") showDesk(sub);
   if (valid === "mining") void import("./mining").then((m) => m.showMining());
   if (valid === "chat") void showChat(sub);
@@ -154,7 +157,7 @@ $("a-edit").addEventListener("click", () => toast("Editing opens in the web edit
 
 // Real data: when signed in and the API is running, replace the demo team with the real one.
 let realOrg: Org | undefined;
-const ROLE: Record<string, [string, string]> = { "finance-manager": ["FM", "av-fm"], "marketing-manager": ["MM", "av-mm"], "business-consultant": ["BC", "av-bc"], "hr-manager": ["HR", "av-hr"], "compliance-manager": ["CM", "av-cm"], "supply-chain-manager": ["SC", "av-sc"], "data-mining-agent": ["DM", "av-dm"], "admin-manager": ["AM", "av-tl"] };
+const ROLE: Record<string, [string, string]> = { "finance-manager": ["FM", "av-fm"], "marketing-manager": ["MM", "av-mm"], "business-consultant": ["BC", "av-bc"], "hr-manager": ["HR", "av-hr"], "compliance-manager": ["CM", "av-cm"], "supply-chain-manager": ["SC", "av-sc"], "data-mining-agent": ["DM", "av-dm"], "online-shop-manager": ["EM", "av-ec"], "dropshipping-agent": ["DA", "av-ds"], "marketplace-manager": ["MP", "av-mp"], "shop-care-agent": ["CC", "av-sh"], "admin-manager": ["AM", "av-tl"] };
 const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]!);
 /** The sidebar trial box and the Overview chip, from the real end date; hidden once the client is on a paid plan. */
 function showTrial(endsAt: string | undefined, planEnded = false): void {
@@ -224,6 +227,8 @@ async function loadOrg(): Promise<void> {
   const hasDataAgent = realOrg.team.some((e) => e.templateKey === "data-mining-agent");
   $("mining-link").hidden = !hasDataAgent;
   app.classList.toggle("has-dm", hasDataAgent);
+  // The online-shop employees on this team, so the Apps screen can let them read the apps the owner connects.
+  app.dataset.shopTeam = realOrg.team.map((e) => e.templateKey).filter((k) => SHOP_EMPLOYEE_KEYS.includes(k)).join(" ");
   // A real client never sees the example business's requests, and example-only panels say so.
   document.querySelectorAll<HTMLElement>("[data-need]").forEach((el) => el.remove());
   pending.clear();
@@ -379,8 +384,8 @@ $<HTMLFormElement>("ask").addEventListener("submit", async (e) => {
   const text = input.value.trim();
   if (!text) return;
   if (!realOrg) { toast("Admin manager got it and will route it (demo)"); input.value = ""; return; }
-  const m = /^(finance|marketing|consultant|hr|compliance|supply|data)\s*[:,-]\s*(.+)$/is.exec(text);
-  const key = m ? { finance: "finance-manager", marketing: "marketing-manager", consultant: "business-consultant", hr: "hr-manager", compliance: "compliance-manager", supply: "supply-chain-manager", data: "data-mining-agent" }[m[1]!.toLowerCase() as "finance"] : "business-consultant";
+  const m = /^(finance|marketing|consultant|hr|compliance|supply|data|shop|dropship|marketplace|care)\s*[:,-]\s*(.+)$/is.exec(text);
+  const key = m ? { finance: "finance-manager", marketing: "marketing-manager", consultant: "business-consultant", hr: "hr-manager", compliance: "compliance-manager", supply: "supply-chain-manager", data: "data-mining-agent", shop: "online-shop-manager", dropship: "dropshipping-agent", marketplace: "marketplace-manager", care: "shop-care-agent" }[m[1]!.toLowerCase() as "finance"] : "business-consultant";
   const emp = realOrg.team.find((x) => x.templateKey === key) ?? realOrg.team[0]!;
   if (asking) { toast("Still working on your last question"); return; }
   asking = true;

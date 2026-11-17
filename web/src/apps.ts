@@ -20,7 +20,10 @@ const money = (n: number, cur: string) => { try { return new Intl.NumberFormat(u
 
 const EMPLOYEES: [string, string][] = [["finance-manager", "Finance"], ["business-consultant", "Consultant"], ["marketing-manager", "Marketing"], ["hr-manager", "HR"]];
 /** A client who hired the Data mining agent can also let it read an app (app.ts marks the page when it is on the team). */
-const employeesWithAccess = (): [string, string][] => (document.getElementById("app")?.classList.contains("has-dm") ? [...EMPLOYEES, ["data-mining-agent", "Data"]] : EMPLOYEES);
+const SHOP_LABEL: Record<string, string> = { "online-shop-manager": "Shop", "dropshipping-agent": "Dropshipping", "marketplace-manager": "Marketplace", "shop-care-agent": "Shop care" };
+/** The online-shop employees on the team (app.ts lists them on the page) can read apps too. */
+const shopHires = (): [string, string][] => (document.getElementById("app")?.dataset.shopTeam ?? "").split(" ").filter((k) => SHOP_LABEL[k]).map((k) => [k, SHOP_LABEL[k]!]);
+const employeesWithAccess = (): [string, string][] => [...EMPLOYEES, ...(document.getElementById("app")?.classList.contains("has-dm") ? [["data-mining-agent", "Data"] as [string, string]] : []), ...shopHires()];
 const CATEGORY: Record<CatalogueItem["category"], string> = { till: "Tills", payroll: "Payroll", accounting: "Accounting", payments: "Payments", ecommerce: "Online shop", marketing: "Website and Google", bridge: "Any other app", customers: "Customers", messaging: "Email and messaging", teamwork: "Teamwork" };
 /** Filter chips: payments and online shops share one. */
 const GROUP: Record<CatalogueItem["category"], string> = { till: "till", payroll: "payroll", accounting: "accounting", payments: "payments", ecommerce: "payments", marketing: "marketing", bridge: "bridge", customers: "customers", messaging: "customers", teamwork: "customers" };

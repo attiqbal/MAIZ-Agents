@@ -17,7 +17,7 @@ interface Live {
 
 const LOOK: Record<string, [abbr: string, cls: string, color: string]> = {
   "finance-manager": ["FM", "av-fm", "#202020"], "marketing-manager": ["MM", "av-mm", "#ff682c"], "business-consultant": ["BC", "av-bc", "#816729"],
-  "hr-manager": ["HR", "av-hr", "#4d4d4d"], "compliance-manager": ["CM", "av-cm", "#828282"], "supply-chain-manager": ["SC", "av-sc", "#828282"], "data-mining-agent": ["DM", "av-dm", "#2ba0ff"], "admin-manager": ["AM", "av-tl", "#828282"],
+  "hr-manager": ["HR", "av-hr", "#4d4d4d"], "compliance-manager": ["CM", "av-cm", "#828282"], "supply-chain-manager": ["SC", "av-sc", "#828282"], "data-mining-agent": ["DM", "av-dm", "#2ba0ff"], "online-shop-manager": ["EM", "av-ec", "#ff705d"], "dropshipping-agent": ["DA", "av-ds", "#2ba0ff"], "marketplace-manager": ["MP", "av-mp", "#f5e211"], "shop-care-agent": ["CC", "av-sh", "#8ed462"], "admin-manager": ["AM", "av-tl", "#828282"],
 };
 const look = (key: string): [string, string, string] => LOOK[key] ?? ["AI", "av-tl", "#828282"];
 const who = (e: LiveEmployee) => `<a class="who-cell desk-a" href="#desk/${esc(e.templateKey)}"><span class="av av-sm ${look(e.templateKey)[1]}" aria-hidden="true">${look(e.templateKey)[0]}</span>${esc(e.name)}</a>`;
