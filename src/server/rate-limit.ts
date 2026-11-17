@@ -48,6 +48,16 @@ export function limitFor(method: string, path: string): Limit | undefined {
   if (method === "GET" && path.startsWith("/r/")) return { max: 20, windowMs: 60_000 };
   // Saving connection details: plenty for typing and fixing, not for hammering.
   if (method === "PUT" && path.startsWith("/api/owner/connections/")) return { max: 30, windowMs: 10 * 60_000 };
+  // Backups (docs/BACKUPS.md): the public freshness check is asked every ten minutes by the uptime workflow.
+  if (method === "GET" && path === "/api/health/backups") return { max: 30, windowMs: 60_000 };
+  if (path === "/api/owner/backups" || path.startsWith("/api/owner/backups/")) {
+    // The page asks again every few seconds while a backup runs.
+    if (method === "GET") return { max: 120, windowMs: 60_000 };
+    // Saving storage details makes the server call an address the owner typed; a backup or a restore test is heavy
+    // work on the database; a new recovery key is a rare, deliberate act.
+    if (method === "PUT") return { max: 20, windowMs: 10 * 60_000 };
+    if (/\/(run|restore-test|recovery-key)$/.test(path)) return { max: 10, windowMs: 10 * 60_000 };
+  }
   if (method !== "POST") return undefined;
   // Coupon codes can be guessed, so tries are few per address. Wrong tries are also counted per person.
   if (path === "/api/coupons/check" || path === "/api/coupons/redeem") return { max: 12, windowMs: 10 * 60_000 };

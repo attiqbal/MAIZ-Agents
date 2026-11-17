@@ -134,7 +134,7 @@ const READS: readonly string[] = [
 /** Routes with no business behind them: public pages and calls proved by a signature, a key or a one-time link, the person's own account, and MAIZ's own owner pages. */
 const OUTSIDE: readonly RegExp[] = [
   /^\/api\/owner(\/|$)/, /^\/api\/agent\/v1(\/|$)/, /^\/api\/auth\//, /^\/api\/signin\//, /^\/api\/signup(\/read-site)?$/, /^\/api\/staff-form\/(open|save)$/,
-  /^\/api\/(health|store|me)$/, /^\/api\/cart\/quote$/, /^\/api\/coupons\/check$/, /^\/api\/promoter\/unsubscribe$/, /^\/api\/affiliate\/me$/,
+  /^\/api\/(health|store|me)$/, /^\/api\/health\/backups$/, /^\/api\/cart\/quote$/, /^\/api\/coupons\/check$/, /^\/api\/promoter\/unsubscribe$/, /^\/api\/affiliate\/me$/,
   /^\/api\/payments\/webhook$/, /^\/api\/whatsapp\/webhook$/, /^\/api\/slack\/(events|callback)$/, /^\/api\/integrations\/(callback|hooks\/[^/]+\/[^/]+)$/,
   /^\/api\/meta\/(callback|webhook|deauthorize|data-deletion|deletion-status)$/, /^\/api\/invites\/(open|accept|mine)$/,
 ];

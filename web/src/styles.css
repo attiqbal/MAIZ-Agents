@@ -1960,6 +1960,41 @@ h1, .sec-head h2, .final h2, .stage-band h2, .article-head h1, .sec-title, .bent
 @media (max-width: 640px) { .ag-two, .ag-three { grid-template-columns: 1fr; } .ag-conn-h .status { margin-left: 0; } }
 .btn[aria-disabled="true"] { opacity: .45; cursor: progress; }
 
+/* ===== Backups (owner-backups.html): status in words, storage set-up, the recovery key shown once. ===== */
+.bk-now { gap: 14px; border-color: var(--line); }
+.bk-now[data-tone="good"] { background: color-mix(in srgb, var(--color-fresh-grass) 16%, white); }
+.bk-now[data-tone="warn"] { background: color-mix(in srgb, var(--color-sunshine) 14%, white); }
+.bk-now[data-tone="crit"] { background: color-mix(in srgb, var(--color-coral) 12%, white); }
+.bk-now-top { display: flex; gap: 10px 16px; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; }
+.bk-headline { font-family: var(--font-display); font-variation-settings: var(--soft); font-weight: 600; font-size: clamp(26px, 3.4vw, 40px); line-height: 1.08; letter-spacing: -0.03em; margin: 0; max-width: 24ch; text-wrap: balance; }
+.bk-headline:focus, #bk-store-h:focus, #bk-key-h:focus, .bk-h3:focus { outline: none; }
+.bk-headline:focus-visible, #bk-store-h:focus-visible, #bk-key-h:focus-visible, .bk-h3:focus-visible { outline: 2px solid var(--color-graphite); outline-offset: 4px; border-radius: 6px; }
+.bk-idle { background: var(--surface-ash-surface); }
+.bk-idle .dot { background: transparent; border: 1.5px solid var(--color-graphite); }
+.bk-lead { margin: 0; max-width: 72ch; font-size: 15.5px; color: var(--text-2); }
+.bk-facts { margin: 0; border-top: 1px solid var(--line); }
+.bk-facts > div { display: grid; grid-template-columns: 190px minmax(0, 1fr); gap: 4px 16px; padding: 12px 0; border-bottom: 1px solid var(--line); }
+.bk-facts dt { font-size: 13px; font-weight: 500; color: var(--color-graphite); }
+.bk-facts dd { margin: 0; font-size: 14.5px; color: var(--text-2); overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+.bk-warn { display: block; margin-top: 4px; color: var(--color-warn); }
+.bk-acts { display: flex; gap: 8px 10px; flex-wrap: wrap; align-items: center; }
+.bk-msg { color: var(--color-graphite); max-width: 60ch; }
+.bk-note { margin: 0; max-width: 78ch; }
+#bk-run-box { display: flex; flex-direction: column; gap: 10px; }
+.bk-step { display: grid; place-items: center; flex: none; width: 30px; height: 30px; border-radius: 50%; background: var(--color-fresh-grass); color: var(--color-graphite); font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.bk-wide { grid-column: span 2; }
+.bk-how-body { display: flex; flex-direction: column; gap: 10px; padding: 4px 0 8px; max-width: 78ch; }
+.bk-how-body p { margin: 0; font-size: 14.5px; }
+.bk-h3 { font-family: var(--font-polysans); font-size: 16px; font-weight: 600; letter-spacing: -0.01em; margin: 6px 0 0; }
+.bk-sure { display: flex; flex-direction: column; gap: 10px; border-top: 1px solid var(--line); padding-top: 14px; }
+.bk-sure p { margin: 0; max-width: 72ch; font-size: 14.5px; }
+#bk-key-body { display: flex; flex-direction: column; gap: 14px; }
+.bk-keybox { display: flex; flex-direction: column; gap: 14px; padding: 20px; border: 1.5px dashed var(--color-graphite); border-radius: 24px; background: color-mix(in srgb, var(--color-sunshine) 12%, white); min-width: 0; }
+.bk-keybox .bk-h3 { margin: 0; font-size: 18px; }
+.bk-keytext { font-family: var(--font-mono); font-size: clamp(15px, 2.2vw, 19px); line-height: 1.7; letter-spacing: 0.04em; font-variant-numeric: tabular-nums; background: var(--color-canvas-white); border: 1px solid var(--line); border-radius: 16px; padding: 14px 16px; overflow-wrap: anywhere; user-select: all; }
+.bk-detail summary { cursor: pointer; min-height: 40px; display: inline-flex; align-items: center; font-size: 13px; color: var(--accent-text); }
+.bk-detail code { display: block; font-family: var(--font-mono); font-size: 12.5px; background: var(--surface-ash-surface); border-radius: 12px; padding: 10px 12px; white-space: pre-wrap; overflow-wrap: anywhere; }
+@media (max-width: 560px) { .bk-wide { grid-column: auto; } .bk-facts > div { grid-template-columns: 1fr; } .bk-keybox { padding: 16px; } }
 /* ---- Teammates: "People with access" in Settings, a teammate's role notes, and the join page (docs/TEAMMATES.md) ---- */
 .pa-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
 .pa-row { border: 1px solid var(--line); border-radius: 24px; padding: 12px 18px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px; background: var(--color-canvas-white); min-width: 0; }

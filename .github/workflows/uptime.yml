@@ -1,0 +1,34 @@
+name: Uptime
+# Asks the live site every 10 minutes whether it is up and whether its backups are fresh. When a step fails GitHub
+# emails the person this workflow belongs to (see docs/BACKUPS.md, "The uptime check", for making sure that is you).
+# Limits: GitHub may start scheduled runs late or skip one when it is busy, and it switches scheduled workflows off
+# after 60 days without activity in the repository.
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: uptime
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      # Repository variable UPTIME_SITE_URL (Settings > Secrets and variables > Actions > Variables), or the live site.
+      SITE_URL: ${{ vars.UPTIME_SITE_URL || 'https://maizagents.com' }}
+    steps:
+      - name: The site answers
+        # Three more tries, 20 seconds apart, so one slow moment or a restart during a deploy is not an alarm.
+        run: |
+          curl --fail --silent --show-error --max-time 20 --retry 3 --retry-delay 20 --retry-all-errors "${SITE_URL%/}/api/health"
+      - name: Backups are fresh
+        # {"ok":true} until backups are set up; after that {"ok":false} when the newest good backup is over 36 hours old.
+        run: |
+          body="$(curl --silent --show-error --max-time 20 --retry 3 --retry-delay 20 --retry-all-errors "${SITE_URL%/}/api/health/backups")"
+          echo "$body"
+          echo "$body" | grep -q '"ok":true' || { echo "::error::Backups are not fresh. Open the Backups page on the site."; exit 1; }

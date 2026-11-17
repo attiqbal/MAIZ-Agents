@@ -56,8 +56,16 @@ import { CredentialStore } from "../modules/credentials/index.js";
 import { PushService, VAPID_STORE_KEY } from "../modules/push/index.js";
 import { AGENT_SECRET_PREFIX, AgentService } from "../modules/agents/index.js";
 import { TeamService } from "../modules/teammates/index.js";
+import { BACKUP_SECRET_PREFIX, BackupService, pgAdmin, spawnRunner, type DbAdmin, type ProgramRunner } from "../modules/backup/index.js";
 
 export interface PlatformConfig {
+  /**
+   * Off-server backups (docs/BACKUPS.md): the database to dump (DATABASE_URL), the server's own keys sealed inside
+   * each backup (TOKEN_KEY), and where the Postgres tools live when they are not on the search path (PG_BIN_DIR).
+   * Left out, or without a database, the Backups page says backups are not available. Tests pass stand-ins for the
+   * programs and the database.
+   */
+  backup?: { databaseUrl?: string; serverKeys?: Readonly<Record<string, string>>; binDir?: string; run?: ProgramRunner; db?: DbAdmin; tmpDir?: string };
   anthropicApiKey?: string;
   anthropicModel?: string;
   /** RunPod Serverless endpoint (vLLM worker) that does the heavy lifting. Both come from environment variables. */
@@ -586,6 +594,27 @@ export function createPlatform(cfg: PlatformConfig) {
   };
 
   /**
+   * Off-server backups the app runs by itself: a nightly encrypted dump to the owner's own storage, a weekly restore
+   * test, and alerts when either fails. Set up on the owner's Backups page; see docs/BACKUPS.md.
+   */
+  const backupDbUrl = cfg.backup?.databaseUrl;
+  const backup = new BackupService({
+    isOwner: isPlatformOwner, now, http: cfg.http, timezone: cfg.ownerTimezone, pageUrl: `${base}/owner-backups.html`,
+    databaseUrl: backupDbUrl, tmpDir: cfg.backup?.tmpDir,
+    run: cfg.backup?.run ?? (backupDbUrl ? spawnRunner(cfg.backup?.binDir) : undefined),
+    db: cfg.backup?.db ?? (backupDbUrl ? pgAdmin(backupDbUrl) : undefined),
+    serverKeys: () => cfg.backup?.serverKeys ?? {},
+    // Changes still waiting in memory are written first, so the backup holds everything up to this minute.
+    flush: async () => { await sink?.flush(); },
+    alert: async (a) => {
+      await alertOwners(a.subject, a.text);
+      // The email always goes. The owner's devices are not woken at night for something that can wait until morning.
+      if (inQuietHours(now(), cfg.ownerTimezone ?? "Europe/London")) return;
+      for (const id of ownerIdSet) void push.sendToUser(id, { title: a.subject, body: "Open the Backups page to see what happened.", link: "/owner-backups.html", tag: `backup-${a.problem}` });
+    },
+  });
+
+  /**
    * Turn on durable storage: load everything saved, put it back into the services,
    * then start writing every new change behind them. Call once, before serving.
    */
@@ -642,6 +671,7 @@ export function createPlatform(cfg: PlatformConfig) {
     for (const r of s.batchRuns ?? []) batch.restoreRun(r);
     for (const c of s.credentials ?? []) credentials.restore(c.userId, c);
     for (const c of s.connectionSecrets ?? []) {
+      if (c.key.startsWith(BACKUP_SECRET_PREFIX)) { backup.restoreSecret(c.key, c.secret); continue; }
       if (c.key === VAPID_STORE_KEY) push.restoreKeys(c.secret); else if (c.key.startsWith(AGENT_SECRET_PREFIX)) agents.restoreSecret(c.key, c.secret); else connections.restore(c.key, c.secret);
     }
     rebuildChannels();
@@ -658,6 +688,7 @@ export function createPlatform(cfg: PlatformConfig) {
     sink = store;
     for (const part of [audit, identity, energy, workforce, ledger, router, admin, integrations, reviews, prices, specialists, aiSettings, spend, batch, payments, rota, reconciliation, people, conversations, notices, credentials, coupons, affiliates, promoter, growth, connections, metaClients, push, mining, agents]) part.useSink(store);
     team.useSink(store);
+    backup.useSink(store);
     live.sink = store;
     live.wa?.useSink(store);
   }
@@ -702,6 +733,6 @@ export function createPlatform(cfg: PlatformConfig) {
     slack: { enumerable: true, get: () => cfg.slack ?? connections.slackApp() },
     loginApps: { enumerable: true, get: (): LoginApps => ({ ...connections.loginApps(), ...cfg.loginApps }) },
   });
-  return { team, agents, mining, orderDiscountFor, quoteFor, hasTeamPackage, push, conversations, notices, warm, ownerDecisions, decisionDigest, dashboard, reconciliation, rota, people, payments, batch, email, usedLinks, sends, loginFails, resets, credentials, formHits, codeFails, coupons, affiliates, promoter, paid, growth, research, connections, growthTick, metaClients, metaSettings, get ownerWhatsApp() { return live.wa; }, admin, reviews, prices, specialists, ai, clients, isPlatformOwner, healthy, hasStore, cfg: liveCfg, now, audit, bus, identity, energy, workforce, ledger, onboarding, router, integrations, slackTokens, saveSlackToken, attachStore };
+  return { team, backup, agents, mining, orderDiscountFor, quoteFor, hasTeamPackage, push, conversations, notices, warm, ownerDecisions, decisionDigest, dashboard, reconciliation, rota, people, payments, batch, email, usedLinks, sends, loginFails, resets, credentials, formHits, codeFails, coupons, affiliates, promoter, paid, growth, research, connections, growthTick, metaClients, metaSettings, get ownerWhatsApp() { return live.wa; }, admin, reviews, prices, specialists, ai, clients, isPlatformOwner, healthy, hasStore, cfg: liveCfg, now, audit, bus, identity, energy, workforce, ledger, onboarding, router, integrations, slackTokens, saveSlackToken, attachStore };
 }
 export type Platform = ReturnType<typeof createPlatform>;
