@@ -20,8 +20,6 @@
         <div id="ow-body">
           <div class="ow-stack">
             <section class="panel cx-sum" aria-labelledby="cx-sum-h"><h2 id="cx-sum-h" class="sr-only">What to do next</h2><div id="cx-progress"></div></section>
-            <div class="learn" id="cx-temp" hidden><b>Saved until restart only.</b>This server has no database switched on, so what you save here is lost when it restarts. On maizagents.com it is kept in the database.</div>
-            <details class="learn cxm-how"><summary>How your details are kept</summary>Tokens and secrets are encrypted before they are stored, and are never shown again after you save them: a saved one just says "Saved" and when it was last changed. To change one, press Change and paste the new value. Tests only read (a Page's name, a number's details); they never post, send or charge anything. The only exception is the WhatsApp test message, which you send on purpose.</details>
             <div class="cxm" id="cxm" data-view="list">
               <section class="cxm-side" id="services" aria-label="Services">
                 <div class="field"><label for="cxm-search">Find a service</label><input class="input" id="cxm-search" type="search" autocomplete="off" placeholder="For example: Google, payments, email" maxlength="60"></div>
@@ -30,6 +28,8 @@
               </section>
               <div class="cxm-main" id="cxm-detail" role="region" aria-label="Selected service"></div>
             </div>
+            <div class="learn" id="cx-temp" hidden><b>Saved until restart only.</b>This server has no database switched on, so what you save here is lost when it restarts. On maizagents.com it is kept in the database.</div>
+            <details class="learn cxm-how"><summary>How your details are kept</summary>Tokens and secrets are encrypted before they are stored, and are never shown again after you save them: a saved one just says "Saved" and when it was last changed. To change one, press Change and paste the new value. Tests only read (a Page's name, a number's details); they never post, send or charge anything. The only exception is the WhatsApp test message, which you send on purpose.</details>
             <p class="sr-only" id="cxm-live" role="status" aria-live="polite"></p>
           </div>
         </div>

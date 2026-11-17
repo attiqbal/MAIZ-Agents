@@ -192,7 +192,7 @@ function inputHtml(c: Conn, f: Field, ui: DetailUi, changing: boolean): string {
   const saved = f.secret && f.set;
   const ph = saved ? "Leave empty to keep the saved one" : f.fallback ?? f.placeholder ?? "";
   const value = ui.drafts[f.key] ?? (f.secret ? "" : f.value ?? "");
-  const label = changing ? `New ${f.label.replace(/^./, (ch) => ch.toLowerCase())}` : f.label;
+  const label = changing ? `New value for: ${f.label}` : f.label;
   return `<div class="field${f.generate ? " cx-wide" : ""}"><label for="${esc(id)}">${esc(label)}${f.required || changing ? "" : ' <span class="muted">(optional)</span>'}</label>
     <div class="cx-inrow"><input class="input" id="${esc(id)}" name="${esc(f.key)}" ${f.secret ? 'type="password" autocomplete="new-password"' : 'type="text" autocomplete="off"'} spellcheck="false" value="${esc(value)}" placeholder="${esc(ph)}" aria-describedby="${esc(id)}-h" maxlength="1000">
     ${f.generate ? `<button type="button" class="btn btn-ghost btn-sm" data-gen="${esc(id)}">Make one for me</button>` : ""}
