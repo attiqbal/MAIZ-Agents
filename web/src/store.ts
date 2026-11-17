@@ -2,7 +2,7 @@
 // platform owner's Prices page; with no API the launch defaults from the backend's cart module are used.
 // Either way the page prices with the same quote() function as /api/cart/quote.
 import { api, getToken } from "./api";
-import { BILLING_INFO, CATALOGUE, KIND_LABEL, MAX_QTY, TEAM_PACKAGE_KEY, quote as quoteWith, type Billing, type CartLine, type CatalogueItem, type Quote } from "../../src/modules/store/cart";
+import { BILLING_INFO, CATALOGUE, KIND_LABEL, MAX_QTY, ONE_PER_BUSINESS, TEAM_PACKAGE_KEY, quote as quoteWith, type Billing, type CartLine, type CatalogueItem, type Quote } from "../../src/modules/store/cart";
 import { OVERAGE_RULE } from "../../src/modules/workforce/task-roles";
 import { HOW_A_PASS_WORKS } from "../../src/modules/workforce/consultants";
 import { getJobDescription, jdHtml } from "./jd";
@@ -21,6 +21,7 @@ function save(lines: CartLine[]): void {
   // The price for this client is asked again for the new cart.
   mine = undefined;
   void priceForMe();
+  askBill();
 }
 
 let cart: CartLine[] = [];
@@ -43,12 +44,65 @@ async function priceForMe(): Promise<void> {
   // Anything this client cannot buy (the Team package they already have) leaves the saved cart, so it cannot block checkout.
   const refused = new Set((mine?.rejected ?? []).map((x) => x.key));
   if (cart.some((l) => refused.has(l.key))) {
+    // Said politely, because it is not an error: the employee is already on the team.
+    const had = cart.filter((l) => refused.has(l.key) && ONE_PER_BUSINESS.has(l.key)).map((l) => getItem(l.key)?.title).filter(Boolean);
+    if (had.length) $("cart-note").textContent = `You already have ${had.join(" and ")} on your team, so it is not in your cart.`;
     cart = cart.filter((l) => !refused.has(l.key));
     try { localStorage.setItem(KEY, JSON.stringify(cart)); } catch { /* storage unavailable */ }
   }
   renderCart();
   renderPlan();
   renderPicker();
+}
+/**
+ * One monthly bill: when the owner has switched it on and the client already pays the Team package, a cart of monthly
+ * extras is added to that bill. The client is told what is charged today and what the new monthly total is, and must
+ * confirm, before anything is sent with `addToBill`. With no answer here, checkout is the ordinary one.
+ */
+interface BillView { addToBill: boolean; reason?: "code" | "discount"; addMinor?: number; monthlyNowMinor?: number; monthlyNewMinor?: number; renewsAt?: string; partMonthMinor?: number; onceMinor?: number }
+let bill: BillView | undefined;
+let confirming = false;
+let billTurn = 0;
+let billTimer: number | undefined;
+const day = (iso: string) => new Date(iso).toLocaleDateString("en-GB", { day: "numeric", month: "long" });
+
+function askBill(): void {
+  bill = undefined;
+  confirming = false;
+  window.clearTimeout(billTimer);
+  const lines = cart;
+  const turn = ++billTurn;
+  if (!getToken() || !lines.some((l) => getItem(l.key)?.billing === "monthly")) { renderBill(); return; }
+  billTimer = window.setTimeout(async () => {
+    const r = await api<BillView>("/billing/preview", { body: { lines } });
+    if (turn !== billTurn) return;
+    bill = r.ok && r.data ? r.data : undefined;
+    renderBill();
+    renderCart();
+  }, 400);
+  renderBill();
+}
+
+function renderBill(): void {
+  let el = document.getElementById("cart-bill");
+  if (!el) {
+    el = document.createElement("div");
+    el.id = "cart-bill";
+    el.className = "cart-bill";
+    el.setAttribute("role", "status");
+    $("cart-checkout").insertAdjacentElement("beforebegin", el);
+  }
+  const b = bill;
+  const btn = $<HTMLButtonElement>("cart-checkout");
+  if (b?.addToBill && b.monthlyNewMinor !== undefined) {
+    const part = b.partMonthMinor !== undefined ? `Your saved card is charged today only for the days left in this billing month: <b>${gbp(b.partMonthMinor / 100)}</b>.` : "Your saved card is charged today only for the days left in this billing month. Stripe works out the exact amount and shows it on your invoice.";
+    el.innerHTML = `<p><b>This is added to your monthly bill. No new subscription is started.</b></p><p>${part}</p><p>Your monthly total goes from <b>${gbp(b.monthlyNowMinor! / 100)}</b> to <b>${gbp(b.monthlyNewMinor / 100)}</b>${b.renewsAt ? `, from ${esc(day(b.renewsAt))}` : ""}.</p>${b.onceMinor ? `<p>Consultant passes are paid for separately at a normal checkout afterwards.</p>` : ""}${confirming ? `<p><b>Press the button again to charge your saved card now.</b></p>` : ""}`;
+    btn.textContent = confirming ? "Yes, charge my saved card" : "Add to my monthly bill";
+    return;
+  }
+  el.innerHTML = b?.reason === "code" ? `<p class="small">You are holding a discount code, so these are paid for at a normal checkout, where your code is used.</p>`
+    : b?.reason === "discount" ? `<p class="small">Your discount code is still running on your monthly bill, so these are paid for in their own checkout.</p>` : "";
+  btn.textContent = "Checkout";
 }
 const discountFor = (months: number | "forever"): string => (months === "forever" ? "every month" : months === 1 ? "first month" : `first ${months} months`);
 
@@ -73,7 +127,7 @@ function renderItem(): void {
     <p><span class="bill-tag bill-${item.billing}">${b.label}</span></p>
     <p class="desc">${esc(item.summary)}</p>
     <p class="jd-note">${esc(b.note)}</p>
-    <div class="store-add">${item.kind === "package" ? "" : `<label class="label" for="store-qty">Quantity</label><input class="input" id="store-qty" type="number" min="1" max="${MAX_QTY}" value="1" inputmode="numeric">`}<button class="btn btn-primary" id="store-add" type="button">Add to cart</button></div>
+    <div class="store-add">${item.kind === "package" || ONE_PER_BUSINESS.has(item.key) ? "" : `<label class="label" for="store-qty">Quantity</label><input class="input" id="store-qty" type="number" min="1" max="${MAX_QTY}" value="1" inputmode="numeric">`}<button class="btn btn-primary" id="store-add" type="button">Add to cart</button></div>
     ${jd ? `<details class="jd"><summary>Full job description</summary>${jdHtml(jd)}</details>` : ""}`;
   $("store-add").addEventListener("click", () => {
     const qty = Math.max(1, Math.min(MAX_QTY, Math.floor(Number(document.querySelector<HTMLInputElement>("#store-qty")?.value) || 1)));
@@ -102,7 +156,7 @@ function renderCart(): void {
   $("cart-lines").innerHTML = q.lines.length
     ? section("monthly", q.lines.filter((l) => l.billing === "monthly"), q.monthlyGbp) + section("once", q.lines.filter((l) => l.billing === "once"), q.onceGbp)
     : `<p class="muted">Nothing here yet. Pick something on the left, or add a role from the org blueprint below.</p>`;
-  $("cart-totals").innerHTML = `<div><dt>Recurring, every month</dt><dd>${gbp(q.monthlyGbp)}</dd></div><div><dt>One-off, consultant passes</dt><dd>${gbp(q.onceGbp)}</dd></div>${d ? `<div class="cart-off"><dt>Your code ${esc(d.code)}, ${discountFor(d.months)}</dt><dd>−${gbp(d.amountOffGbp)}</dd></div>` : ""}<div class="cart-due"><dt>Due today</dt><dd>${gbp(q.dueTodayGbp)}</dd></div>${q.monthlyGbp ? `<div><dt>${d && d.months !== 1 ? "Later months" : "From next month"}</dt><dd>${d && d.months === "forever" ? gbp(Math.max(0, q.monthlyGbp - d.amountOffGbp)) : gbp(q.monthlyGbp)} / month${d && typeof d.months === "number" && d.months > 1 ? `, less ${gbp(d.amountOffGbp)} while your code runs` : ""}</dd></div>` : ""}`;
+  $("cart-totals").innerHTML = `<div><dt>Recurring, every month</dt><dd>${gbp(q.monthlyGbp)}</dd></div><div><dt>One-off, consultant passes</dt><dd>${gbp(q.onceGbp)}</dd></div>${d ? `<div class="cart-off"><dt>Your code ${esc(d.code)}, ${discountFor(d.months)}</dt><dd>−${gbp(d.amountOffGbp)}</dd></div>` : ""}<div class="cart-due"><dt>Due today</dt><dd>${bill?.addToBill ? (bill.partMonthMinor !== undefined ? `${gbp(bill.partMonthMinor / 100)} for the days left` : "Worked out by Stripe") : gbp(q.dueTodayGbp)}</dd></div>${q.monthlyGbp ? `<div><dt>${d && d.months !== 1 ? "Later months" : "From next month"}</dt><dd>${d && d.months === "forever" ? gbp(Math.max(0, q.monthlyGbp - d.amountOffGbp)) : gbp(q.monthlyGbp)} / month${d && typeof d.months === "number" && d.months > 1 ? `, less ${gbp(d.amountOffGbp)} while your code runs` : ""}</dd></div>` : ""}`;
   $<HTMLButtonElement>("cart-checkout").disabled = q.lines.length === 0;
 }
 
@@ -151,13 +205,27 @@ export function initStore(opts: { onPaid?: () => void } = {}): void {
   $("cart-checkout").addEventListener("click", async () => {
     if (!getToken()) { $("cart-note").textContent = SIGN_IN; return; }
     const btn = $<HTMLButtonElement>("cart-checkout");
+    // Adding to the monthly bill charges a saved card without a payment page, so it asks once more first.
+    if (bill?.addToBill && !confirming) { confirming = true; renderBill(); btn.focus(); return; }
+    const toBill = !!bill?.addToBill && confirming;
     btn.disabled = true;
-    btn.textContent = "Opening the payment page…";
-    const r = await api<{ order?: { status: string }; url?: string; error?: string }>("/checkout", { body: { lines: cart } });
+    btn.textContent = toBill ? "Adding it to your bill…" : "Opening the payment page…";
+    const r = await api<{ order?: { status: string }; url?: string; error?: string; addedToBill?: boolean; remaining?: CartLine[] }>("/checkout", { body: { lines: cart, ...(toBill ? { addToBill: true } : {}) } });
     btn.disabled = cart.length === 0;
-    btn.textContent = "Checkout";
+    confirming = false;
+    renderBill();
     if (r.status === 400 && /not switched on/.test(r.data?.error ?? "")) { $("cart-note").textContent = PLACEHOLDER; return; }
     if (!r.ok) { $("cart-note").textContent = r.data?.error ?? "Could not start the payment. Nothing was charged."; return; }
+    // The monthly lines went onto the bill. Passes that were in the cart stay there for their own checkout.
+    if (r.data?.addedToBill) {
+      cart = (r.data.remaining ?? []).map(({ key, qty }) => ({ key, qty }));
+      save(cart);
+      renderCart();
+      if (r.data.url) { location.assign(r.data.url); return; }
+      $("cart-note").textContent = `Done. It is on your monthly bill and your new employees are on your team.${cart.length ? " Your consultant passes are still in your cart: check out to pay for them." : ""}`;
+      opts.onPaid?.();
+      return;
+    }
     if (r.data?.url) { location.assign(r.data.url); return; }
     if (r.data?.order?.status === "paid") { cart = []; save(cart); renderCart(); $("cart-note").textContent = "Done. Your new employees are on your team."; opts.onPaid?.(); return; }
     $("cart-note").textContent = "The payment did not go through. Nothing was charged.";
@@ -179,6 +247,8 @@ export function initStore(opts: { onPaid?: () => void } = {}): void {
     cart = load();
     renderCart();
     renderPlan();
+    askBill();
   });
   void priceForMe();
+  askBill();
 }

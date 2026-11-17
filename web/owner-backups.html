@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en">
+<head>
+<!--@include head title="Backups · MAIZ Agents" description="The MAIZ platform owner sets up nightly backups, keeps the recovery key and tests that a backup can be restored."-->
+<meta name="robots" content="noindex">
+</head>
+<body>
+<div class="page-top">
+  <!--@include owner-header-->
+  <main id="main">
+    <section class="section">
+      <div class="container" style="max-width:1180px">
+        <!--@include owner-nav-->
+        <div class="rv-head">
+          <div><h1>Backups</h1>
+            <p class="sub">Every night the site makes a copy of all its data, locks it with a key, and puts it in storage that you own, away from this server. If the server is ever lost, that copy and your key bring everything back.</p></div>
+          <span class="badge badge-dark" id="ow-eg" hidden>Example data</span>
+        </div>
+        <div class="ob-panel" id="ow-gate" hidden aria-live="polite"><h2 id="ow-gate-h" style="font-size:1.25rem;margin:0 0 6px"></h2><p id="ow-gate-p" class="sub" style="margin:0 0 14px"></p><a class="btn btn-primary" id="ow-gate-a" href="/signin.html">Log in</a></div>
+        <div id="ow-body">
+          <div class="ow-stack">
+
+            <section class="panel bk-now" id="bk-now" aria-labelledby="bk-now-h">
+              <div class="bk-now-top">
+                <h2 id="bk-now-h" class="bk-headline" tabindex="-1">Checking your backups</h2>
+                <span id="bk-badge"></span>
+              </div>
+              <div id="bk-now-body" aria-live="polite"></div>
+              <div id="bk-run-box">
+                <div class="acts bk-acts">
+                  <button type="button" class="btn btn-primary" id="bk-run">Back up now</button>
+                  <button type="button" class="btn btn-ghost" id="bk-test">Test a restore now</button>
+                  <span class="small bk-msg" id="bk-msg" role="status"></span>
+                </div>
+                <p class="muted small bk-note">A restore test opens the newest backup and loads it into a spare, empty database. It counts what is there, then deletes the spare. Your live data is never touched. The site also runs this test by itself once a week.</p>
+              </div>
+            </section>
+
+            <div class="learn" id="bk-temp" hidden><b>Saved until restart only.</b>This server has no database switched on, so what you save here is lost when it restarts.</div>
+
+            <div class="ow-stack" id="bk-setup">
+              <section class="panel" id="bk-store" aria-labelledby="bk-store-h">
+                <div class="panel-h"><span class="bk-step" aria-hidden="true">1</span><h2 id="bk-store-h" tabindex="-1">Where backups are kept</h2><span class="r" id="bk-store-state"></span></div>
+                <p class="bk-lead">Backups go to a private storage bucket that you rent from a storage company. It must be a different company from the one that runs this server, so one accident cannot take both. Most storage companies work, as long as they offer "S3-compatible" storage.</p>
+                <details class="cx-setup bk-how">
+                  <summary>How to make a bucket and its key</summary>
+                  <div class="bk-how-body">
+                    <p>With any storage company the job is the same four things, all done on their website:</p>
+                    <ol class="ow-list">
+                      <li>Make a new bucket. Keep it private (not public).</li>
+                      <li>Make an access key that can read and write that one bucket only. You get two values: a key id and a secret. The secret is shown once.</li>
+                      <li>Find the storage address. Companies call it the "S3 endpoint" or "S3 API address". It starts with https://</li>
+                      <li>Paste the four values into the form below.</li>
+                    </ol>
+                    <h3 class="bk-h3">Worked example: Cloudflare R2</h3>
+                    <ol class="ow-list">
+                      <li>Log in at dash.cloudflare.com and open <b>R2 Object Storage</b> in the menu on the left. The first time, Cloudflare asks you to add a payment card to turn R2 on.</li>
+                      <li>Press <b>Create bucket</b>. Give it a name such as <span class="mono">maiz-backups</span>, leave the other choices as they are, and press <b>Create bucket</b>.</li>
+                      <li>Go back to the R2 overview and press <b>Manage API tokens</b>, then <b>Create API token</b>.</li>
+                      <li>Under Permissions choose <b>Object Read &amp; Write</b>. Under "Specify bucket" choose <b>Apply to specific buckets only</b> and pick your bucket. Press <b>Create API token</b>.</li>
+                      <li>Cloudflare now shows an <b>Access Key ID</b>, a <b>Secret Access Key</b> and, under "Use jurisdiction-specific endpoints for S3 clients", an address ending in <span class="mono">.r2.cloudflarestorage.com</span>. Copy all three before you leave the page.</li>
+                      <li>Paste them below. Leave Region empty.</li>
+                    </ol>
+                    <p class="muted small">Cloudflare changes the names of its buttons from time to time. If a name here does not match, look for the nearest one. Check your storage company's price list yourself: this page does not know what they charge.</p>
+                  </div>
+                </details>
+                <form class="ow-stack" id="bk-store-form" novalidate>
+                  <div class="ow-grid">
+                    <div class="field bk-wide"><label for="bk-address">Storage address</label><input class="input" id="bk-address" type="url" inputmode="url" autocomplete="off" spellcheck="false" maxlength="300" placeholder="https://" aria-describedby="bk-address-h"><span class="hint" id="bk-address-h">Also called the S3 endpoint. It must start with https://</span></div>
+                    <div class="field"><label for="bk-bucket">Bucket name</label><input class="input" id="bk-bucket" autocomplete="off" spellcheck="false" autocapitalize="off" maxlength="63" aria-describedby="bk-bucket-h"><span class="hint" id="bk-bucket-h">Exactly as your storage company shows it.</span></div>
+                    <div class="field"><label for="bk-keyid">Key id</label><input class="input" id="bk-keyid" autocomplete="off" spellcheck="false" autocapitalize="off" maxlength="200" aria-describedby="bk-keyid-h"><span class="hint" id="bk-keyid-h">Often called Access Key ID.</span></div>
+                    <div class="field bk-wide"><label for="bk-secret">Secret <span class="cx-saved" id="bk-secret-saved" hidden>Saved</span></label><input class="input" id="bk-secret" type="password" autocomplete="off" spellcheck="false" maxlength="500" aria-describedby="bk-secret-h"><span class="hint" id="bk-secret-h">Often called Secret Access Key. It is stored encrypted and never shown again.</span></div>
+                    <div class="field"><label for="bk-region">Region (optional)</label><input class="input" id="bk-region" autocomplete="off" spellcheck="false" autocapitalize="off" maxlength="40" aria-describedby="bk-region-h"><span class="hint" id="bk-region-h">Leave empty unless your storage company gives you one.</span></div>
+                    <div class="field"><label for="bk-folder">Folder (optional)</label><input class="input" id="bk-folder" autocomplete="off" spellcheck="false" autocapitalize="off" maxlength="100" aria-describedby="bk-folder-h"><span class="hint" id="bk-folder-h">A folder inside the bucket, if you share the bucket with other things.</span></div>
+                    <div class="field"><label for="bk-keep">Nightly backups to keep</label><input class="input" id="bk-keep" type="number" min="7" max="365" step="1" inputmode="numeric" value="30" aria-describedby="bk-keep-h"><span class="hint" id="bk-keep-h">From 7 to 365. Older ones are removed after each good backup.</span></div>
+                  </div>
+                  <div class="acts bk-acts"><button class="btn btn-primary" type="submit" id="bk-store-save">Check and save</button><button class="btn btn-quiet" type="button" id="bk-store-off" hidden>Turn backups off</button><span class="small bk-msg" id="bk-store-msg" role="status"></span></div>
+                  <p class="muted small bk-note">Before saving, the site writes a small test file to your bucket, finds it again and removes it. If any of that fails, nothing is saved and you are told why.</p>
+                </form>
+                <div class="bk-sure" id="bk-off-sure" hidden>
+                  <p><b>Turn backups off?</b> The nightly backup stops. Backups already in your storage stay there, and your recovery key is kept so they can still be opened.</p>
+                  <div class="acts bk-acts"><button class="btn btn-primary" type="button" id="bk-off-yes">Yes, turn backups off</button><button class="btn btn-quiet" type="button" id="bk-off-no">Keep them on</button></div>
+                </div>
+              </section>
+
+              <section class="panel" id="bk-key" aria-labelledby="bk-key-h">
+                <div class="panel-h"><span class="bk-step" aria-hidden="true">2</span><h2 id="bk-key-h" tabindex="-1">Your recovery key</h2><span class="r" id="bk-key-state"></span></div>
+                <p class="bk-lead">Every backup is locked with a recovery key. Without the key a backup is unreadable, to a thief and to you. The site makes the key and shows it to you once.</p>
+                <div class="learn"><b>The honest part.</b>The server keeps its own copy of the key, encrypted, so it can make the nightly backup and test it without you. That copy lives on this server. If the server is lost, its copy is lost with it, and the copy you saved is the only way to open a backup. Nobody at MAIZ can make the key again or show it a second time.</div>
+                <div id="bk-key-body"></div>
+              </section>
+            </div>
+
+            <section class="panel" aria-labelledby="bk-lost-h">
+              <div class="panel-h"><h2 id="bk-lost-h">If the server is ever lost</h2></div>
+              <p class="bk-lead">You need two things: a backup file from your storage, and your recovery key. Give both to the person who rebuilds the server. Each backup also carries the server's own lock for saved passwords and tokens, sealed with your recovery key, so the one key brings everything back.</p>
+              <p class="muted small bk-note">The exact steps for that person are in the file <span class="mono">docs/BACKUPS.md</span> in the code, under "Restoring for real". They need the code and the key. They do not need the old server.</p>
+            </section>
+
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+<!--@include footer-->
+<script type="module" src="/src/owner-backups.ts"></script>
+</body>
+</html>

@@ -10,7 +10,7 @@ interface CatalogueItem {
 interface Connection { id: string; connectorKey: string; status: string; lastSyncAt?: string; lastError?: string; access: string[]; needsChoice?: boolean; externalAccount?: string }
 interface Growth { connected: boolean; waiting: string[]; lines: string[]; growth: { alerts: { severity: "bad" | "good"; title: string; detail: string }[] } }
 interface Pending { id: string; kind: "sales" | "payroll"; date: string; data: { currency: string; gross: number; net?: number; transactions?: number; headcount?: number } }
-interface AppsData { catalogue: CatalogueItem[]; connections: Connection[]; pending: Pending[] }
+interface AppsData { catalogue: CatalogueItem[]; connections: Connection[]; pending: Pending[]; problem?: string }
 interface ActivityLines { connectionId: string; app: string; lines: string[] }
 interface ImportResult { added: number; updated: number; unchanged: number; conflicts: string[]; warnings: string[]; unmapped: string[] }
 
@@ -20,7 +20,10 @@ const money = (n: number, cur: string) => { try { return new Intl.NumberFormat(u
 
 const EMPLOYEES: [string, string][] = [["finance-manager", "Finance"], ["business-consultant", "Consultant"], ["marketing-manager", "Marketing"], ["hr-manager", "HR"]];
 /** A client who hired the Data mining agent can also let it read an app (app.ts marks the page when it is on the team). */
-const employeesWithAccess = (): [string, string][] => (document.getElementById("app")?.classList.contains("has-dm") ? [...EMPLOYEES, ["data-mining-agent", "Data"]] : EMPLOYEES);
+const SHOP_LABEL: Record<string, string> = { "online-shop-manager": "Shop", "dropshipping-agent": "Dropshipping", "marketplace-manager": "Marketplace", "shop-care-agent": "Shop care" };
+/** The online-shop employees on the team (app.ts lists them on the page) can read apps too. */
+const shopHires = (): [string, string][] => (document.getElementById("app")?.dataset.shopTeam ?? "").split(" ").filter((k) => SHOP_LABEL[k]).map((k) => [k, SHOP_LABEL[k]!]);
+const employeesWithAccess = (): [string, string][] => [...EMPLOYEES, ...(document.getElementById("app")?.classList.contains("has-dm") ? [["data-mining-agent", "Data"] as [string, string]] : []), ...shopHires()];
 const CATEGORY: Record<CatalogueItem["category"], string> = { till: "Tills", payroll: "Payroll", accounting: "Accounting", payments: "Payments", ecommerce: "Online shop", marketing: "Website and Google", bridge: "Any other app", customers: "Customers", messaging: "Email and messaging", teamwork: "Teamwork" };
 /** Filter chips: payments and online shops share one. */
 const GROUP: Record<CatalogueItem["category"], string> = { till: "till", payroll: "payroll", accounting: "accounting", payments: "payments", ecommerce: "payments", marketing: "marketing", bridge: "bridge", customers: "customers", messaging: "customers", teamwork: "customers" };
@@ -65,6 +68,8 @@ export async function loadApps(): Promise<void> {
   const r = getToken() ? await api<AppsData>("/integrations") : { ok: false, data: undefined };
   live = r.ok && !!r.data;
   data = live ? r.data! : DEMO;
+  // Why the last one-click connection failed, in the provider's own words, shown once.
+  if (live && data.problem) toast(data.problem);
   growth = undefined;
   activity = new Map();
   if (live && data.connections.length) {
@@ -242,8 +247,11 @@ export function initApps(): void {
     }
     const dis = t.closest<HTMLElement>("[data-disconnect]");
     if (dis) {
-      await api(`/integrations/connections/${dis.dataset.disconnect}`, { method: "DELETE" });
-      toast("Disconnected. Your books keep what was already added.");
+      const key = data.connections.find((c) => c.id === dis.dataset.disconnect)?.connectorKey ?? "";
+      const r = await api(`/integrations/connections/${dis.dataset.disconnect}`, { method: "DELETE" });
+      if (!r.ok) { toast("Could not disconnect. Please try again."); return; }
+      // Google's rules: what Google sent is deleted with the connection, and the client is told so.
+      toast(["ga4", "search-console", "gmail"].includes(key) ? "Disconnected. The figures Google sent us have been deleted." : "Disconnected. Your books keep what was already added.");
       void loadApps();
       return;
     }

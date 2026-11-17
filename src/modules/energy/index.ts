@@ -628,6 +628,19 @@ export class EnergyMeter {
     };
   }
 
+  /** Platform-level: this month's energy and real cost by provider across every client, for the owner's resource table. */
+  usageByProvider(month: string): { provider: string; energy: number; costMicro: number; uses: number }[] {
+    const out = new Map<string, { provider: string; energy: number; costMicro: number; uses: number }>();
+    for (const rows of this.usage.values()) {
+      for (const r of rows) {
+        if (!r.day.startsWith(month)) continue;
+        const o = out.get(r.provider) ?? { provider: r.provider, energy: 0, costMicro: 0, uses: 0 };
+        out.set(r.provider, { ...o, energy: o.energy + r.energy, costMicro: o.costMicro + r.costMicro, uses: o.uses + 1 });
+      }
+    }
+    return [...out.values()];
+  }
+
   /** Platform-level usage for one client (no user check): the platform owner's clients screen. */
   usageOf(workspaceId: string): { energyToday: number; energyMonth: number; costMicroMonth: number } {
     const day = this.today(workspaceId);

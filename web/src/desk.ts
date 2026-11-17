@@ -70,7 +70,10 @@ function render(key: string): void {
       <section class="panel" aria-labelledby="desk-ask-h"><div class="panel-h"><h2 id="desk-ask-h">What I can see, and ask me</h2></div>
         <p class="small muted">Reads: ${esc(e.sees.join(", "))}. Nothing leaves your business without your approval.</p>
         <div class="chips">${e.ask.map((q) => `<button type="button" class="chip" data-ask="${esc(`${e.askAs}: ${q}`)}">${esc(q)}</button>`).join("")}</div></section>
-    </div>`;
+    </div>
+    <section class="panel" id="desk-uses" aria-labelledby="desk-uses-h" hidden></section>`;
+  // The same list the employee itself is given (what it can use, what it costs, what is missing). Only with a real login.
+  void import("./desk-resources").then((m) => m.showResources($("desk-uses"), e.key));
 }
 
 let current = "";

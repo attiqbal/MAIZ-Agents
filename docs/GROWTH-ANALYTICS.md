@@ -19,7 +19,9 @@ Code: `connectors/google.ts` (OAuth), `ga4.ts`, `search-console.ts`, `insights.t
 1. In Google Cloud, enable the **Analytics Data API**, **Analytics Admin API** and **Search Console API**.
 2. Add the two read-only scopes `analytics.readonly` and `webmasters.readonly`, create a **Web application** client, and add `<APP_URL>/api/integrations/callback` as its redirect URI.
 3. Paste the Client ID and secret on the card, Save, Test connection.
-4. **Verification (important, not yet confirmed by us):** as we understand Google's rules, these two scopes are "sensitive". Until Google has verified the app, only people you list as test users can connect, and their connection stops after 7 days. To open it to every client, publish the app and complete Google's verification. Check Google's current help before relying on this.
+4. **Verification:** these two scopes are "sensitive" (confirm on the console's Data access page). Until Google has verified the app, only people you list as test users (up to 100) can connect, their permission stops after 7 days, and an unverified app is capped at 100 new users for the life of the project. To open it to every client, publish the app and complete Google's verification: a justification per scope, a demo video, and a privacy policy that names the Google data and carries the Limited Use statement (`web/privacy.html#google`). Sensitive scopes take up to about 10 business days (Google's figure, not guaranteed). Gmail's `gmail.metadata` is a *restricted* scope and also needs a yearly third-party security assessment, so it has its own client and is kept out of this submission.
+
+**Disconnect deletes.** Pressing Disconnect on a Google app deletes the saved token and every figure that connection sent (memory and database), and revokes Google's permission once the client has no other Google connection through the same app. Google's User Data Policy asks for this; do not remove it.
 
 If the Google login can read several sites, the client picks one; we re-check the choice against Google's own list before saving it.
 

@@ -2,8 +2,10 @@
 // answers that stream in as they are written, and queued answers that land here when the batch finishes.
 import { api, getToken, type Org } from "./api";
 import { askStream, describeOutcome } from "./stream";
+import { isBusy, setBusy } from "./keep-focus";
+import { answerOffer, linkHtml, offerButtonsHtml, type TurnLink, type TurnOffer } from "./mining-chat";
 
-interface Turn { id: string; role: "you" | "employee"; text: string; at: string; status?: "answered" | "queued" | "failed" | "no_energy"; checked?: boolean; runsAt?: string }
+interface Turn { id: string; role: "you" | "employee"; text: string; at: string; status?: "answered" | "queued" | "failed" | "no_energy"; checked?: boolean; runsAt?: string; offer?: TurnOffer; link?: TurnLink }
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
@@ -14,12 +16,14 @@ let current: Org["team"][number] | undefined;
 let busy = false;
 let confirmClear = false;
 
-function turnHtml(t: Turn, who: string): string {
+/** `last` is true for the newest turn: an offer can only be answered while it is the last thing said. */
+function turnHtml(t: Turn, who: string, last = false): string {
   if (t.role === "you") return `<div class="turn turn-you"><span class="small muted">You · ${esc(time(t.at))}</span><p>${esc(t.text)}</p></div>`;
   const state = t.status === "queued"
     ? `<span class="badge">Queued${t.runsAt ? ` for ${esc(time(t.runsAt))}` : ""}</span>`
-    : t.status === "answered" ? `<span class="badge">${t.checked ? "Checked" : "Draft for you to review"}</span>` : "";
-  return `<div class="turn turn-them${t.status === "failed" || t.status === "no_energy" ? " turn-note" : ""}"><span class="small muted">${esc(who)} · ${esc(time(t.at))} ${state}</span><p class="turn-text">${esc(t.text)}</p></div>`;
+    : t.offer ? (last ? '<span class="badge">Waiting for you</span>' : "")
+    : t.status === "answered" && !t.link ? `<span class="badge">${t.checked ? "Checked" : "Draft for you to review"}</span>` : "";
+  return `<div class="turn turn-them${t.status === "failed" || t.status === "no_energy" ? " turn-note" : ""}"><span class="small muted">${esc(who)} · ${esc(time(t.at))} ${state}</span><p class="turn-text">${esc(t.text)}</p>${t.offer && last ? offerButtonsHtml() : ""}${linkHtml(t.link)}</div>`;
 }
 
 async function loadThread(): Promise<void> {
@@ -27,7 +31,7 @@ async function loadThread(): Promise<void> {
   const r = await api<{ turns: Turn[] }>(`/conversations/${current.id}`);
   const turns = r.data?.turns ?? [];
   $("chat-thread").innerHTML = turns.length
-    ? turns.map((t) => turnHtml(t, current!.name)).join("")
+    ? turns.map((t, n) => turnHtml(t, current!.name, n === turns.length - 1)).join("")
     : `<p class="small muted">Nothing here yet. Ask ${esc(current.name)} something below. Follow-up questions remember what you said before.</p>`;
   $("chat-clear").hidden = turns.length === 0;
   const box = $("chat-thread");
@@ -87,6 +91,23 @@ export function initChat(): void {
     if (out.kind === "note") live.textContent = out.text;
     await loadThread();
     input.focus();
+  });
+  // "Confirm and start" or "Not now" under a market data offer. The offer is the server's; nothing is sent from here.
+  $("chat-thread").addEventListener("click", async (e) => {
+    const b = (e.target as HTMLElement).closest<HTMLButtonElement>("[data-offer]");
+    if (!b || isBusy(b) || busy) return;
+    const thread = $("chat-thread");
+    thread.querySelectorAll<HTMLElement>("[data-offer]").forEach((x) => setBusy(x, true));
+    const confirmed = b.dataset.offer === "confirm";
+    if (confirmed) b.closest(".turn")?.insertAdjacentHTML("beforeend", '<p class="status live wrap"><span class="dot"></span>Searching now. This can take up to a minute.</p>');
+    thread.setAttribute("aria-busy", "true");
+    const r = await answerOffer(confirmed ? "confirm" : "decline");
+    thread.setAttribute("aria-busy", "false");
+    await loadThread();
+    if (!r.ok) thread.insertAdjacentHTML("beforeend", `<div class="turn turn-them turn-note" role="alert"><p class="turn-text">${esc(r.error ?? "That did not go through. Please try again.")}</p></div>`);
+    // The buttons are gone: focus moves to the link to the dataset when there is one, otherwise back to the message box.
+    const links = thread.querySelectorAll<HTMLElement>(".turn:last-child .turn-link a");
+    (links[links.length - 1] ?? $("chat-in")).focus();
   });
   $("chat-clear").addEventListener("click", async () => {
     if (!current) return;

@@ -19,6 +19,7 @@ How a billing discount is charged (built 2026-11-16):
 - It comes off the client's **next order that has a monthly line**, on the monthly part only, never on a one-off consultant pass, and never more than the monthly amount (`billDiscount` in `rules.ts`). A cart with nothing monthly leaves the code waiting.
 - `POST /api/cart/quote` shows a signed-in client the discount line and the reduced amount due today, and the cart in the control centre shows the same. Checkout sends the amount and the number of months to the payment provider (Stripe makes a one-use coupon on that subscription), and the order records the code and the amount.
 - A code discounts one subscription: when it is paid the redemption is marked used (`CouponService.markDiscountUsed`), and an older unpaid checkout that was holding the same code is closed first.
+- One monthly bill (docs/ONE-BILL.md): a code is only ever applied by a normal checkout. A client who holds a waiting code, or whose code is still running on their bill, buys later extras at a normal checkout even when the one-bill switch is on, so a code is never lost or applied twice. The cart says so.
 - While the discounted months run the client cannot add a second code; once it has run out they can (`discountEndsAt`).
 
 Limits on a coupon: most uses in total, an expiry date, only trial or only paying clients, only one email. Owner can turn a code on or off, see every use, and email a code to someone (branded email). Codes are normalised to upper case; a client may type them in any case.

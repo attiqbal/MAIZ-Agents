@@ -13,10 +13,17 @@ import { initPeople, setPeopleBusiness } from "./people";
 import { initDesk, showDesk } from "./desk";
 import { renderDeptBar } from "./dept";
 import { api, getToken, clearSession, type Org } from "./api";
+import { startNeeds, loadNeeds } from "./needs";
 import { JOB_DESCRIPTIONS, getJobDescription, jdHtml } from "./jd";
+import { SHOP_EMPLOYEE_KEYS } from "../../src/modules/ecommerce/rules";
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const app = $("app");
+// A signed-in client never sees the example rows of Approvals, Books and cash or the calendar, not even while
+// their own records load: the examples are hidden at once and the real screens draw in their place (needs.ts,
+// approvals-live.ts, books-live.ts, calendar-live.ts).
+const signedIn = !!getToken();
+app.classList.toggle("signed-in", signedIn);
 
 // Profile from onboarding (falls back to the example business).
 let profile: { biz?: string; email?: string; slack?: boolean; contact?: string } = {};
@@ -42,13 +49,18 @@ function route(): void {
   const valid = screens.some((s) => s.dataset.screen === key) ? key : "home";
   // The Data mining agent has its own working screen, not an example dashboard.
   if (valid === "desk" && sub === "data-mining-agent") { location.replace("#mining"); return; }
+  // The online-shop employees have no example dashboard either. Their working view is the conversation.
+  if (valid === "desk" && SHOP_EMPLOYEE_KEYS.includes(sub)) { location.replace(`#chat/${sub}`); return; }
   if (valid === "desk") showDesk(sub);
-  if (valid === "mining") void import("./mining").then((m) => m.showMining());
+  if (valid === "mining") void import("./mining").then((m) => m.showMining(sub));
   if (valid === "chat") void showChat(sub);
   if (valid === "firstday") void import("./firstday").then((m) => m.showFirstDay());
   if (valid === "apps") void import("./apps").then((m) => m.setAppsView(sub));
   if (valid === "apps") void import("./agents").then((m) => m.showAgents());
   if (valid === "slack") void import("./apps").then((m) => m.initSlackTab(Boolean(profile.slack)));
+  if (signedIn && valid === "approvals") void import("./approvals-live").then((m) => m.showApprovals());
+  if (signedIn && valid === "finance") void import("./books-live").then((m) => m.showBooks());
+  if (signedIn && valid === "compliance") void import("./calendar-live").then((m) => m.showCalendar());
   screens.forEach((s) => s.toggleAttribute("hidden", s.dataset.screen !== valid));
   // Slack lives inside Apps and connections, so the rail marks that entry for it.
   const here = valid === "desk" ? `desk/${sub}` : valid === "slack" ? "apps" : valid;
@@ -110,6 +122,8 @@ const details: Record<string, { title: string; cost: string; leaves: string; pre
 let selected = "posts";
 
 function refresh(): void {
+  // A signed-in client's counts and "Needs you" list come from their real records, never from the example items.
+  if (signedIn) { startNeeds(); void loadNeeds(); return; }
   document.querySelectorAll<HTMLElement>("[data-need]").forEach((el) => el.toggleAttribute("hidden", !pending.has(el.dataset.need!)));
   document.querySelectorAll<HTMLElement>("#alist [data-a]").forEach((el) => el.toggleAttribute("hidden", !pending.has(el.dataset.a!)));
   const n = pending.size;
@@ -154,7 +168,7 @@ $("a-edit").addEventListener("click", () => toast("Editing opens in the web edit
 
 // Real data: when signed in and the API is running, replace the demo team with the real one.
 let realOrg: Org | undefined;
-const ROLE: Record<string, [string, string]> = { "finance-manager": ["FM", "av-fm"], "marketing-manager": ["MM", "av-mm"], "business-consultant": ["BC", "av-bc"], "hr-manager": ["HR", "av-hr"], "compliance-manager": ["CM", "av-cm"], "supply-chain-manager": ["SC", "av-sc"], "data-mining-agent": ["DM", "av-dm"], "admin-manager": ["AM", "av-tl"] };
+const ROLE: Record<string, [string, string]> = { "finance-manager": ["FM", "av-fm"], "marketing-manager": ["MM", "av-mm"], "business-consultant": ["BC", "av-bc"], "hr-manager": ["HR", "av-hr"], "compliance-manager": ["CM", "av-cm"], "supply-chain-manager": ["SC", "av-sc"], "data-mining-agent": ["DM", "av-dm"], "online-shop-manager": ["EM", "av-ec"], "dropshipping-agent": ["DA", "av-ds"], "marketplace-manager": ["MP", "av-mp"], "shop-care-agent": ["CC", "av-sh"], "admin-manager": ["AM", "av-tl"] };
 const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]!);
 /** The sidebar trial box and the Overview chip, from the real end date; hidden once the client is on a paid plan. */
 function showTrial(endsAt: string | undefined, planEnded = false): void {
@@ -210,6 +224,8 @@ async function loadOrg(): Promise<void> {
     $("demo-banner").hidden = false; return;
   }
   realOrg = r.data;
+  // Teammates: the "People with access" panel, and what a person who is not the owner sees (src/access.ts).
+  void import("./access").then((m) => m.initAccess(realOrg?.role));
   $("ask-when").hidden = false;
   warmUp();
   $("org-name").textContent = realOrg.name;
@@ -220,10 +236,13 @@ async function loadOrg(): Promise<void> {
   setPeopleBusiness(realOrg.name);
   showTrial(realOrg.trialEndsAt, realOrg.planEnded === true);
   void loadBilling();
+  if (!realOrg.role || realOrg.role === "owner") void loadCodes(); // codes are the owner's alone
   app.classList.add("is-live");
   const hasDataAgent = realOrg.team.some((e) => e.templateKey === "data-mining-agent");
   $("mining-link").hidden = !hasDataAgent;
   app.classList.toggle("has-dm", hasDataAgent);
+  // The online-shop employees on this team, so the Apps screen can let them read the apps the owner connects.
+  app.dataset.shopTeam = realOrg.team.map((e) => e.templateKey).filter((k) => SHOP_EMPLOYEE_KEYS.includes(k)).join(" ");
   // A real client never sees the example business's requests, and example-only panels say so.
   document.querySelectorAll<HTMLElement>("[data-need]").forEach((el) => el.remove());
   pending.clear();
@@ -262,7 +281,7 @@ async function loadOrg(): Promise<void> {
 void loadOrg();
 
 // Settings: the plan, the provider's billing page (card, invoices, cancel) and what has been bought.
-interface OrderRow { id: string; status: string; lines: { title: string; qty: number }[]; dueTodayMinor: number; createdAt: string; paidAt?: string; discount?: { code: string; amountOffMinor: number }; problem?: string }
+interface OrderRow { id: string; status: string; lines: { title: string; qty: number }[]; dueTodayMinor: number; createdAt: string; paidAt?: string; discount?: { code: string; amountOffMinor: number }; problem?: string; payUrl?: string }
 const ORDER_STATE: Record<string, string> = { paid: "Paid", pending: "Waiting for payment", failed: "Not paid", cancelled: "Cancelled" };
 const pounds = (minor: number) => `£${(minor / 100).toLocaleString("en-GB", { minimumFractionDigits: minor % 100 ? 2 : 0, maximumFractionDigits: 2 })}`;
 async function loadBilling(): Promise<void> {
@@ -275,12 +294,14 @@ async function loadBilling(): Promise<void> {
     : realOrg.planEnded ? (over ? `Your plan ended on ${day(ends)}. Your work is kept; start the Team package again to carry on.` : `Your plan was cancelled and your team works until ${day(ends)}. You can start it again any time.`)
     : over ? `Your free trial ended on ${day(ends)}. Your work is kept; choose your plan to carry on.` : `Your free trial runs until ${day(ends)}. Nothing is charged unless you choose a plan.`;
   $("bill-choose").hidden = !ends;
+  if (realOrg.role && realOrg.role !== "owner") return; // billing is the owner's alone
+  void import("./billing").then((m) => m.mountBillingLines($("bill-lines"), $("bill-msg")));
   const r = await api<{ enabled: boolean; orders: OrderRow[] }>("/orders");
   const orders = r.ok ? r.data?.orders ?? [] : [];
   $("bill-portal").hidden = !orders.some((o) => o.paidAt);
   $("bill-orders-wrap").hidden = orders.length === 0;
   $("bill-orders").innerHTML = orders.length ? `<thead><tr><th scope="col">Date</th><th scope="col">What</th><th scope="col">Paid today</th><th scope="col">Status</th></tr></thead><tbody>${orders.slice(0, 12).map((o) =>
-    `<tr><td>${esc(day(o.paidAt ?? o.createdAt))}</td><td>${esc(o.lines.map((l) => (l.qty > 1 ? `${l.qty} × ${l.title}` : l.title)).join(", "))}${o.discount ? `<br><span class="small muted">Code ${esc(o.discount.code)}: ${pounds(o.discount.amountOffMinor)} off</span>` : ""}</td><td class="mono">${pounds(o.dueTodayMinor)}</td><td>${esc(ORDER_STATE[o.status] ?? o.status)}${o.problem ? `<br><span class="small muted">${esc(o.problem)}</span>` : ""}</td></tr>`).join("")}</tbody>` : "";
+    `<tr><td>${esc(day(o.paidAt ?? o.createdAt))}</td><td>${esc(o.lines.map((l) => (l.qty > 1 ? `${l.qty} × ${l.title}` : l.title)).join(", "))}${o.discount ? `<br><span class="small muted">Code ${esc(o.discount.code)}: ${pounds(o.discount.amountOffMinor)} off</span>` : ""}</td><td class="mono">${pounds(o.dueTodayMinor)}</td><td>${esc(ORDER_STATE[o.status] ?? o.status)}${o.status === "pending" && o.payUrl ? `<br><a href="${esc(o.payUrl)}" rel="noopener">Finish paying on Stripe</a>` : ""}${o.problem ? `<br><span class="small muted">${esc(o.problem)}</span>` : ""}</td></tr>`).join("")}</tbody>` : "";
 }
 $("bill-portal").addEventListener("click", async () => {
   const b = $<HTMLButtonElement>("bill-portal");
@@ -340,7 +361,6 @@ $("cp-form").addEventListener("submit", async (ev) => {
   msg.textContent = r.ok ? `Done: ${r.data?.applied}.` : r.data?.error ?? "Could not apply the code. Please try again.";
   if (r.ok) { $<HTMLInputElement>("cp-code").value = ""; void loadCodes(); void loadOrg(); void loadTopUps(); }
 });
-void loadCodes();
 
 // Account menu: sign out, and the Settings screen's account details.
 /** Logging out also stops this device's alerts, so the next person to use it is not sent this account's news. */
@@ -368,7 +388,7 @@ function resetWhen(): void { chosenWhen = undefined; document.querySelectorAll("
 // limits this, so calling it often costs nothing; this just keeps us from asking more than every few minutes.
 let lastWarm = 0;
 function warmUp(): void {
-  if (!getToken() || Date.now() - lastWarm < 4 * 60_000) return;
+  if (!getToken() || realOrg?.role === "viewer" || Date.now() - lastWarm < 4 * 60_000) return;
   lastWarm = Date.now();
   void api("/warm", { method: "POST", body: {} });
 }
@@ -379,26 +399,31 @@ $<HTMLFormElement>("ask").addEventListener("submit", async (e) => {
   const text = input.value.trim();
   if (!text) return;
   if (!realOrg) { toast("Admin manager got it and will route it (demo)"); input.value = ""; return; }
-  const m = /^(finance|marketing|consultant|hr|compliance|supply|data)\s*[:,-]\s*(.+)$/is.exec(text);
-  const key = m ? { finance: "finance-manager", marketing: "marketing-manager", consultant: "business-consultant", hr: "hr-manager", compliance: "compliance-manager", supply: "supply-chain-manager", data: "data-mining-agent" }[m[1]!.toLowerCase() as "finance"] : "business-consultant";
+  const m = /^(finance|marketing|consultant|hr|compliance|supply|data|shop|dropship|marketplace|care)\s*[:,-]\s*(.+)$/is.exec(text);
+  const key = m ? { finance: "finance-manager", marketing: "marketing-manager", consultant: "business-consultant", hr: "hr-manager", compliance: "compliance-manager", supply: "supply-chain-manager", data: "data-mining-agent", shop: "online-shop-manager", dropship: "dropshipping-agent", marketplace: "marketplace-manager", care: "shop-care-agent" }[m[1]!.toLowerCase() as "finance"] : "business-consultant";
   const emp = realOrg.team.find((x) => x.templateKey === key) ?? realOrg.team[0]!;
+  // "data:" with no Data mining agent on the team is sent as typed, so the reply can say so and point to the store.
+  const noDataAgent = key === "data-mining-agent" && emp.templateKey !== key;
   if (asking) { toast("Still working on your last question"); return; }
   asking = true;
   const stopWorking = startWorking(emp.name);
   const u = /^urgent\s*[:,-]\s*(.+)$/is.exec(m ? m[2]! : text);
   // The answer is written into the panel as it arrives. textContent only: streamed words are never parsed as HTML.
   const live = streamPanel(emp.name);
-  const sent = u ? u[1]! : m ? m[2]! : text;
-  const result = await askStream({ text: sent, employeeId: emp.id, urgent: !!u, ...(chosenWhen ? { when: chosenWhen } : {}) }, live);
+  const sent = noDataAgent ? text : u ? u[1]! : m ? m[2]! : text;
+  // `bar` says nobody was named: a clear request for public market data is then answered with its quote, and nothing runs.
+  const result = await askStream({ text: sent, employeeId: emp.id, urgent: !!u, ...(!m || noDataAgent ? { bar: true } : {}), ...(chosenWhen ? { when: chosenWhen } : {}) }, live);
   stopWorking();
   asking = false;
   if (!result.ok) { showNote(emp.name, result.message ?? "I could not reach your team. Your question is still in the box, so you can send it again.", true); return; }
   input.value = "";
   resetWhen();
+  // A market data search that waits for "Confirm and start", or a pointer to the store when the agent is not hired.
+  if (result.done.offer || result.done.link) { const offered = result.done; void import("./mining-chat").then((mc) => { mc.showAskOffer(answerBox(), offered); window.scrollTo({ top: 0, behavior: "smooth" }); }); return; }
   const out = describeOutcome(emp.name, result.done);
   if (out.kind === "queued") { showQueued(emp.name, result.done.runsAt); return; }
   if (out.kind === "note") { showNote(emp.name, out.text); return; }
-  showAnswer(emp.name, out.text, result.done.checked === true, key);
+  showAnswer(emp.name, out.text, result.done.checked === true, key, result.done.hints);
   void loadOrg();
 });
 
@@ -434,10 +459,10 @@ function showQueued(who: string, runsAt?: string): void {
   });
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
-function showAnswer(who: string, text: string, checked: boolean, key: string): void {
+function showAnswer(who: string, text: string, checked: boolean, key: string, hints: { id: string; title: string; detail: string; action: { label: string; href: string } }[] = []): void {
   const box = answerBox();
   box.setAttribute("role", "status");
-  box.innerHTML = `<div class="panel-h"><h2>${esc(who)} says</h2><span class="r">${checked ? "Checked, for you to review" : "Draft for you to review"}</span></div><div class="preview" style="white-space:pre-wrap">${esc(text)}</div><p><a class="btn btn-sm btn-ghost" href="#chat/${esc(key)}">Follow up in conversation</a></p>`;
+  box.innerHTML = `<div class="panel-h"><h2>${esc(who)} says</h2><span class="r">${checked ? "Checked, for you to review" : "Draft for you to review"}</span></div><div class="preview" style="white-space:pre-wrap">${esc(text)}</div><p><a class="btn btn-sm btn-ghost" href="#chat/${esc(key)}">Follow up in conversation</a></p>${hints.map((h) => `<div class="need"><b>${esc(h.title)}</b><span class="d">${esc(h.detail)}</span><div class="acts"><a class="btn btn-sm btn-primary" href="${/^#[\w/-]{1,40}$/.test(h.action.href) ? esc(h.action.href) : "#apps"}">${esc(h.action.label)}</a></div></div>`).join("")}`;
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
 /** An answer panel that fills in word by word. Reading aloud waits for the finished answer (aria-busy), not every word. */

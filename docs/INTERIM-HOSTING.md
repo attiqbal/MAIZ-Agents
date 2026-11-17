@@ -4,6 +4,8 @@
 
 ## Stop-gap: off-server backup without Oracle
 
+**Easiest way now: the in-app backups.** Open **Backups** in the owner menu, paste the details of a private bucket (a Cloudflare R2 example is on the page), make and save the recovery key, and the site makes an encrypted copy every night, tests a restore every week and emails you when something is wrong. No cron job or `rclone` is needed. See [BACKUPS.md](BACKUPS.md). The `deploy/backup.sh` route below still works and can run alongside it; the in-app backups do not replace the Hetzner server backups in item 1.
+
 Risk if nothing is done: all data lives on one Hetzner disk. A deleted server, a failed disk or a bad command loses every customer's records and cannot be undone. Do this before the first real customer.
 
 1. **Hetzner server backups** (one click in Hetzner Cloud: server > Backups, about 20% of the server price, roughly £2/month). Whole-server snapshots, kept by Hetzner.

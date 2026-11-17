@@ -39,7 +39,7 @@ export const PAID_SERVICES: readonly PaidService[] = [
   {
     key: "canva", name: "Canva", kind: "listed",
     summary: "Brand templates and designs in Canva.",
-    note: "Canva's Connect API can fill brand templates, but as far as we know that part is for Canva Enterprise accounts and needs a connected app. Not built yet. Until then, make the video in Canva and paste its link into the draft.",
+    note: "Canva's Connect API can read your design list (built: see the Canva card on the Connections page). Not built: filling brand templates is a separate Canva feature that, as far as we know, is for Canva Enterprise accounts. Make the video in Canva and paste its link into the draft.",
     link: { href: "https://www.canva.dev/docs/connect/", label: "Canva Connect API" },
   },
   {

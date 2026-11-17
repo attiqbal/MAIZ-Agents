@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { createHmac } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import { createApp, makeToken, readToken, type Req } from "../src/server/app.js";
@@ -355,6 +356,33 @@ describe("business apps API", () => {
     expect((await s.call("GET", "/api/integrations/callback", undefined, { cookie: "maiz_oauth=other" }, `code=x&state=${state}`)).status).toBe(400);
     expect((await s.call("GET", "/api/integrations/callback", undefined, { cookie: `a=b; ${cookie}` }, `code=x&state=${state}`)).status).toBe(302);
     expect((await s.call("GET", "/api/integrations/callback", undefined, { cookie }, `code=x&state=${state}`)).status).toBe(400);
+  });
+  it("sends a PKCE proof that matches, and shows the owner why a provider said no", async () => {
+    const s = setup({ integrationApps: { etsy: { clientId: "key", clientSecret: "shared", redirectUri: "https://app.test/api/integrations/callback" } } });
+    const { token } = (await s.call("POST", "/api/signup", { email: "ann@kestrel.co", businessName: "Kestrel Coffee", sells: "Coffee", size: "2–10", country: "GB", goal: "More customers" })).body as any;
+    const auth = { authorization: `Bearer ${token}` };
+    const begin = async () => {
+      const start = await s.call("POST", "/api/integrations/apps/etsy/connect", {}, auth);
+      const url = new URL((start.body as any).url);
+      return { state: url.searchParams.get("state")!, challenge: url.searchParams.get("code_challenge")!, cookie: start.headers!["set-cookie"]!.split(";")[0]! };
+    };
+    const a = await begin();
+    expect(a.challenge).toMatch(/^[\w-]{43}$/);
+    const back = await s.call("GET", "/api/integrations/callback", undefined, { cookie: a.cookie }, `code=x&state=${a.state}`);
+    expect(back.headers!.location).toMatch(/connect=failed/);
+    const verifier = new URLSearchParams(s.calls.find((c) => String(c.url).includes("oauth/token"))!.init.body).get("code_verifier")!;
+    expect(createHash("sha256").update(verifier).digest("base64url")).toBe(a.challenge);
+    expect(((await s.call("GET", "/api/integrations", undefined, auth)).body as any).problem).toMatch(/^Etsy did not approve the connection/);
+    expect(((await s.call("GET", "/api/integrations", undefined, auth)).body as any).problem).toBeUndefined();
+    // A refusal before any code: the provider's own words are kept, but pressing Cancel is not an error.
+    const b = await begin();
+    await s.call("GET", "/api/integrations/callback", undefined, { cookie: b.cookie }, `error=invalid_scope&error_description=${encodeURIComponent("scope <b>transactions_r</b> is not allowed")}&state=${b.state}`);
+    const said = ((await s.call("GET", "/api/integrations", undefined, auth)).body as any).problem as string;
+    expect(said).toMatch(/Etsy said no: invalid_scope: scope b transactions_r \/b is not allowed/);
+    expect(said).not.toContain("<");
+    const c = await begin();
+    const cancel = await s.call("GET", "/api/integrations/callback", undefined, { cookie: c.cookie }, `error=access_denied&state=${c.state}`);
+    expect(cancel.headers!.location).not.toMatch(/failed/);
   });
   it("only accepts a signed connect state on the OAuth return", async () => {
     const { call } = await signedUp();

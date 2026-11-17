@@ -10,7 +10,8 @@
 /** What a connection can be used for. Employees are granted capabilities, never raw app access. */
 export type Capability =
   | "sales.read" | "payroll.read" | "accounts.read" | "traffic.read" | "search.read"
-  | "crm.read" | "support.read" | "inbox.read" | "bookings.read" | "audience.read" | "tasks.read" | "reviews.read";
+  | "crm.read" | "support.read" | "inbox.read" | "bookings.read" | "audience.read" | "tasks.read" | "reviews.read" | "suppliers.read"
+  | "social.read" | "ads.read" | "documents.read";
 
 export type Category = "till" | "payroll" | "accounting" | "payments" | "ecommerce" | "marketing" | "bridge" | "customers" | "messaging" | "teamwork";
 
@@ -37,8 +38,10 @@ export type AuthSpec =
       authorizeParams?: Record<string, string>;
       /** How the app wants our id and secret at its token address. Default: in the form body. */
       tokenAuth?: "basic" | "body";
+      /** The provider wants (or allows) PKCE: a one-time proof sent with the sign-in and again with the code. */
+      pkce?: boolean;
     }
-  | { kind: "api_key"; fields: readonly { key: string; label: string; help?: string }[] }
+  | { kind: "api_key"; fields: readonly { key: string; label: string; help?: string; /** Longest value accepted. Default 500; some tokens (Printify) are longer. */ maxLength?: number }[] }
   | { kind: "file"; accepts: string; howToExport: readonly string[] }
   /** Zapier, Make or any tool that can POST JSON to a URL. */
   | { kind: "webhook" }
@@ -125,7 +128,7 @@ export interface SearchDay {
  * or a rating times 100); `areas.ts` says what each figure is called. Numbers only, so nothing a customer typed
  * can ever reach an employee's instructions.
  */
-export type ActivityArea = "crm" | "support" | "inbox" | "bookings" | "audience" | "tasks" | "reviews";
+export type ActivityArea = "crm" | "support" | "inbox" | "bookings" | "audience" | "tasks" | "reviews" | "supply" | "social" | "ads" | "documents";
 export interface ActivityDay {
   /** YYYY-MM-DD */
   date: string;
@@ -163,6 +166,8 @@ export interface ConnectorContext {
   now: () => Date;
   /** The organisation's base currency, used when an app does not say. */
   currency: string;
+  /** MAIZ's own registration with the provider, for the few apps that want its id or an extra key on every call. */
+  app?: OAuthApp;
 }
 
 export interface DateRange {
@@ -179,6 +184,9 @@ export interface ProviderSetup {
   /** Approval the provider wants before other businesses can connect, and how long it usually takes. */
   approval?: string;
 }
+
+/** An extra box on the owner's card beside the client id and secret (a developer token, an application id). */
+export interface OwnerField { key: string; label: string; help: string; secret: boolean; required: boolean; placeholder?: string; pattern?: RegExp }
 
 export interface Connector {
   /** Stable id, lower-case, used in URLs and storage. */
@@ -209,6 +217,14 @@ export interface Connector {
    * more than one, the owner chooses; the pick is kept as the credentials' `tenant`.
    */
   choices?(ctx: ConnectorContext): Promise<{ id: string; name: string }[]>;
+  /** Set when there is no public way in at all. The owner's card says so plainly instead of promising a connection. */
+  unavailable?: string;
+  /** Extra boxes the owner fills in once. Their values reach the connector as `app.extra`. */
+  ownerFields?: readonly OwnerField[];
+  /** Builds the sign-in address when the provider does not follow the usual shape (Amazon, eBay, TikTok). */
+  authorizeUrl?(app: OAuthApp, state: string, challenge?: string): string;
+  /** "none": the provider has no harmless way to check the owner's details, so the card's test says so. */
+  ownerTest?: "none" | "salesforce";
   /** Swap a refresh token for a fresh access token. Called before `read` when the token has expired. */
   refresh?(http: typeof fetch, app: OAuthApp, credentials: Credentials): Promise<Credentials>;
 }
@@ -223,6 +239,8 @@ export interface OAuthApp {
   clientId: string;
   clientSecret: string;
   redirectUri: string;
+  /** Values of the connector's `ownerFields`. */
+  extra?: Record<string, string>;
 }
 
 export class IntegrationError extends Error {}

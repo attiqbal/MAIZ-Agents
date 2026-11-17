@@ -41,8 +41,10 @@ const platform = createPlatform({
   meta: metaFromEnv(env),
   whatsapp: whatsappFromEnv(env),
   // Only to show the owner's Connections page whether each server-set service is set, and to test it. Never sent out.
-  connectionEnv: Object.fromEntries(["RESEND_API_KEY", "EMAIL_FROM", "PAYMENTS_PROVIDER", "STRIPE_SECRET_KEY", "STRIPE_WEBHOOK_SECRET", "RUNPOD_API_KEY", "RUNPOD_ENDPOINT_ID", "ANTHROPIC_API_KEY", "SLACK_CLIENT_ID", "SLACK_CLIENT_SECRET", "SLACK_SIGNING_SECRET", "SLACK_REDIRECT_URI", "META_GRAPH_VERSION", "GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", "MICROSOFT_CLIENT_ID", "MICROSOFT_CLIENT_SECRET", "MICROSOFT_TENANT", "XERO_CLIENT_ID", "XERO_CLIENT_SECRET", "SQUARE_CLIENT_ID", "SQUARE_CLIENT_SECRET", "SQUARE_BASE_URL", "GOOGLE_DATA_CLIENT_ID", "GOOGLE_DATA_CLIENT_SECRET", "REDDIT_CLIENT_ID", "REDDIT_CLIENT_SECRET", "REDDIT_USERNAME", "YOUTUBE_API_KEY", "X_BEARER_TOKEN", "FRED_API_KEY", "ALPHAVANTAGE_API_KEY", "COMPANIES_HOUSE_API_KEY", "CREATOMATE_API_KEY", "SHOTSTACK_API_KEY", ...Object.values(clientAppEnv()).flatMap((v) => [v.clientId, v.clientSecret])].map((k) => [k, env[k]])),
+  connectionEnv: Object.fromEntries(["RESEND_API_KEY", "EMAIL_FROM", "PAYMENTS_PROVIDER", "STRIPE_SECRET_KEY", "STRIPE_WEBHOOK_SECRET", "RUNPOD_API_KEY", "RUNPOD_ENDPOINT_ID", "ANTHROPIC_API_KEY", "SLACK_CLIENT_ID", "SLACK_CLIENT_SECRET", "SLACK_SIGNING_SECRET", "SLACK_REDIRECT_URI", "META_GRAPH_VERSION", "GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", "MICROSOFT_CLIENT_ID", "MICROSOFT_CLIENT_SECRET", "MICROSOFT_TENANT", "XERO_CLIENT_ID", "XERO_CLIENT_SECRET", "SQUARE_CLIENT_ID", "SQUARE_CLIENT_SECRET", "SQUARE_BASE_URL", "GOOGLE_DATA_CLIENT_ID", "GOOGLE_DATA_CLIENT_SECRET", "REDDIT_CLIENT_ID", "REDDIT_CLIENT_SECRET", "REDDIT_USERNAME", "YOUTUBE_API_KEY", "X_BEARER_TOKEN", "FRED_API_KEY", "ALPHAVANTAGE_API_KEY", "COMPANIES_HOUSE_API_KEY", "CREATOMATE_API_KEY", "SHOTSTACK_API_KEY", ...Object.values(clientAppEnv()).flatMap((v) => [v.clientId, v.clientSecret, ...Object.values(v.extra)])].map((k) => [k, env[k]])),
   metaClients: metaClientsFromEnv(env),
+  // Off-server backups (docs/BACKUPS.md): the database to dump, and the key sealed inside each backup so one saved recovery key is enough.
+  backup: { databaseUrl: env.DATABASE_URL || undefined, serverKeys: env.TOKEN_KEY ? { TOKEN_KEY: env.TOKEN_KEY } : undefined, binDir: env.PG_BIN_DIR || undefined },
   // The feature flag: unset means checkout is refused and nothing is charged. "mock" (development only) charges nobody.
   payments:
     env.PAYMENTS_PROVIDER === "mock" ? new MockPaymentProvider()
@@ -138,8 +140,20 @@ server.listen(port, () => console.log(`listening on :${port}`));
 // Once a minute: the hourly sign-off reminder to the owner, the batch dispatcher, and the nightly books check (each client once, after their own midnight).
 // The batch dispatcher: once a minute, runs any client whose closing time has passed or whose queue is big enough.
 const BATCH_TICK_MS = 60_000;
-const batchTimer = setInterval(() => { void platform.decisionDigest.tick(); void platform.agents.tick().catch((e) => console.error("agents tick failed:", e instanceof Error ? e.message : e)); void platform.batch.tick(); void platform.reconciliation.tick(); void platform.metaClients.maintenance().catch((e) => console.error("meta maintenance failed:", e instanceof Error ? e.message : e)); void platform.growthTick().catch((e) => console.error("growth tick failed:", e instanceof Error ? e.name : "error")); }, BATCH_TICK_MS);
+const batchTimer = setInterval(() => { void platform.decisionDigest.tick(); void platform.agents.tick().catch((e) => console.error("agents tick failed:", e instanceof Error ? e.message : e)); void platform.batch.tick(); void platform.mining.tick().catch((e) => console.error("mining tick failed:", e instanceof Error ? e.name : "error")); void platform.reconciliation.tick(); void platform.metaClients.maintenance().catch((e) => console.error("meta maintenance failed:", e instanceof Error ? e.message : e)); void platform.growthTick().catch((e) => console.error("growth tick failed:", e instanceof Error ? e.name : "error")); }, BATCH_TICK_MS);
 batchTimer.unref();
+// Backups: once a minute, starts the nightly backup (03:10 in the owner's time zone) or the weekly restore test when
+// one is due, and alerts the owner when something is wrong. tick() never throws. See docs/BACKUPS.md.
+const backupTimer = setInterval(() => { void platform.backup.tick(); }, BATCH_TICK_MS);
+backupTimer.unref();
+// Once a minute: reminders for the dates clients put on their own Compliance calendar (each goes once, in their daytime).
+const calendarTimer = setInterval(() => {
+  try { platform.overview.dates.tick(); } catch (e) { console.error("calendar reminders failed:", e instanceof Error ? e.message : "error"); }
+}, BATCH_TICK_MS);
+calendarTimer.unref();
+// Once a minute: monthly lines whose paid month is over leave the team, unpaid additions to a bill are closed, stops the payment provider missed are tried again.
+const billingTimer = setInterval(() => { void platform.payments.sweep().catch((e) => console.error("billing sweep failed:", e instanceof Error ? e.message : e)); }, BATCH_TICK_MS);
+billingTimer.unref();
 
 // Hosts send SIGTERM before replacing the instance: stop taking requests and write pending changes to Postgres.
 let stopping = false;
@@ -150,6 +164,8 @@ async function shutdown(signal: string) {
   const force = setTimeout(() => process.exit(1), 10_000);
   force.unref();
   clearInterval(batchTimer);
+  clearInterval(backupTimer);
+  clearInterval(billingTimer);
   server.close();
   try { await store?.close(); } catch (err) { console.error("flush on shutdown failed:", err); }
   // Give waiting emails (sign-in links, owner alerts) a few seconds to go out.

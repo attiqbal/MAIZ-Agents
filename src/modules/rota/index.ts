@@ -99,7 +99,7 @@ export class RotaService {
   // ---------- staff ----------
 
   addStaff(userId: string, workspaceId: string, input: unknown): Staff {
-    this.identity.require(userId, workspaceId, "task.create");
+    this.identity.require(userId, workspaceId, "people.manage");
     const b = (input && typeof input === "object" ? input : {}) as Record<string, unknown>;
     const name = clean(b.name, 80);
     if (!name) throw new RotaError("give the person a name");
@@ -117,7 +117,7 @@ export class RotaService {
 
   /** Marks someone as left. Their past shifts stay; future ones become open shifts so nobody turns up to nothing. */
   deactivate(userId: string, workspaceId: string, staffId: string, today: string): Staff {
-    this.identity.require(userId, workspaceId, "task.create");
+    this.identity.require(userId, workspaceId, "people.manage");
     const s = this.staffOf(workspaceId, staffId);
     this.saveStaff({ ...s, active: false });
     for (const sh of this.mine(workspaceId, this.shifts)) if (sh.staffId === staffId && sh.date >= today) this.saveShift({ ...sh, staffId: undefined });
@@ -138,7 +138,7 @@ export class RotaService {
   // ---------- shifts ----------
 
   addShift(userId: string, workspaceId: string, input: unknown): Shift {
-    this.identity.require(userId, workspaceId, "task.create");
+    this.identity.require(userId, workspaceId, "people.manage");
     const b = (input && typeof input === "object" ? input : {}) as Record<string, unknown>;
     const date = String(b.date ?? "");
     const start = String(b.start ?? "");
@@ -162,7 +162,7 @@ export class RotaService {
 
   /** Gives a shift to someone (or back to nobody). Refused when it breaks a rule. */
   assign(userId: string, workspaceId: string, shiftId: string, staffId: string | null): Shift {
-    this.identity.require(userId, workspaceId, "task.create");
+    this.identity.require(userId, workspaceId, "people.manage");
     const shift = this.shiftOf(workspaceId, shiftId);
     if (staffId) this.checkAssign(workspaceId, shift, staffId);
     this.saveShift({ ...shift, staffId: staffId ?? undefined });
@@ -171,7 +171,7 @@ export class RotaService {
   }
 
   removeShift(userId: string, workspaceId: string, shiftId: string): void {
-    this.identity.require(userId, workspaceId, "task.create");
+    this.identity.require(userId, workspaceId, "people.manage");
     const s = this.shiftOf(workspaceId, shiftId);
     this.shifts.delete(shiftId);
     this.sink?.record(workspaceId, "rota_shift", shiftId, { removed: true });
@@ -183,7 +183,10 @@ export class RotaService {
   /** One week, Monday to Sunday, with each person's hours and the cost of the week. */
   week(userId: string, workspaceId: string, anyDateInWeek: string) {
     this.identity.require(userId, workspaceId, "task.read");
-    return this.weekOf(workspaceId, anyDateInWeek);
+    const w = this.weekOf(workspaceId, anyDateInWeek);
+    if (this.identity.can(userId, workspaceId, "people.manage")) return w;
+    // Pay is personal data: only the owner and managers see rates and what the week costs.
+    return { ...w, staff: w.staff.map(({ hourlyRateMinor: _rate, ...rest }) => rest), hoursByPerson: w.hoursByPerson.map((p) => ({ ...p, costMinor: null })), totalCostMinor: null };
   }
 
   /** The week for code that already checked permission (the HR desk shows a person's own shifts). */

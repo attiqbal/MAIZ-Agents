@@ -10,11 +10,18 @@ How to run MAIZ Agents once it is live. Setup is in [DEPLOY.md](DEPLOY.md).
 ## Health
 - `GET /api/health` answers `{"ok":true}`, or `503` when writes to Postgres are failing. Render restarts the service when the check fails.
 - Logs (Render > service > Logs): start-up prints `storage: postgres`, `website: serving web/dist` and `listening on :PORT`. Failed requests print `... failed:` with the error. Config problems print `config: ...` and the service exits.
-- Set up an external uptime check (for example a free UptimeRobot or Better Stack monitor) on `https://<your address>/api/health`.
+- External uptime check: `.github/workflows/uptime.yml` asks `/api/health` and `/api/health/backups` every 10 minutes and GitHub emails when either fails. Set the repository variable `UPTIME_SITE_URL`, and see docs/BACKUPS.md, "The uptime check", for who gets the email and GitHub's limits (late or skipped runs, switched off after 60 days without activity). A second monitor from another company (for example UptimeRobot or Better Stack) on `https://<your address>/api/health` is still sensible.
 
 ## Deploy and roll back
 - Deploy: merge to `main`. Render builds the Dockerfile and swaps over when the health check passes.
 - Roll back: Render > service > Events, pick the last good deploy, **Rollback**. Database migrations only ever add (`db/*.sql`, applied in order on start), so the previous version keeps working with the newer schema. A migration that removes or renames something needs its own plan.
+
+## Backups
+- In-app: the owner's **Backups** page (`/owner-backups.html`). Nightly encrypted dump at 03:10 owner time to the owner's own S3-compatible bucket, last 30 kept; weekly restore test into a throwaway database; email to the owner on a failed backup, a failed test, or no good backup for 36 hours (once a day per problem).
+- `GET /api/health/backups` answers only `{"ok":true|false}`; it is false (503) when backups are set up and the newest good one is over 36 hours old.
+- Needs `pg_dump` and `pg_restore` 16 (in the Docker image; `PG_BIN_DIR`) and a database role that can create databases. On a server without them the page says "not available on this server".
+- Lost the server: follow docs/BACKUPS.md, "Restoring for real". It needs the backup file and the recovery key, nothing else. The recovery key is not recoverable from the server; make sure the owner saved it.
+- `TOKEN_KEY` is sealed inside every backup (locked with the recovery key), so the one saved key is enough. Keep the password-manager copy of `TOKEN_KEY` too.
 
 ## Database
 - Turn on Neon point-in-time restore before the first real customer.

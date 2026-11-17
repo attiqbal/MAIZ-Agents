@@ -1,4 +1,4 @@
-import { accountExistsEmail, affiliatePaidEmail, affiliateWelcomeEmail, couponGiftEmail, confirmEmailEmail, decisionsWaitingEmail, ownerAlertEmail, passwordResetEmail, signInLinkEmail, signOffReminderEmail, type EmailBrand, type Mail } from "./email-templates.js";
+import { accountExistsEmail, affiliatePaidEmail, affiliateWelcomeEmail, couponGiftEmail, confirmEmailEmail, decisionsWaitingEmail, ownerAlertEmail, passwordResetEmail, signInLinkEmail, signOffReminderEmail, teamInviteEmail, type EmailBrand, type Mail } from "./email-templates.js";
 
 /** One example of every email, with made-up links. Used by the preview script and the tests. */
 export function sampleEmails(brand: EmailBrand): Record<string, Omit<Mail, "to">> {
@@ -11,6 +11,7 @@ export function sampleEmails(brand: EmailBrand): Record<string, Omit<Mail, "to">
     "coupon-gift": couponGiftEmail("WELCOME-FRIEND", "30 more days of free trial", `${b}/onboarding.html`, brand),
     "affiliate-welcome": affiliateWelcomeEmail("Sam Example", `${b}/r/sam`, `${b}/affiliate.html`, "20% of each payment for the first 12 months", brand),
     "affiliate-paid": affiliatePaidEmail("Sam Example", "£45.00", "BACS 2026-12-01", `${b}/affiliate.html`, brand),
+    "team-invite": teamInviteEmail({ businessName: "Kestrel Joinery", invitedBy: "ann@kestreljoinery.example", roleLabel: "Team member", can: "Ask the team for work and see the results.", url: `${b}/join.html#i=example-token` }, brand),
     "owner-decisions": decisionsWaitingEmail(3, `${b}/owner-decisions.html`, brand),
     "owner-sign-off-reminder": signOffReminderEmail([
       { kind: "review", id: "example-1", title: "Brand kit and logo directions", clientName: "Kestrel Joinery", ageHours: 5, link: "/review.html#example-1" },

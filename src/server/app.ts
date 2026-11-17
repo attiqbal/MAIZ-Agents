@@ -39,10 +39,17 @@ import type { TaskResult } from "../modules/workforce/index.js";
 import { passwordRoutes } from "./password-auth.js";
 import { pushRoute } from "./push-routes.js";
 import { miningRoute } from "./mining-routes.js";
+import { backupHealthRoute, backupOwnerRoute } from "./backup-routes.js";
+import { billingRoute } from "./billing-routes.js";
+import { resourcesRoute } from "./resources-routes.js";
+import { miningAsk } from "./mining-chat.js";
 import { MiningError } from "../modules/data-mining/index.js";
 import { PushError } from "../modules/push/index.js";
 import { agentOwnerRoute, agentPublicRoute } from "./agent-routes.js";
+import { overviewRoute } from "./overview-routes.js";
 import { AgentError } from "../modules/agents/index.js";
+import { teamPublicRoute, teamRoute, type TeamRouteCtx } from "./team-routes.js";
+import { roleGate } from "./route-policy.js";
 import { LOGIN_PROVIDERS, attemptSecrets, authorizeUrl, completeLogin, isLoginProvider, loginRedirectUri } from "./social-login.js";
 
 const OAUTH_STATE_SECONDS = 600;
@@ -62,6 +69,15 @@ const loginFailed = (code: "cancelled" | "failed" | "unverified" | "owner", appU
   status: 302,
   headers: { location: `/signin.html?error=${code}`, "set-cookie": loginCookie("", 0, appUrl), "cache-control": "no-store" },
 });
+/** The PKCE proof for one connect attempt: derived, so nothing needs storing and the browser never sees it. */
+const pkceVerifier = (secret: string, nonce: string): string => createHmac("sha256", secret).update(`pkce:${nonce}`).digest("base64url");
+const pkceChallenge = (verifier: string): string => createHash("sha256").update(verifier).digest("base64url");
+/** What a provider said when it refused, cut to short plain words (never raw markup) so it can be shown to the person. */
+const refusalText = (error: string | null, description: string | null): string => {
+  if (!error || error === "access_denied" || !/^[\w.:-]{1,60}$/.test(error)) return "";
+  const d = (description ?? "").replace(/[^\w .,'()/:+-]/g, " ").replace(/\s+/g, " ").trim().slice(0, 160);
+  return `${error}${d ? `: ${d}` : ""}`;
+};
 const oauthCookie = (nonce: string, maxAge: number, appUrl?: string): string =>
   `${OAUTH_COOKIE}=${nonce}; Path=/api/integrations; HttpOnly; SameSite=Lax; Max-Age=${maxAge}${appUrl?.startsWith("https://") ? "; Secure" : ""}`;
 function readCookie(header: string | undefined, name: string): string | undefined {
@@ -106,7 +122,7 @@ export interface Res {
 }
 
 /** What a client sees of an order: never the provider's reference. */
-const orderView = (o: Order) => ({ id: o.id, status: o.status, lines: o.lines, dueTodayMinor: o.dueTodayMinor, monthlyMinor: o.monthlyMinor, currency: o.currency, createdAt: o.createdAt, paidAt: o.paidAt, employeeIds: o.employeeIds, ...(o.discount ? { discount: { code: o.discount.code, amountOffMinor: o.discount.amountOffMinor, months: o.discount.months } } : {}), ...(o.problem && !o.fulfilledAt && o.status === "paid" ? { problem: "We took your payment but could not finish setting up. MAIZ has been alerted." } : {}) });
+const orderView = (o: Order, mayPay = false) => ({ id: o.id, status: o.status, lines: o.lines, dueTodayMinor: o.dueTodayMinor, monthlyMinor: o.monthlyMinor, currency: o.currency, createdAt: o.createdAt, paidAt: o.paidAt, employeeIds: o.employeeIds, ...(o.addedTo ? { addedToBill: true } : {}), ...(mayPay && o.status === "pending" && o.payUrl ? { payUrl: o.payUrl } : {}), ...(o.discount ? { discount: { code: o.discount.code, amountOffMinor: o.discount.amountOffMinor, months: o.discount.months } } : {}), ...(o.problem && !o.fulfilledAt && o.status === "paid" ? { problem: "We took your payment but could not finish setting up. MAIZ has been alerted." } : {}) });
 
 const json = (status: number, body: unknown): Res => ({ status, body });
 
@@ -178,6 +194,8 @@ export function createApp(p: Platform) {
     };
 
     if (method === "GET" && path === "/api/health") return p.healthy() ? json(200, { ok: true }) : json(503, { ok: false, error: "storage is failing" });
+    // Are backups fresh? Public, yes or no only, for the uptime check (docs/BACKUPS.md).
+    { const r = backupHealthRoute(req, p); if (r) return r; }
     // Agent store: every employee with its full job description. Public, no sign-in needed.
     if (method === "GET" && path === "/api/store") {
       return json(200, {
@@ -259,6 +277,10 @@ export function createApp(p: Platform) {
     // ---- email and password: sign up, log in, forgot password ----
     const authed = await passwordRoutes(req, { p, makeToken: (claims, ttl) => makeToken(secret, claims, ttl, p.now().getTime()), readToken: (t) => readToken(secret, t, p.now().getTime()), issueSession: (e) => issueSession(e), sessionClaims, orgOf, body });
     if (authed) return authed;
+
+    // ---- teammates: what an invite link is for, and joining a business with it (docs/TEAMMATES.md) ----
+    const teamCtx: TeamRouteCtx = { p, issueSession: (e) => issueSession(e), sessionClaims, body };
+    { const r = await teamPublicRoute(req, teamCtx); if (r) return r; }
 
     // ---- sign in with Google or Microsoft: proves an email, then hands over the same one-time link as email sign-in ----
     if (method === "GET" && path === "/api/signin/providers") {
@@ -446,21 +468,29 @@ export function createApp(p: Platform) {
     // ---- business apps: OAuth return and webhooks are public; state or the secret link proves who they are for ----
     if (method === "GET" && path === "/api/integrations/callback") {
       const state = readToken(secret, req.query.get("state") ?? undefined, p.now().getTime());
-      const code = req.query.get("code");
+      const code = req.query.get("code") ?? req.query.get("spapi_oauth_code");
       if (!state?.u || state.k !== "int-oauth" || typeof state.a !== "string" || typeof state.n !== "string") return json(400, { error: "invalid or expired connect link" });
       // Bound to the browser that started it (cookie) and usable once, so a link sent to someone else cannot attach their account.
       if (readCookie(req.headers["cookie"], OAUTH_COOKIE) !== state.n || p.usedLinks.has(state.n)) return json(400, { error: "invalid or expired connect link" });
       p.usedLinks.add(state.n, state.exp * 1000);
       const org = orgOf(state.u);
       const home = state.r === "firstday" ? "#firstday" : "#apps";
+      if (!code && org) {
+        // The provider refused before sending a code (a missing permission, a wrong address). Keep its own words to show once.
+        const said = refusalText(req.query.get("error"), req.query.get("error_description"));
+        if (said) { p.integrations.noteProblem(state.u, org.id, `${p.integrations.registry.get(state.a)?.name ?? "The app"} said no: ${said}`); return { status: 302, headers: { location: `/app.html?connect=failed${home}` } }; }
+      }
       if (!code || !org) return { status: 302, headers: { location: `/app.html${home}` } }; // owner pressed Cancel in the app
       try {
         // Some apps return an account id beside the code (QuickBooks realmId). Short plain values only.
         const extra: Record<string, string> = {};
-        for (const k of ["realmId"]) { const v = req.query.get(k); if (v && /^[\w.-]{1,64}$/.test(v)) extra[k] = v; }
+        for (const k of ["realmId", "selling_partner_id"]) { const v = req.query.get(k); if (v && /^[\w.-]{1,64}$/.test(v)) extra[k] = v; }
+        // Apps that use PKCE: the proof is worked out from the secret and this browser's nonce, so it is never stored or sent to the browser.
+        if (p.integrations.registry.get(state.a)?.auth.kind === "oauth2" && (p.integrations.registry.get(state.a)!.auth as { pkce?: boolean }).pkce) extra.code_verifier = pkceVerifier(secret, state.n);
         await p.integrations.completeOAuth(state.u, org.id, state.a, code, extra);
       } catch (e) {
         if (!(e instanceof IntegrationError)) throw e;
+        p.integrations.noteProblem(state.u, org.id, e.message);
         return { status: 302, headers: { location: `/app.html?connect=failed${home}` } };
       }
       return { status: 302, headers: { location: `/app.html${home}` } };
@@ -483,9 +513,13 @@ export function createApp(p: Platform) {
     // ---- everything below needs a signed-in user ----
     const userId = session(req);
     if (!userId) return json(401, { error: "sign in first" });
+    // ---- teammates: every request is checked against the caller's role before any route runs (src/server/route-policy.ts) ----
+    { const r = roleGate(req, userId, p, orgOf(userId)?.id) ?? (await teamRoute(req, userId, teamCtx, orgOf(userId)?.id)); if (r) return r; }
     { const r = (await metaOwnerRoute(req, userId, metaCtx)) ?? (await metaClientRoute(req, userId, metaCtx)); if (r) return r; }
     // ---- MAIZ quality review: the platform owner's queue across every client. Clients get 403. ----
     if (path === "/api/owner/reviews" || path.startsWith("/api/owner/reviews/")) return ownerReviewRoutes(req, userId, body);
+    // What the employees can use and what it costs (docs/RESOURCES.md).
+    { const r = resourcesRoute(req, userId, p, orgOf(userId)?.id); if (r) return r; }
     if (path === "/api/owner/ai" || path.startsWith("/api/owner/ai/")) return ownerAiRoutes(req, userId, body);
     if (path === "/api/owner/prices" || path.startsWith("/api/owner/prices/")) return ownerPriceRoutes(req, userId, body);
     if (method === "GET" && path === "/api/owner/team") {
@@ -507,6 +541,8 @@ export function createApp(p: Platform) {
     }
     if (path.startsWith("/api/owner/promoter")) return ownerPromoterRoutes(req, userId, body);
     if (path.startsWith("/api/owner/coupons") || path.startsWith("/api/owner/affiliates") || path === "/api/owner/promotions") return ownerPromoRoutes(req, userId, body);
+    // Off-server backups: set-up, status, back up now and the restore test (docs/BACKUPS.md). Platform owner only.
+    { const r = await backupOwnerRoute(req, userId, p, body); if (r) return r; }
     if (path.startsWith("/api/owner/")) {
       if (!p.isPlatformOwner(userId)) return json(403, { error: "only the MAIZ platform owner can see this" });
       if (method === "GET" && path === "/api/owner/batch") return json(200, p.batch.ownerView(userId));
@@ -535,6 +571,8 @@ export function createApp(p: Platform) {
     { const r = await pushRoute(req, userId, p, orgOf(userId)?.id, body); if (r) return r; }
     // The Data mining agent: quote, run, datasets and sharing (docs/DATA-MINING.md).
     { const r = await miningRoute(req, userId, p, orgOf(userId)?.id, body); if (r) return r; }
+    // Plan and billing: the monthly lines a client pays for, stopping one, and adding to the monthly bill (docs/ONE-BILL.md).
+    { const r = await billingRoute(req, userId, p, orgOf(userId)?.id, body); if (r) return r; }
 
     // ---- affiliate: whoever logs in with an affiliate's email sees their own results ----
     if (method === "GET" && path === "/api/affiliate/me") return json(200, { affiliate: affiliateView(sessionClaims(req)?.e) });
@@ -543,6 +581,8 @@ export function createApp(p: Platform) {
     if (!org) return json(404, { error: "no organisation yet" });
     // Outside agents, the owner's side: connections, keys, limits and jobs waiting for approval (docs/EXTERNAL-AGENTS.md).
     { const r = await agentOwnerRoute(req, userId, p, org.id, body); if (r) return r; }
+    // The client's Approvals, Books and cash and Compliance calendar screens, from real records (docs/OVERVIEW-DATA.md).
+    { const r = overviewRoute(req, userId, p, org.id, body); if (r) return r; }
 
     // ---- coupons on the account page ----
     if (method === "GET" && path === "/api/coupons") return json(200, { used: p.coupons.forClient(org.id).map((r) => ({ code: r.code, at: r.at, applied: r.applied })) });
@@ -578,10 +618,12 @@ export function createApp(p: Platform) {
 
     // ---- buying from the store ----
     if (method === "POST" && path === "/api/checkout") {
-      const { order, url } = await p.payments.checkout(userId, org.id, body().lines);
-      return json(201, { order: orderView(order), ...(url ? { url } : {}) });
+      // `addToBill` is only ever true from a page that has just told the client their saved card will be charged.
+      const cart = body();
+      const { order, url, addedToBill, remaining } = await p.payments.checkout(userId, org.id, cart.lines, { addToBill: cart.addToBill === true });
+      return json(201, { order: orderView(order, true), ...(url ? { url } : {}), ...(addedToBill ? { addedToBill, remaining } : {}) });
     }
-    if (method === "GET" && path === "/api/orders") return json(200, { enabled: p.payments.enabled, orders: p.payments.mine(userId, org.id).map(orderView) });
+    if (method === "GET" && path === "/api/orders") { const mayPay = p.identity.can(userId, org.id, "employee.hire"); return json(200, { enabled: p.payments.enabled, orders: p.payments.mine(userId, org.id).map((o) => orderView(o, mayPay)) }); }
     if (method === "POST" && path === "/api/billing/portal") return json(200, { url: await p.payments.portalUrl(userId, org.id, `${(p.cfg.appUrl ?? "").replace(/\/$/, "")}/app.html#team`) });
     const cancelOrder = /^\/api\/orders\/([\w-]{1,64})\/cancel$/.exec(path);
     if (method === "POST" && cancelOrder) return json(200, { order: orderView(await p.payments.cancel(userId, org.id, cancelOrder[1]!)) });
@@ -627,6 +669,7 @@ export function createApp(p: Platform) {
       return json(200, {
         id: org.id,
         name: org.name,
+        role: p.identity.roleOf(userId, org.id), // teammates: the page hides what this role cannot do (docs/TEAMMATES.md)
         trialEndsAt: plan.expiresAt,
         /** True when `trialEndsAt` is the end of a cancelled paid plan, so the page words it as that. */
         planEnded: plan.endedPaid === true,
@@ -663,6 +706,9 @@ export function createApp(p: Platform) {
 
     if (method === "POST" && path === "/api/ask") {
       const a = prepareAsk(userId, org.id, body());
+      // A request to look up market data is answered with its quote and nothing runs (docs/DATA-MINING.md).
+      const mined = miningAsk(p, userId, org.id, a);
+      if (mined) return json(200, mined);
       const task = await p.workforce.assign(userId, org.id, a.emp.id, a.text, { urgent: a.urgent, when: a.when, history: a.history });
       return json(200, answerBody(userId, org.id, a, task));
     }
@@ -671,10 +717,12 @@ export function createApp(p: Platform) {
     // "done" carries the whole answer and is the one to trust: a quality check may have changed what was streamed.
     if (method === "POST" && path === "/api/ask/stream") {
       const a = prepareAsk(userId, org.id, body());
+      const mined = miningAsk(p, userId, org.id, a);
       return {
         status: 200,
         headers: { "content-type": "text/event-stream; charset=utf-8", "cache-control": "no-store, no-transform", "x-accel-buffering": "no" },
         stream: async (send) => {
+          if (mined) { send("accepted", { employee: mined.employee }); send("done", mined); return; }
           send("accepted", { employee: a.emp.name });
           try {
             const task = await p.workforce.assign(userId, org.id, a.emp.id, a.text, {
@@ -1057,7 +1105,7 @@ export function createApp(p: Platform) {
     const { method, path } = req;
     const ig = p.integrations;
     if (method === "GET" && path === "/api/integrations") {
-      return json(200, { catalogue: ig.catalogue(), connections: ig.list(userId, orgId), pending: ig.pending(userId, orgId) });
+      return json(200, { catalogue: ig.catalogue(), connections: ig.list(userId, orgId), pending: ig.pending(userId, orgId), problem: ig.takeProblem(userId, orgId) });
     }
     if (method === "GET" && path === "/api/integrations/activity") return json(200, { activity: ig.activitySummary(userId, orgId) });
     if (method === "POST" && path === "/api/integrations/post") return json(200, ig.post(userId, orgId));
@@ -1076,7 +1124,7 @@ export function createApp(p: Platform) {
         const nonce = randomBytes(16).toString("hex");
         const back = body().returnTo === "firstday" ? { r: "firstday" } : {};
         const state = makeToken(secret, { k: "int-oauth", u: userId, a: key, n: nonce, ...back }, OAUTH_STATE_SECONDS, p.now().getTime());
-        return { status: 200, body: { url: ig.authorizeUrl(userId, orgId, key, state) }, headers: { "set-cookie": oauthCookie(nonce, OAUTH_STATE_SECONDS, p.cfg.appUrl) } };
+        return { status: 200, body: { url: ig.authorizeUrl(userId, orgId, key, state, pkceChallenge(pkceVerifier(secret, nonce))) }, headers: { "set-cookie": oauthCookie(nonce, OAUTH_STATE_SECONDS, p.cfg.appUrl) } };
       }
       if (c.auth.kind === "api_key") return json(201, { connection: ig.connectWithKey(userId, orgId, key, body().values ?? {}) });
       if (c.auth.kind === "webhook") {
@@ -1112,7 +1160,7 @@ export function createApp(p: Platform) {
     if (!emp) throw new BadRequest("pick one of your employees");
     p.identity.require(userId, orgId, "task.create");
     const when: "now" | "tonight" | undefined = b.when === "now" || b.when === "tonight" ? b.when : undefined;
-    return { text, emp, when, urgent: b.urgent === true, history: p.conversations.history(userId, orgId, emp.id) };
+    return { text, emp, when, urgent: b.urgent === true, bar: b.bar === true, history: p.conversations.history(userId, orgId, emp.id) };
   }
 
   /** What the client sees of a finished ask, and the same turn saved to the conversation. */
@@ -1126,7 +1174,7 @@ export function createApp(p: Platform) {
         ? { text: queuedText, status: "queued", jobId: task.jobId, runsAt: task.runsAt }
         : { text: message ?? "No answer this time.", status: task.status === "no_energy" ? "no_energy" : "failed" };
     p.conversations.record(userId, orgId, a.emp.id, a.text, reply);
-    return { status: task.status, reason: task.reason, answer: task.deliverable, checked: task.checked === true, energyUsed: task.energyUsed, jobId: task.jobId, runsAt: task.runsAt, queueReason: task.queueReason, ...(message ? { message } : {}) };
+    return { status: task.status, reason: task.reason, answer: task.deliverable, checked: task.checked === true, energyUsed: task.energyUsed, jobId: task.jobId, runsAt: task.runsAt, queueReason: task.queueReason, ...(task.hints?.length ? { hints: task.hints } : {}), ...(message ? { message } : {}) };
   }
 
   return async function handle(req: Req): Promise<Res> {

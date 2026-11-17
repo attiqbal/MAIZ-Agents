@@ -39,7 +39,8 @@ export interface Sink {
   integration(c: IntegrationConnection): void;
   /** Credentials for a connected app as JSON. The store must encrypt it. Empty string means removed. */
   integrationSecret(workspaceId: string, connectionId: string, secret: string): void;
-  integrationRecord(r: StoredRecord): void;
+  /** removed = the figure was deleted for good (the client disconnected the app it came from). */
+  integrationRecord(r: StoredRecord, removed?: boolean): void;
   /** A specialised task in MAIZ quality review, replaced on every change. */
   review(r: ReviewItem): void;
   /** A custom specialist waiting for (or past) the platform owner's review. */
@@ -74,7 +75,7 @@ export const PROMO_KINDS = ["coupon", "redemption", "affiliate", "referral", "ac
 export type PromoKind = (typeof PROMO_KINDS)[number];
 
 /** Kinds stored through Sink.record. The database accepts any kind; this list is what load() hands back. */
-export const GENERIC_KINDS = ["order", "rota_staff", "rota_shift", "rota_settings", "recon", "task", "conversation", "notices", "meta_conn", "meta_post", "meta_limits", "dataset", "agent_conn", "agent_job", "agent_delivery"] as const;
+export const GENERIC_KINDS = ["order", "rota_staff", "rota_shift", "rota_settings", "recon", "task", "conversation", "notices", "meta_conn", "meta_post", "meta_limits", "dataset", "agent_conn", "agent_job", "agent_delivery", "cal_date", "employee_removed", "member_gone", "team_invite", "team_member"] as const;
 export type GenericKind = (typeof GENERIC_KINDS)[number];
 export interface GenericRecord { workspaceId: string; kind: GenericKind; id: string; data: any }
 

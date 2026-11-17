@@ -5,7 +5,10 @@ import { defaultRegistry } from "../integrations/catalogue.js";
 import type { OAuthApp } from "../integrations/index.js";
 import { clientAppEnv } from "./client-apps.js";
 import { CATALOG, defOf, type ConnDef, type ConnKey, type GuideStep } from "./catalog.js";
+import { META_STORE_KEY, packMeta, unpackMeta } from "./meta.js";
+import { modeOf, tierOf, type Mode, type Tier } from "./tiers.js";
 import { probeApp, probeGeneric, ProbeUnreachable, type ProbeKind } from "./probes.js";
+import { NO_SAFE_CHECK, probeSalesforce } from "./probes-more.js";
 import { deskKeyWorks } from "../research/desk.js";
 import { keyWorks, RenderError } from "../paid-services/render.js";
 import { isPaidListing } from "./paid-apps.js";
@@ -21,11 +24,18 @@ export class ConnectionsError extends Error {}
 
 export type Status = "connected" | "not_connected" | "error";
 export interface TestResult { ok: boolean; message: string; details: string[]; at: string }
-export interface FieldView { key: string; label: string; help: string; secret: boolean; required: boolean; placeholder?: string; generate?: boolean; set: boolean; value?: string; fallback?: string }
+export interface FieldView { key: string; label: string; help: string; secret: boolean; required: boolean; placeholder?: string; generate?: boolean; set: boolean; value?: string; fallback?: string; /** When this detail was last saved or replaced on the page. */ changedAt?: string }
 export interface ConnectionView {
   key: ConnKey; title: string; summary: string; group: ConnDef["group"]; usedBy: string[];
   /** The owner can type details here (false: set on the server, or a server-only service). */
   editable: boolean;
+  /** How much the site depends on it, with the reason in the owner's words. */
+  tier: Tier;
+  tierWhy: string;
+  /** How it is connected now: typed here, set on the server, waiting for the provider's approval, or used by hand. */
+  mode: Mode;
+  /** The latest time any detail was changed on the page. */
+  changedAt?: string;
   status: Status;
   /** Where the working settings come from. */
   source: "browser" | "server" | "none";
@@ -88,7 +98,10 @@ const ENV: Record<string, { vars: Record<string, string>; required: string[]; ex
   shotstack: { vars: { apiKey: "SHOTSTACK_API_KEY" }, required: ["apiKey"] },
 };
 // Client apps made from the integrations registry (QuickBooks, HubSpot, Outlook...) read their keys from <PREFIX>_CLIENT_ID and _SECRET.
-for (const [key, v] of Object.entries(clientAppEnv())) ENV[key] = { vars: v, required: ["clientId", "clientSecret"] };
+for (const [key, v] of Object.entries(clientAppEnv())) {
+  const owner = defaultRegistry().get(key)?.ownerFields ?? [];
+  ENV[key] = { vars: { clientId: v.clientId, clientSecret: v.clientSecret, ...v.extra }, required: ["clientId", "clientSecret", ...owner.filter((f) => f.required).map((f) => f.key)] };
+}
 /** Secrets set only on the server, so a test message can never carry one back. */
 const SERVER_SECRETS = ["STRIPE_SECRET_KEY", "STRIPE_WEBHOOK_SECRET", "RUNPOD_API_KEY", "ANTHROPIC_API_KEY"];
 const PROBED: readonly ConnKey[] = ["google", "microsoft", "slack", "xero", "square", "google-data"];
@@ -151,6 +164,8 @@ const RULES: Record<string, [RegExp, string]> = {
   "square.clientId": [/^(sandbox-)?sq0id[a-z]-[\w-]{8,100}$/, "The Square Application ID starts with sq0idp-. Copy it again in full."],
   "square.clientSecret": [/^(sandbox-)?sq0csp-[\w-]{8,200}$/, "The Square Application secret starts with sq0csp-. Press Show on the OAuth page and copy it again."],
 };
+// Extra boxes (a developer token, an application id) are checked like every other field before they are saved.
+for (const key of Object.keys(clientAppEnv())) for (const f of defaultRegistry().get(key)?.ownerFields ?? []) if (f.pattern) RULES[`${key}.${f.key}`] = [f.pattern, `${f.label}: that does not look right. Copy it again in full from the provider.`];
 const ruleFor = (key: string, field: string): [RegExp, string] | undefined => RULES[`${key}.${field}`] ?? RULES[field];
 
 async function getJson(http: typeof fetch, url: string, headers: Record<string, string>): Promise<{ status: number; json: any }> {
@@ -179,6 +194,8 @@ export function explainMeta(message: string): string {
 export class ConnectionsService {
   private stored: Stored = {};
   private tests = new Map<string, TestResult>();
+  /** When each typed detail was last changed: connection key, then field key, then the time. Never a value. */
+  private changed: Record<string, Record<string, string>> = {};
   private lastRun = new Map<string, number>();
   private webhookSeenAt?: string;
   private sink?: Sink;
@@ -188,6 +205,7 @@ export class ConnectionsService {
   useSink(sink: Sink): void { this.sink = sink; }
   /** Stored details for one connection, as the store decrypted them. */
   restore(key: string, secret: string): void {
+    if (key === META_STORE_KEY) { this.restoreMeta(secret); return; }
     if (!defOf(key)?.editable || !secret) return;
     try {
       const v = JSON.parse(secret);
@@ -198,6 +216,13 @@ export class ConnectionsService {
       this.stored[key as ConnKey] = Object.fromEntries(Object.entries(v).filter(([f, x]) => ok(f, x))) as Record<string, string>;
     } catch { /* an unreadable record is treated as not connected */ }
   }
+  /** Last-changed times and last test results from before a restart. Unknown services and fields are dropped. */
+  private restoreMeta(secret: string): void {
+    const m = unpackMeta(secret, (k) => defOf(k)?.fields.map((f) => f.key));
+    this.changed = m.changed;
+    this.tests = new Map(Object.entries(m.tests));
+  }
+  private saveMeta(): void { this.sink?.connectionSecret(META_STORE_KEY, packMeta({ changed: this.changed, tests: Object.fromEntries(this.tests) })); }
   /** True when something is stored for this connection (used by tests and the platform). */
   hasStored(key: ConnKey): boolean { return !!this.stored[key] && Object.keys(this.stored[key]!).length > 0; }
 
@@ -281,9 +306,11 @@ export class ConnectionsService {
       if (v) out[k] = { clientId: v.clientId!, clientSecret: v.clientSecret!, redirectUri: `${this.base}/api/integrations/callback` };
     }
     // Every other OAuth client app (QuickBooks, HubSpot, Outlook...) has a generated card with the same two boxes.
-    for (const k of Object.keys(clientAppEnv())) {
-      const v = this.typed(k);
-      if (v) out[k] = { clientId: v.clientId!, clientSecret: v.clientSecret!, redirectUri: `${this.base}/api/integrations/callback` };
+    for (const [k, env] of Object.entries(clientAppEnv())) {
+      const v = this.complete(k);
+      if (!v) continue;
+      const extra = Object.fromEntries(Object.keys(env.extra).map((f) => [f, v[f]]).filter((e): e is [string, string] => typeof e[1] === "string"));
+      out[k] = { clientId: v.clientId!, clientSecret: v.clientSecret!, redirectUri: `${this.base}/api/integrations/callback`, ...(Object.keys(extra).length ? { extra } : {}) };
     }
     // One Google app serves both Analytics and Search Console.
     const g = this.typed("google-data");
@@ -372,9 +399,13 @@ export class ConnectionsService {
         // A generated client-app card: OAuth keys typed here, or an app that waits for the provider's approval.
         const def = defOf(key);
         if (isPaidListing(key)) return { ok: false, missing: [], text: "Nothing to connect: used by hand for now." };
+        const connector = defaultRegistry().get(key);
+        if (connector?.unavailable) return { ok: false, missing: [], text: connector.unavailable };
         if (!def?.editable) return { ok: false, missing: [], text: "Waiting for the provider's approval. Clients use Zapier or Make for now." };
         const ok = !!this.complete(key);
-        return { ok, missing: this.missingOf(key), text: ok ? `Clients can connect ${def.title} with one click.` : `Not set: clients cannot connect ${def.title} with one click yet.` };
+        const name = connector?.name ?? def.title;
+        const waiting = connector?.availability === "approval";
+        return { ok, missing: this.missingOf(key), text: ok ? `Clients can connect ${name} with one click${waiting ? ", as far as the provider has approved your app. Until it does, only your own account and testers can connect" : ""}.` : `Not set: ${waiting ? `built and ready. Paste your app's details here once the provider has approved it, and clients can connect ${name} with one click` : `clients cannot connect ${name} with one click yet`}.` };
       }
     }
   }
@@ -395,12 +426,14 @@ export class ConnectionsService {
     const fields: FieldView[] = def.fields.map((f) => {
       const value = this.field(def.key, f.key);
       const fallback = def.key === "whatsapp" && !value && ((f.key === "accessToken" && fbToken) || (f.key === "appSecret" && fbSecret)) ? "Using the one from the Facebook Page card" : undefined;
-      return { key: f.key, label: f.label, help: f.help, secret: f.secret, required: f.required, placeholder: f.placeholder, generate: f.generate, set: !!value, value: f.secret ? undefined : value, fallback };
+      return { key: f.key, label: f.label, help: f.help, secret: f.secret, required: f.required, placeholder: f.placeholder, generate: f.generate, set: !!value, value: f.secret ? undefined : value, fallback, changedAt: value ? this.changed[def.key]?.[f.key] : undefined };
     });
+    const t = tierOf(def);
+    const changedAt = fields.map((f) => f.changedAt).filter((x): x is string => !!x).sort().at(-1);
     const wa = def.key === "whatsapp" ? this.whatsappConfig() : undefined;
     return {
       key: def.key, title: def.title, summary: def.summary, group: def.group, usedBy: def.usedBy,
-      editable: def.editable && !server, status, source,
+      editable: def.editable && !server, tier: t.tier, tierWhy: t.why, mode: server && def.editable ? "server" : modeOf(def), changedAt, status, source,
       statusText: server && c.ok ? `${c.text} Set on the server, so it cannot be changed here.` : c.text,
       missing: c.missing,
       canTest: true,
@@ -454,10 +487,15 @@ export class ConnectionsService {
       next[f.key] = s;
     }
     if (problems.length) throw new ConnectionsError(problems.join(" "));
+    const before = this.stored[def.key] ?? {};
+    const at = this.opts.now().toISOString();
+    const times = Object.fromEntries(Object.keys(next).map((f) => [f, next[f] === before[f] ? this.changed[def.key]?.[f] ?? at : at]));
+    this.changed = { ...this.changed, [def.key]: times };
     this.stored = { ...this.stored, [def.key]: next };
     this.tests.delete(def.key);
     // The Facebook token and app secret are shared with Instagram and WhatsApp, so their last tests are stale too.
     if (def.key === "facebook") { this.tests.delete("instagram"); this.tests.delete("whatsapp"); }
+    this.saveMeta();
     this.sink?.connectionSecret(def.key, Object.keys(next).length ? JSON.stringify(next) : "");
     this.opts.onChange?.();
     return this.viewOf(def);
@@ -470,8 +508,11 @@ export class ConnectionsService {
     if (this.serverSet(def.key)) throw new ConnectionsError(`${def.title} is set on the server, so it cannot be removed here`);
     const { [def.key]: _gone, ...rest } = this.stored;
     this.stored = rest;
+    const { [def.key]: _times, ...otherTimes } = this.changed;
+    this.changed = otherTimes;
     this.tests.delete(def.key);
     if (def.key === "facebook") { this.tests.delete("instagram"); this.tests.delete("whatsapp"); }
+    this.saveMeta();
     this.sink?.connectionSecret(def.key, "");
     this.opts.onChange?.();
     return this.viewOf(def);
@@ -506,6 +547,7 @@ export class ConnectionsService {
     const secrets = this.allSecrets();
     result = { ...result, message: redact(result.message, ...secrets), details: result.details.map((d) => redact(d, ...secrets)) };
     this.tests.set(def.key, { ...result, at: this.opts.now().toISOString() });
+    this.saveMeta();
     return this.viewOf(def);
   }
 
@@ -662,11 +704,14 @@ export class ConnectionsService {
         if (isPaidListing(key)) return { ok: false, message: "Nothing to test: this service is used by hand for now.", details: [] };
         const def = defOf(key);
         const connector = defaultRegistry().get(key);
+        if (connector?.unavailable) return { ok: false, message: "Nothing to test: this app cannot be connected.", details: [] };
         if (!def?.editable || connector?.auth.kind !== "oauth2") return { ok: false, message: "Nothing to test yet: this app is waiting for the provider's approval.", details: [] };
         const v = this.complete(key);
         if (!v) return this.notReady(key);
-        const tokenUrl = connector.auth.tokenUrl;
-        return probeGeneric(def.title, tokenUrl, connector.auth.tokenAuth === "basic", { clientId: v.clientId!, clientSecret: v.clientSecret!, redirectUri: `${this.base}/api/integrations/callback` }, this.http);
+        const app = { clientId: v.clientId!, clientSecret: v.clientSecret!, redirectUri: `${this.base}/api/integrations/callback` };
+        if (connector.ownerTest === "salesforce") return probeSalesforce(app, this.http);
+        if (NO_SAFE_CHECK.has(key)) return { ok: true, message: `Saved. ${connector.name} has no harmless way to check these details in advance, so the real test is connecting one account yourself from the Apps page.`, details: ["Nothing was sent to the provider."] };
+        return probeGeneric(connector.name, connector.auth.tokenUrl, connector.auth.tokenAuth === "basic", app, this.http, connector.auth.pkce);
       }
     }
   }

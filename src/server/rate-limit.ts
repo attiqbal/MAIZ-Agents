@@ -48,6 +48,20 @@ export function limitFor(method: string, path: string): Limit | undefined {
   if (method === "GET" && path.startsWith("/r/")) return { max: 20, windowMs: 60_000 };
   // Saving connection details: plenty for typing and fixing, not for hammering.
   if (method === "PUT" && path.startsWith("/api/owner/connections/")) return { max: 30, windowMs: 10 * 60_000 };
+  // Backups (docs/BACKUPS.md): the public freshness check is asked every ten minutes by the uptime workflow.
+  if (method === "GET" && path === "/api/health/backups") return { max: 30, windowMs: 60_000 };
+  if (path === "/api/owner/backups" || path.startsWith("/api/owner/backups/")) {
+    // The page asks again every few seconds while a backup runs.
+    if (method === "GET") return { max: 120, windowMs: 60_000 };
+    // Saving storage details makes the server call an address the owner typed; a backup or a restore test is heavy
+    // work on the database; a new recovery key is a rare, deliberate act.
+    if (method === "PUT") return { max: 20, windowMs: 10 * 60_000 };
+    if (/\/(run|restore-test|recovery-key)$/.test(path)) return { max: 10, windowMs: 10 * 60_000 };
+  }
+  // The Approvals, Books and Calendar screens gather many records in one read: plenty for opening and refreshing, not for hammering.
+  if (path.startsWith("/api/overview/")) return method === "GET" ? { max: 120, windowMs: 60_000 } : { max: 30, windowMs: 60_000 };
+  // What an employee can use: assembled from several services on each call, so kept to a steady pace per address.
+  if (method === "GET" && (path.startsWith("/api/resources/") || path === "/api/owner/resources")) return { max: 60, windowMs: 60_000 };
   if (method !== "POST") return undefined;
   // Coupon codes can be guessed, so tries are few per address. Wrong tries are also counted per person.
   if (path === "/api/coupons/check" || path === "/api/coupons/redeem") return { max: 12, windowMs: 10 * 60_000 };
@@ -56,6 +70,12 @@ export function limitFor(method: string, path: string): Limit | undefined {
   if (path === "/api/payments/webhook") return undefined; // signed by the payment provider, which retries on 429
   // Outside agents: jobs an hour and the daily energy ceiling are enforced per key; wrong keys are throttled per address (see AGENT_BAD_KEY_LIMIT).
   if (isAgentApi(path)) return undefined;
+  // Teammates: opening or using an invite link, and sending invites (each one is an email to someone else's address).
+  // Invites are also limited per business and per invited address in the service.
+  if (path === "/api/invites/open" || path === "/api/invites/accept") return { max: 20, windowMs: 10 * 60_000 };
+  if (path === "/api/team/invites" || /^\/api\/team\/invites\/[\w-]{1,64}\/resend$/.test(path)) return { max: 20, windowMs: 10 * 60_000 };
+  // The planning interview for an outside tool: a proposal per try, and each one is written to the audit log.
+  if (path === "/api/agents/plan") return { max: 20, windowMs: 10 * 60_000 };
   // A webhook test makes the server call an address the owner typed: a few tries are plenty.
   if (/^\/api\/agents\/[\w-]{1,64}\/test$/.test(path)) return { max: 10, windowMs: 10 * 60_000 };
   // Tasks are limited by energy (the team pool, the daily ceiling and the monthly cost cap), not by a request count:
@@ -63,12 +83,17 @@ export function limitFor(method: string, path: string): Limit | undefined {
   if (path === "/api/ask") return undefined;
   // Each checkout creates a payment session at the provider: keep it to a handful of tries per address.
   if (path === "/api/checkout") return { max: 20, windowMs: 10 * 60_000 };
+  // Stopping a monthly line calls the payment provider; a preview asks it for a figure. Enough to try again, not to hammer it.
+  if (path === "/api/billing/lines/stop") return { max: 20, windowMs: 10 * 60_000 };
+  if (path === "/api/billing/preview") return { max: 30, windowMs: 10 * 60_000 };
   if (path.startsWith("/api/auth/")) return { max: 15, windowMs: 10 * 60_000 };
   if (path === "/api/signin/start" || path === "/api/signup") return { max: 10, windowMs: 10 * 60_000 };
   // Reading a visitor's website makes our server call an address they typed: a few tries per address, no more.
   if (path === "/api/signup/read-site") return { max: 6, windowMs: 10 * 60_000 };
   // Connection tests call Meta, Stripe, Resend and RunPod: enough to fix and retry, not enough to hammer them.
   if (path.startsWith("/api/owner/connections/") && /\/(test|send-test)$/.test(path)) return { max: 30, windowMs: 10 * 60_000 };
+  // Disconnecting removes saved details for every client at once: a person does it a few times, never in a loop.
+  if (path.startsWith("/api/owner/connections/") && path.endsWith("/disconnect")) return { max: 30, windowMs: 10 * 60_000 };
   // Run-now wakes the GPU pod, which is billed per second: keep it to a few presses an hour per address.
   if (path === "/api/queue/run-now" || path === "/api/owner/batch/run-now") return { max: 6, windowMs: 60 * 60_000 };
   return { max: 60, windowMs: 60_000 };

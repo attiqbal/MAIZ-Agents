@@ -1,5 +1,6 @@
 import { clean } from "../research/sources.js";
 import { MAX_ITEMS_PER_SOURCE, MAX_SNIPPET, miningSource, type MiningFigure, type MiningItem, type MiningSourceId } from "./sources.js";
+import { MAX_CHECKS, MAX_NEW_ITEMS, type CheckStatus, type DatasetCheck, type DatasetWatch, type FigureChange, type NewItem } from "./watch.js";
 
 /**
  * A dataset: what one run of the Data mining agent found on one topic. Small on purpose: short snippets, links and
@@ -28,6 +29,12 @@ export interface Dataset {
   energyUsed: number;
   /** Template keys of the employees this dataset is shared with. */
   sharedWith: string[];
+  /** When a weekly check last brought in newer data. Unset until one has. */
+  updatedAt?: string;
+  /** The weekly check, while it is switched on. */
+  watch?: DatasetWatch;
+  /** The latest weekly checks, newest first, capped. */
+  checks?: DatasetCheck[];
 }
 
 /** A dataset as the client's screen receives it: the workspace id stays on the server. */
@@ -46,6 +53,10 @@ export interface DatasetHeader {
   energyUsed: number;
   sharedWith: string[];
   sources: { id: MiningSourceId; label: string; status: SourceStatus; count: number; note?: string }[];
+  updatedAt?: string;
+  watch?: DatasetWatch;
+  /** The latest weekly check, so the list can say what changed without opening the dataset. */
+  lastCheck?: Pick<DatasetCheck, "at" | "status" | "summary">;
 }
 
 export const MAX_SUMMARY = 1_200;
@@ -81,8 +92,14 @@ export function headerOf(d: Dataset): DatasetHeader {
   return {
     id: d.id, topic: d.topic, createdAt: d.createdAt, summary: d.summary, energyUsed: d.energyUsed, sharedWith: [...d.sharedWith],
     sources: d.sources.map((s) => ({ id: s.id, label: s.label, status: s.status, count: s.items.length + (s.figures?.length ?? 0), ...(s.note ? { note: s.note } : {}) })),
+    ...(d.updatedAt ? { updatedAt: d.updatedAt } : {}),
+    ...(d.watch ? { watch: { ...d.watch, sources: [...d.watch.sources] } } : {}),
+    ...(d.checks?.[0] ? { lastCheck: { at: d.checks[0].at, status: d.checks[0].status, summary: d.checks[0].summary } } : {}),
   };
 }
+
+/** The day a dataset's data is from: its latest weekly check when there has been one, otherwise the first search. */
+export const gatheredOn = (d: Pick<Dataset, "createdAt" | "updatedAt">): string => (d.updatedAt ?? d.createdAt).slice(0, 10);
 
 const plural = (n: number, one: string, many: string): string => `${n} ${n === 1 ? one : many}`;
 const cut = (text: string, max: number): string => (text.length > max ? `${text.slice(0, max - 1).trimEnd()}…` : text);
@@ -120,7 +137,7 @@ export function summarise(topic: string, sources: readonly DatasetSource[], gath
  * look-alikes when the data was cleaned, so nothing inside can imitate the markers that open and close it.
  */
 export function renderForContext(d: Dataset, max = MAX_CONTEXT_PER_DATASET): string {
-  const open = `<<<dataset topic="${d.topic}" gathered="${d.createdAt.slice(0, 10)}">>>`;
+  const open = `<<<dataset topic="${d.topic}" gathered="${gatheredOn(d)}">>>`;
   const close = "<<<end of dataset>>>";
   const perSource = d.sources.map((s) => [
     ...s.items.map((i) => `- [${i.source}${i.at ? `, ${i.at}` : ""}] ${i.title}${i.snippet ? `: ${cut(i.snippet, CONTEXT_SNIPPET)}` : ""} (${i.url})`),
@@ -143,7 +160,7 @@ export function renderForContext(d: Dataset, max = MAX_CONTEXT_PER_DATASET): str
 
 /** Datasets for one employee, newest first, until the employee's cap is reached. */
 export function renderContext(datasets: readonly Dataset[], max = MAX_CONTEXT_PER_EMPLOYEE): string | undefined {
-  const newestFirst = [...datasets].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  const newestFirst = [...datasets].sort((a, b) => (b.updatedAt ?? b.createdAt).localeCompare(a.updatedAt ?? a.createdAt));
   const parts: string[] = [];
   let used = CONTEXT_HEADER.length;
   for (const d of newestFirst) {
@@ -181,6 +198,50 @@ function readFigure(v: unknown): MiningFigure | undefined {
 }
 
 const present = <T>(v: T | undefined): v is T => v !== undefined;
+const isoDate = (v: unknown): string | undefined => (typeof v === "string" && v.length <= 40 && !Number.isNaN(Date.parse(v)) ? new Date(v).toISOString() : undefined);
+const CHECK_STATUSES: readonly CheckStatus[] = ["changed", "same", "skipped"];
+/** No weekly figure can sensibly be above this; a stored one that is was damaged. */
+const MAX_WATCH_ENERGY = 100_000;
+
+/** A stored weekly watch, or undefined when any part of it is not what a watch can be: a damaged watch never runs. */
+function readWatch(v: unknown): DatasetWatch | undefined {
+  const r = record(v);
+  const since = isoDate(r?.since), nextCheckAt = isoDate(r?.nextCheckAt);
+  const named = list(r?.sources);
+  const sources = named.map((id) => (typeof id === "string" ? miningSource(id)?.id : undefined)).filter(present);
+  const maxEnergy = Number(r?.maxEnergy);
+  if (!r || !since || !nextCheckAt || !sources.length || sources.length !== named.length) return undefined;
+  if (!Number.isInteger(maxEnergy) || maxEnergy <= 0 || maxEnergy > MAX_WATCH_ENERGY) return undefined;
+  return { since, sources: [...new Set(sources)], maxEnergy, nextCheckAt, ...(r.lowEnergyTold === true ? { lowEnergyTold: true } : {}) };
+}
+
+function readNewItem(v: unknown): NewItem | undefined {
+  const item = readItem(v);
+  const sourceId = record(v)?.sourceId;
+  const known = typeof sourceId === "string" ? miningSource(sourceId) : undefined;
+  return item && known ? { ...item, sourceId: known.id } : undefined;
+}
+
+function readFigureChange(v: unknown): FigureChange | undefined {
+  const r = record(v);
+  const label = text(r?.label, 120), from = text(r?.from, 40), to = text(r?.to, 40);
+  return label && from && to ? { label, from, to } : undefined;
+}
+
+function readCheck(v: unknown): DatasetCheck | undefined {
+  const r = record(v);
+  const at = isoDate(r?.at);
+  const status = CHECK_STATUSES.find((x) => x === r?.status);
+  if (!r || !at || !status) return undefined;
+  const energy = Number(r.energyUsed);
+  const note = text(r.note, 400);
+  return {
+    at, status, summary: text(r.summary, 300), energyUsed: Number.isFinite(energy) && energy >= 0 ? Math.floor(energy) : 0,
+    newItems: list(r.newItems).map(readNewItem).filter(present).slice(0, MAX_NEW_ITEMS),
+    figures: list(r.figures).map(readFigureChange).filter(present).slice(0, MAX_ITEMS_PER_SOURCE),
+    ...(note ? { note } : {}),
+  };
+}
 
 /**
  * Rebuilds a stored dataset, field by field, with the same cleaning and caps as a new one. Anything that is not a
@@ -202,10 +263,13 @@ export function readDataset(v: unknown): Dataset | undefined {
     return { id: known.id, label: known.label, status, items: list(row.items).map(readItem).filter(present).slice(0, MAX_ITEMS_PER_SOURCE), ...(figures.length ? { figures } : {}), ...(note ? { note } : {}) };
   }).filter(present);
   const energy = Number(r.energyUsed);
+  const updatedAt = isoDate(r.updatedAt), watch = readWatch(r.watch);
+  const checks = list(r.checks).map(readCheck).filter(present).slice(0, MAX_CHECKS);
   return {
     id: r.id, workspaceId: r.workspaceId, topic, createdAt, sources,
-    summary: summarise(topic, sources, createdAt.slice(0, 10)),
+    summary: summarise(topic, sources, gatheredOn({ createdAt, updatedAt })),
     energyUsed: Number.isFinite(energy) && energy >= 0 ? Math.floor(energy) : 0,
     sharedWith: [...new Set(list(r.sharedWith).filter((k): k is string => typeof k === "string" && /^[a-z0-9:-]{2,80}$/.test(k)))],
+    ...(updatedAt ? { updatedAt } : {}), ...(watch ? { watch } : {}), ...(checks.length ? { checks } : {}),
   };
 }

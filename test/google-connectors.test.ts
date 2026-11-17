@@ -231,4 +231,44 @@ describe("hardening", () => {
     const revoke = seen.find((x) => x.url.endsWith("/revoke"));
     expect(revoke?.body).toContain("token=yr-1");
   });
+  it("deletes the figures Google sent when the client disconnects, in memory and in the store", async () => {
+    const { http } = fakeGoogle();
+    const { ig, ws } = await setup(http);
+    const removed: string[] = [];
+    ig.useSink({ integration() {}, integrationSecret() {}, integrationRecord(r: { id: string }, gone?: boolean) { if (gone) removed.push(r.id); } } as never);
+    const conn = await ig.completeOAuth("owner", ws, "ga4", "code");
+    await ig.sync("owner", ws, conn.id, { from: "2026-10-01", to: "2026-11-10" });
+    const before = ig.recordsOf(ws).length;
+    expect(before).toBeGreaterThan(0);
+    ig.disconnect("owner", ws, conn.id);
+    expect(ig.recordsOf(ws)).toHaveLength(0);
+    expect(removed).toHaveLength(before);
+  });
+
+  it("keeps Google's permission while another Google connection of the same client still needs it", async () => {
+    const { http, seen } = fakeGoogle();
+    const { ig, ws } = await setup(http);
+    const ga = await ig.completeOAuth("owner", ws, "ga4", "code");
+    const sc = await ig.completeOAuth("owner", ws, "search-console", "code");
+    ig.disconnect("owner", ws, ga.id);
+    await new Promise((r) => setTimeout(r, 0));
+    // Google cancels the whole permission when one token is revoked, which would break Search Console too.
+    expect(seen.some((x) => x.url.endsWith("/revoke"))).toBe(false);
+    ig.disconnect("owner", ws, sc.id);
+    await new Promise((r) => setTimeout(r, 0));
+    expect(seen.filter((x) => x.url.endsWith("/revoke"))).toHaveLength(1);
+  });
+
+  it("asks Google to cancel the Gmail permission on disconnect", async () => {
+    const { http, seen } = fakeGoogle();
+    const audit = new AuditLog();
+    const identity = new IdentityService(audit, new EventBus());
+    const ledger = new Ledger(identity, audit);
+    const ws = (await identity.createWorkspace("owner", { name: "Kestrel", baseCurrency: "GBP" })).id;
+    const ig = new IntegrationService(identity, audit, ledger, defaultRegistry(), { http, now: () => NOW, oauthApps: { gmail: { ...APP, clientId: "gmail-id" } } });
+    const conn = await ig.completeOAuth("owner", ws, "gmail", "code");
+    ig.disconnect("owner", ws, conn.id);
+    await new Promise((r) => setTimeout(r, 0));
+    expect(seen.find((x) => x.url.endsWith("/revoke"))?.body).toContain("token=yr-1");
+  });
 });

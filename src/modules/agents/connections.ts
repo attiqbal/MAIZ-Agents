@@ -3,6 +3,7 @@ import type { Sink } from "../../core/persistence.js";
 import type { AuditLog } from "../audit/index.js";
 import type { IdentityService } from "../identity/index.js";
 import { cleanLimits, cleanName, cleanTool, employeeKey, hashKey, looksLikeKey, newKey, newSigningSecret, sameHash } from "./keys.js";
+import { cleanProfile, type AgentProfile } from "./planner.js";
 import {
   AgentError, AgentRefusal, CUSTOMER_SUPPORT_KEY, DEFAULT_LIMITS, KEY_LIFETIME_DAYS, MAX_CONNECTIONS_PER_WORKSPACE, NEVER_ALLOWED,
   type AgentConnection,
@@ -99,9 +100,11 @@ export class ConnectionBook {
     const webhookUrl = b.webhookUrl ? (await assertWebhookUrl(b.webhookUrl)).toString() : undefined;
     const issued = newKey();
     const at = this.d.now();
+    // The set-up planned with the Admin manager, if there was one. Checked like everything else the browser sends.
+    const profile = b.profile === undefined || b.profile === null ? undefined : cleanProfile(b.profile, employees, at.toISOString());
     const connection: AgentConnection = {
       id: newId("agent_conn"), workspaceId, name, tool: cleanTool(b.tool), employees, needsApproval: b.needsApproval === true, limits,
-      ...(webhookUrl ? { webhookUrl } : {}),
+      ...(webhookUrl ? { webhookUrl } : {}), ...(profile ? { profile } : {}),
       keyHash: issued.hash, keyPrefix: issued.prefix, keyCreatedAt: at.toISOString(), keyExpiresAt: this.expiry(at),
       status: "active", createdBy: userId, createdAt: at.toISOString(), updatedAt: at.toISOString(),
     };
@@ -110,7 +113,7 @@ export class ConnectionBook {
     const signingSecret = newSigningSecret();
     this.saveSecret(connection.id, signingSecret);
     this.save(connection);
-    this.d.audit.record({ workspaceId, actor: `user:${userId}`, action: "agent.created", target: connection.id, data: { name, tool: connection.tool, employees, needsApproval: connection.needsApproval, limits, webhook: !!webhookUrl } });
+    this.d.audit.record({ workspaceId, actor: `user:${userId}`, action: "agent.created", target: connection.id, data: { name, tool: connection.tool, employees, needsApproval: connection.needsApproval, limits, webhook: !!webhookUrl, planned: !!profile } });
     return { connection, key: issued.key, signingSecret };
   }
 
@@ -121,21 +124,33 @@ export class ConnectionBook {
     const b = asObject(raw);
     const clearWebhook = b.webhookUrl === null || b.webhookUrl === "";
     const webhookUrl = b.webhookUrl && !clearWebhook ? (await assertWebhookUrl(b.webhookUrl)).toString() : undefined;
-    const { webhookUrl: oldUrl, ...rest } = c;
+    const { webhookUrl: oldUrl, profile: oldProfile, ...rest } = c;
     const keptUrl = clearWebhook ? undefined : webhookUrl ?? oldUrl;
+    const employees = b.employees === undefined ? c.employees : this.chooseEmployees(userId, workspaceId, b.employees);
+    const profile = this.nextProfile(b.profile, oldProfile, employees);
     const next: AgentConnection = {
       ...rest,
       name: b.name === undefined ? c.name : cleanName(b.name),
       tool: b.tool === undefined ? c.tool : cleanTool(b.tool),
-      employees: b.employees === undefined ? c.employees : this.chooseEmployees(userId, workspaceId, b.employees),
+      employees,
       needsApproval: typeof b.needsApproval === "boolean" ? b.needsApproval : c.needsApproval,
       limits: cleanLimits(b.limits, c.limits),
-      ...(keptUrl ? { webhookUrl: keptUrl } : {}),
+      ...(keptUrl ? { webhookUrl: keptUrl } : {}), ...(profile ? { profile } : {}),
       updatedAt: this.d.now().toISOString(),
     };
     this.save(next);
     this.d.audit.record({ workspaceId, actor: `user:${userId}`, action: "agent.updated", target: id, data: { name: next.name, employees: next.employees, needsApproval: next.needsApproval, limits: next.limits, webhook: !!next.webhookUrl } });
     return next;
+  }
+
+  /**
+   * The set-up after a change: a new one when the owner planned again, none when they cleared it, otherwise the old
+   * one, with any example for an employee the tool may no longer use taken out.
+   */
+  private nextProfile(raw: unknown, old: AgentProfile | undefined, employees: readonly string[]): AgentProfile | undefined {
+    if (raw === null) return undefined;
+    if (raw !== undefined) return cleanProfile(raw, employees, this.d.now().toISOString());
+    return old ? { ...old, examples: old.examples.filter((e) => employees.includes(employeeKey(e.employee))) } : undefined;
   }
 
   /** A new key. The old one stops working at once. With `withSecret` the webhook signing secret is replaced too. */

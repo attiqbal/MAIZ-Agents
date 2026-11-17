@@ -6,8 +6,10 @@ import type { IdentityService } from "../identity/index.js";
 import type { ChatMessage, Completer, TextStream } from "../model-gateway/types.js";
 import { getTemplate, type EmployeeTemplate } from "./templates.js";
 import { getJobDescription, renderJobDescription } from "./job-descriptions.js";
+import { SHOP_EMPLOYEE_KEYS, shopCopyNote } from "../ecommerce/rules.js";
 import type { EnergyMeter } from "../energy/index.js";
 import { describePack, packFor } from "./finance/rules-pack.js";
+import type { ResourceSuggestion } from "../resources/types.js";
 
 /** Describes the business so every employee can tailor its work. */
 export interface BusinessProfile {
@@ -24,6 +26,18 @@ export interface Employee {
   workspaceId: string;
   templateKey: string;
   name: string;
+}
+
+/** The six employees every client has: the core team and the Admin manager. They can never be taken off a team. */
+export const CORE_TEMPLATE_KEYS: ReadonlySet<string> = new Set(["finance-manager", "marketing-manager", "business-consultant", "hr-manager", "compliance-manager", "admin-manager"]);
+
+export class WorkforceError extends Error {}
+
+/** Stored when an add-on employee leaves a team (its monthly order ended). The employee's work is kept. */
+export interface EmployeeRemoval {
+  employeeId: string;
+  name: string;
+  at: string;
 }
 
 export type TaskStatus = "ready_for_review" | "failed" | "no_energy" | "queued";
@@ -52,6 +66,10 @@ export interface TaskResult {
   at?: string;
   /** A second model checked this answer before it was shown. */
   checked?: boolean;
+  /** Keys of the resources the employee was given for this task (src/modules/resources). Recorded so the owner can see what is used. */
+  used?: string[];
+  /** Resources that would have helped but are not connected, for the web app to show as links. */
+  hints?: ResourceSuggestion[];
   jobId?: string;
   runsAt?: string;
   queueReason?: string;
@@ -92,6 +110,9 @@ export interface Intake {
 /** Most tasks one client may have waiting for a batch, whatever their energy, so one client cannot flood the pod. */
 export const MAX_QUEUED_PER_CLIENT = 200;
 
+/** What the resource registry gives an employee for one task. See src/server/platform.ts. */
+export type ResourceGuide = (userId: string, workspaceId: string, templateKey: string, brief: string, employeeName: string) => { text: string; used: string[]; hints: ResourceSuggestion[] } | undefined;
+
 interface RunContext {
   /** Routing policy. "live" for quick lookups, else the employee template. */
   taskType: string;
@@ -117,6 +138,14 @@ export class WorkforceService {
   }
 
   /** Extra facts per employee from other modules (for example connected apps). Kept out of this module's imports. */
+  private resourceGuide?: ResourceGuide;
+  /** Turns on the "what you can use" part of every employee's instructions, written from the resource registry. */
+  setResourceGuide(fn: ResourceGuide): void { this.resourceGuide = fn; }
+  /** The guide for one task. Never throws: a failing registry must not stop work, the job description's own tool list is used then. */
+  private guideFor(userId: string, workspaceId: string, templateKey: string, brief: string, employeeName: string): ReturnType<ResourceGuide> {
+    try { return this.resourceGuide?.(userId, workspaceId, templateKey, brief, employeeName); } catch { return undefined; }
+  }
+
   private contextSources: ((workspaceId: string, templateKey: string, taskType?: string) => string | undefined)[] = [];
   addContext(source: (workspaceId: string, templateKey: string, taskType?: string) => string | undefined): void {
     this.contextSources.push(source);
@@ -155,6 +184,11 @@ export class WorkforceService {
     if (!d) return false;
     if (d.liveDuringTrial && this.energy?.planOf(workspaceId).expiresAt) return true;
     return d.liveFirstTasks > 0 && (this.answered.get(workspaceId) ?? 0) < d.liveFirstTasks;
+  }
+
+  /** Platform-level (no user check): every finished task of every client since a time. For the owner's resource table only. */
+  allTasksSince(sinceIso: string): TaskResult[] {
+    return [...this.tasks.values()].filter((t) => t.at && t.at >= sinceIso);
   }
 
   /** Finished tasks for one client since a time, newest first. The board and the week's counts read this. */
@@ -242,6 +276,41 @@ export class WorkforceService {
     return employee;
   }
 
+  /** Employees who have left a team, by id. Kept so the work they did still carries their name. */
+  private former = new Map<string, EmployeeRemoval>();
+
+  /**
+   * Takes an add-on employee off a team: the exact opposite of `hire`. The team, its headcount and the weekly energy
+   * the employee brought all follow, because they are worked out from who is on the team. Tasks, conversations and
+   * energy records stay as they are. Returns false, and changes nothing, when the employee is not on this team (already
+   * removed, another client's, or never existed), so calling it twice is safe. Platform-level, no user check: it is
+   * called when a monthly order has ended, never by a client directly.
+   */
+  remove(workspaceId: string, employeeId: string, by: string): boolean {
+    const employee = this.employees.get(employeeId);
+    if (!employee || employee.workspaceId !== workspaceId) return false;
+    if (CORE_TEMPLATE_KEYS.has(employee.templateKey)) throw new WorkforceError("the core team cannot be removed");
+    const removal: EmployeeRemoval = { employeeId, name: employee.name, at: new Date().toISOString() };
+    this.employees.delete(employeeId);
+    this.former.set(employeeId, removal);
+    this.sink?.record(workspaceId, "employee_removed", employeeId, removal);
+    this.audit.record({ workspaceId, actor: by, action: "employee.removed", target: employeeId, data: { template: employee.templateKey } });
+    void this.bus.publish({ type: "employee.removed", workspaceId, payload: { employeeId }, at: new Date() }).catch(() => undefined);
+    return true;
+  }
+
+  /** At start-up, after the employees are loaded: an employee who had left stays off the team. */
+  restoreRemoved(r: EmployeeRemoval): void {
+    const employee = this.employees.get(r.employeeId);
+    this.employees.delete(r.employeeId);
+    this.former.set(r.employeeId, { ...r, name: r.name ?? employee?.name });
+  }
+
+  /** The name of an employee who has left a team, for labelling the work they did. Platform-level, no user check. */
+  formerName(employeeId: string): string | undefined {
+    return this.former.get(employeeId)?.name;
+  }
+
   /** Platform-level (no user check): how many employees a client has. */
   countIn(workspaceId: string): number {
     return [...this.employees.values()].filter((e) => e.workspaceId === workspaceId).length;
@@ -250,6 +319,11 @@ export class WorkforceService {
   /** Platform-level (no user check): the template of every employee a client has. */
   templatesIn(workspaceId: string): string[] {
     return [...this.employees.values()].filter((e) => e.workspaceId === workspaceId).map((e) => e.templateKey);
+  }
+
+  /** Platform-level (no user check): the id of the client's employee hired from this template, if they have one. */
+  employeeIn(workspaceId: string, templateKey: string): string | undefined {
+    return [...this.employees.values()].find((e) => e.workspaceId === workspaceId && e.templateKey === templateKey)?.id;
   }
 
   /** Platform-level lookup (no user check): which template an employee was hired from. */
@@ -330,11 +404,15 @@ export class WorkforceService {
 
     const profile = this.profiles.get(workspaceId);
     const jd = template.jobDescription ?? getJobDescription(template.key);
+    const guide = this.guideFor(userId, workspaceId, template.key, brief, employee.name);
     const parts = [
       template.instructions,
       // The full job description: responsibilities, skills, deliverables and authority limits.
-      ...(jd ? [renderJobDescription(jd)] : []),
-      profile ? `Business profile:\n${JSON.stringify(profile, null, 2)}` : "No business profile has been set yet.",
+      ...(jd ? [renderJobDescription(jd, { tools: !guide })] : []),
+      // What the employee can use, cheapest first (replaces the job description's own tool list).
+      ...(guide ? [guide.text] : []),
+      // Compact: every word of the instructions is paid for on every task.
+      profile ? `Business profile:\n${JSON.stringify(profile)}` : "No business profile has been set yet.",
     ];
     // The Finance manager keeps books to the owner's country rules (or a safe generic set).
     if (template.key === "finance-manager") parts.push(describePack(packFor(profile?.country)));
@@ -375,12 +453,16 @@ export class WorkforceService {
         ],
       });
       task.deliverable = result.text;
+      // An online-shop draft that slips in false urgency, invented reviews or a refusal of the 14 day right gets a plain warning under it.
+      const shopNote = SHOP_EMPLOYEE_KEYS.includes(template.key) ? shopCopyNote(result.text) : undefined;
+      if (shopNote) task.deliverable = `${result.text}\n\n${shopNote}`;
       task.provider = result.provider;
       task.inputTokens = result.inputTokens;
       task.outputTokens = result.outputTokens;
       task.costMicro = result.costMicro;
       task.baselineMicro = result.routing?.baselineMicro;
       if (result.routing?.reviewed && !result.routing.lowConfidence) task.checked = true;
+      if (guide) { task.used = guide.used; if (guide.hints.length) task.hints = guide.hints; }
       task.energyUsed = this.energy?.record(workspaceId, employeeId, result.provider, result.inputTokens, result.outputTokens, verdict.overtime, result.costMicro).energy;
     } catch (err) {
       task.status = "failed";

@@ -18,7 +18,7 @@ import { AdminManager } from "../modules/admin-manager/index.js";
 import { InMemoryModelProvisioner, InMemoryStorageProvisioner } from "../modules/admin-manager/provisioning.js";
 import { OnboardingService } from "../modules/onboarding/index.js";
 import { BatchService } from "../modules/batch/service.js";
-import { WorkforceService } from "../modules/workforce/index.js";
+import { CORE_TEMPLATE_KEYS, WorkforceService } from "../modules/workforce/index.js";
 import { IntegrationService, defaultRegistry, type OAuthApp } from "../modules/integrations/index.js";
 import { QualityReviewService } from "../modules/review/index.js";
 import { DecisionDigest, inQuietHours, openDecisions, type OpenDecision } from "./decisions.js";
@@ -27,7 +27,7 @@ import { PriceBook, paidTeamPlan } from "../modules/pricing/index.js";
 import { SpecialistReviewService, type SpecialistRequest } from "../modules/review/specialists.js";
 import { templateFromRole } from "../modules/workforce/templates.js";
 import { MockPaymentProvider, PaymentService, type OrderDiscount, type PaymentProvider } from "../modules/payments/index.js";
-import { TEAM_PACKAGE_KEY, quoteForPlan } from "../modules/store/cart.js";
+import { ONE_PER_BUSINESS, TEAM_PACKAGE_KEY, quoteForPlan } from "../modules/store/cart.js";
 import { ReconciliationService } from "../modules/reconciliation/index.js";
 import { localParts } from "../modules/batch/schedule.js";
 import { RotaService, RotaError } from "../modules/rota/index.js";
@@ -41,10 +41,11 @@ import { userIdFor } from "./identity.js";
 import { ExpiringSet, SendLog } from "./expiring.js";
 import { AffiliateService, CouponService, billDiscount } from "../modules/promotions/index.js";
 import { PromoterService } from "../modules/promoter/index.js";
-import { DEFAULT_PAID_MULTIPLIER, PaidServices, type Payer } from "../modules/paid-services/index.js";
+import { DEFAULT_PAID_MULTIPLIER, PaidServices, paidService, type Payer } from "../modules/paid-services/index.js";
 import { GrowthService } from "../modules/growth/index.js";
 import { ResearchService } from "../modules/research/index.js";
-import { DataMiningService } from "../modules/data-mining/index.js";
+import { DATA_MINING_AGENT, DataMiningService, miningSource } from "../modules/data-mining/index.js";
+import { ResourceRegistry, clientSummary, renderGuide, suggestionsForTask, usageTable, usedBy, type RecordsEntry } from "../modules/resources/index.js";
 import { MetaGraph, MetaRejected, type MetaConfig } from "../modules/meta/index.js";
 import { LiveProvider, MetaClientService, SandboxProvider } from "../modules/meta-clients/index.js";
 import type { MetaClientSettings } from "./config.js";
@@ -55,8 +56,18 @@ import { COMPANY } from "../company.js";
 import { CredentialStore } from "../modules/credentials/index.js";
 import { PushService, VAPID_STORE_KEY } from "../modules/push/index.js";
 import { AGENT_SECRET_PREFIX, AgentService } from "../modules/agents/index.js";
+import { TeamService } from "../modules/teammates/index.js";
+import { BACKUP_SECRET_PREFIX, BackupService, pgAdmin, spawnRunner, type DbAdmin, type ProgramRunner } from "../modules/backup/index.js";
+import { createOverview } from "../modules/overview/index.js";
 
 export interface PlatformConfig {
+  /**
+   * Off-server backups (docs/BACKUPS.md): the database to dump (DATABASE_URL), the server's own keys sealed inside
+   * each backup (TOKEN_KEY), and where the Postgres tools live when they are not on the search path (PG_BIN_DIR).
+   * Left out, or without a database, the Backups page says backups are not available. Tests pass stand-ins for the
+   * programs and the database.
+   */
+  backup?: { databaseUrl?: string; serverKeys?: Readonly<Record<string, string>>; binDir?: string; run?: ProgramRunner; db?: DbAdmin; tmpDir?: string };
   anthropicApiKey?: string;
   anthropicModel?: string;
   /** RunPod Serverless endpoint (vLLM worker) that does the heavy lifting. Both come from environment variables. */
@@ -316,6 +327,11 @@ export function createPlatform(cfg: PlatformConfig) {
   const mining = new DataMiningService({
     identity, meter: energy, audit, http: cfg.http, now, team: (userId, ws) => workforce.team(userId, ws), titleOf: (key, ws) => workforce.templateFor(key, ws)?.title, countryOf: (ws) => workforce.countryOf(ws),
     multiplier: () => prices.general().paidServiceMultiplier ?? DEFAULT_PAID_MULTIPLIER, keys: () => ({ reddit: connections.redditApp(), youtube: connections.youtubeKey(), x: connections.xToken(), ...connections.deskKeys() }),
+    // The weekly check on a dataset: runs with nobody signed in, at a quiet hour of the client's night, and tells them like a finished batch does.
+    agentIn: (ws) => workforce.employeeIn(ws, DATA_MINING_AGENT),
+    // "UTC" with no country in the profile is the fallback, not a known time zone: such a client is checked a plain week apart.
+    timezone: (ws) => { const tz = batch.scheduleOf(ws).timezone; return tz === "UTC" && !workforce.countryOf(ws) ? undefined : tz; },
+    notify: (ws, n) => { notices.add(ws, { kind: "info", ...n }); void admin.tell(ws, n.body, n.link).catch(() => undefined); },
   });
   workforce.addContext((ws, templateKey) => mining.contextFor(ws, templateKey));
   /** MAIZ quality review: every client's specialised tasks wait here for the platform owner's sign-off. */
@@ -360,6 +376,8 @@ export function createPlatform(cfg: PlatformConfig) {
     timezone: (ws) => batch.scheduleOf(ws).timezone,
     notify: (ws, n) => { notices.add(ws, { kind: "info", title: n.title, body: n.body, link: "/app.html#apps" }); },
   });
+  /** Teammates: the owner invites people into the business with limited rights. See docs/TEAMMATES.md. */
+  const team = new TeamService({ identity, audit, now, userIdFor, isPlatformOwner: (id) => ownerIdSet.has(id), onRemoved: (ws, userId) => { push.forget(userId, ws); } });
   let alertOwnersLate: (subject: string, text: string) => Promise<void> = async () => undefined;
   /** Staff and shifts, so rota questions are answered from real records. */
   const rota = new RotaService(identity, audit);
@@ -394,11 +412,59 @@ export function createPlatform(cfg: PlatformConfig) {
     businessName: (ws) => identity.workspaceById(ws)?.name,
   });
   workforce.addContext((ws, templateKey) => people.contextFor(ws, templateKey));
+  /**
+   * What every employee may use, ready or not, with its cost and what to ask first. Built on each question from the
+   * modules above through their own public functions, so a service added to one of them appears here by itself.
+   * The same answer writes the "what you can use" part of every employee's instructions, the client's list on the
+   * desk and the owner's usage table (docs/RESOURCES.md).
+   */
+  const records = (u: string, ws: string, key: string): RecordsEntry[] => {
+    const out: RecordsEntry[] = [];
+    const today = now().toISOString().slice(0, 10);
+    const count = (read: () => number): number => { try { return read(); } catch { return 0; } };
+    if (key === "rota-coordinator" || key === "hr-manager") out.push({ key: "rota", name: "The rota", goodFor: "Staff, shifts, hours and the limits each person gave.", gives: ["rota"], state: count(() => rota.week(u, ws, today).staff.length) > 0 ? "ready" : "empty", fix: { label: "Add your staff", href: "#people" } });
+    if (key === "hr-manager" || key === "compliance-manager") out.push({ key: "staff", name: "Staff records", goodFor: "Who works for you, their documents and what is due.", gives: ["staff"], state: count(() => people.overview(u, ws).summary.headcount) > 0 ? "ready" : "empty", fix: { label: "Add your staff", href: "#people" } });
+    if (key === "finance-manager") out.push({ key: "books", name: "The MAIZ books", goodFor: "Double-entry books, with every total worked out by tested code.", gives: ["ledger"], state: "ready", fix: { label: "Open Books", href: "#books" } });
+    return out;
+  };
+  const resources = new ResourceRegistry({
+    team: (u, ws) => workforce.team(u, ws),
+    hasProfile: (u, ws) => !!workforce.profileOf(u, ws),
+    apps: () => integrations.catalogue(),
+    connections: (u, ws) => integrations.list(u, ws),
+    mining: (u, ws) => mining.overview(u, ws),
+    paid: () => paid.list(),
+    records,
+    outsideTools: (u, ws) => agents.overview(u, ws).connections.map((c) => ({ name: c.name, status: c.status, employees: c.employees.map((e) => e.key) })),
+    taskEnergy: (ws) => energy.estimateFor(ws),
+    now,
+  });
+  workforce.setResourceGuide((u, ws, key, brief, name) => {
+    const r = resources.forEmployee(u, ws, key);
+    return { text: renderGuide(r, brief), used: usedBy(r), hints: suggestionsForTask(r, brief, name) };
+  });
+  /** The client's "What this employee can use" list. The employee must be on this client's team. */
+  const resourcesFor = (u: string, ws: string, templateKey: string) => clientSummary(resources.forEmployee(u, ws, templateKey));
+  const RESOURCE_NAMES: Record<string, string> = { "known:profile": "Business profile", "known:datasets": "Saved datasets", "known:rota": "The rota", "known:staff": "Staff records", "known:books": "The MAIZ books", "model:open": "Writing and analysis (open models)" };
+  const resourceName = (key: string): string => {
+    const [kind, id = ""] = [key.slice(0, key.indexOf(":")), key.slice(key.indexOf(":") + 1)];
+    if (kind === "app") return integrations.registry.get(id)?.name ?? id;
+    if (kind === "paid") return paidService(id)?.name ?? id;
+    if (kind === "source") return miningSource(id)?.label ?? id;
+    return RESOURCE_NAMES[key] ?? key;
+  };
+  /** The owner's table: what the employees were given and what paid things took this month, from records already kept. */
+  const resourceUsage = (userId: string) => {
+    if (!isPlatformOwner(userId)) throw new PermissionError("only the platform owner sees what the employees use");
+    const month = now().toISOString().slice(0, 7);
+    const rows = usageTable({ tasks: workforce.allTasksSince(`${month}-01`).map((t) => ({ used: t.used, energy: t.energyUsed, costMicro: t.costMicro })), providers: energy.usageByProvider(month) });
+    return { month, rows: rows.map((r) => ({ ...r, name: resourceName(r.key) })) };
+  };
   /** Checkout and orders. What a paid order buys is hired here, from the same templates the store sells. */
   /** A client has the Team package once they are on a paid plan (clients who went paid before it was sold keep theirs). */
   const hasTeamPackage = (ws: string): boolean => !energy.onTrial(ws);
   /** Prices a cart for this client's plan: a first monthly order includes the Team package, and it is never sold twice. */
-  const quoteFor = (ws: string | undefined, lines: readonly unknown[]): ReturnType<typeof quoteForPlan> => quoteForPlan(lines, ws ? hasTeamPackage(ws) : false, prices.catalogue());
+  const quoteFor = (ws: string | undefined, lines: readonly unknown[]): ReturnType<typeof quoteForPlan> => quoteForPlan(lines, ws ? hasTeamPackage(ws) : false, prices.catalogue(), ws ? workforce.templatesIn(ws) : []);
   const payments = new PaymentService(identity, audit, {
     provider: cfg.payments ?? (cfg.allowDevAuth ? new MockPaymentProvider() : undefined),
     quote: (lines, ws) => quoteFor(ws, lines),
@@ -417,7 +483,9 @@ export function createPlatform(cfg: PlatformConfig) {
         const templateKey = line.key.split(":")[0]!;
         // The Team package is the plan itself: the core team was hired at signup, so there is nobody new to hire.
         if (templateKey === TEAM_PACKAGE_KEY) continue;
-        for (let i = 0; i < line.qty; i++) ids.push((await workforce.hire(order.userId, order.workspaceId, templateKey)).id);
+        // An online-shop employee is hired once; a second paid checkout for it (or a replay) hires nobody new.
+        if (ONE_PER_BUSINESS.has(templateKey) && workforce.templatesIn(order.workspaceId).includes(templateKey)) continue;
+        for (let i = 0; i < (ONE_PER_BUSINESS.has(templateKey) ? 1 : line.qty); i++) ids.push((await workforce.hire(order.userId, order.workspaceId, templateKey)).id);
       }
       // A recurring line makes the client a paying one: they leave the free trial and start the paid plan with a full
       // pool (the trial's energy is not held against it). One-off consultant passes alone do not end the trial.
@@ -429,13 +497,32 @@ export function createPlatform(cfg: PlatformConfig) {
     },
     // The Team package stopping ends the plan: at the end of the month paid for when the client cancelled here,
     // at once when the payment provider ended the subscription (the paid time is over by then).
-    stopped: (order, by) => {
+    stopped: (order, by, also = []) => {
       if (!order.lines.some((l) => l.key === TEAM_PACKAGE_KEY)) return;
       const endsAt = by === "client" ? paidThrough(order.paidAt ?? order.createdAt, now()) : now();
       if (!energy.endPaidPlan(order.workspaceId, endsAt.toISOString(), `payment:${by}`)) return;
-      // Extras bought later are separate monthly orders. They are not stopped for the client, so they are told.
-      const extras = payments.all().some((o) => o.workspaceId === order.workspaceId && o.id !== order.id && o.status === "paid" && o.monthlyMinor > 0);
-      notices.add(order.workspaceId, { kind: "info", title: "Your Team package has been cancelled", body: `Your team keeps working until ${endsAt.toLocaleDateString("en-GB", { day: "numeric", month: "long" })}. You can start it again any time from the store.${extras ? " Extras you added later are billed separately: cancel those too in Settings, Plan and billing, if you no longer want them." : ""}`, link: extras ? "/app.html#settings" : "/app.html#store" });
+      // Extras bought later stop with the package, each at the end of its own paid month (docs/ONE-BILL.md). The client is told which.
+      const day = (d: Date | string) => new Date(d).toLocaleDateString("en-GB", { day: "numeric", month: "long" });
+      const stoppedToo = also.length ? ` These extras stop too and will not be charged again: ${also.map((l) => `${l.qty > 1 ? `${l.qty} × ` : ""}${l.title} (works until ${day(l.endsAt)})`).join(", ")}.` : "";
+      // An extra the payment provider could not be told about yet is tried again by itself; the client hears the truth meanwhile.
+      const stuck = payments.all().some((o) => o.workspaceId === order.workspaceId && o.id !== order.id && o.status === "paid" && !!o.stopWanted);
+      notices.add(order.workspaceId, { kind: "info", title: "Your Team package has been cancelled", body: `Your team keeps working until ${day(endsAt)}. You can start it again any time from the store.${stoppedToo}${stuck ? " One extra could not be stopped yet. We are trying again, and MAIZ has been told." : ""}`, link: also.length || stuck ? "/app.html#settings" : "/app.html#store" });
+    },
+    plan: (key) => key === TEAM_PACKAGE_KEY,
+    oneBill: () => prices.general().oneMonthlyBill === 1,
+    periodEnd: paidThrough,
+    // The exact inverse of `fulfil`: the employee a line hired leaves, and the weekly energy it added goes with it,
+    // because the pool is worked out from who is on the team. The six core employees are never touched.
+    release: (order, line, employeeIds) => {
+      const templateKey = line.key.split(":")[0]!;
+      if (CORE_TEMPLATE_KEYS.has(templateKey)) return [];
+      return employeeIds.filter((id) => workforce.templateOf(id) === templateKey && workforce.remove(order.workspaceId, id, "payment:line_ended"));
+    },
+    released: (ws, lines) => {
+      const names = lines.flatMap((l) => l.employeeIds.map((id) => workforce.formerName(id) ?? l.title));
+      const energyGone = lines.reduce((n, l) => n + prices.weeklyEnergyFor(l.key.split(":")[0]!) * l.employeeIds.length, 0);
+      const many = names.length > 1;
+      notices.add(ws, { kind: "info", title: many ? `${names.length} employees have left your team` : `${names[0]} has left your team`, body: `The month you paid for has ended, so ${many ? `${names.join(", ")} have` : `${names[0]} has`} left your team. The work ${many ? "they" : "it"} did is kept.${energyGone ? ` The weekly energy that came with ${many ? "them" : "it"} (${energyGone.toLocaleString("en-GB")}) has gone too.` : ""} You can add ${many ? "them" : "it"} again any time from the store.`, link: "/app.html#store" });
     },
   });
 
@@ -458,6 +545,18 @@ export function createPlatform(cfg: PlatformConfig) {
   });
 
   /**
+   * The client's Approvals, Books and cash and Compliance calendar screens, and the dates a client adds to their own
+   * calendar (with a reminder through the bell). Reads the other modules as the signed-in person. docs/OVERVIEW-DATA.md.
+   */
+  const overview = createOverview({
+    identity, now, agents, metaClients, people, reviews, specialists, integrations, ledger, reconciliation, payments, energy, admin, paidThrough,
+    timezone: (ws) => batch.scheduleOf(ws).timezone,
+    team: (ws) => [...new Set(workforce.templatesIn(ws))].map((key) => ({ key, title: workforce.templateFor(key, ws)?.title ?? key })),
+    notify: (ws, n) => { notices.add(ws, { kind: "info", title: n.title, body: n.body, link: "/app.html#compliance" }); },
+  });
+  workforce.addContext((ws, templateKey) => overview.dates.contextFor(ws, templateKey));
+
+  /**
    * The client's control center, from real records: each employee's energy, the task board and the week's totals.
    * Everything is read through the services, so permissions and workspace walls apply.
    */
@@ -468,7 +567,7 @@ export function createPlatform(cfg: PlatformConfig) {
     const energyDays = energy.recentDays(userId, workspaceId, 7);
     const done = workforce.tasksSince(userId, workspaceId, weekAgo).filter((t) => t.status === "ready_for_review");
     const open = batch.openJobsOf(workspaceId);
-    const label = (id: string) => team.find((e) => e.id === id)?.name ?? "Employee";
+    const label = (id: string) => team.find((e) => e.id === id)?.name ?? workforce.formerName(id) ?? "Employee";
     const clip = (t: string, n: number) => (t.length > n ? `${t.slice(0, n - 1)}…` : t);
     const people = team.map((e) => {
       const allowance = energy.quotaOf(userId, workspaceId, e.id);
@@ -583,6 +682,27 @@ export function createPlatform(cfg: PlatformConfig) {
   };
 
   /**
+   * Off-server backups the app runs by itself: a nightly encrypted dump to the owner's own storage, a weekly restore
+   * test, and alerts when either fails. Set up on the owner's Backups page; see docs/BACKUPS.md.
+   */
+  const backupDbUrl = cfg.backup?.databaseUrl;
+  const backup = new BackupService({
+    isOwner: isPlatformOwner, now, http: cfg.http, timezone: cfg.ownerTimezone, pageUrl: `${base}/owner-backups.html`,
+    databaseUrl: backupDbUrl, tmpDir: cfg.backup?.tmpDir,
+    run: cfg.backup?.run ?? (backupDbUrl ? spawnRunner(cfg.backup?.binDir) : undefined),
+    db: cfg.backup?.db ?? (backupDbUrl ? pgAdmin(backupDbUrl) : undefined),
+    serverKeys: () => cfg.backup?.serverKeys ?? {},
+    // Changes still waiting in memory are written first, so the backup holds everything up to this minute.
+    flush: async () => { await sink?.flush(); },
+    alert: async (a) => {
+      await alertOwners(a.subject, a.text);
+      // The email always goes. The owner's devices are not woken at night for something that can wait until morning.
+      if (inQuietHours(now(), cfg.ownerTimezone ?? "Europe/London")) return;
+      for (const id of ownerIdSet) void push.sendToUser(id, { title: a.subject, body: "Open the Backups page to see what happened.", link: "/owner-backups.html", tag: `backup-${a.problem}` });
+    },
+  });
+
+  /**
    * Turn on durable storage: load everything saved, put it back into the services,
    * then start writing every new change behind them. Call once, before serving.
    */
@@ -623,6 +743,13 @@ export function createPlatform(cfg: PlatformConfig) {
       else if (x.kind === "rota_shift" && !x.data.removed) rota.restoreShift(x.data);
       else if (x.kind === "agent_conn" || x.kind === "agent_job" || x.kind === "agent_delivery") agents.restore(x.kind, x.data);
       else if (x.kind === "dataset") mining.restore(x.data);
+      else if (x.kind === "employee_removed") workforce.restoreRemoved(x.data);
+    }
+    for (const x of s.records ?? []) if (x.kind === "cal_date") overview.dates.restore(x.data);
+    // Teammates: removals win over the stored membership rows, then the people and invites lists come back.
+    for (const x of s.records ?? []) {
+      if (x.kind === "member_gone") identity.restoreRemoval(x.data);
+      else if (x.kind === "team_invite" || x.kind === "team_member") team.restore(x.kind, x.data);
     }
     for (const r of specialists.approved()) workforce.registerCustomTemplate(r.workspaceId, customTemplateOf(r));
     if (s.aiSettings) aiSettings.restore(s.aiSettings);
@@ -634,6 +761,7 @@ export function createPlatform(cfg: PlatformConfig) {
     for (const r of s.batchRuns ?? []) batch.restoreRun(r);
     for (const c of s.credentials ?? []) credentials.restore(c.userId, c);
     for (const c of s.connectionSecrets ?? []) {
+      if (c.key.startsWith(BACKUP_SECRET_PREFIX)) { backup.restoreSecret(c.key, c.secret); continue; }
       if (c.key === VAPID_STORE_KEY) push.restoreKeys(c.secret); else if (c.key.startsWith(AGENT_SECRET_PREFIX)) agents.restoreSecret(c.key, c.secret); else connections.restore(c.key, c.secret);
     }
     rebuildChannels();
@@ -649,6 +777,9 @@ export function createPlatform(cfg: PlatformConfig) {
     }
     sink = store;
     for (const part of [audit, identity, energy, workforce, ledger, router, admin, integrations, reviews, prices, specialists, aiSettings, spend, batch, payments, rota, reconciliation, people, conversations, notices, credentials, coupons, affiliates, promoter, growth, connections, metaClients, push, mining, agents]) part.useSink(store);
+    team.useSink(store);
+    backup.useSink(store);
+    overview.dates.useSink(store);
     live.sink = store;
     live.wa?.useSink(store);
   }
@@ -693,6 +824,6 @@ export function createPlatform(cfg: PlatformConfig) {
     slack: { enumerable: true, get: () => cfg.slack ?? connections.slackApp() },
     loginApps: { enumerable: true, get: (): LoginApps => ({ ...connections.loginApps(), ...cfg.loginApps }) },
   });
-  return { agents, mining, orderDiscountFor, quoteFor, hasTeamPackage, push, conversations, notices, warm, ownerDecisions, decisionDigest, dashboard, reconciliation, rota, people, payments, batch, email, usedLinks, sends, loginFails, resets, credentials, formHits, codeFails, coupons, affiliates, promoter, paid, growth, research, connections, growthTick, metaClients, metaSettings, get ownerWhatsApp() { return live.wa; }, admin, reviews, prices, specialists, ai, clients, isPlatformOwner, healthy, hasStore, cfg: liveCfg, now, audit, bus, identity, energy, workforce, ledger, onboarding, router, integrations, slackTokens, saveSlackToken, attachStore };
+  return { resources, resourcesFor, resourceUsage, team, backup, overview, agents, mining, orderDiscountFor, quoteFor, hasTeamPackage, push, conversations, notices, warm, ownerDecisions, decisionDigest, dashboard, reconciliation, rota, people, payments, batch, email, usedLinks, sends, loginFails, resets, credentials, formHits, codeFails, coupons, affiliates, promoter, paid, growth, research, connections, growthTick, metaClients, metaSettings, get ownerWhatsApp() { return live.wa; }, admin, reviews, prices, specialists, ai, clients, isPlatformOwner, healthy, hasStore, cfg: liveCfg, now, audit, bus, identity, energy, workforce, ledger, onboarding, router, integrations, slackTokens, saveSlackToken, attachStore };
 }
 export type Platform = ReturnType<typeof createPlatform>;

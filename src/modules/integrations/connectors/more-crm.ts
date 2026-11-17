@@ -1,4 +1,5 @@
 import { IntegrationError, type Connector, type ConnectorContext, type DateRange, type Records } from "../types.js";
+import { makeRefresh, tokenCall } from "./oauth-util.js";
 import { DayBook, dayOf, getJson, inRange, oauth, postJson, sameHttpsHost, standardRefresh, toMinor } from "./util.js";
 
 /**
@@ -48,25 +49,25 @@ async function readSalesforce(ctx: ConnectorContext, range: DateRange): Promise<
 export const salesforce: Connector = {
   key: "salesforce", name: "Salesforce", category: "customers", availability: "live", capabilities: ["crm.read"],
   summary: "New leads and contacts, deals won and lost, and your open pipeline from Salesforce.",
-  note: "Read-only (the api scope with a read-only connected app). We count records and add up deal amounts; names and notes are never read. Counts stop at 5,000 records per type per update.",
-  auth: { kind: "oauth2", authorizeUrl: "https://login.salesforce.com/services/oauth2/authorize", tokenUrl: SF_TOKEN, scopes: ["api", "refresh_token"], envPrefix: "SALESFORCE" },
+  note: "Read-only (the api scope). We count records and add up deal amounts; names and notes are never read. Counts stop at 5,000 records per type per update.",
+  auth: { kind: "oauth2", authorizeUrl: "https://login.salesforce.com/services/oauth2/authorize", tokenUrl: SF_TOKEN, scopes: ["api", "refresh_token"], envPrefix: "SALESFORCE", pkce: true },
+  ownerTest: "salesforce",
   setup: {
     console: { href: "https://login.salesforce.com/", label: "Salesforce: sign in, then Setup, App Manager" },
     steps: [
-      "In a Salesforce org (a free Developer Edition is fine) open Setup, App Manager, New Connected App. Turn on Enable OAuth Settings.",
-      "Paste the Redirect URI shown on this page. Selected OAuth scopes: Manage user data via APIs (api) and Perform requests at any time (refresh_token).",
-      "Save, wait a few minutes, then open the app's Manage Consumer Details and copy the Consumer Key (Client ID) and Consumer Secret into the boxes here.",
-      "Clients from other Salesforce orgs can connect to a Connected App created in your org; Salesforce may ask them to approve it once.",
+      "Since Salesforce's Spring '26 release new Connected Apps cannot be created unless Salesforce Support turns that back on. Make an External Client App instead: Setup, App Manager, New External Client App. Give it a name and a contact email.",
+      "Under OAuth Settings tick Enable OAuth. Paste the Callback URL shown on this page. Selected scopes: Manage user data via APIs (api) and Perform requests at any time (refresh_token). Tick Authorization Code and Credentials Flow, and keep Require secret for Web Server Flow and Require PKCE ticked: MAIZ sends the PKCE proof.",
+      "Save, then wait up to ten minutes: a new app is not active straight away, and until it is Salesforce answers that it does not know the Consumer Key. Under Settings, OAuth Settings, press Consumer Key and Secret and copy both into the boxes here.",
+      "Important: an app made only in your own Salesforce org (Distribution State: Local) is usually not usable by people in other orgs. To let clients connect their own orgs it must be packaged and installed in each client's org, or their admin must give the user the Approve Uninstalled Connected Apps permission. If a client sees the error OAUTH_APPROVAL_ERROR_GENERIC, that is why: ask their Salesforce admin to install the app or grant that permission. Check Salesforce's current help for External Client App distribution, because this changed in 2025 and 2026.",
     ],
-    approval: "No review needed for a Connected App. Salesforce can take 2 to 10 minutes to activate it.",
+    approval: "No review by Salesforce for connecting. Setting up distribution to other orgs is the real work.",
   },
   read: readSalesforce,
-  refresh: standardRefresh(SF_TOKEN),
-  async exchangeCode(http, app, code) {
-    const res = await http(SF_TOKEN, { method: "POST", redirect: "error", headers: { "content-type": "application/x-www-form-urlencoded", accept: "application/json" }, body: new URLSearchParams({ grant_type: "authorization_code", code, client_id: app.clientId, client_secret: app.clientSecret, redirect_uri: app.redirectUri }) });
-    const o = (await res.json().catch(() => ({}))) as { access_token?: string; refresh_token?: string; instance_url?: string };
-    if (!res.ok || !o.access_token || !o.instance_url) throw new IntegrationError("Salesforce did not approve the connection");
-    const host = (() => { try { const u = new URL(o.instance_url!); return u.protocol === "https:" && SF_HOST.test(u.hostname) ? u.origin : undefined; } catch { return undefined; } })();
+  refresh: makeRefresh("Salesforce", SF_TOKEN, { fallbackSeconds: 5400 }),
+  async exchangeCode(http, app, code, params) {
+    const form: Record<string, string> = { grant_type: "authorization_code", code, redirect_uri: app.redirectUri, ...(params?.code_verifier ? { code_verifier: params.code_verifier } : {}) };
+    const o = (await tokenCall(http, "Salesforce", SF_TOKEN, form, app)) as { access_token: string; refresh_token?: string; instance_url?: string };
+    const host = (() => { try { const u = new URL(o.instance_url ?? ""); return u.protocol === "https:" && SF_HOST.test(u.hostname) ? u.origin : undefined; } catch { return undefined; } })();
     if (!host) throw new IntegrationError("Salesforce sent an address we do not trust. Please try again.");
     return { credentials: { kind: "oauth2", accessToken: o.access_token, refreshToken: o.refresh_token, expiresAt: new Date(Date.now() + 90 * 60_000).toISOString(), tenant: host }, externalAccount: new URL(host).hostname };
   },

@@ -30,11 +30,15 @@ const GENERAL: [keyof GeneralPrices, string, string, string][] = [
   ["paidServiceMultiplier", "Paid services use this many times the energy", "×", "Video rendering and other things that cost us money each time. 2 means double"],
 ];
 
+/** The one monthly bill switch is a tick box, saved as 1 (on) or 0 (off). */
+const ONE_BILL = "oneMonthlyBill";
+const ONE_BILL_LABEL = "One monthly bill for each client";
+
 function demo(): Book {
   // Demo copy of the launch defaults (src/modules/pricing DEFAULT_GENERAL); importing that module would pull server code in.
   const general: GeneralPrices = {
     basicPackageMonthlyGbp: 150, addOnEmployeeMonthlyGbp: 25, specialistStandardMonthlyGbp: 35, specialistPremiumMonthlyGbp: 35, overageGbpPer100Energy: 1,
-    trialDays: 7, trialTeamEnergy: 3_000, weeklyTeamEnergy: 8_000, dailyTeamCeiling: 3_000, addOnWeeklyEnergy: 2_000, specialistStandardWeeklyEnergy: 2_000, specialistPremiumWeeklyEnergy: 2_000, paidServiceMultiplier: 2,
+    trialDays: 7, trialTeamEnergy: 3_000, weeklyTeamEnergy: 8_000, dailyTeamCeiling: 3_000, addOnWeeklyEnergy: 2_000, specialistStandardWeeklyEnergy: 2_000, specialistPremiumWeeklyEnergy: 2_000, paidServiceMultiplier: 2, oneMonthlyBill: 0,
   };
   return {
     general,
@@ -57,7 +61,7 @@ function renderGeneral(): void {
   $("pr-general").innerHTML = GENERAL.map(([k, label, unit, hint]) => {
     const id = `pr-g-${k}`;
     return `<div class="field"><label for="${id}">${esc(label)}${unit === "£" ? " (£)" : unit === "days" ? " (days)" : unit === "×" ? " (times)" : ""}</label><input class="input" id="${id}" type="number" min="0" step="${unit === "£" ? "0.01" : unit === "×" ? "0.1" : "1"}" inputmode="decimal" data-k="general.${k}" value="${book.general[k]}"><span class="hint">${esc(hint)}</span></div>`;
-  }).join("");
+  }).join("") + `<div class="field ow-bill"><label class="ow-check" for="pr-g-${ONE_BILL}"><input type="checkbox" id="pr-g-${ONE_BILL}" data-k="general.${ONE_BILL}" aria-describedby="pr-g-${ONE_BILL}-h"${book.general[ONE_BILL] === 1 ? " checked" : ""}>${ONE_BILL_LABEL}</label><span class="hint" id="pr-g-${ONE_BILL}-h">When this is on, a client who already pays the Team package gets any extra monthly employee added to that same monthly bill, and their saved card is charged only for the days left in the month. When it is off, each extra has its own payment, as it does now. Turn it on, then make one test purchase yourself in Stripe test mode before you rely on it. Clients who already pay for extras separately are left as they are.</span></div>`;
 }
 
 function renderAgents(): void {
@@ -89,7 +93,7 @@ function renderItems(): void {
 
 const label = (path: string): string => {
   const [scope, a, b] = path.split(".");
-  if (scope === "general") return GENERAL.find(([k]) => k === a)?.[1] ?? a!;
+  if (scope === "general") return a === ONE_BILL ? ONE_BILL_LABEL : GENERAL.find(([k]) => k === a)?.[1] ?? a!;
   if (scope === "agents") return `${book.agents.find((x) => x.key === a)?.title ?? a} daily cap`;
   const item = book.items.find((x) => x.key === a)?.title ?? a;
   return `${item}: ${b === "priceGbp" ? "price" : b === "available" ? "in the store" : b}`;
@@ -97,6 +101,7 @@ const label = (path: string): string => {
 const show = (path: string, v: unknown): string => {
   if (v === null || v === undefined) return "no cap";
   if (typeof v === "boolean") return v ? "on" : "off";
+  if (path === `general.${ONE_BILL}`) return Number(v) === 1 ? "on" : "off";
   return path.endsWith("Gbp") || path.endsWith("priceGbp") || path.includes("Gbp") ? gbp(Number(v)) : Number(v).toLocaleString("en-GB");
 };
 
@@ -142,7 +147,7 @@ function current(path: string): unknown {
 
 function track(el: HTMLInputElement): void {
   const k = el.dataset.k!;
-  const v = el.type === "checkbox" ? el.checked : el.value.trim() === "" ? (k.startsWith("agents.") ? null : NaN) : Number(el.value);
+  const v = el.type === "checkbox" ? (k === `general.${ONE_BILL}` ? (el.checked ? 1 : 0) : el.checked) : el.value.trim() === "" ? (k.startsWith("agents.") ? null : NaN) : Number(el.value);
   el.toggleAttribute("aria-invalid", typeof v === "number" && (!Number.isFinite(v) || v < 0));
   if (v === current(k) || (typeof v === "number" && !Number.isFinite(v))) edits.delete(k);
   else edits.set(k, v);
