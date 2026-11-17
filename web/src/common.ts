@@ -115,6 +115,15 @@ export function finishSignIn(r: SignedIn): void {
     const profile = JSON.parse(localStorage.getItem("maiz.profile") ?? "{}");
     localStorage.setItem("maiz.profile", JSON.stringify({ ...profile, email: r.email }));
   } catch { /* storage unavailable */ }
+  // Teammates: an invite comes first. The link opened in this tab waits in sessionStorage; an invite sent to the
+  // address that just logged in is offered before they set up a business of their own (docs/TEAMMATES.md).
+  let invited = false;
+  try { invited = !!sessionStorage.getItem("maiz.invite"); } catch { /* storage unavailable */ }
+  if (invited) { location.replace("/join.html"); return; }
+  if (!r.platformOwner && !r.hasOrganisation) {
+    void api<{ invites?: unknown[] }>("/invites/mine").then((w) => location.replace(w.data?.invites?.length ? "/join.html" : r.affiliate ? "/affiliate.html" : "/onboarding.html"));
+    return;
+  }
   // The MAIZ platform owner lands on the quality review queue; clients on their control centre, or on setup if they have no team yet.
   location.replace(r.platformOwner ? "/review.html" : r.hasOrganisation ? "/app.html" : r.affiliate ? "/affiliate.html" : "/onboarding.html");
 }

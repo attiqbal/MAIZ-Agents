@@ -85,8 +85,11 @@ export class IdentityService {
 
   addMember(actorUserId: string, workspaceId: string, userId: string, role: Role): void {
     this.require(actorUserId, workspaceId, "workspace.manage");
+    // A workspace has one owner, the person who signed up. Nobody is ever added as another, and the owner's own role is never overwritten.
+    if (role === "owner" || this.roleOf(userId, workspaceId) === "owner") throw new PermissionError("a workspace has one owner, and that cannot be changed here");
     this.memberships.set(`${workspaceId}|${userId}`, role);
     this.sink?.membership(workspaceId, userId, role);
+    this.sink?.record(workspaceId, "member_gone", userId, { workspaceId, userId, removed: false });
     this.audit.record({
       workspaceId,
       actor: `user:${actorUserId}`,
@@ -94,6 +97,43 @@ export class IdentityService {
       target: `user:${userId}`,
       data: { role },
     });
+  }
+
+  /** Changes what a teammate may do. The owner's role cannot be changed, and nobody can be made an owner. */
+  setRole(actorUserId: string, workspaceId: string, userId: string, role: Exclude<Role, "owner">): void {
+    this.require(actorUserId, workspaceId, "workspace.manage");
+    const from = this.roleOf(userId, workspaceId);
+    if (!from || from === "owner" || (role as Role) === "owner" || !ROLE_PERMISSIONS[role]) throw new PermissionError("that person's role cannot be changed");
+    if (from === role) return;
+    this.memberships.set(`${workspaceId}|${userId}`, role);
+    this.sink?.membership(workspaceId, userId, role);
+    this.audit.record({ workspaceId, actor: `user:${actorUserId}`, action: "member.role_changed", target: `user:${userId}`, data: { from, to: role } });
+  }
+
+  /**
+   * Takes a teammate out of the workspace. Every request works out the caller's workspace and role afresh, so their
+   * existing login opens nothing of this workspace from the next request on. The owner cannot be removed.
+   */
+  removeMember(actorUserId: string, workspaceId: string, userId: string): void {
+    this.require(actorUserId, workspaceId, "workspace.manage");
+    const role = this.roleOf(userId, workspaceId);
+    if (!role || role === "owner") throw new PermissionError("that person cannot be removed");
+    this.memberships.delete(`${workspaceId}|${userId}`);
+    // The stored membership row cannot be deleted by the app's database role, so the removal is its own record and wins at start-up.
+    this.sink?.record(workspaceId, "member_gone", userId, { workspaceId, userId, removed: true });
+    this.audit.record({ workspaceId, actor: `user:${actorUserId}`, action: "member.removed", target: `user:${userId}`, data: { role } });
+  }
+
+  /** Put back a removal read from storage (after the memberships themselves). */
+  restoreRemoval(r: { workspaceId?: unknown; userId?: unknown; removed?: unknown }): void {
+    if (r?.removed !== true || typeof r.workspaceId !== "string" || typeof r.userId !== "string") return;
+    if (this.roleOf(r.userId, r.workspaceId) !== "owner") this.memberships.delete(`${r.workspaceId}|${r.userId}`);
+  }
+
+  /** The person who signed up. Platform-level and team code only. */
+  ownerOf(workspaceId: string): string | undefined {
+    for (const [key, role] of this.memberships) if (role === "owner" && key.startsWith(`${workspaceId}|`)) return key.slice(workspaceId.length + 1);
+    return undefined;
   }
 
   roleOf(userId: string, workspaceId: string): Role | undefined {

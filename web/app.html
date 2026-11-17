@@ -413,6 +413,10 @@
         <div class="ubar ubar-2"><span>Company</span><span id="set-biz" class="mono"></span></div>
         <div class="ubar ubar-2"><span>Email</span><span id="set-email" class="mono"></span></div>
         <div class="ubar ubar-2"><span>Sign out of this device</span><button class="btn btn-sm btn-ghost" data-signout>Sign out</button></div></section>
+      <!-- Teammates: who has access to this business. Filled by src/access.ts (docs/TEAMMATES.md). -->
+      <section class="panel" aria-labelledby="pa-h" id="people-access"><div class="panel-h"><h2 id="pa-h">People with access</h2><span class="r" id="pa-count"></span></div>
+        <div id="pa-body"><p class="muted small">Log in to see who has access to this business.</p></div>
+        <p class="pa-msg" id="pa-msg" role="status"></p></section>
       <section class="panel" aria-labelledby="bill-h"><div class="panel-h"><h2 id="bill-h">Plan and billing</h2><span class="r" id="bill-state"></span></div>
         <p id="bill-plan" class="muted small">Log in to see your plan.</p>
         <div class="acts set-acts"><a class="btn btn-primary btn-sm" href="#store" id="bill-choose" hidden>Choose your plan</a><button class="btn btn-ghost btn-sm" type="button" id="bill-portal" hidden>Manage card, invoices and cancellation</button><span class="muted small" id="bill-msg" role="status"></span></div>

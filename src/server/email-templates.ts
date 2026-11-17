@@ -249,3 +249,20 @@ export const affiliatePaidEmail = (name: string, amount: string, reference: stri
   paragraphs: [`Hello ${name}, we have marked ${amount} of your commission as paid.`, ...(reference ? [`Reference: ${reference}`] : [])],
   button: { label: "See your earnings", url: dashboardUrl },
 }, brand);
+
+/**
+ * An owner invites a person into their business. The link works once and lasts 7 days (src/modules/teammates).
+ * The words are the same whether or not the address already has an account, so the email gives nothing away.
+ */
+export const teamInviteEmail = (i: { businessName: string; invitedBy: string; roleLabel: string; can: string; url: string }, brand: EmailBrand) => build(`You are invited to join ${i.businessName} on MAIZ Agents`, {
+  audience: "customer",
+  preheader: `${i.invitedBy || "The owner"} invited you to ${i.businessName}'s AI team. The link works once and lasts 7 days.`,
+  heading: `Join ${i.businessName}`,
+  paragraphs: [
+    `${i.invitedBy || "The owner"} has invited you to work with ${i.businessName}'s AI team on MAIZ Agents.`,
+    `Your access: ${i.roleLabel}. ${i.can}`,
+    "Use the button below to join. You can choose a password, or log in if you already use MAIZ Agents. The link works once and expires in 7 days.",
+  ],
+  button: { label: `Join ${i.businessName}`, url: i.url },
+  fineprint: ["Joining is free for you: the business pays for its plan.", "If you were not expecting this, you can ignore this email. Nothing happens unless you use the link."],
+}, brand);

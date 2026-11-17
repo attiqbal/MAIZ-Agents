@@ -221,6 +221,8 @@ async function loadOrg(): Promise<void> {
     $("demo-banner").hidden = false; return;
   }
   realOrg = r.data;
+  // Teammates: the "People with access" panel, and what a person who is not the owner sees (src/access.ts).
+  void import("./access").then((m) => m.initAccess(realOrg?.role));
   $("ask-when").hidden = false;
   warmUp();
   $("org-name").textContent = realOrg.name;
@@ -231,6 +233,7 @@ async function loadOrg(): Promise<void> {
   setPeopleBusiness(realOrg.name);
   showTrial(realOrg.trialEndsAt, realOrg.planEnded === true);
   void loadBilling();
+  if (!realOrg.role || realOrg.role === "owner") void loadCodes(); // codes are the owner's alone
   app.classList.add("is-live");
   const hasDataAgent = realOrg.team.some((e) => e.templateKey === "data-mining-agent");
   $("mining-link").hidden = !hasDataAgent;
@@ -286,6 +289,7 @@ async function loadBilling(): Promise<void> {
     : realOrg.planEnded ? (over ? `Your plan ended on ${day(ends)}. Your work is kept; start the Team package again to carry on.` : `Your plan was cancelled and your team works until ${day(ends)}. You can start it again any time.`)
     : over ? `Your free trial ended on ${day(ends)}. Your work is kept; choose your plan to carry on.` : `Your free trial runs until ${day(ends)}. Nothing is charged unless you choose a plan.`;
   $("bill-choose").hidden = !ends;
+  if (realOrg.role && realOrg.role !== "owner") return; // billing is the owner's alone
   void import("./billing").then((m) => m.mountBillingLines($("bill-lines"), $("bill-msg")));
   const r = await api<{ enabled: boolean; orders: OrderRow[] }>("/orders");
   const orders = r.ok ? r.data?.orders ?? [] : [];
@@ -352,7 +356,6 @@ $("cp-form").addEventListener("submit", async (ev) => {
   msg.textContent = r.ok ? `Done: ${r.data?.applied}.` : r.data?.error ?? "Could not apply the code. Please try again.";
   if (r.ok) { $<HTMLInputElement>("cp-code").value = ""; void loadCodes(); void loadOrg(); void loadTopUps(); }
 });
-void loadCodes();
 
 // Account menu: sign out, and the Settings screen's account details.
 /** Logging out also stops this device's alerts, so the next person to use it is not sent this account's news. */
@@ -380,7 +383,7 @@ function resetWhen(): void { chosenWhen = undefined; document.querySelectorAll("
 // limits this, so calling it often costs nothing; this just keeps us from asking more than every few minutes.
 let lastWarm = 0;
 function warmUp(): void {
-  if (!getToken() || Date.now() - lastWarm < 4 * 60_000) return;
+  if (!getToken() || realOrg?.role === "viewer" || Date.now() - lastWarm < 4 * 60_000) return;
   lastWarm = Date.now();
   void api("/warm", { method: "POST", body: {} });
 }

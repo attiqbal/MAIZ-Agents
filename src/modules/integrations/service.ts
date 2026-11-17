@@ -296,8 +296,10 @@ export class IntegrationService {
     if (!text.trim()) throw new IntegrationError("the file is empty");
     if (Buffer.byteLength(text) > MAX_FILE_BYTES) throw new IntegrationError("the file is too big: export a shorter date range");
     const parsed = c.parseFile(text, { currency: this.currency(userId, workspaceId), date: opts.date });
-    const conn = [...this.connections.values()].find((x) => x.workspaceId === workspaceId && x.connectorKey === key && x.status !== "disconnected")
-      ?? this.save(userId, workspaceId, c, undefined);
+    const existing = [...this.connections.values()].find((x) => x.workspaceId === workspaceId && x.connectorKey === key && x.status !== "disconnected");
+    // The first upload connects the app, and connecting apps is the owner's alone. Later uploads only refresh it.
+    if (!existing) this.identity.require(userId, workspaceId, "workspace.manage");
+    const conn = existing ?? this.save(userId, workspaceId, c, undefined);
     this.update({ ...conn, lastSyncAt: this.now().toISOString() });
     return this.store(conn.id, workspaceId, parsed);
   }
