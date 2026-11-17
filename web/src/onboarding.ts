@@ -8,6 +8,14 @@ import { MAX_NEEDS, cleanCountryName, planSignup, resolveSector, type SignupPlan
 import { introLines, personaFor } from "../../src/modules/onboarding/people";
 import { APPS, COUNTRIES, NEEDS, OTHER_SECTOR, SECTORS, countryFacts, getSector, type AppHow } from "../../src/modules/onboarding/sectors";
 
+// Before launch the server is in "interest" mode and signup is closed: send visitors to the interest form.
+// ?preview=1 skips this so the platform owner can still test signup (the server only lets the owner create accounts then).
+if (!/[?&]preview=1/.test(location.search)) {
+  void fetch("/api/signup/mode").then((r) => (r.ok ? r.json() : undefined)).then((m: { mode?: string } | undefined) => {
+    if (m?.mode === "interest") location.replace("/register-interest.html");
+  }).catch(() => undefined);
+}
+
 wirePasswordToggles();
 const TOTAL = 6;
 const PLAN_STEP = 4;

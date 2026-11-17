@@ -3,6 +3,7 @@ import { resolve } from "node:path";
 import { readFileSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { defineConfig, type Plugin } from "vite";
+import { INTEREST_MODE, signupCopy } from "./signup-mode";
 import { NEEDS, SECTORS, OTHER_SECTOR } from "../src/modules/onboarding/sectors";
 
 /**
@@ -20,7 +21,7 @@ function partials(): Plugin {
           for (const [, k, v] of attrs.matchAll(/(\w+)="([^"]*)"/g)) out = out.replaceAll(`{{${k}}}`, v!);
           return expand(out, depth + 1);
         });
-  return { name: "partials", transformIndexHtml: { order: "pre", handler: (html) => companyTokens(expand(html)) } };
+  return { name: "partials", transformIndexHtml: { order: "pre", handler: (html) => signupCopy(companyTokens(expand(html))) } };
 }
 
 
@@ -54,7 +55,7 @@ function sectorsHtml(): string {
   return `<div class="team-strip" style="grid-template-columns:repeat(auto-fill,minmax(220px,1fr))">${chips}</div><div class="sector-list">${sections}</div>`;
 }
 function industries(): Plugin {
-  return { name: "maiz-sectors", transformIndexHtml: { order: "pre", handler: (html) => html.replace("<!--@sectors-->", sectorsHtml) } };
+  return { name: "maiz-sectors", transformIndexHtml: { order: "pre", handler: (html) => html.replace("<!--@sectors-->", signupCopy(sectorsHtml())) } };
 }
 
 // Public origin of the site, used for canonical links, Open Graph tags, the sitemap and robots.txt.
@@ -84,7 +85,7 @@ const companyTokens = (html: string): string =>
     .replaceAll("%CONTACT_EMAIL%", COMPANY.email);
 
 /** Public, indexable pages. App and onboarding pages are noindex and stay out of the sitemap. */
-const INDEXED_PAGES = ["/", "/employees.html", "/how-it-works.html", "/control-centre.html", "/pricing.html", "/security.html", "/faq.html", "/energy.html", "/industries.html", "/terms.html", "/privacy.html", "/cookies.html"];
+const INDEXED_PAGES = ["/", "/employees.html", "/how-it-works.html", "/control-centre.html", "/pricing.html", "/security.html", "/faq.html", "/energy.html", "/industries.html", "/register-interest.html", "/terms.html", "/privacy.html", "/cookies.html"];
 
 // Optional search-engine verification codes, set at build time (Google Search Console, Bing Webmaster Tools).
 // DNS verification needs neither; these are for the "HTML tag" method.
@@ -95,7 +96,9 @@ const BUILT = new Date().toISOString().slice(0, 10);
 // picture instead of showing the one they cached before.
 const OG_VERSION = createHash("sha256").update(readFileSync(resolve(__dirname, "public", "og.png"))).digest("hex").slice(0, 8);
 const OG_IMAGE = `${SITE_URL}/og.png?v=${OG_VERSION}`;
-const OG_ALT = "MAIZ Agents: hire a team, not another tool. Six illustrated AI employees, £150 a month for the whole team, 7 days free.";
+const OG_ALT = INTEREST_MODE
+  ? "MAIZ Agents: hire a team, not another tool. Six illustrated AI employees, opening soon."
+  : "MAIZ Agents: hire a team, not another tool. Six illustrated AI employees, £150 a month for the whole team, 7 days free.";
 
 const decode = (s: string) =>
   s.replace(/<[^>]+>/g, "").replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&amp;/g, "&").replace(/\s+/g, " ").trim();
@@ -151,10 +154,10 @@ const ORG = {
 /** The Team package, exactly as the pricing page shows it. Keep in step with src/modules/pricing. */
 const TEAM_OFFER = {
   "@type": "Product", "@id": `${SITE_URL}/pricing.html#team`, name: "MAIZ Agents Team package", brand: { "@id": `${SITE_URL}/#org` },
-  description: "Five AI employees (Finance, Marketing, Business consultant, HR and Compliance) and a free Admin manager, with 8,000 energy a week shared by the team. 7-day free trial, no card.",
+  description: "Five AI employees (Finance, Marketing, Business consultant, HR and Compliance) and a free Admin manager, with 8,000 energy a week shared by the team." + (INTEREST_MODE ? " Opening soon: register your interest." : " 7-day free trial, no card."),
   image: OG_IMAGE,
   offers: {
-    "@type": "Offer", url: `${SITE_URL}/pricing.html`, price: "150", priceCurrency: "GBP", availability: "https://schema.org/InStock",
+    "@type": "Offer", url: `${SITE_URL}/pricing.html`, price: "150", priceCurrency: "GBP", availability: INTEREST_MODE ? "https://schema.org/ComingSoon" : "https://schema.org/InStock",
     priceSpecification: { "@type": "UnitPriceSpecification", price: "150", priceCurrency: "GBP", unitText: "MONTH", referenceQuantity: { "@type": "QuantitativeValue", value: 1, unitCode: "MON" } },
   },
 };
@@ -226,7 +229,7 @@ function llmsTxt(): string {
 ## Key facts
 
 - Team package: £150 a month for the whole team (five employees plus the free Admin manager), with 8,000 energy a week shared by the team. No per-seat fees.
-- Free trial: 7 days, 3,000 energy, no card needed.
+${INTEREST_MODE ? "- Status: not open yet. Visitors can register their interest at " + u("/register-interest.html") + " and are emailed when it opens. Any free trial will be confirmed at launch." : "- Free trial: 7 days, 3,000 energy, no card needed."}
 - Optional add-ons: an extra ready-made employee £25 a month, a specialist £35 a month (each adds 2,000 energy a week), and consultant passes for 7 or 30 days.
 - Energy is the team's weekly allowance. Each task shows its energy cost before it starts; redoing a task returns its energy. It refills every Monday.
 - Control: nothing leaves the business without the owner's approval. Finance figures come from tested accounting code, not AI guesses; estimates are labelled.
@@ -265,6 +268,8 @@ export default defineConfig({
       input: {
         main: resolve(__dirname, "index.html"),
         onboarding: resolve(__dirname, "onboarding.html"),
+        registerInterest: resolve(__dirname, "register-interest.html"),
+        ownerInterest: resolve(__dirname, "owner-interest.html"),
         app: resolve(__dirname, "app.html"),
         signin: resolve(__dirname, "signin.html"),
         staffForm: resolve(__dirname, "staff-form.html"),

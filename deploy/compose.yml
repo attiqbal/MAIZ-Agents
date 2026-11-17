@@ -33,6 +33,7 @@ services:
         GOOGLE_SITE_VERIFICATION: ${GOOGLE_SITE_VERIFICATION:-}
         BING_SITE_VERIFICATION: ${BING_SITE_VERIFICATION:-}
         CONTACT_EMAIL: ${CONTACT_EMAIL:-}
+        SIGNUP_MODE: ${SIGNUP_MODE:-interest}
     restart: unless-stopped
     depends_on:
       db:

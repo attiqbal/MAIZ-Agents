@@ -19,7 +19,8 @@ import { DEFAULT_COMMISSION, DEFAULT_HOLD_DAYS, PromoError, describeCommission }
 import { EnergyError, parseAutoReload } from "../modules/energy/index.js";
 import { BatchError } from "../modules/batch/schedule.js";
 import { SettingsError } from "../modules/model-gateway/routing/settings.js";
-import { affiliatePaidEmail, affiliateWelcomeEmail, brandFrom, couponGiftEmail, signInLinkEmail } from "./email-templates.js";
+import { InterestError } from "../modules/interest/index.js";
+import { interestOwnerEmail, interestThanksEmail, affiliatePaidEmail, affiliateWelcomeEmail, brandFrom, couponGiftEmail, signInLinkEmail } from "./email-templates.js";
 import { SignupError, type SignupChoices } from "../modules/onboarding/index.js";
 import { planSignup, readSignupAnswers } from "../modules/onboarding/recommend.js";
 import { OTHER_SECTOR, getSector } from "../modules/onboarding/sectors.js";
@@ -85,6 +86,9 @@ const CODE_TRIES = 8;
 
 /** Opens or saves of one staff form link per hour. */
 const STAFF_FORM_PER_HOUR = 30;
+/** The pre-launch list: sign-ups per hour across the whole site, and per email address. */
+const INTEREST_PER_HOUR = 300;
+const INTEREST_PER_ADDRESS_PER_HOUR = 3;
 /** Tries with links that do not exist, across everyone, per hour. */
 const UNKNOWN_FORM_LINKS_PER_HOUR = 300;
 
@@ -336,10 +340,37 @@ export function createApp(p: Platform) {
       catch { return json(200, { read: false, reason: "We could not read that website just now." }); }
     }
 
+    // ---- pre-launch: which signup the site is in, and the "register your interest" list ----
+    if (method === "GET" && path === "/api/signup/mode") return { ...json(200, { mode: p.signupOpen ? "open" : "interest" }), headers: { "cache-control": "no-store" } };
+    if (method === "POST" && path === "/api/interest") {
+      const raw = body();
+      if (!raw || typeof raw !== "object" || Array.isArray(raw)) throw new BadRequest("send the form as an object");
+      const b = raw as Record<string, unknown>;
+      // A hidden field real people never fill in: bots that do get the same friendly answer and nothing is stored.
+      if (typeof b.company_site === "string" && b.company_site.trim()) return json(201, { registered: true });
+      const nowMs = p.now().getTime();
+      // Anonymous and public, so it is capped as a whole (the list cannot be flooded) and per address (nobody is spammed with thank-yous).
+      const emailKey = `interest:${String(b.email ?? "").toLowerCase().slice(0, 254)}`;
+      if (p.formHits.recent("interest:all", nowMs).length >= INTEREST_PER_HOUR || p.formHits.recent(emailKey, nowMs).length >= INTEREST_PER_ADDRESS_PER_HOUR) return json(429, { error: "Too many tries just now. Please wait a little and try again." });
+      p.formHits.record("interest:all", nowMs);
+      p.formHits.record(emailKey, nowMs);
+      let got: ReturnType<typeof p.interest.register>;
+      try { got = p.interest.register(b); } catch (e) { if (e instanceof InterestError) return json(400, { error: e.message }); throw e; }
+      const brand = brandFrom(p.cfg);
+      // Emails go out after the answer is sent; a failed email never loses the registration, which is already stored.
+      const after = async () => {
+        if (got.fresh) await p.email.send({ to: got.record.email, ...interestThanksEmail(got.record.name, brand) }).catch((e) => console.error("interest thank-you email failed:", e instanceof Error ? e.message : e));
+        for (const to of p.cfg.platformOwners ?? []) await p.email.send({ to, ...interestOwnerEmail(got.record, `${(p.cfg.appUrl ?? "").replace(/\/$/, "")}/owner-interest.html`, brand) }).catch((e) => console.error("interest owner email failed:", e instanceof Error ? e.message : e));
+      };
+      return { ...json(201, { registered: true }), after };
+    }
+
     // ---- sign up: needs a verified email (or the development shortcut) ----
     if (method === "POST" && path === "/api/signup") {
       const b = body();
       const claims = sessionClaims(req);
+      // Pre-launch: nobody makes an account except the platform owner (to test). Existing accounts sign in as usual.
+      if (!p.signupOpen && !(claims && typeof claims.e === "string" && p.isPlatformOwner(userIdFor(claims.e)))) return json(403, { error: "MAIZ Agents has not opened yet. Please register your interest and we will email you when it does." });
       let email: string;
       if (claims && typeof claims.e === "string") email = claims.e; // verified by a sign-in link
       else if (p.cfg.allowDevAuth) email = String(b.email ?? "").trim().toLowerCase(); // development only: no check
@@ -494,6 +525,15 @@ export function createApp(p: Platform) {
     if (path === "/api/owner/reviews" || path.startsWith("/api/owner/reviews/")) return ownerReviewRoutes(req, userId, body);
     if (path === "/api/owner/ai" || path.startsWith("/api/owner/ai/")) return ownerAiRoutes(req, userId, body);
     if (path === "/api/owner/prices" || path.startsWith("/api/owner/prices/")) return ownerPriceRoutes(req, userId, body);
+    if (method === "GET" && path === "/api/owner/interest") {
+      if (!p.isPlatformOwner(userId)) return json(403, { error: "only the MAIZ platform owner can see the interest list" });
+      return json(200, { people: p.interest.list() });
+    }
+    if (method === "POST" && path === "/api/owner/interest/remove") {
+      if (!p.isPlatformOwner(userId)) return json(403, { error: "only the MAIZ platform owner can change the interest list" });
+      const email = String(body().email ?? "");
+      return p.interest.remove(email) ? json(200, { removed: true }) : json(404, { error: "that address is not on the list" });
+    }
     if (method === "GET" && path === "/api/owner/team") {
       if (!p.isPlatformOwner(userId)) return json(403, { error: "only the MAIZ platform owner can see the owner's team" });
       const pw = p.promoter.waiting(userId), gw = p.growth.waiting(userId), go = p.growth.overview(userId);

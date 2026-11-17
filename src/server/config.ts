@@ -24,6 +24,7 @@ export function checkEnv(env: Record<string, string | undefined>): string[] {
   }
 
   problems.push(...loginEnvProblems(env));
+  if (env.SIGNUP_MODE && env.SIGNUP_MODE !== "interest" && env.SIGNUP_MODE !== "open") problems.push(`SIGNUP_MODE "${env.SIGNUP_MODE}" is not valid (use "interest" for the pre-launch list or "open" for normal signup)`);
 
   if (!!env.RUNPOD_API_KEY !== !!env.RUNPOD_ENDPOINT_ID) problems.push("RUNPOD_API_KEY and RUNPOD_ENDPOINT_ID must be set together (or neither)");
   if (env.RUNPOD_ENDPOINT_ID && !/^[a-z0-9]{6,40}$/i.test(env.RUNPOD_ENDPOINT_ID)) problems.push("RUNPOD_ENDPOINT_ID must be the endpoint's id (letters and digits only), not a URL");

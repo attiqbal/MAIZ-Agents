@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+<!--@include head title="Register your interest · MAIZ Agents" description="MAIZ Agents is opening soon. Join the list and we will email you when your AI team can start."-->
+<link rel="canonical" href="%SITE_URL%/register-interest.html">
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+<div class="page-top">
+  <!--@include header-->
+  <main id="main" tabindex="-1">
+    <section class="section">
+      <div class="container" style="max-width:640px">
+        <header class="article-head">
+          <span class="kicker">Opening soon</span>
+          <h1>Register your interest</h1>
+          <p class="standfirst">MAIZ Agents is not open yet. Tell us a little about you and we will email you when your AI team can start. It costs nothing and you owe nothing.</p>
+        </header>
+        <form id="in-form" class="auth-form" novalidate>
+          <p class="err" id="in-err" role="alert" hidden></p>
+          <div class="field"><label for="in-name">Your name</label><input class="input" id="in-name" type="text" autocomplete="name" maxlength="100" required></div>
+          <div class="field"><label for="in-email">Email</label><input class="input" id="in-email" type="email" autocomplete="email" inputmode="email" maxlength="254" placeholder="you@business.com" required></div>
+          <div class="field"><label for="in-business">Your business <span class="hint">(optional)</span></label><input class="input" id="in-business" type="text" autocomplete="organization" maxlength="150"></div>
+          <div class="field"><label for="in-need">What would you like help with? <span class="hint">(optional)</span></label><textarea class="input" id="in-need" rows="4" maxlength="1000" placeholder="For example: invoices, social posts, staff holidays"></textarea></div>
+          <div class="field" style="position:absolute;left:-9999px" aria-hidden="true"><label for="in-site">Leave this empty</label><input id="in-site" type="text" tabindex="-1" autocomplete="off"></div>
+          <button class="btn btn-primary btn-lg btn-block" type="submit" id="in-go">Register your interest</button>
+          <p class="hint">We use your details only to tell you when MAIZ Agents opens, and to understand what people need. We never sell them. You can ask us to remove you at any time. <a href="/privacy.html#interest">How we use your data</a>.</p>
+        </form>
+        <div id="in-thanks" hidden>
+          <h2 id="in-thanks-h" tabindex="-1">Thank you, you are on the list</h2>
+          <p class="standfirst">We have sent you a short confirmation email. We will email you when MAIZ Agents opens.</p>
+          <p><a class="btn btn-ghost" href="/">Back to the front page</a></p>
+        </div>
+        <p class="hint auth-alt">Already have an account? <a href="/signin.html">Log in</a></p>
+      </div>
+    </section>
+  </main>
+</div>
+<!--@include footer-->
+<script type="module" src="/src/interest.ts"></script>
+</body>
+</html>

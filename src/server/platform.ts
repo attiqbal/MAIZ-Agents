@@ -16,6 +16,7 @@ import { RoutingSettingsStore, defaultSettings } from "../modules/model-gateway/
 import type { Completer } from "../modules/model-gateway/types.js";
 import { AdminManager } from "../modules/admin-manager/index.js";
 import { InMemoryModelProvisioner, InMemoryStorageProvisioner } from "../modules/admin-manager/provisioning.js";
+import { InterestService } from "../modules/interest/index.js";
 import { OnboardingService } from "../modules/onboarding/index.js";
 import { BatchService } from "../modules/batch/service.js";
 import { WorkforceService } from "../modules/workforce/index.js";
@@ -83,6 +84,11 @@ export interface PlatformConfig {
    * queue and sign off specialised tasks. Clients can never approve their own.
    */
   platformOwners?: readonly string[];
+  /**
+   * "interest": the site is pre-launch, visitors register their interest and nobody can create an account
+   * (the platform owner still can, to test). "open" (the default here): normal signup. The server entry point reads SIGNUP_MODE and defaults to "interest"; the website build reads the same variable.
+   */
+  signupMode?: "interest" | "open";
   /** The platform owner's time zone (OWNER_TIMEZONE), so hourly sign-off reminders are not sent at night. Default Europe/London. */
   ownerTimezone?: string;
   /**
@@ -168,6 +174,8 @@ export function createPlatform(cfg: PlatformConfig) {
     const g = prices.general();
     return { days: g.trialDays, teamEnergy: g.trialTeamEnergy, dailyTeamCeiling: g.dailyTeamCeiling };
   });
+  /** People who asked to hear when MAIZ Agents opens (the pre-launch mailing list). */
+  const interest = new InterestService(now);
   const router = new ChannelRouter(identity, workforce, audit);
   /** Business apps (tills, payroll). Employees get only the app data the owner granted them. */
   // Our Xero/Square apps: the server's when set there, otherwise what the owner typed on the Connections page
@@ -667,6 +675,7 @@ export function createPlatform(cfg: PlatformConfig) {
       if (x.kind === "coupon") coupons.restoreCoupon(x.data);
       else if (x.kind === "redemption") coupons.restoreRedemption(x.data);
       else if (x.kind === "push_sub") push.restore(x.data);
+      else if (x.kind === "interest") interest.restore(x.data);
       else if (x.kind === "meta_review" || x.kind === "meta_deletion") metaClients.restorePlatform(x.kind, x.data);
       else if (x.kind === "channel") { live.waState = x.data; live.wa?.restore(x.data); }
       else if (["campaign", "draft", "lead", "optout", "fact"].includes(x.kind)) promoter.restore(x.kind, x.data);
@@ -674,7 +683,7 @@ export function createPlatform(cfg: PlatformConfig) {
       else affiliates.restore(x.kind, x.data);
     }
     sink = store;
-    for (const part of [audit, identity, energy, workforce, ledger, router, admin, integrations, reviews, prices, specialists, aiSettings, spend, batch, payments, rota, reconciliation, people, conversations, learning, video, notices, credentials, coupons, affiliates, promoter, growth, connections, metaClients, push, mining, agents]) part.useSink(store);
+    for (const part of [audit, identity, energy, workforce, ledger, router, admin, integrations, reviews, prices, specialists, aiSettings, spend, batch, payments, rota, reconciliation, people, conversations, learning, video, notices, credentials, interest, coupons, affiliates, promoter, growth, connections, metaClients, push, mining, agents]) part.useSink(store);
     live.sink = store;
     live.wa?.useSink(store);
   }
@@ -719,6 +728,6 @@ export function createPlatform(cfg: PlatformConfig) {
     slack: { enumerable: true, get: () => cfg.slack ?? connections.slackApp() },
     loginApps: { enumerable: true, get: (): LoginApps => ({ ...connections.loginApps(), ...cfg.loginApps }) },
   });
-  return { agents, mining, orderDiscountFor, quoteFor, hasTeamPackage, push, conversations, learning, video, syncLearning, notices, warm, ownerDecisions, decisionDigest, dashboard, reconciliation, rota, people, payments, batch, email, usedLinks, sends, loginFails, resets, credentials, formHits, codeFails, coupons, affiliates, promoter, paid, growth, research, connections, growthTick, metaClients, metaSettings, get ownerWhatsApp() { return live.wa; }, admin, reviews, prices, specialists, ai, clients, isPlatformOwner, healthy, hasStore, cfg: liveCfg, now, audit, bus, identity, energy, workforce, ledger, onboarding, router, integrations, slackTokens, saveSlackToken, attachStore };
+  return { interest, signupOpen: (cfg.signupMode ?? "open") === "open", agents, mining, orderDiscountFor, quoteFor, hasTeamPackage, push, conversations, learning, video, syncLearning, notices, warm, ownerDecisions, decisionDigest, dashboard, reconciliation, rota, people, payments, batch, email, usedLinks, sends, loginFails, resets, credentials, formHits, codeFails, coupons, affiliates, promoter, paid, growth, research, connections, growthTick, metaClients, metaSettings, get ownerWhatsApp() { return live.wa; }, admin, reviews, prices, specialists, ai, clients, isPlatformOwner, healthy, hasStore, cfg: liveCfg, now, audit, bus, identity, energy, workforce, ledger, onboarding, router, integrations, slackTokens, saveSlackToken, attachStore };
 }
 export type Platform = ReturnType<typeof createPlatform>;

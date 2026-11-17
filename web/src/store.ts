@@ -142,7 +142,7 @@ export function initStore(opts: { onPaid?: () => void } = {}): void {
   });
   // With no payment provider switched on, say so plainly instead of pretending to charge.
   const PLACEHOLDER = "Payments are not switched on here yet. Your cart is saved on this device, and nothing has been charged.";
-  const SIGN_IN = "Log in or start your free trial to check out. Your cart is saved on this device, and nothing has been charged.";
+  const SIGN_IN = "Log in to check out. Your cart is saved on this device, and nothing has been charged.";
   // Back from the payment page without paying: say so plainly. The cart is still here.
   if (new URLSearchParams(location.search).has("cancelled")) {
     $("cart-note").textContent = "Payment cancelled. Nothing was charged, and your cart is still here.";

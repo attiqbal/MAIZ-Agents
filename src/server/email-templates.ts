@@ -249,3 +249,25 @@ export const affiliatePaidEmail = (name: string, amount: string, reference: stri
   paragraphs: [`Hello ${name}, we have marked ${amount} of your commission as paid.`, ...(reference ? [`Reference: ${reference}`] : [])],
   button: { label: "See your earnings", url: dashboardUrl },
 }, brand);
+
+/** Thank-you for registering interest on the pre-launch site. Says only what is true: they are on the list. */
+export const interestThanksEmail = (name: string, brand: EmailBrand) => build("You are on the MAIZ Agents list", {
+  audience: "customer",
+  preheader: "We will email you when MAIZ Agents opens.",
+  heading: `Thank you, ${name}`,
+  paragraphs: [
+    "You are on our list. We will email you when MAIZ Agents opens, and we will not email you about anything else.",
+    "Registering your interest is not an order or a booking, and you owe nothing.",
+  ],
+  button: { label: "Visit MAIZ Agents", url: brand.baseUrl },
+  fineprint: ["Want to be taken off the list? Reply to this email and we will remove you."],
+}, brand);
+
+/** Tells the owner someone registered. */
+export const interestOwnerEmail = (r: { name: string; email: string; business: string; need: string; source: string }, listUrl: string, brand: EmailBrand) => build(`New interest: ${r.name}`, {
+  audience: "owner",
+  preheader: `${r.name} registered their interest.`,
+  heading: "Someone registered their interest",
+  paragraphs: [`Name: ${r.name}`, `Email: ${r.email}`, `Business: ${r.business || "not given"}`, `What they need: ${r.need || "not given"}`, `From page: ${r.source}`],
+  button: { label: "See the whole list", url: listUrl },
+}, brand);
