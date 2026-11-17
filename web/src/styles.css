@@ -1959,3 +1959,17 @@ h1, .sec-head h2, .final h2, .stage-band h2, .article-head h1, .sec-title, .bent
 .ag-pre { background: var(--color-canvas-white); border: 1px solid var(--line); border-radius: 14px; padding: 10px 12px; font-size: 12.5px; white-space: pre-wrap; overflow-wrap: anywhere; margin: 6px 0; }
 @media (max-width: 640px) { .ag-two, .ag-three { grid-template-columns: 1fr; } .ag-conn-h .status { margin-left: 0; } }
 .btn[aria-disabled="true"] { opacity: .45; cursor: progress; }
+
+/* One bill: the monthly lines in Plan and billing (docs/ONE-BILL.md). */
+.bl-h { font-family: var(--font-polysans); font-size: 19px; font-weight: 400; letter-spacing: -0.01em; margin: 18px 0 8px; }
+.bl-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.bl-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px 14px; align-items: center; border: 1px solid var(--line); border-radius: 24px; padding: 14px 18px; background: var(--color-canvas-white); }
+.bl-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; overflow-wrap: anywhere; }
+.bl-price { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.bl-act { grid-column: 1 / -1; }
+.bl-sure { display: flex; flex-direction: column; gap: 8px; border-top: 1px solid var(--line); padding-top: 10px; }
+.bl-sure .acts { display: flex; gap: 8px; flex-wrap: wrap; }
+.bl-total { margin: 10px 0 0; max-width: 70ch; }
+@media (max-width: 640px) { .bl-row { grid-template-columns: 1fr; } .bl-price { white-space: normal; } }
+.ow-bill { grid-column: 1 / -1; }
+.ow-bill .hint { max-width: 72ch; }

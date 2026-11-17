@@ -275,6 +275,7 @@ async function loadBilling(): Promise<void> {
     : realOrg.planEnded ? (over ? `Your plan ended on ${day(ends)}. Your work is kept; start the Team package again to carry on.` : `Your plan was cancelled and your team works until ${day(ends)}. You can start it again any time.`)
     : over ? `Your free trial ended on ${day(ends)}. Your work is kept; choose your plan to carry on.` : `Your free trial runs until ${day(ends)}. Nothing is charged unless you choose a plan.`;
   $("bill-choose").hidden = !ends;
+  void import("./billing").then((m) => m.mountBillingLines($("bill-lines"), $("bill-msg")));
   const r = await api<{ enabled: boolean; orders: OrderRow[] }>("/orders");
   const orders = r.ok ? r.data?.orders ?? [] : [];
   $("bill-portal").hidden = !orders.some((o) => o.paidAt);

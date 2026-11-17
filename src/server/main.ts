@@ -140,6 +140,9 @@ server.listen(port, () => console.log(`listening on :${port}`));
 const BATCH_TICK_MS = 60_000;
 const batchTimer = setInterval(() => { void platform.decisionDigest.tick(); void platform.agents.tick().catch((e) => console.error("agents tick failed:", e instanceof Error ? e.message : e)); void platform.batch.tick(); void platform.reconciliation.tick(); void platform.metaClients.maintenance().catch((e) => console.error("meta maintenance failed:", e instanceof Error ? e.message : e)); void platform.growthTick().catch((e) => console.error("growth tick failed:", e instanceof Error ? e.name : "error")); }, BATCH_TICK_MS);
 batchTimer.unref();
+// Once a minute: monthly lines whose paid month is over leave the team, unpaid additions to a bill are closed, stops the payment provider missed are tried again.
+const billingTimer = setInterval(() => { void platform.payments.sweep().catch((e) => console.error("billing sweep failed:", e instanceof Error ? e.message : e)); }, BATCH_TICK_MS);
+billingTimer.unref();
 
 // Hosts send SIGTERM before replacing the instance: stop taking requests and write pending changes to Postgres.
 let stopping = false;
@@ -150,6 +153,7 @@ async function shutdown(signal: string) {
   const force = setTimeout(() => process.exit(1), 10_000);
   force.unref();
   clearInterval(batchTimer);
+  clearInterval(billingTimer);
   server.close();
   try { await store?.close(); } catch (err) { console.error("flush on shutdown failed:", err); }
   // Give waiting emails (sign-in links, owner alerts) a few seconds to go out.

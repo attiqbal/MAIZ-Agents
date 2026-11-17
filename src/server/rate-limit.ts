@@ -63,6 +63,9 @@ export function limitFor(method: string, path: string): Limit | undefined {
   if (path === "/api/ask") return undefined;
   // Each checkout creates a payment session at the provider: keep it to a handful of tries per address.
   if (path === "/api/checkout") return { max: 20, windowMs: 10 * 60_000 };
+  // Stopping a monthly line calls the payment provider; a preview asks it for a figure. Enough to try again, not to hammer it.
+  if (path === "/api/billing/lines/stop") return { max: 20, windowMs: 10 * 60_000 };
+  if (path === "/api/billing/preview") return { max: 30, windowMs: 10 * 60_000 };
   if (path.startsWith("/api/auth/")) return { max: 15, windowMs: 10 * 60_000 };
   if (path === "/api/signin/start" || path === "/api/signup") return { max: 10, windowMs: 10 * 60_000 };
   // Reading a visitor's website makes our server call an address they typed: a few tries per address, no more.
