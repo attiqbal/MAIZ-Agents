@@ -61,6 +61,9 @@ export interface RecordsEntry {
   fix: { label: string; href: string };
 }
 
+/** One of the platform's outside tools. `cost` is free, energy or double (paid per use). */
+export interface ToolEntry { key: string; name: string; goodFor: string; cost: string; preferCheaper?: string; employees: readonly string[]; available: boolean; quote?: { energy: number } }
+
 /** One of the client's own outside AI tools (`AgentService.overview()`). */
 export interface OutsideToolEntry { name: string; status: string; employees: readonly string[] }
 
@@ -72,6 +75,8 @@ export interface ResourceSources {
   connections(userId: string, workspaceId: string): readonly ConnectionEntry[];
   mining(userId: string, workspaceId: string): MiningEntry;
   paid(): readonly PaidEntry[];
+  /** The platform's outside tools (voice, search, page reading, stock pictures) as the client sees them (`ToolboxService.overview().tools`). */
+  tools?(userId: string, workspaceId: string): readonly ToolEntry[];
   records(userId: string, workspaceId: string, templateKey: string): readonly RecordsEntry[];
   outsideTools?(userId: string, workspaceId: string): readonly OutsideToolEntry[];
   /** What an ordinary task has been using lately, for the "about N energy" figure. */
@@ -114,6 +119,9 @@ const sourceTag = (id: string): string => SOURCE_TAG[id] ?? id;
 const MEDIA_ROLES = new Set(["marketing-manager", "content-creator", "social-media-content", "creative-studio", "pr-communications"]);
 const mediaTag = (p: PaidEntry): string | undefined => (/video/i.test(p.summary) ? "video" : /voice|speech|audio/i.test(p.summary) ? "audio" : /image|picture|photo/i.test(p.summary) ? "image" : undefined);
 
+/** What each platform tool supplies, so the choice rule can match a need ("live-web", "stock-image") to it. */
+const TOOL_TAG: Record<string, string> = { voice: "audio", "web-search": "live-web", "page-reader": "page-text", "stock-pexels": "stock-image", "stock-unsplash": "stock-image" };
+
 const shortDate = (iso: string): string => {
   const d = new Date(iso);
   return Number.isNaN(d.getTime()) ? iso.slice(0, 10) : d.toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "UTC" });
@@ -151,6 +159,7 @@ export class ResourceRegistry {
     part(out, () => this.apps(userId, workspaceId, templateKey));
     part(out, () => this.mining(userId, workspaceId, templateKey));
     part(out, () => this.paid(templateKey));
+    part(out, () => this.platformTools(userId, workspaceId, templateKey));
     part(out, () => this.outsideTools(userId, workspaceId, templateKey));
     out.push({
       key: "model:open", kind: "model", name: "Your own writing and analysis", goodFor: "Drafts, plans, summaries and analysis.", gives: ["writing"],
@@ -252,6 +261,15 @@ export class ResourceRegistry {
         ...(p.connected ? {} : { fix: { by: "maiz" as const, label: `${p.name} is not switched on yet`, href: APPS } }),
       };
     });
+  }
+
+  private platformTools(userId: string, workspaceId: string, templateKey: string): Resource[] {
+    return (this.s.tools?.(userId, workspaceId) ?? []).map((t): Resource => ({
+      key: `service:${t.key}`, kind: "paid-service", name: t.name, goodFor: `${t.goodFor}${t.preferCheaper ? ` ${t.preferCheaper}` : ""}`,
+      gives: [TOOL_TAG[t.key] ?? t.key], allowed: t.employees.includes(templateKey), state: t.available ? "ready" : "waiting_approval",
+      needsApproval: t.cost !== "free", cost: t.cost === "free" ? { class: "free" } : { class: t.cost === "double" ? "double_energy" : "energy", ...(t.quote ? { energy: t.quote.energy } : {}) },
+      ...(t.available ? {} : { fix: { by: "maiz" as const, label: `${t.name} is not switched on yet`, href: APPS } }),
+    }));
   }
 
   private outsideTools(userId: string, workspaceId: string, templateKey: string): Resource[] {

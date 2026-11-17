@@ -16,7 +16,7 @@ const UNSPLASH = "https://api.unsplash.com";
 export const VOICE_MODEL = "eleven_multilingual_v2";
 /** Speech at 32 kbit/s is clear for a voice and keeps a two-minute recording near half a megabyte. */
 export const VOICE_FORMAT = "mp3_22050_32";
-export const MAX_AUDIO_BYTES = 2_000_000;
+export const MAX_AUDIO_BYTES = 700_000;
 export const VOICE_ID = /^[A-Za-z0-9]{10,40}$/;
 
 async function send(http: typeof fetch, name: string, url: string, init: RequestInit, timeout = TIMEOUT_MS): Promise<Response> {

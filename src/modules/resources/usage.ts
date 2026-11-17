@@ -22,7 +22,7 @@ export interface UsageRow {
 }
 
 /** "paid:creatomate" and "mine:reddit" are the names the energy meter books under; the registry calls them paid:creatomate and source:reddit. */
-const keyOfProvider = (p: string): string | undefined => (p.startsWith("paid:") ? p : p.startsWith("mine:") ? `source:${p.slice(5)}` : undefined);
+const keyOfProvider = (p: string): string | undefined => (p.startsWith("paid:") ? p : p.startsWith("mine:") ? `source:${p.slice(5)}` : p.startsWith("tool:") ? `service:${p.slice(5)}` : undefined);
 
 export function usageTable(input: UsageInput): UsageRow[] {
   const rows = new Map<string, UsageRow>();

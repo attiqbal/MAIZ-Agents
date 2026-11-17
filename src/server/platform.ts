@@ -44,6 +44,7 @@ import { PromoterService } from "../modules/promoter/index.js";
 import { DEFAULT_PAID_MULTIPLIER, PaidServices, paidService, type Payer } from "../modules/paid-services/index.js";
 import { GrowthService } from "../modules/growth/index.js";
 import { ResearchService } from "../modules/research/index.js";
+import { ToolboxService, tool as toolOf } from "../modules/toolbox/index.js";
 import { DATA_MINING_AGENT, DataMiningService, miningSource } from "../modules/data-mining/index.js";
 import { ResourceRegistry, clientSummary, renderGuide, suggestionsForTask, usageTable, usedBy, type RecordsEntry } from "../modules/resources/index.js";
 import { MetaGraph, MetaRejected, type MetaConfig } from "../modules/meta/index.js";
@@ -334,6 +335,12 @@ export function createPlatform(cfg: PlatformConfig) {
     notify: (ws, n) => { notices.add(ws, { kind: "info", ...n }); void admin.tell(ws, n.body, n.link).catch(() => undefined); },
   });
   workforce.addContext((ws, templateKey) => mining.contextFor(ws, templateKey));
+  /** The platform's outside services for employees (voice, web search, page reading, free stock pictures). See docs/NEW-SERVICES.md. */
+  const toolbox = new ToolboxService({
+    identity, meter: energy, audit, http: cfg.http, now, team: (userId, ws) => workforce.team(userId, ws),
+    multiplier: () => prices.general().paidServiceMultiplier ?? DEFAULT_PAID_MULTIPLIER, keys: () => connections.toolKeys(),
+  });
+  workforce.addContext((ws, templateKey) => toolbox.contextFor(ws, templateKey));
   /** MAIZ quality review: every client's specialised tasks wait here for the platform owner's sign-off. */
   const reviews = new QualityReviewService(identity, audit, isPlatformOwner, {
     now,
@@ -434,6 +441,7 @@ export function createPlatform(cfg: PlatformConfig) {
     connections: (u, ws) => integrations.list(u, ws),
     mining: (u, ws) => mining.overview(u, ws),
     paid: () => paid.list(),
+    tools: (u, ws) => toolbox.overview(u, ws).tools,
     records,
     outsideTools: (u, ws) => agents.overview(u, ws).connections.map((c) => ({ name: c.name, status: c.status, employees: c.employees.map((e) => e.key) })),
     taskEnergy: (ws) => energy.estimateFor(ws),
@@ -451,6 +459,7 @@ export function createPlatform(cfg: PlatformConfig) {
     if (kind === "app") return integrations.registry.get(id)?.name ?? id;
     if (kind === "paid") return paidService(id)?.name ?? id;
     if (kind === "source") return miningSource(id)?.label ?? id;
+    if (kind === "service") return toolOf(id)?.name ?? id;
     return RESOURCE_NAMES[key] ?? key;
   };
   /** The owner's table: what the employees were given and what paid things took this month, from records already kept. */
@@ -743,6 +752,7 @@ export function createPlatform(cfg: PlatformConfig) {
       else if (x.kind === "rota_shift" && !x.data.removed) rota.restoreShift(x.data);
       else if (x.kind === "agent_conn" || x.kind === "agent_job" || x.kind === "agent_delivery") agents.restore(x.kind, x.data);
       else if (x.kind === "dataset") mining.restore(x.data);
+      else if (x.kind === "tool_file") toolbox.restore(x.data);
       else if (x.kind === "employee_removed") workforce.restoreRemoved(x.data);
     }
     for (const x of s.records ?? []) if (x.kind === "cal_date") overview.dates.restore(x.data);
@@ -776,7 +786,7 @@ export function createPlatform(cfg: PlatformConfig) {
       else affiliates.restore(x.kind, x.data);
     }
     sink = store;
-    for (const part of [audit, identity, energy, workforce, ledger, router, admin, integrations, reviews, prices, specialists, aiSettings, spend, batch, payments, rota, reconciliation, people, conversations, notices, credentials, coupons, affiliates, promoter, growth, connections, metaClients, push, mining, agents]) part.useSink(store);
+    for (const part of [audit, identity, energy, workforce, ledger, router, admin, integrations, reviews, prices, specialists, aiSettings, spend, batch, payments, rota, reconciliation, people, conversations, notices, credentials, coupons, affiliates, promoter, growth, connections, metaClients, push, mining, toolbox, agents]) part.useSink(store);
     team.useSink(store);
     backup.useSink(store);
     overview.dates.useSink(store);
@@ -824,6 +834,6 @@ export function createPlatform(cfg: PlatformConfig) {
     slack: { enumerable: true, get: () => cfg.slack ?? connections.slackApp() },
     loginApps: { enumerable: true, get: (): LoginApps => ({ ...connections.loginApps(), ...cfg.loginApps }) },
   });
-  return { resources, resourcesFor, resourceUsage, team, backup, overview, agents, mining, orderDiscountFor, quoteFor, hasTeamPackage, push, conversations, notices, warm, ownerDecisions, decisionDigest, dashboard, reconciliation, rota, people, payments, batch, email, usedLinks, sends, loginFails, resets, credentials, formHits, codeFails, coupons, affiliates, promoter, paid, growth, research, connections, growthTick, metaClients, metaSettings, get ownerWhatsApp() { return live.wa; }, admin, reviews, prices, specialists, ai, clients, isPlatformOwner, healthy, hasStore, cfg: liveCfg, now, audit, bus, identity, energy, workforce, ledger, onboarding, router, integrations, slackTokens, saveSlackToken, attachStore };
+  return { resources, resourcesFor, resourceUsage, team, backup, overview, agents, mining, toolbox, orderDiscountFor, quoteFor, hasTeamPackage, push, conversations, notices, warm, ownerDecisions, decisionDigest, dashboard, reconciliation, rota, people, payments, batch, email, usedLinks, sends, loginFails, resets, credentials, formHits, codeFails, coupons, affiliates, promoter, paid, growth, research, connections, growthTick, metaClients, metaSettings, get ownerWhatsApp() { return live.wa; }, admin, reviews, prices, specialists, ai, clients, isPlatformOwner, healthy, hasStore, cfg: liveCfg, now, audit, bus, identity, energy, workforce, ledger, onboarding, router, integrations, slackTokens, saveSlackToken, attachStore };
 }
 export type Platform = ReturnType<typeof createPlatform>;

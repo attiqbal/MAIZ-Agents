@@ -4,6 +4,7 @@
  */
 import { clientAppDefs } from "./client-apps.js";
 import { paidAppDefs } from "./paid-apps.js";
+import { toolboxAppDefs } from "./toolbox-apps.js";
 
 export type BuiltInKey = "facebook" | "instagram" | "whatsapp" | "resend" | "google" | "microsoft" | "slack" | "xero" | "square" | "google-data" | "reddit" | "youtube" | "x" | "fred" | "alphavantage" | "companieshouse" | "stripe" | "runpod" | "anthropic";
 /** The built-in cards, plus one generated card per client app in the integrations registry (see client-apps.ts). */
@@ -345,7 +346,7 @@ const BUILT_IN: readonly ConnDef[] = [
   },
 ] as const;
 
-const PAID = paidAppDefs();
+const PAID = [...paidAppDefs(), ...toolboxAppDefs()];
 /** Built-in cards, then the paid video services, then one generated card for each client app. */
 export const CATALOG: readonly ConnDef[] = [...BUILT_IN, ...PAID, ...clientAppDefs([...BUILT_IN, ...PAID].map((d) => d.key))];
 

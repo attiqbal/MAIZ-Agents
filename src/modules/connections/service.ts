@@ -12,6 +12,8 @@ import { NO_SAFE_CHECK, probeSalesforce } from "./probes-more.js";
 import { deskKeyWorks } from "../research/desk.js";
 import { keyWorks, RenderError } from "../paid-services/render.js";
 import { isPaidListing } from "./paid-apps.js";
+import { ToolError } from "../toolbox/providers.js";
+import { toolKeyTest } from "../toolbox/key-test.js";
 import { redditToken, ResearchError, xTokenWorks, youtubeKeyWorks } from "../research/sources.js";
 
 /**
@@ -96,6 +98,10 @@ const ENV: Record<string, { vars: Record<string, string>; required: string[]; ex
   companieshouse: { vars: { apiKey: "COMPANIES_HOUSE_API_KEY" }, required: ["apiKey"] },
   creatomate: { vars: { apiKey: "CREATOMATE_API_KEY" }, required: ["apiKey"] },
   shotstack: { vars: { apiKey: "SHOTSTACK_API_KEY" }, required: ["apiKey"] },
+  elevenlabs: { vars: { apiKey: "ELEVENLABS_API_KEY" }, required: ["apiKey"] },
+  "brave-search": { vars: { apiKey: "BRAVE_SEARCH_API_KEY" }, required: ["apiKey"] },
+  pexels: { vars: { apiKey: "PEXELS_API_KEY" }, required: ["apiKey"] },
+  unsplash: { vars: { accessKey: "UNSPLASH_ACCESS_KEY" }, required: ["accessKey"] },
 };
 // Client apps made from the integrations registry (QuickBooks, HubSpot, Outlook...) read their keys from <PREFIX>_CLIENT_ID and _SECRET.
 for (const [key, v] of Object.entries(clientAppEnv())) {
@@ -120,6 +126,10 @@ const APP_TEXT: Partial<Record<ConnKey, [string, string]>> = {
   alphavantage: ["Your team can look up share prices.", "Not set: no share price look-ups."],
   companieshouse: ["Your team can look up UK companies.", "Not set: no UK company look-ups."],
   creatomate: ["Your promotion agent can render videos from your Creatomate templates. Each one uses paid-service energy.", "Not set: videos are practice renders that cost nothing."],
+  elevenlabs: ["Employees can make voice-overs. Each uses paid-service energy.", "Not set: no voice-overs."],
+  "brave-search": ["Employees can search the live web. Each search uses paid-service energy.", "Not set: no live web search."],
+  pexels: ["Employees can find free pictures and video on Pexels.", "Not set: no Pexels pictures."],
+  unsplash: ["Employees can find free photos on Unsplash.", "Not set: no Unsplash photos."],
   shotstack: ["Your promotion agent can render videos from your Shotstack templates. Each one uses paid-service energy.", "Not set: videos are practice renders that cost nothing."],
 };
 
@@ -153,6 +163,10 @@ const RULES: Record<string, [RegExp, string]> = {
   "companieshouse.apiKey": [/^[A-Za-z0-9-]{20,60}$/, "A Companies House key is letters, numbers and dashes with no spaces. Copy it again in full."],
   "x.bearerToken": [/^[A-Za-z0-9%_.~=+-]{30,500}$/, "An X bearer token is one long code with no spaces. Copy it again in full."],
   "creatomate.apiKey": [/^[A-Za-z0-9_-]{20,200}$/, "A Creatomate API key is one long code with no spaces. Copy it again in full."],
+  "elevenlabs.apiKey": [/^sk_[A-Za-z0-9_]{16,200}$/, "An ElevenLabs key starts with sk_ and has no spaces. Copy it again in full."],
+  "brave-search.apiKey": [/^[A-Za-z0-9_-]{16,100}$/, "A Brave Search key is one code of letters and numbers with no spaces. Copy it again in full."],
+  "pexels.apiKey": [/^[A-Za-z0-9]{20,100}$/, "A Pexels key is one code of letters and numbers with no spaces. Copy it again in full."],
+  "unsplash.accessKey": [/^[A-Za-z0-9_-]{20,100}$/, "The Unsplash Access Key is one code with no spaces. It is not the Secret key."],
   "shotstack.apiKey": [/^[A-Za-z0-9_-]{20,200}$/, "A Shotstack API key is one long code with no spaces. Copy it again in full."],
   "youtube.apiKey": [/^AIza[\w-]{30,60}$/, "A YouTube API key starts with AIza and has no spaces. Copy it again in full."],
   "microsoft.clientId": [/^[0-9a-f]{8}-([0-9a-f]{4}-){3}[0-9a-f]{12}$/i, "The Application (client) ID is a long id with dashes, from the app's Overview page."],
@@ -328,6 +342,10 @@ export class ConnectionsService {
   videoKeys(): { creatomate?: string; shotstack?: string } {
     return { creatomate: this.complete("creatomate")?.apiKey, shotstack: this.complete("shotstack")?.apiKey };
   }
+  /** Keys for the platform's outside services (voice, web search, stock pictures), typed on this page (or the server's). */
+  toolKeys(): { elevenlabs?: string; braveSearch?: string; pexels?: string; unsplash?: string } {
+    return { elevenlabs: this.complete("elevenlabs")?.apiKey, braveSearch: this.complete("brave-search")?.apiKey, pexels: this.complete("pexels")?.apiKey, unsplash: this.complete("unsplash")?.accessKey };
+  }
   /** X bearer token for market research, typed on this page (or the server's). */
   xToken(): string | undefined { return this.complete("x")?.bearerToken; }
   /** Keys for the data desk (economic series, share prices, UK companies). */
@@ -391,7 +409,7 @@ export class ConnectionsService {
         const ok = !!v("ANTHROPIC_API_KEY");
         return { ok, missing: ok ? [] : ["ANTHROPIC_API_KEY on the server"], text: ok ? "Claude is set up." : "Not set: no quality checking by Claude." };
       }
-      case "google": case "microsoft": case "slack": case "xero": case "square": case "google-data": case "reddit": case "youtube": case "x": case "fred": case "alphavantage": case "companieshouse": case "creatomate": case "shotstack": {
+      case "google": case "microsoft": case "slack": case "xero": case "square": case "google-data": case "reddit": case "youtube": case "x": case "fred": case "alphavantage": case "companieshouse": case "creatomate": case "shotstack": case "elevenlabs": case "brave-search": case "pexels": case "unsplash": {
         const ok = !!this.complete(key);
         return { ok, missing: this.missingOf(key), text: APP_TEXT[key]![ok ? 0 : 1] };
       }
@@ -688,6 +706,16 @@ export class ConnectionsService {
           return { ok: false, message: e instanceof ResearchError ? `${e.message} Check the key is allowed to use the YouTube Data API v3.` : "YouTube could not be reached.", details: [] };
         }
         return { ok: true, message: "YouTube accepted the key.", details: ["The test read one public list (about 1 unit of today's 10,000)."] };
+      }
+      case "elevenlabs": case "brave-search": case "pexels": case "unsplash": {
+        const v = this.complete(key);
+        const k = v?.apiKey ?? v?.accessKey;
+        if (!k) return this.notReady(key);
+        try {
+          return await toolKeyTest(this.http, key, k);
+        } catch (e) {
+          return { ok: false, message: e instanceof ToolError ? redact(e.message, k) : "The service could not be reached.", details: [] };
+        }
       }
       case "creatomate": case "shotstack": {
         const k = this.complete(key)?.apiKey;

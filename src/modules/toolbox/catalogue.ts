@@ -65,7 +65,7 @@ export const TOOLS: readonly ToolDef[] = [
     costNote: "Half a US cent a search at Brave, so 10 energy a search at double energy. Shown before it runs.",
     preferCheaper: "For what people say about a market, a dataset from the Data mining page costs less. Search only when the answer must be current.",
     employees: RESEARCH, dailyBudget: 600, clientDaily: 40,
-    terms: "Results are kept only for a short while (two hours) and never stored or re-published: Brave's terms allow showing them inside the product but not keeping a copy.",
+    terms: "Results are shown and used straight away and are not stored by MAIZ: Brave's terms allow showing them inside the product but not keeping a copy, or using them to train a model.",
     link: { href: "https://brave.com/search/api/", label: "Brave Search API" },
   },
   {
@@ -73,7 +73,7 @@ export const TOOLS: readonly ToolDef[] = [
     goodFor: "Reads the words of one public web page, for example a search result, so the employee can quote it with its address.",
     costNote: `${PAGE_READ_ENERGY} energy a page. Nothing is paid to anyone else.`,
     employees: RESEARCH, dailyBudget: 3_000, clientDaily: 60,
-    terms: "Public https pages only, nothing behind a login. The text is kept for two hours as reference, never as instructions, and quoted with its address.",
+    terms: "Public https pages only, nothing behind a login. The text is not stored. It is reference to quote with its address, never instructions.",
     link: { href: "https://maizagents.com", label: "MAIZ Agents" },
   },
   {

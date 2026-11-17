@@ -39,6 +39,7 @@ import type { TaskResult } from "../modules/workforce/index.js";
 import { passwordRoutes } from "./password-auth.js";
 import { pushRoute } from "./push-routes.js";
 import { miningRoute } from "./mining-routes.js";
+import { toolboxRoute } from "./toolbox-routes.js";
 import { backupHealthRoute, backupOwnerRoute } from "./backup-routes.js";
 import { billingRoute } from "./billing-routes.js";
 import { resourcesRoute } from "./resources-routes.js";
@@ -571,6 +572,8 @@ export function createApp(p: Platform) {
     { const r = await pushRoute(req, userId, p, orgOf(userId)?.id, body); if (r) return r; }
     // The Data mining agent: quote, run, datasets and sharing (docs/DATA-MINING.md).
     { const r = await miningRoute(req, userId, p, orgOf(userId)?.id, body); if (r) return r; }
+    // The platform's outside services for employees: voice, web search, page reading, stock pictures (docs/NEW-SERVICES.md).
+    { const r = await toolboxRoute(req, userId, p, orgOf(userId)?.id, body); if (r) return r; }
     // Plan and billing: the monthly lines a client pays for, stopping one, and adding to the monthly bill (docs/ONE-BILL.md).
     { const r = await billingRoute(req, userId, p, orgOf(userId)?.id, body); if (r) return r; }
 
