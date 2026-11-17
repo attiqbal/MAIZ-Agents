@@ -222,6 +222,7 @@ async function loadOrg(): Promise<void> {
   setPeopleBusiness(realOrg.name);
   showTrial(realOrg.trialEndsAt, realOrg.planEnded === true);
   void loadBilling();
+  if (!realOrg.role || realOrg.role === "owner") void loadCodes(); // codes are the owner's alone
   app.classList.add("is-live");
   const hasDataAgent = realOrg.team.some((e) => e.templateKey === "data-mining-agent");
   $("mining-link").hidden = !hasDataAgent;
@@ -343,7 +344,6 @@ $("cp-form").addEventListener("submit", async (ev) => {
   msg.textContent = r.ok ? `Done: ${r.data?.applied}.` : r.data?.error ?? "Could not apply the code. Please try again.";
   if (r.ok) { $<HTMLInputElement>("cp-code").value = ""; void loadCodes(); void loadOrg(); void loadTopUps(); }
 });
-void loadCodes();
 
 // Account menu: sign out, and the Settings screen's account details.
 /** Logging out also stops this device's alerts, so the next person to use it is not sent this account's news. */

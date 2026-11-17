@@ -153,7 +153,7 @@ const STORE = "Only the owner can hire or buy from the store.";
 /** Controls only the owner can use. The lists name what the screens draw; anything missed is still refused by the server, with its reason. */
 const OWNER_ONLY: Rule[] = [
   ["#cart-checkout, [data-hire]", STORE],
-  ['[data-screen="apps"] [data-connect], [data-screen="apps"] [data-disconnect], [data-access], [data-choices], #slack-connect', APPS],
+  ['[data-screen="apps"] [data-connect], [data-screen="apps"] [data-disconnect], [data-screen="apps"] [data-pick], #apps-grid [data-key], #apps-grid [data-upload], [data-access], [data-choices], #slack-connect', APPS],
   ['[data-ag="new"], [data-ag="edit"], [data-ag="rotate"], [data-ag="test"], [data-ag="remove"], [data-ag="approve"], [data-ag="refuse"]', "Only the owner can connect or change outside AI tools."],
   ["#setup-undo", "Only the owner can change this setting."],
 ];
@@ -222,6 +222,13 @@ function applyRole(role: Exclude<Role, "owner">): void {
   lockPanel("tu-h", "Only the owner can change energy top-ups.");
   lockPanel("cp-h", "Only the owner can use a gift or discount code.");
   $("trial-cta").hidden = true;
+  // The setup card on the Overview is the owner's to act on: a teammate is told so, with nothing to press.
+  const setup = document.getElementById("setup-need");
+  if (setup) {
+    setup.querySelector(".acts")?.remove();
+    setup.querySelector("b")!.textContent = "The team's setup is not finished";
+    setup.querySelector(".d")!.textContent = "Only the owner can set up the team. You can still look around.";
+  }
   $("trial-box").insertAdjacentHTML("beforeend", '<span class="muted">Only the owner can change the plan.</span>');
   for (const [screen, notes] of Object.entries(SCREEN_NOTES)) {
     const reason = notes[role];
