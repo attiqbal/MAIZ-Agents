@@ -57,7 +57,7 @@ export const searchConsole: Connector = {
   summary: "How your website shows up in Google: how often, how many click, and which searches bring people. Your Marketing manager uses it to improve your pages.",
   availability: "live",
   capabilities: ["search.read"],
-  note: "Read-only. Google's figures run about three days behind.",
+  note: "Read-only. Google's figures run about three days behind. Your AI team is given weekly totals and your top searches to answer your questions, and they are never used to train AI. Disconnect deletes them.",
   auth: { kind: "oauth2", authorizeUrl: GOOGLE_AUTHORIZE, tokenUrl: GOOGLE_TOKEN, scopes: [SCOPE], envPrefix: "GOOGLE_DATA", authorizeParams: GOOGLE_PARAMS },
   read: readSearch,
   choices: searchChoices,
