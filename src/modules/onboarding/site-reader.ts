@@ -185,31 +185,50 @@ async function firstPart(res: Response): Promise<string> {
   return Buffer.concat(chunks).subarray(0, MAX_BYTES).toString("utf8");
 }
 
-/** Fetches the home page of `address` and returns what it says. Throws SiteReadError for anything it will not or cannot read. */
-export async function readSite(address: string, deps: SiteReaderDeps = {}): Promise<SiteReading> {
-  const http = deps.http ?? fetch;
-  let url = homePage(typeof address === "string" ? address : "");
-  const site = url.hostname.replace(/^www\./, "");
+/** A public https page, path and query kept (the part after # dropped), or an error. The host passes the same checks as a home page. */
+export function publicPage(input: string): URL {
+  const typed = input.trim().slice(0, 600);
+  let u: URL;
+  try { u = new URL(typed); } catch { throw new SiteReadError("not a web address"); }
+  const home = homePage(`${u.protocol}//${u.host}`);
+  if (u.username || u.password) throw new SiteReadError("not a public https website");
+  return new URL(`${home.origin}${u.pathname}${u.search}`);
+}
+
+/**
+ * The first part of a public web page, following a few redirects. The host is checked before every request, so a
+ * redirect cannot lead inside a network; `next` says which address a redirect may become (the front page only at
+ * signup, the page itself when an employee reads a search result).
+ */
+export async function fetchPublicHtml(start: URL, next: (target: URL) => URL, http: typeof fetch = fetch): Promise<{ html: string; url: URL }> {
+  let url = start;
   for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
-    // Checked before every request, so a redirect cannot lead inside a network.
     try { await assertPublicHost(url.hostname, "That website"); } catch { throw new SiteReadError("not reachable"); }
     let res: Response;
     try {
       res = await http(url.toString(), { method: "GET", redirect: "manual", signal: AbortSignal.timeout(TIMEOUT_MS), headers: { accept: "text/html", "user-agent": USER_AGENT } });
     } catch { throw new SiteReadError("not reachable"); }
     if (res.status >= 300 && res.status < 400) {
-      const next = res.headers.get("location");
+      const location = res.headers.get("location");
       await res.body?.cancel().catch(() => undefined);
-      if (!next) throw new SiteReadError("redirect with no address");
+      if (!location) throw new SiteReadError("redirect with no address");
       let target: URL;
-      try { target = new URL(next, url); } catch { throw new SiteReadError("redirect to a bad address"); }
-      // Only the front page of the new host is read, and only if it passes the same checks.
-      url = homePage(target.protocol === "https:" ? `https://${target.host}` : target.toString());
+      try { target = new URL(location, url); } catch { throw new SiteReadError("redirect to a bad address"); }
+      url = next(target);
       continue;
     }
     if (!res.ok) throw new SiteReadError("the site answered with an error");
     if (!/text\/html|application\/xhtml/i.test(res.headers.get("content-type") ?? "")) throw new SiteReadError("not a web page");
-    return understand(await firstPart(res), site);
+    return { html: await firstPart(res), url };
   }
   throw new SiteReadError("too many redirects");
+}
+
+/** Fetches the home page of `address` and returns what it says. Throws SiteReadError for anything it will not or cannot read. */
+export async function readSite(address: string, deps: SiteReaderDeps = {}): Promise<SiteReading> {
+  const start = homePage(typeof address === "string" ? address : "");
+  const site = start.hostname.replace(/^www\./, "");
+  // Only the front page of a new host is read, and only if it passes the same checks.
+  const { html } = await fetchPublicHtml(start, (target) => homePage(target.protocol === "https:" ? `https://${target.host}` : target.toString()), deps.http ?? fetch);
+  return understand(html, site);
 }
