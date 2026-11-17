@@ -1986,6 +1986,7 @@ h1, .sec-head h2, .final h2, .stage-band h2, .article-head h1, .sec-title, .bent
 .ovl-note { max-width: 78ch; }
 .ovl-year { font-size: 11px; }
 .ovl-form .ovl-note-in { border-radius: 18px; resize: vertical; min-height: 64px; font: inherit; }
+.ovl-form .ag-two { grid-template-columns: 1fr; }
 .ovl-done { list-style: none; margin: 0; padding: 0; }
 .ovl-done .ubar { font-size: 14px; }
 .ovl-done .acts { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
