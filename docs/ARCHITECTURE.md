@@ -21,6 +21,7 @@ A modular monolith in TypeScript: one application, strict module boundaries.
 | Model Gateway | `src/modules/model-gateway` | tier routing and fallback; Anthropic, OpenAI-compatible (vLLM on RunPod, hosted open models) and mock adapters |
 | Model routing | `src/modules/model-gateway/routing` | RunPod first, Claude as supervisor. See `docs/AI-ROUTING.md` |
 | Integrations | `src/modules/integrations` | business apps (Xero, Square, Stripe live; BrightPay and any till by file; Zapier/Make webhook), encrypted credentials, per-employee access, pending records posted to the ledger on the owner's say. See `docs/INTEGRATIONS.md` |
+| Backups | `src/modules/backup` | nightly and on-demand encrypted `pg_dump` to the owner's S3-compatible storage (own SigV4 signer), weekly restore test into a throwaway database, alerts, set up on the owner's Backups page. See `docs/BACKUPS.md` |
 | Admin manager | `src/modules/admin-manager` | welcomes the owner (dashboard or chat app), introduces the team, sends the setup form, then runs a journaled, rollbackable setup: profile, storage, models, training, checks |
 
 ### Signup to working team
