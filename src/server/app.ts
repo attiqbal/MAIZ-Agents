@@ -10,13 +10,17 @@ import { ReviewError } from "../modules/review/index.js";
 import { PricingError } from "../modules/pricing/index.js";
 import { OWNER_SPECIALISTS, PromoterError } from "../modules/promoter/index.js";
 import { PaidServiceError, RenderError } from "../modules/paid-services/index.js";
+import { LearningError } from "../modules/learning/index.js";
+import { factsFromSignup, factsFromWebsite } from "../modules/learning/sources.js";
+import { VideoError } from "../modules/video/index.js";
 import { GROWTH_ROLE, GrowthError, discoveryQueries } from "../modules/growth/index.js";
 import { ResearchError } from "../modules/research/index.js";
 import { DEFAULT_COMMISSION, DEFAULT_HOLD_DAYS, PromoError, describeCommission } from "../modules/promotions/index.js";
 import { EnergyError, parseAutoReload } from "../modules/energy/index.js";
 import { BatchError } from "../modules/batch/schedule.js";
 import { SettingsError } from "../modules/model-gateway/routing/settings.js";
-import { affiliatePaidEmail, affiliateWelcomeEmail, brandFrom, couponGiftEmail, signInLinkEmail } from "./email-templates.js";
+import { InterestError } from "../modules/interest/index.js";
+import { interestOwnerEmail, interestThanksEmail, affiliatePaidEmail, affiliateWelcomeEmail, brandFrom, couponGiftEmail, signInLinkEmail } from "./email-templates.js";
 import { SignupError, type SignupChoices } from "../modules/onboarding/index.js";
 import { planSignup, readSignupAnswers } from "../modules/onboarding/recommend.js";
 import { OTHER_SECTOR, getSector } from "../modules/onboarding/sectors.js";
@@ -82,6 +86,9 @@ const CODE_TRIES = 8;
 
 /** Opens or saves of one staff form link per hour. */
 const STAFF_FORM_PER_HOUR = 30;
+/** The pre-launch list: sign-ups per hour across the whole site, and per email address. */
+const INTEREST_PER_HOUR = 300;
+const INTEREST_PER_ADDRESS_PER_HOUR = 3;
 /** Tries with links that do not exist, across everyone, per hour. */
 const UNKNOWN_FORM_LINKS_PER_HOUR = 300;
 
@@ -333,10 +340,37 @@ export function createApp(p: Platform) {
       catch { return json(200, { read: false, reason: "We could not read that website just now." }); }
     }
 
+    // ---- pre-launch: which signup the site is in, and the "register your interest" list ----
+    if (method === "GET" && path === "/api/signup/mode") return { ...json(200, { mode: p.signupOpen ? "open" : "interest" }), headers: { "cache-control": "no-store" } };
+    if (method === "POST" && path === "/api/interest") {
+      const raw = body();
+      if (!raw || typeof raw !== "object" || Array.isArray(raw)) throw new BadRequest("send the form as an object");
+      const b = raw as Record<string, unknown>;
+      // A hidden field real people never fill in: bots that do get the same friendly answer and nothing is stored.
+      if (typeof b.company_site === "string" && b.company_site.trim()) return json(201, { registered: true });
+      const nowMs = p.now().getTime();
+      // Anonymous and public, so it is capped as a whole (the list cannot be flooded) and per address (nobody is spammed with thank-yous).
+      const emailKey = `interest:${String(b.email ?? "").toLowerCase().slice(0, 254)}`;
+      if (p.formHits.recent("interest:all", nowMs).length >= INTEREST_PER_HOUR || p.formHits.recent(emailKey, nowMs).length >= INTEREST_PER_ADDRESS_PER_HOUR) return json(429, { error: "Too many tries just now. Please wait a little and try again." });
+      p.formHits.record("interest:all", nowMs);
+      p.formHits.record(emailKey, nowMs);
+      let got: ReturnType<typeof p.interest.register>;
+      try { got = p.interest.register(b); } catch (e) { if (e instanceof InterestError) return json(400, { error: e.message }); throw e; }
+      const brand = brandFrom(p.cfg);
+      // Emails go out after the answer is sent; a failed email never loses the registration, which is already stored.
+      const after = async () => {
+        if (got.fresh) await p.email.send({ to: got.record.email, ...interestThanksEmail(got.record.name, brand) }).catch((e) => console.error("interest thank-you email failed:", e instanceof Error ? e.message : e));
+        for (const to of p.cfg.platformOwners ?? []) await p.email.send({ to, ...interestOwnerEmail(got.record, `${(p.cfg.appUrl ?? "").replace(/\/$/, "")}/owner-interest.html`, brand) }).catch((e) => console.error("interest owner email failed:", e instanceof Error ? e.message : e));
+      };
+      return { ...json(201, { registered: true }), after };
+    }
+
     // ---- sign up: needs a verified email (or the development shortcut) ----
     if (method === "POST" && path === "/api/signup") {
       const b = body();
       const claims = sessionClaims(req);
+      // Pre-launch: nobody makes an account except the platform owner (to test). Existing accounts sign in as usual.
+      if (!p.signupOpen && !(claims && typeof claims.e === "string" && p.isPlatformOwner(userIdFor(claims.e)))) return json(403, { error: "MAIZ Agents has not opened yet. Please register your interest and we will email you when it does." });
       let email: string;
       if (claims && typeof claims.e === "string") email = claims.e; // verified by a sign-in link
       else if (p.cfg.allowDevAuth) email = String(b.email ?? "").trim().toLowerCase(); // development only: no check
@@ -369,7 +403,10 @@ export function createApp(p: Platform) {
       const coupon = typeof b.coupon === "string" && b.coupon.trim() ? redeemAtSignup(userId, org.workspaceId, email, b.coupon) : undefined;
       await p.admin.welcome(userId, org);
       const token = issueSession(email);
-      return json(201, { token, workspaceId: org.workspaceId, blueprint: org.blueprint, trialEndsAt: p.energy.planOf(org.workspaceId).expiresAt ?? org.trialEndsAt, ...(coupon ? { coupon } : {}) });
+      // The business profile starts from what was just typed. The home page is read after the reply, so signup never waits on it.
+      p.learning.learnFacts(org.workspaceId, factsFromSignup({ sells: answers.sells, website: answers.website, sectorLabel, country: answers.country ?? answers.countryName, size: answers.size, needs: answers.needs, apps: answers.apps }));
+      const res = json(201, { token, workspaceId: org.workspaceId, blueprint: org.blueprint, trialEndsAt: p.energy.planOf(org.workspaceId).expiresAt ?? org.trialEndsAt, ...(coupon ? { coupon } : {}) });
+      return answers.website ? { ...res, after: async () => { try { p.learning.learnFacts(org.workspaceId, factsFromWebsite(await readSite(answers.website!, { http: p.cfg.http }))); } catch { /* an unreadable site just adds nothing */ } } } : res;
     }
 
     // ---- payment provider webhooks: public, authenticated by the provider's signature over the exact bytes ----
@@ -488,6 +525,15 @@ export function createApp(p: Platform) {
     if (path === "/api/owner/reviews" || path.startsWith("/api/owner/reviews/")) return ownerReviewRoutes(req, userId, body);
     if (path === "/api/owner/ai" || path.startsWith("/api/owner/ai/")) return ownerAiRoutes(req, userId, body);
     if (path === "/api/owner/prices" || path.startsWith("/api/owner/prices/")) return ownerPriceRoutes(req, userId, body);
+    if (method === "GET" && path === "/api/owner/interest") {
+      if (!p.isPlatformOwner(userId)) return json(403, { error: "only the MAIZ platform owner can see the interest list" });
+      return json(200, { people: p.interest.list() });
+    }
+    if (method === "POST" && path === "/api/owner/interest/remove") {
+      if (!p.isPlatformOwner(userId)) return json(403, { error: "only the MAIZ platform owner can change the interest list" });
+      const email = String(body().email ?? "");
+      return p.interest.remove(email) ? json(200, { removed: true }) : json(404, { error: "that address is not on the list" });
+    }
     if (method === "GET" && path === "/api/owner/team") {
       if (!p.isPlatformOwner(userId)) return json(403, { error: "only the MAIZ platform owner can see the owner's team" });
       const pw = p.promoter.waiting(userId), gw = p.growth.waiting(userId), go = p.growth.overview(userId);
@@ -723,6 +769,58 @@ export function createApp(p: Platform) {
       p.identity.require(userId, org.id, "task.read");
       const use = await p.paid.status({ kind: "client", workspaceId: org.id, employeeId: "" }, paidStatus[1]!);
       return json(200, { use: { ...use, payer: undefined } });
+    }
+
+    // ---- feedback on answers, and what the team has learned about this business ----
+    // Thumbs up or down, redo, or an edit to the answer's words. Small preferences are kept; see docs/LEARNING.md.
+    if (method === "POST" && path === "/api/feedback") {
+      const b = body();
+      const emp = p.workforce.team(userId, org.id).find((e) => e.id === b.employeeId);
+      if (!emp) throw new BadRequest("pick one of your employees");
+      const kind = b.kind;
+      if (kind !== "up" && kind !== "down" && kind !== "redo" && kind !== "edit") throw new BadRequest("say whether it was good, not good, to redo, or edited");
+      const turnId = String(b.turnId ?? "");
+      let before: string | undefined;
+      let after: string | undefined;
+      try {
+        if (kind === "edit") ({ before, after } = p.conversations.editAnswer(userId, org.id, emp.id, turnId, String(b.text ?? "")));
+        else p.conversations.rateAnswer(userId, org.id, emp.id, turnId, kind);
+      } catch (e) {
+        if (e instanceof PermissionError) throw e;
+        throw new BadRequest(e instanceof Error ? e.message : "that answer was not found");
+      }
+      const r = p.learning.feedback(userId, org.id, { employeeId: emp.id, templateKey: emp.templateKey, kind, turnId, note: b.note, before, after });
+      return json(200, { ...r, turns: p.conversations.thread(userId, org.id, emp.id) });
+    }
+    if (method === "GET" && path === "/api/learning") {
+      p.identity.require(userId, org.id, "task.read");
+      p.syncLearning(userId, org.id);
+      return json(200, p.learning.view(userId, org.id));
+    }
+    if (method === "POST" && path === "/api/learning/lessons") { p.learning.addLesson(userId, org.id, body().text); return json(201, p.learning.view(userId, org.id)); }
+    const lesson = /^\/api\/learning\/lessons\/([\w-]{1,64})$/.exec(path);
+    if (method === "DELETE" && lesson) { p.learning.deleteLesson(userId, org.id, lesson[1]!); return json(200, p.learning.view(userId, org.id)); }
+    if (method === "POST" && path === "/api/learning/facts") { p.learning.setFact(userId, org.id, body()); return json(200, p.learning.view(userId, org.id)); }
+    const fact = /^\/api\/learning\/facts\/([\w-]{1,64})$/.exec(path);
+    if (method === "DELETE" && fact) { p.learning.deleteFact(userId, org.id, fact[1]!); return json(200, p.learning.view(userId, org.id)); }
+    if (method === "POST" && path === "/api/learning/forget") { p.learning.forgetAll(userId, org.id); return json(200, p.learning.view(userId, org.id)); }
+
+    // ---- client video: templates plus the business's brand. Cost shown first, charged by paid services, approved before use ----
+    const videoView = (extra: object = {}) => ({
+      ...p.video.view(userId, org.id),
+      services: p.paid.list().filter((s) => s.kind === "api").map((s) => ({ key: s.key, name: s.name, summary: s.summary, note: s.note, link: s.link, connected: s.connected, quote: s.quote })),
+      listed: p.paid.list().filter((s) => s.kind !== "api").map((s) => ({ key: s.key, name: s.name, note: s.note, kind: s.kind, link: s.link })),
+      team: p.energy.teamEnergyOf(org.id),
+      ...extra,
+    });
+    if (method === "GET" && path === "/api/video") return json(200, videoView());
+    if (method === "POST" && path === "/api/video/brand") { p.video.setBrand(userId, org.id, body()); return json(200, videoView()); }
+    if (method === "POST" && path === "/api/video") { const draft = await p.video.create(userId, org.id, body()); return json(201, videoView({ draft })); }
+    const vid = /^\/api\/video\/([\w-]{1,64})(?:\/(refresh|decide))?$/.exec(path);
+    if (vid) {
+      if (method === "POST" && vid[2] === "refresh") { const draft = await p.video.refresh(userId, org.id, vid[1]!); return json(200, videoView({ draft })); }
+      if (method === "POST" && vid[2] === "decide") { const b = body(); const draft = p.video.decide(userId, org.id, vid[1]!, b.approve === true, b.note); return json(200, videoView({ draft })); }
+      if (method === "DELETE" && !vid[2]) { p.video.remove(userId, org.id, vid[1]!); return json(200, videoView()); }
     }
 
     // The app calls this when it opens or the ask box is focused, so a sleeping GPU is awake by the time the question is sent.
@@ -1133,7 +1231,7 @@ export function createApp(p: Platform) {
     try {
       return renewed(req, await route(req));
     } catch (err) {
-      if (err instanceof BadRequest || err instanceof SetupError || err instanceof SignupError || err instanceof LedgerError || err instanceof ChannelError || err instanceof IntegrationError || err instanceof ReviewError || err instanceof PeopleError || err instanceof PricingError || err instanceof PromoError || err instanceof PromoterError || err instanceof GrowthError || err instanceof ResearchError || err instanceof PushError || err instanceof AgentError || err instanceof MiningError || err instanceof EnergyError || err instanceof SettingsError || err instanceof BatchError || err instanceof PaymentError || err instanceof RotaError || err instanceof MetaClientError) return json(400, { error: err.message });
+      if (err instanceof BadRequest || err instanceof SetupError || err instanceof SignupError || err instanceof LedgerError || err instanceof ChannelError || err instanceof IntegrationError || err instanceof ReviewError || err instanceof PeopleError || err instanceof PricingError || err instanceof PromoError || err instanceof PromoterError || err instanceof GrowthError || err instanceof ResearchError || err instanceof PushError || err instanceof AgentError || err instanceof MiningError || err instanceof EnergyError || err instanceof SettingsError || err instanceof BatchError || err instanceof PaymentError || err instanceof RotaError || err instanceof MetaClientError || err instanceof LearningError || err instanceof VideoError) return json(400, { error: err.message });
       // A paid service that has not been confirmed answers 409 with the quote, so the screen can show the cost and ask.
       if (err instanceof PaidServiceError) return json(err.quote ? 409 : 400, { error: err.message, quote: err.quote });
       if (err instanceof RenderError) return json(400, { error: err.message });

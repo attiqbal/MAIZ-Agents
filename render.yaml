@@ -36,6 +36,9 @@ services:
       # Contact address shown on the Terms and Privacy pages (build time). Company details are in src/company.ts.
       - key: CONTACT_EMAIL
         sync: false
+      # interest = pre-launch (register your interest only); open = normal signup. Build time too, so redeploy after changing.
+      - key: SIGNUP_MODE
+        value: interest
       - key: PLATFORM_OWNER_EMAILS
         sync: false
       # AI workers: RunPod does the heavy lifting, Claude supervises (docs/AI-ROUTING.md). Set both or neither.

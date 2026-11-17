@@ -37,6 +37,7 @@ const platform = createPlatform({
   integrationApps: integrationAppsFromEnv(env, env.APP_URL ?? "http://localhost:5173"),
   loginApps: loginAppsFromEnv(env),
   platformOwners: platformOwnersFromEnv(env),
+  signupMode: env.SIGNUP_MODE === "open" ? "open" : "interest",
   ownerTimezone: env.OWNER_TIMEZONE || undefined,
   meta: metaFromEnv(env),
   whatsapp: whatsappFromEnv(env),

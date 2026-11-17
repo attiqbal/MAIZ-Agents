@@ -16,6 +16,7 @@ import { RoutingSettingsStore, defaultSettings } from "../modules/model-gateway/
 import type { Completer } from "../modules/model-gateway/types.js";
 import { AdminManager } from "../modules/admin-manager/index.js";
 import { InMemoryModelProvisioner, InMemoryStorageProvisioner } from "../modules/admin-manager/provisioning.js";
+import { InterestService } from "../modules/interest/index.js";
 import { OnboardingService } from "../modules/onboarding/index.js";
 import { BatchService } from "../modules/batch/service.js";
 import { WorkforceService } from "../modules/workforce/index.js";
@@ -33,6 +34,9 @@ import { localParts } from "../modules/batch/schedule.js";
 import { RotaService, RotaError } from "../modules/rota/index.js";
 import { PeopleService } from "../modules/people/index.js";
 import { ConversationService } from "../modules/conversations/index.js";
+import { LearningService } from "../modules/learning/index.js";
+import { factsFromAsks, factsFromConnections, factsFromProfile } from "../modules/learning/sources.js";
+import { VideoStudio } from "../modules/video/index.js";
 import { NotificationService } from "../modules/notifications/index.js";
 
 import { ConsoleEmailSender, QueuedEmailSender, ResendEmailSender, type EmailSender } from "./email.js";
@@ -80,6 +84,11 @@ export interface PlatformConfig {
    * queue and sign off specialised tasks. Clients can never approve their own.
    */
   platformOwners?: readonly string[];
+  /**
+   * "interest": the site is pre-launch, visitors register their interest and nobody can create an account
+   * (the platform owner still can, to test). "open" (the default here): normal signup. The server entry point reads SIGNUP_MODE and defaults to "interest"; the website build reads the same variable.
+   */
+  signupMode?: "interest" | "open";
   /** The platform owner's time zone (OWNER_TIMEZONE), so hourly sign-off reminders are not sent at night. Default Europe/London. */
   ownerTimezone?: string;
   /**
@@ -165,6 +174,8 @@ export function createPlatform(cfg: PlatformConfig) {
     const g = prices.general();
     return { days: g.trialDays, teamEnergy: g.trialTeamEnergy, dailyTeamCeiling: g.dailyTeamCeiling };
   });
+  /** People who asked to hear when MAIZ Agents opens (the pre-launch mailing list). */
+  const interest = new InterestService(now);
   const router = new ChannelRouter(identity, workforce, audit);
   /** Business apps (tills, payroll). Employees get only the app data the owner granted them. */
   // Our Xero/Square apps: the server's when set there, otherwise what the owner typed on the Connections page
@@ -272,6 +283,27 @@ export function createPlatform(cfg: PlatformConfig) {
     meter: energy, multiplier: () => prices.general().paidServiceMultiplier ?? DEFAULT_PAID_MULTIPLIER, keys: () => connections.videoKeys(), http: cfg.http ?? fetch, now,
     onUse: (u) => { if (u.payer.kind === "client") audit.record({ workspaceId: u.payer.workspaceId, actor: `employee:${u.payer.employeeId}`, action: "paid_service.used", data: { service: u.service, energy: u.energy, simulated: u.simulated } }); },
   });
+  /** What each business has taught its team (feedback, edits, profile). Added to every employee's instructions in a short block. */
+  const learning = new LearningService(identity, now);
+  workforce.addContext((ws, templateKey) => learning.contextFor(ws, templateKey));
+  /** Client video from templates and the client's brand. Priced and charged by `paid`; approval is a separate step. */
+  const video = new VideoStudio(identity, {
+    paid,
+    employeeOk: (userId, ws, employeeId) => workforce.team(userId, ws).some((e) => e.id === employeeId),
+    onDecision: (ws, d, approved, userId) => {
+      const templateKey = workforce.templateOf(d.employeeId) ?? "all";
+      learning.feedback(userId, ws, { employeeId: d.employeeId, templateKey, kind: approved ? "up" : "down", note: approved ? undefined : d.note });
+    },
+  }, now);
+  /** Fills the business profile from what is already known: setup answers, connected apps and repeated asks. Cheap, so it runs when the profile is opened. */
+  const syncLearning = (userId: string, ws: string): void => {
+    const names = new Map(integrations.catalogue().map((c) => [c.key, c.name]));
+    learning.learnFacts(ws, [
+      ...factsFromProfile(workforce.profileOf(userId, ws)),
+      ...factsFromConnections(integrations.list(userId, ws).filter((c) => c.status === "connected").map((c) => names.get(c.connectorKey) ?? c.connectorKey)),
+      ...factsFromAsks(conversations.askedOf(ws)),
+    ]);
+  };
   const OWNER_PROMOTER: Payer = { kind: "owner", agent: "promotion-agent" };
   const promoter = new PromoterService((userId) => ownerIdSet.has(userId), {
     now, completer: gateway, send: (mail) => email.send(mail),
@@ -615,6 +647,8 @@ export function createPlatform(cfg: PlatformConfig) {
     for (const x of s.records ?? []) {
       if (x.kind === "meta_conn" || x.kind === "meta_post" || x.kind === "meta_limits") metaClients.restore(x.kind, x.data);
       else if (x.kind === "conversation") conversations.restore(x.data);
+      else if (x.kind === "learning") learning.restore(x.data);
+      else if (x.kind === "video") video.restore(x.data);
       else if (x.kind === "notices") notices.restore(x.data);
       else if (x.kind === "order") payments.restore(x.data);
       else if (x.kind === "recon") reconciliation.restore(x.data);
@@ -641,6 +675,7 @@ export function createPlatform(cfg: PlatformConfig) {
       if (x.kind === "coupon") coupons.restoreCoupon(x.data);
       else if (x.kind === "redemption") coupons.restoreRedemption(x.data);
       else if (x.kind === "push_sub") push.restore(x.data);
+      else if (x.kind === "interest") interest.restore(x.data);
       else if (x.kind === "meta_review" || x.kind === "meta_deletion") metaClients.restorePlatform(x.kind, x.data);
       else if (x.kind === "channel") { live.waState = x.data; live.wa?.restore(x.data); }
       else if (["campaign", "draft", "lead", "optout", "fact"].includes(x.kind)) promoter.restore(x.kind, x.data);
@@ -648,7 +683,7 @@ export function createPlatform(cfg: PlatformConfig) {
       else affiliates.restore(x.kind, x.data);
     }
     sink = store;
-    for (const part of [audit, identity, energy, workforce, ledger, router, admin, integrations, reviews, prices, specialists, aiSettings, spend, batch, payments, rota, reconciliation, people, conversations, notices, credentials, coupons, affiliates, promoter, growth, connections, metaClients, push, mining, agents]) part.useSink(store);
+    for (const part of [audit, identity, energy, workforce, ledger, router, admin, integrations, reviews, prices, specialists, aiSettings, spend, batch, payments, rota, reconciliation, people, conversations, learning, video, notices, credentials, interest, coupons, affiliates, promoter, growth, connections, metaClients, push, mining, agents]) part.useSink(store);
     live.sink = store;
     live.wa?.useSink(store);
   }
@@ -693,6 +728,6 @@ export function createPlatform(cfg: PlatformConfig) {
     slack: { enumerable: true, get: () => cfg.slack ?? connections.slackApp() },
     loginApps: { enumerable: true, get: (): LoginApps => ({ ...connections.loginApps(), ...cfg.loginApps }) },
   });
-  return { agents, mining, orderDiscountFor, quoteFor, hasTeamPackage, push, conversations, notices, warm, ownerDecisions, decisionDigest, dashboard, reconciliation, rota, people, payments, batch, email, usedLinks, sends, loginFails, resets, credentials, formHits, codeFails, coupons, affiliates, promoter, paid, growth, research, connections, growthTick, metaClients, metaSettings, get ownerWhatsApp() { return live.wa; }, admin, reviews, prices, specialists, ai, clients, isPlatformOwner, healthy, hasStore, cfg: liveCfg, now, audit, bus, identity, energy, workforce, ledger, onboarding, router, integrations, slackTokens, saveSlackToken, attachStore };
+  return { interest, signupOpen: (cfg.signupMode ?? "open") === "open", agents, mining, orderDiscountFor, quoteFor, hasTeamPackage, push, conversations, learning, video, syncLearning, notices, warm, ownerDecisions, decisionDigest, dashboard, reconciliation, rota, people, payments, batch, email, usedLinks, sends, loginFails, resets, credentials, formHits, codeFails, coupons, affiliates, promoter, paid, growth, research, connections, growthTick, metaClients, metaSettings, get ownerWhatsApp() { return live.wa; }, admin, reviews, prices, specialists, ai, clients, isPlatformOwner, healthy, hasStore, cfg: liveCfg, now, audit, bus, identity, energy, workforce, ledger, onboarding, router, integrations, slackTokens, saveSlackToken, attachStore };
 }
 export type Platform = ReturnType<typeof createPlatform>;

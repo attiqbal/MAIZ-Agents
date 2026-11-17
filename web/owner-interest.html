@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+<!--@include head title="Interest list · MAIZ Agents" description="People who registered their interest before MAIZ Agents opens."-->
+<meta name="robots" content="noindex">
+</head>
+<body>
+<div class="page-top">
+  <!--@include owner-header-->
+  <main id="main">
+    <section class="section">
+      <div class="container" style="max-width:1180px">
+        <!--@include owner-nav-->
+        <div class="rv-head">
+          <div><h1>Interest list</h1>
+            <p class="sub">Everyone who registered their interest on the website, newest first. You get an email each time someone joins. They have been told we will email them only when MAIZ Agents opens.</p></div>
+          <span class="badge badge-dark" id="ow-eg" hidden>Example data</span>
+        </div>
+        <div class="ob-panel" id="ow-gate" hidden aria-live="polite"><h2 id="ow-gate-h" style="font-size:1.25rem;margin:0 0 6px"></h2><p id="ow-gate-p" class="sub" style="margin:0 0 14px"></p><a class="btn btn-primary" id="ow-gate-a" href="/signin.html">Log in</a></div>
+        <div id="ow-body">
+          <div class="kpis" id="in-kpis"></div>
+          <section class="panel" aria-labelledby="in-h"><div class="panel-h"><h2 id="in-h">People waiting</h2><a class="btn btn-sm btn-quiet" id="in-csv" href="#" download="maiz-interest-list.csv">Download as a spreadsheet</a></div>
+            <div class="tbl-wrap" tabindex="0" role="region" aria-label="People who registered their interest, scrolls sideways on small screens"><table class="tbl" id="in-table"></table></div></section>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+<!--@include footer-->
+<script type="module" src="/src/owner-interest.ts"></script>
+</body>
+</html>

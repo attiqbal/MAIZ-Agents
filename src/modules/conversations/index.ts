@@ -24,6 +24,10 @@ export interface Turn {
   /** Queued turns: the batch job that will fill in the answer, and when it runs. */
   jobId?: string;
   runsAt?: string;
+  /** Employee turns: what the client said about this answer, so the screen can show it. */
+  feedback?: "up" | "down" | "redo";
+  /** The client changed the words of this answer. */
+  edited?: boolean;
 }
 
 export interface Conversation { workspaceId: string; employeeId: string; turns: Turn[]; updatedAt: string }
@@ -103,6 +107,40 @@ export class ConversationService {
     const { runsAt: _runsAt, ...rest } = hit;
     this.save({ ...c, updatedAt: this.now().toISOString(), turns: c.turns.map((t) => (t === hit ? { ...rest, text: "This could not be finished and nothing was charged. Ask again when you are ready.", status: "failed" as const } : t)) });
     return true;
+  }
+
+  /** Platform-level: what a business asked, across all its employees, for spotting jobs it repeats. Newest last. */
+  askedOf(workspaceId: string): string[] {
+    return [...this.byEmployee.values()].filter((c) => c.workspaceId === workspaceId).flatMap((c) => c.turns.filter((t) => t.role === "you").map((t) => t.text));
+  }
+
+  /** One answered employee turn, for feedback. Throws if it is not there or is not an answer. */
+  answerTurn(userId: string, workspaceId: string, employeeId: string, turnId: string): Turn {
+    const t = this.thread(userId, workspaceId, employeeId).find((x) => x.id === turnId);
+    if (!t || t.role !== "employee" || t.status !== "answered") throw new Error("that answer was not found");
+    return t;
+  }
+
+  /** The client's own words replace an answer. Returns the words before and after. */
+  editAnswer(userId: string, workspaceId: string, employeeId: string, turnId: string, text: string): { before: string; after: string } {
+    this.identity.require(userId, workspaceId, "task.create");
+    const t = this.answerTurn(userId, workspaceId, employeeId, turnId);
+    const after = clip(text.trim(), MAX_STORED_CHARS);
+    if (!after) throw new Error("an answer cannot be empty");
+    this.mark(workspaceId, employeeId, turnId, { text: after, edited: true });
+    return { before: t.text, after };
+  }
+
+  /** Remembers a thumbs up, thumbs down or redo on an answer. */
+  rateAnswer(userId: string, workspaceId: string, employeeId: string, turnId: string, feedback: "up" | "down" | "redo"): void {
+    this.identity.require(userId, workspaceId, "task.create");
+    this.answerTurn(userId, workspaceId, employeeId, turnId);
+    this.mark(workspaceId, employeeId, turnId, { feedback });
+  }
+
+  private mark(workspaceId: string, employeeId: string, turnId: string, change: Partial<Turn>): void {
+    const c = this.mine(workspaceId, employeeId)!;
+    this.save({ ...c, updatedAt: this.now().toISOString(), turns: c.turns.map((t) => (t.id === turnId ? { ...t, ...change } : t)) });
   }
 
   /** Starts the thread over. Deletes it: nothing about it is kept. */
