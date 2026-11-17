@@ -100,7 +100,8 @@ export const CLIENT_RULES: readonly RouteRule[] = [
   rule("POST", `/api/queue/${ID}/cancel`, "task.create"),
   rule("POST", `/api/paid-services/${ID}/render`, "task.create"),
   rule("POST", "/api/mining/run", "task.create"),
-  rule("POST", `/api/mining/datasets/${ID}/(share|remove)`, "task.create"),
+  rule("POST", `/api/mining/datasets/${ID}/(share|remove|watch)`, "task.create"),
+  rule("POST", "/api/mining/chat/(confirm|decline)", "task.create"),
   rule("POST", "/api/meta/posts", "task.create"),
   rule("POST", `/api/meta/posts/${ID}/results`, "task.create"),
   // A first upload connects the app, which the service keeps for the owner; later uploads and refreshes are work.
