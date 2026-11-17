@@ -36,6 +36,9 @@ const CHANGES: readonly Row[] = [
   ["POST", "/api/checkout", "owner", { lines: [] }],
   ["GET", "/api/orders", "owner"],
   ["POST", "/api/billing/portal", "owner"],
+  ["GET", "/api/billing/lines", "owner"],
+  ["POST", "/api/billing/lines/stop", "owner", { orderId: "x", key: "x" }],
+  ["POST", "/api/billing/preview", "owner", { lines: [] }],
   ["POST", "/api/orders/:id/cancel", "owner"],
   ["GET", "/api/coupons", "owner"],
   ["POST", "/api/coupons/redeem", "owner", { code: "NOT-A-CODE" }],
@@ -117,6 +120,11 @@ const CHANGES: readonly Row[] = [
   ["POST", "/api/integrations/apps/nope/import", "member", { csv: "a,b" }],
   ["POST", "/api/integrations/connections/:id/sync", "member"],
   // a person's own things
+  // the Compliance calendar's own dates
+  ["POST", "/api/overview/calendar/dates", "admin", { title: "x", date: "2027-01-01" }],
+  ["POST", "/api/overview/calendar/dates/:id", "admin", { title: "x" }],
+  ["POST", "/api/overview/calendar/dates/:id/done", "admin", { done: true }],
+  ["POST", "/api/overview/calendar/dates/:id/remove", "admin"],
   ["POST", "/api/push/subscribe", "viewer", {}],
   ["POST", "/api/push/unsubscribe", "viewer", {}],
   ["POST", "/api/push/test", "viewer"],
@@ -128,7 +136,7 @@ const READS: readonly string[] = [
   "/api/team", "/api/org", "/api/dashboard", "/api/energy", "/api/setup", "/api/notifications", "/api/suggestions", "/api/queue", "/api/batch/schedule",
   "/api/finance/summary", "/api/rota/week", "/api/specialists", "/api/reviews", "/api/conversations/:emp", "/api/paid-services", "/api/paid-services/uses/:id",
   "/api/push", "/api/mining", "/api/mining/datasets/:id", "/api/agents", "/api/integrations", "/api/integrations/activity", "/api/integrations/growth",
-  "/api/meta", "/api/meta/posts", "/api/meta/insights", "/api/meta/sandbox/outbox",
+  "/api/overview", "/api/overview/approvals", "/api/overview/books", "/api/overview/calendar", "/api/meta", "/api/meta/posts", "/api/meta/insights", "/api/meta/sandbox/outbox",
 ];
 
 /** Routes with no business behind them: public pages and calls proved by a signature, a key or a one-time link, the person's own account, and MAIZ's own owner pages. */

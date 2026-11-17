@@ -173,7 +173,8 @@ export function createOverview(d: OverviewDeps) {
   const planDates = (userId: string, ws: string): CalendarSources["plan"] => {
     const plan = d.energy.planOf(ws);
     const ends = plan.expiresAt ? dayOf(plan.expiresAt, ws) : undefined;
-    const renewals = d.payments.mine(userId, ws)
+    // What was bought and paid is billing, which only the owner may read, so everyone else sees the plan's own end date and no renewals.
+    const renewals = (d.identity.can(userId, ws, "workspace.manage") ? d.payments.mine(userId, ws) : [])
       .filter((o) => o.status === "paid" && o.monthlyMinor > 0 && !!o.paidAt)
       // A cancelled Team package is shown once, as the day it ends, not as a payment that will not be taken.
       .filter((o) => !(plan.endedPaid && o.lines.some((l) => l.key === TEAM_PACKAGE_KEY)))

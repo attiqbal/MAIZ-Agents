@@ -44,6 +44,8 @@ export const CLIENT_RULES: readonly RouteRule[] = [
   rule("POST", "/api/checkout", "workspace.manage", OWNER_HIRE),
   rule("GET", "/api/orders", "workspace.manage", OWNER_BILLING),
   rule("POST", "/api/billing/portal", "workspace.manage", OWNER_BILLING),
+  rule("GET", "/api/billing/lines", "workspace.manage", OWNER_BILLING),
+  rule("POST", "/api/billing/(lines/stop|preview)", "workspace.manage", OWNER_BILLING),
   rule("POST", `/api/orders/${ID}/cancel`, "workspace.manage", OWNER_BILLING),
   rule("GET", "/api/coupons", "workspace.manage", OWNER_BILLING),
   rule("POST", "/api/coupons/redeem", "workspace.manage", OWNER_BILLING),
@@ -85,6 +87,7 @@ export const CLIENT_RULES: readonly RouteRule[] = [
   rule("POST", "/api/meta/sandbox/whatsapp-reply", "approval.decide", MANAGER_DECIDE),
   rule("POST", "/api/finance/entries", "approval.decide", MANAGER_BOOKS),
   rule("POST", "/api/integrations/post", "approval.decide", MANAGER_BOOKS),
+  rule("POST", `/api/overview/calendar/dates(/${ID}(/(done|remove))?)?`, "approval.decide", MANAGER_DECIDE),
 
   // ---- asking the team for work (`task.create`): everyone except view-only ----
   rule("POST", "/api/ask", "task.create"),
