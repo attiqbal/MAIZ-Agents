@@ -216,6 +216,7 @@ const mk = async (opts = {}) => { const ctx = await b.newContext({ viewport: { w
   await p.click("#c-facebook button[type=submit]"); await p.waitForTimeout(500);
   ok("owner connections: Facebook saved from the page", /Saved/.test(await p.textContent("#m-facebook") ?? "") && (await p.textContent("#c-facebook .cx-badge") ?? "").includes("Connected"));
   ok("owner connections: the saved token never comes back to the browser", !(await p.content()).includes(FAKE));
+  ok("owner connections: services are grouped Critical, Must have and Optional, with only the selected one open", (await p.locator(".cxm-group").count()) === 3 && (await p.locator(".cxm-card").count()) === 1);
   const tok = await p.evaluate(() => localStorage.getItem("maiz.token"));
   const ch = await (await p.request.get(B + "/api/owner/promoter/channels", { headers: { authorization: `Bearer ${tok}` } })).json();
   ok("owner connections: the promotion agent can publish at once, no restart", ch.facebook === true, JSON.stringify(ch));
