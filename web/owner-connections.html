@@ -13,23 +13,24 @@
         <!--@include owner-nav-->
         <div class="rv-head">
           <div><h1>Connections</h1>
-            <p class="sub">What your AI team needs from you to do the whole job. Each card is asked for by the team member who needs it. Follow the steps, paste what it asks for, press Test, and you will know straight away whether it works. No server login needed.</p></div>
+            <p class="sub">Everything the site and your AI team connect to, with the most important first. Pick a service to set it up, check it or change it. Only the one you pick opens.</p></div>
           <span class="badge badge-dark" id="ow-eg" hidden>Example data</span>
         </div>
         <div class="ob-panel" id="ow-gate" hidden aria-live="polite"><h2 id="ow-gate-h" style="font-size:1.25rem;margin:0 0 6px"></h2><p id="ow-gate-p" class="sub" style="margin:0 0 14px"></p><a class="btn btn-primary" id="ow-gate-a" href="/signin.html">Log in</a></div>
         <div id="ow-body">
           <div class="ow-stack">
-            <section class="panel cx-sum" aria-labelledby="cx-sum-h"><h2 id="cx-sum-h" class="sr-only">Progress</h2><div id="cx-progress"></div></section>
+            <section class="panel cx-sum" aria-labelledby="cx-sum-h"><h2 id="cx-sum-h" class="sr-only">What to do next</h2><div id="cx-progress"></div></section>
             <div class="learn" id="cx-temp" hidden><b>Saved until restart only.</b>This server has no database switched on, so what you save here is lost when it restarts. On maizagents.com it is kept in the database.</div>
-            <div class="learn"><b>How your details are kept.</b>Tokens and secrets are encrypted before they are stored, and are never shown again after you save them: a saved one just says "Saved". To change one, paste the new value. Tests only read (a Page's name, a number's details); they never post, send or charge anything. The only exception is the WhatsApp test message, which you send on purpose.</div>
-            <h2 class="cx-group-h">Asked for by your team</h2>
-            <div class="ow-stack" id="cx-team"></div>
-            <h2 class="cx-group-h">For your clients</h2>
-            <p class="muted small cx-group-p">Set each one up once, and every client gets it: one-click sign-in, their AI team in Slack, and their books and tills connected without uploading files. Each card has the addresses to paste into the provider's own screens.</p>
-            <div class="ow-stack" id="cx-clients"></div>
-            <h2 class="cx-group-h">Platform services</h2>
-            <p class="muted small cx-group-p">These run the whole site. Email is set here. Payments, the AI engine and Claude stay server settings on purpose, because a mistake there costs money; you can still see whether each one works and test it here.</p>
-            <div class="ow-stack" id="cx-platform"></div>
+            <details class="learn cxm-how"><summary>How your details are kept</summary>Tokens and secrets are encrypted before they are stored, and are never shown again after you save them: a saved one just says "Saved" and when it was last changed. To change one, press Change and paste the new value. Tests only read (a Page's name, a number's details); they never post, send or charge anything. The only exception is the WhatsApp test message, which you send on purpose.</details>
+            <div class="cxm" id="cxm" data-view="list">
+              <section class="cxm-side" id="services" aria-label="Services">
+                <div class="field"><label for="cxm-search">Find a service</label><input class="input" id="cxm-search" type="search" autocomplete="off" placeholder="For example: Google, payments, email" maxlength="60"></div>
+                <div class="chips" id="cxm-filters" role="group" aria-label="Show"></div>
+                <div id="cxm-list"></div>
+              </section>
+              <div class="cxm-main" id="cxm-detail" role="region" aria-label="Selected service"></div>
+            </div>
+            <p class="sr-only" id="cxm-live" role="status" aria-live="polite"></p>
           </div>
         </div>
       </div>
