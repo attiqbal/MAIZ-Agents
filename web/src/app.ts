@@ -262,7 +262,7 @@ async function loadOrg(): Promise<void> {
 void loadOrg();
 
 // Settings: the plan, the provider's billing page (card, invoices, cancel) and what has been bought.
-interface OrderRow { id: string; status: string; lines: { title: string; qty: number }[]; dueTodayMinor: number; createdAt: string; paidAt?: string; discount?: { code: string; amountOffMinor: number }; problem?: string }
+interface OrderRow { id: string; status: string; lines: { title: string; qty: number }[]; dueTodayMinor: number; createdAt: string; paidAt?: string; discount?: { code: string; amountOffMinor: number }; problem?: string; payUrl?: string }
 const ORDER_STATE: Record<string, string> = { paid: "Paid", pending: "Waiting for payment", failed: "Not paid", cancelled: "Cancelled" };
 const pounds = (minor: number) => `£${(minor / 100).toLocaleString("en-GB", { minimumFractionDigits: minor % 100 ? 2 : 0, maximumFractionDigits: 2 })}`;
 async function loadBilling(): Promise<void> {
@@ -281,7 +281,7 @@ async function loadBilling(): Promise<void> {
   $("bill-portal").hidden = !orders.some((o) => o.paidAt);
   $("bill-orders-wrap").hidden = orders.length === 0;
   $("bill-orders").innerHTML = orders.length ? `<thead><tr><th scope="col">Date</th><th scope="col">What</th><th scope="col">Paid today</th><th scope="col">Status</th></tr></thead><tbody>${orders.slice(0, 12).map((o) =>
-    `<tr><td>${esc(day(o.paidAt ?? o.createdAt))}</td><td>${esc(o.lines.map((l) => (l.qty > 1 ? `${l.qty} × ${l.title}` : l.title)).join(", "))}${o.discount ? `<br><span class="small muted">Code ${esc(o.discount.code)}: ${pounds(o.discount.amountOffMinor)} off</span>` : ""}</td><td class="mono">${pounds(o.dueTodayMinor)}</td><td>${esc(ORDER_STATE[o.status] ?? o.status)}${o.problem ? `<br><span class="small muted">${esc(o.problem)}</span>` : ""}</td></tr>`).join("")}</tbody>` : "";
+    `<tr><td>${esc(day(o.paidAt ?? o.createdAt))}</td><td>${esc(o.lines.map((l) => (l.qty > 1 ? `${l.qty} × ${l.title}` : l.title)).join(", "))}${o.discount ? `<br><span class="small muted">Code ${esc(o.discount.code)}: ${pounds(o.discount.amountOffMinor)} off</span>` : ""}</td><td class="mono">${pounds(o.dueTodayMinor)}</td><td>${esc(ORDER_STATE[o.status] ?? o.status)}${o.status === "pending" && o.payUrl ? `<br><a href="${esc(o.payUrl)}" rel="noopener">Finish paying on Stripe</a>` : ""}${o.problem ? `<br><span class="small muted">${esc(o.problem)}</span>` : ""}</td></tr>`).join("")}</tbody>` : "";
 }
 $("bill-portal").addEventListener("click", async () => {
   const b = $<HTMLButtonElement>("bill-portal");

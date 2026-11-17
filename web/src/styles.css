@@ -1973,3 +1973,6 @@ h1, .sec-head h2, .final h2, .stage-band h2, .article-head h1, .sec-title, .bent
 @media (max-width: 640px) { .bl-row { grid-template-columns: 1fr; } .bl-price { white-space: normal; } }
 .ow-bill { grid-column: 1 / -1; }
 .ow-bill .hint { max-width: 72ch; }
+
+.cart-bill { display: flex; flex-direction: column; gap: 6px; margin: 12px 0; }
+.cart-bill p { margin: 0; max-width: 60ch; }
