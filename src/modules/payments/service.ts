@@ -679,7 +679,8 @@ export class PaymentService {
         if (seen.status === "paid" && seen.stopWanted && now.getTime() - new Date(seen.stopWanted).getTime() >= STOP_RETRY_MS) await this.stopOwn(seen);
         let o = this.orders.get(seen.id)!;
         // An order cancelled before stops were recorded: its paid month ends on the next monthly anniversary.
-        if (o.status === "cancelled" && o.fulfilledAt && monthlyOf(o).some((l) => !o.stops?.[l.key])) this.save(o = this.withStops(o, this.periodOf(o).toISOString(), "client"));
+        // A cancelled order that only held the plan has nothing to take away: its end is the energy plan's own.
+        if (o.status === "cancelled" && o.fulfilledAt && monthlyOf(o).some((l) => !this.d.plan?.(l.key)) && monthlyOf(o).some((l) => !o.stops?.[l.key])) this.save(o = this.withStops(o, this.periodOf(o).toISOString(), "client"));
         for (const line of monthlyOf(o)) {
           const stop = o.stops?.[line.key];
           if (!stop || stop.releasedAt || new Date(stop.endsAt).getTime() > now.getTime()) continue;
