@@ -1,4 +1,4 @@
-import { BackupBusy, BackupError, NIGHTLY_TIME, type JobKind } from "../modules/backup/index.js";
+import { BackupBusy, BackupError, MANUAL_KEEP, NIGHTLY_TIME, type JobKind } from "../modules/backup/index.js";
 import type { Platform } from "./platform.js";
 import type { Req, Res } from "./app.js";
 
@@ -26,7 +26,7 @@ export async function backupOwnerRoute(req: Req, userId: string, p: Platform, bo
   if (path !== "/api/owner/backups" && !path.startsWith("/api/owner/backups/")) return undefined;
   if (!p.isPlatformOwner(userId)) return json(403, { error: "only the MAIZ platform owner can manage backups" });
   const b = p.backup;
-  const view = async () => ({ ...(await b.view(userId)), nightlyTime: NIGHTLY_TIME, persistent: p.hasStore() && p.healthy() });
+  const view = async () => ({ ...(await b.view(userId)), nightlyTime: NIGHTLY_TIME, manualKeep: MANUAL_KEEP, persistent: p.hasStore() && p.healthy() });
   const start = async (what: JobKind): Promise<Res> => {
     const { done } = await b.begin(userId, what);
     return { status: 202, body: await view(), after: () => done };
