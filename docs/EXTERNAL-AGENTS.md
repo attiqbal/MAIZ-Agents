@@ -1,6 +1,6 @@
 # Connecting a client's existing agents
 
-Stage 1 of the plan is built (16 November 2026): the key, the public API, the limits, owner approval and signed webhooks. The owner's screen is built too: "Your own AI tools" on Apps and connections (`web/src/agents.ts`), where the owner makes a connection, copies the key and signing secret once, chooses employees and limits, approves waiting jobs, pauses, replaces the key or removes it. The Admin manager planner is not built yet. The plan below was written on 12 November 2026 and revised the same day after Atif's feedback: connecting must be easy, the owner turns it on and sets the limits, it must work for any task, and the Admin manager plans it.
+Stage 1 of the plan is built (16 November 2026): the key, the public API, the limits, owner approval and signed webhooks. The owner's screen is built too: "Your own AI tools" on Apps and connections (`web/src/agents.ts`), where the owner makes a connection, copies the key and signing secret once, chooses employees and limits, approves waiting jobs, pauses, replaces the key or removes it. The core of Stage 2, the Admin manager's planning interview, is built too (see "The planning interview (Stage 2, core)" below). The plan below was written on 12 November 2026 and revised the same day after Atif's feedback: connecting must be easy, the owner turns it on and sets the limits, it must work for any task, and the Admin manager plans it.
 
 ## What is built (Stage 1)
 
@@ -78,9 +78,18 @@ Signed-in session, same as the rest of the app. Anyone on the team may look; eve
 | POST | `/api/agents/:id/test` | Send a signed test webhook. `{ delivered, status? }` |
 | POST | `/api/agents/jobs/:id/approve`, `/refuse` | Decide a waiting job. Refuse takes an optional `{ "reason" }` |
 
+### The planning interview (Stage 2, core)
+
+On Apps and connections, "Connect a tool with the Admin manager" starts a short conversation (`web/src/agents-plan.ts`, `src/modules/agents/planner.ts`). Three tap questions: what the tool does (customer service, order tracking, bookings, reports, or something else in the owner's own words), where it lives (Zapier, Make, n8n, Claude, ChatGPT or not sure), and roughly how many requests a day (a few, up to 50, up to 200, more, not sure). From the answers it proposes: the employees the tool may give work to (only ones on the client's own team that an outside tool is allowed to reach), the limits (sized from the weekly pool and what a job is expected to use, never above the platform maximums, with an honest note when the plan is too small), whether each job waits for the owner's OK, a few example requests the tool can send, and plain connection steps for that tool. The owner can accept it, change it (it opens the normal form filled in), start again, or skip the questions. "Plan again with the Admin manager" does the same for an existing connection and changes it to match; its key stays the same.
+
+- **No model.** The questions and templates are fixed, so it works at once and uses no energy. Nothing calls the model gateway.
+- **Nothing is created until the owner accepts.** `GET /api/agents/plan` gives the questions; `POST /api/agents/plan` with the three answers (and `purposeNote` for "something else") gives a proposal and changes nothing (it is audited as `agent.proposed` by `admin-manager`). Accepting goes through the normal create or change route, so the owner-only check, the maximum limits and the list of employees an outside tool may never reach are applied again there. Both routes are rate limited.
+- **Kept with the connection.** The answers are saved as the connection's `profile` (`purpose`, `purposeNote`, `volume`, `examples`, `plannedAt`) and every part is cleaned and length-capped on the way in. When one of its jobs is handled, the employee is told in the existing fenced brief what the tool is for, in a short line the tool cannot change. `/api/agent/v1/me` also returns the example requests so the tool can show them.
+- **Left out of this stage:** creating the connection switched off and enabling it after a test job, the "Connected" state that waits for a first successful test, the weekly note to the owner, the Admin manager explaining fixes when a test fails, active hours, rollback through the Admin manager, and tool-specific recipes beyond the plain steps. The owner can still pause and test by hand.
+
 ### Not built yet
 
-The Admin manager connection planner (the three questions, the proposal, the weekly note), active hours, a structured `json` answer, a per-job callback address, the usage page split by source, and MCP. Jobs always run now, never in the nightly batch. There is no link yet between a job and MAIZ quality review: a job is `done` when the employee's draft is ready, the same moment the ask bar shows it.
+The weekly note, active hours, a structured `json` answer, a per-job callback address, the usage page split by source, and MCP. Jobs always run now, never in the nightly batch. There is no link yet between a job and MAIZ quality review: a job is `done` when the employee's draft is ready, the same moment the ask bar shows it.
 
 ## Quick start
 

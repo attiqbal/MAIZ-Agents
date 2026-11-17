@@ -147,11 +147,10 @@ function sizeLimits(volume: AgentVolume, size: PlanSize): { limits: AgentLimits;
   const percentOfPoolADay = Math.ceil((perDay / pool) * 100);
   const estimate: PlanEstimate = { perJob, jobsADay, perDay, percentOfPoolADay };
   const dailyPercent = Math.min(MAX_LIMITS.dailyPercent, Math.max(MIN_DAILY_PERCENT, percentOfPoolADay));
-  const sized = `At about ${jobsADay} requests a day, and about ${perJob} energy for each one, it would use about ${perDay.toLocaleString("en-GB")} energy a day. That is about ${percentOfPoolADay}% of your weekly energy.`;
   const over = percentOfPoolADay > MAX_LIMITS.dailyPercent
     ? [`That is more than the daily limit an outside tool may have (${MAX_LIMITS.dailyPercent}% of your weekly energy), so it would stop part way through a busy day. Fewer requests or a bigger plan would fix that.`]
     : [];
-  return { limits: { dailyPercent, perJobPercent, jobsPerHour: JOBS_AN_HOUR[volume] }, estimate, notes: [...notes, sized, ...over] };
+  return { limits: { dailyPercent, perJobPercent, jobsPerHour: JOBS_AN_HOUR[volume] }, estimate, notes: [...notes, ...over] };
 }
 
 function approvalFor(a: Answers): { needsApproval: boolean; note: string } {

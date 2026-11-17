@@ -217,7 +217,8 @@ async function onPlan(b: HTMLButtonElement, a: string): Promise<boolean> {
     setBusy(b, true);
     const done = await save(planning.target, d);
     setBusy(b, false);
-    if (done.ok) planning = undefined; else { planning = { ...planning, error: done.error ?? "" }; paint(); }
+    planning = done.ok ? undefined : { ...planning, error: done.error ?? "" };
+    paint();
     return true;
   }
   return true;
