@@ -294,9 +294,10 @@ describe("generated client-app cards", () => {
 
   it("shows approval-only apps with their steps and nothing to type", async () => {
     const { call, card } = setup();
-    const g = await card("tiktok");
+    const g = await card("indeed");
     expect(g.editable).toBe(false);
-    expect(g.guide.some((s: any) => /Approval:/.test(s.text))).toBe(true);
-    expect((await call("PUT", "/api/owner/connections/tiktok", { fields: { clientId: "x" } })).status).toBeGreaterThanOrEqual(400);
+    expect(g.title).toMatch(/cannot be connected/);
+    expect(g.guide.some((s: any) => /partner/i.test(s.text))).toBe(true);
+    expect((await call("PUT", "/api/owner/connections/indeed", { fields: { clientId: "x" } })).status).toBeGreaterThanOrEqual(400);
   });
 });

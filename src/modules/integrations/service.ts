@@ -145,12 +145,14 @@ export class IntegrationService {
   // ---------- connecting ----------
 
   /** Where to send the owner to approve an OAuth app. `state` is signed by the caller and comes back to the callback. */
-  authorizeUrl(userId: string, workspaceId: string, key: string, state: string): string {
+  authorizeUrl(userId: string, workspaceId: string, key: string, state: string, challenge?: string): string {
     this.identity.require(userId, workspaceId, "workspace.manage");
     const c = this.registry.require(key);
     const app = this.opts.oauthApps?.[key];
     if (c.auth.kind !== "oauth2" || !app) throw new IntegrationError(`${c.name} cannot be connected directly yet. Upload a file instead.`);
+    if (c.authorizeUrl) return c.authorizeUrl(app, state, c.auth.pkce ? challenge : undefined);
     const url = new URL(c.auth.authorizeUrl);
+    if (c.auth.pkce && challenge) { url.searchParams.set("code_challenge", challenge); url.searchParams.set("code_challenge_method", "S256"); }
     url.searchParams.set("client_id", app.clientId);
     url.searchParams.set("scope", c.auth.scopes.join(" "));
     url.searchParams.set("redirect_uri", app.redirectUri);
@@ -165,11 +167,11 @@ export class IntegrationService {
     const c = this.registry.require(key);
     const app = this.opts.oauthApps?.[key];
     if (c.auth.kind !== "oauth2" || !app) throw new IntegrationError("this app is not set up for direct connection");
-    const exchanged = c.exchangeCode ? await c.exchangeCode(this.http, app, code, params) : await standardExchange(this.http, c.auth.tokenUrl, app, code);
+    const exchanged = c.exchangeCode ? await c.exchangeCode(this.http, app, code, params) : await standardExchange(this.http, c.auth.tokenUrl, app, code, c.auth.pkce ? params.code_verifier : undefined, c.name, c.auth.tokenAuth === "basic");
     let { credentials, externalAccount } = exchanged;
     let needsChoice = false;
     if (c.choices && credentials.kind === "oauth2") {
-      const options = await c.choices(this.contextFor_(userId, workspaceId, credentials));
+      const options = await c.choices(this.contextFor_(userId, workspaceId, credentials, c.key));
       if (!options.length) throw new IntegrationError(`That Google account has nothing ${c.name} can read. Connect the account that owns the website's ${c.name}.`);
       if (options.length === 1) { credentials = { ...credentials, tenant: options[0]!.id }; externalAccount = options[0]!.name; }
       else needsChoice = true;
@@ -189,7 +191,7 @@ export class IntegrationService {
     const creds = this.secrets.get(conn.id);
     if (!c.choices || !creds) throw new IntegrationError(`${c.name} has nothing to choose`);
     const fresh = await this.freshCredentials(conn, c, creds);
-    return c.choices(this.contextFor_(userId, workspaceId, fresh));
+    return c.choices(this.contextFor_(userId, workspaceId, fresh, c.key));
   }
 
   /** The owner picks one of the accounts the login really has. Anything else is refused. */
@@ -227,8 +229,20 @@ export class IntegrationService {
     return [...this.connections.values()].some((c) => c.id !== conn.id && c.workspaceId === conn.workspaceId && c.status !== "disconnected" && GOOGLE_CONNECTORS.has(c.connectorKey) && this.opts.oauthApps?.[c.connectorKey]?.clientId === clientId);
   }
 
-  private contextFor_(userId: string, workspaceId: string, credentials: Credentials): ConnectorContext {
-    return { credentials, http: this.http, now: this.now, currency: this.currency(userId, workspaceId) };
+  private contextFor_(userId: string, workspaceId: string, credentials: Credentials, key?: string): ConnectorContext {
+    return { credentials, http: this.http, now: this.now, currency: this.currency(userId, workspaceId), app: key ? this.opts.oauthApps?.[key] : undefined };
+  }
+
+  /** Why the last one-click connection did not work, kept for ten minutes and shown once on the Apps page. */
+  private problems = new Map<string, { at: number; text: string }>();
+  noteProblem(userId: string, workspaceId: string, text: string): void {
+    this.problems.set(`${workspaceId}:${userId}`, { at: this.now().getTime(), text: text.slice(0, 400) });
+  }
+  takeProblem(userId: string, workspaceId: string): string | undefined {
+    const k = `${workspaceId}:${userId}`;
+    const p = this.problems.get(k);
+    this.problems.delete(k);
+    return p && this.now().getTime() - p.at < 10 * 60_000 ? p.text : undefined;
   }
 
   connectWithKey(userId: string, workspaceId: string, key: string, values: Record<string, unknown>): IntegrationConnection {
@@ -298,7 +312,7 @@ export class IntegrationService {
     const r = range ?? { from: new Date(this.now().getTime() - 30 * DAY_MS).toISOString().slice(0, 10), to: today };
     try {
       const fresh = await this.freshCredentials(conn, c, creds);
-      const data = await c.read(this.contextFor_(userId, workspaceId, fresh), r);
+      const data = await c.read(this.contextFor_(userId, workspaceId, fresh, c.key), r);
       this.update({ ...conn, status: "connected", lastSyncAt: this.now().toISOString(), lastError: undefined });
       return this.store(conn.id, workspaceId, { ...data, warnings: [], unmapped: [] });
     } catch (e) {
@@ -585,17 +599,20 @@ export class IntegrationService {
 }
 
 /** RFC 6749 authorization-code exchange, form encoded. Most apps accept this as is. */
-async function standardExchange(http: typeof fetch, tokenUrl: string, app: OAuthApp, code: string) {
-  const res = await http(tokenUrl, {
-    method: "POST",
-    headers: { "content-type": "application/x-www-form-urlencoded", accept: "application/json" },
-    body: new URLSearchParams({ grant_type: "authorization_code", code, client_id: app.clientId, client_secret: app.clientSecret, redirect_uri: app.redirectUri }),
-  });
-  const o = (await res.json().catch(() => ({}))) as { access_token?: string; refresh_token?: string; expires_in?: number };
-  if (!res.ok || !o.access_token) throw new IntegrationError("the app did not approve the connection");
+async function standardExchange(http: typeof fetch, tokenUrl: string, app: OAuthApp, code: string, verifier?: string, name = "The app", basic = false) {
+  const form: Record<string, string> = { grant_type: "authorization_code", code, redirect_uri: app.redirectUri, ...(verifier ? { code_verifier: verifier } : {}) };
+  const headers: Record<string, string> = { "content-type": "application/x-www-form-urlencoded", accept: "application/json" };
+  if (basic) headers.authorization = `Basic ${Buffer.from(`${app.clientId}:${app.clientSecret}`).toString("base64")}`;
+  else { form.client_id = app.clientId; form.client_secret = app.clientSecret; }
+  const res = await http(tokenUrl, { method: "POST", headers, body: new URLSearchParams(form) });
+  const o = (await res.json().catch(() => ({}))) as { access_token?: string; refresh_token?: string; expires_in?: number; error?: unknown };
+  if (!res.ok || !o.access_token) throw new IntegrationError(`${name} did not approve the connection${saidCode(o.error)}`);
   const expiresAt = o.expires_in ? new Date(Date.now() + o.expires_in * 1000).toISOString() : undefined;
   return { credentials: { kind: "oauth2" as const, accessToken: o.access_token, refreshToken: o.refresh_token, expiresAt }, externalAccount: undefined };
 }
+
+/** A provider's short error code, only when it looks like one, for the message a person sees. */
+const saidCode = (v: unknown): string => (typeof v === "string" && /^[\w.:-]{1,60}$/.test(v) ? ` (it answered: ${v})` : "");
 
 /** How the store card connects an app today. An OAuth app without our keys set falls back to its file or the bridge. */
 function connectMode(c: Connector, haveOAuthApp: boolean): "oauth" | "api_key" | "webhook" | "file" | "bridge" {

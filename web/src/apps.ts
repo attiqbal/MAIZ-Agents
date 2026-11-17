@@ -10,7 +10,7 @@ interface CatalogueItem {
 interface Connection { id: string; connectorKey: string; status: string; lastSyncAt?: string; lastError?: string; access: string[]; needsChoice?: boolean; externalAccount?: string }
 interface Growth { connected: boolean; waiting: string[]; lines: string[]; growth: { alerts: { severity: "bad" | "good"; title: string; detail: string }[] } }
 interface Pending { id: string; kind: "sales" | "payroll"; date: string; data: { currency: string; gross: number; net?: number; transactions?: number; headcount?: number } }
-interface AppsData { catalogue: CatalogueItem[]; connections: Connection[]; pending: Pending[] }
+interface AppsData { catalogue: CatalogueItem[]; connections: Connection[]; pending: Pending[]; problem?: string }
 interface ActivityLines { connectionId: string; app: string; lines: string[] }
 interface ImportResult { added: number; updated: number; unchanged: number; conflicts: string[]; warnings: string[]; unmapped: string[] }
 
@@ -68,6 +68,8 @@ export async function loadApps(): Promise<void> {
   const r = getToken() ? await api<AppsData>("/integrations") : { ok: false, data: undefined };
   live = r.ok && !!r.data;
   data = live ? r.data! : DEMO;
+  // Why the last one-click connection failed, in the provider's own words, shown once.
+  if (live && data.problem) toast(data.problem);
   growth = undefined;
   activity = new Map();
   if (live && data.connections.length) {

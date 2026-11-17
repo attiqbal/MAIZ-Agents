@@ -1,3 +1,4 @@
+import { extraEnvName } from "../modules/connections/client-apps.js";
 import { defaultRegistry, type OAuthApp } from "../modules/integrations/index.js";
 import { loginEnvProblems } from "./social-login.js";
 
@@ -67,7 +68,10 @@ export function integrationAppsFromEnv(env: Record<string, string | undefined>, 
     if (c.auth.kind !== "oauth2") continue;
     const clientId = env[`${c.auth.envPrefix}_CLIENT_ID`];
     const clientSecret = env[`${c.auth.envPrefix}_CLIENT_SECRET`];
-    if (clientId && clientSecret) apps[c.key] = { clientId, clientSecret, redirectUri };
+    // Extra boxes (a developer token, an application id) come from <PREFIX>_<NAME>, and the app is only complete with the required ones.
+    const owner = c.ownerFields ?? [];
+    const extra = Object.fromEntries(owner.map((f) => [f.key, env[extraEnvName(c.auth.kind === "oauth2" ? c.auth.envPrefix : "", f.key)]]).filter((e): e is [string, string] => !!e[1]));
+    if (clientId && clientSecret && owner.every((f) => !f.required || extra[f.key])) apps[c.key] = { clientId, clientSecret, redirectUri, ...(Object.keys(extra).length ? { extra } : {}) };
   }
   return apps;
 }

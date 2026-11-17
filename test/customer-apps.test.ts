@@ -72,7 +72,8 @@ describe("the catalogue", () => {
     expect(hub.fields.map((f) => f.key)).toEqual(["clientId", "clientSecret"]);
     expect(hub.fields.find((f) => f.key === "clientSecret")?.secret).toBe(true);
     expect(defs.find((d) => d.key === "gmail")!.editable).toBe(true);
-    expect(defs.find((d) => d.key === "tiktok")!.editable).toBe(false);
+    expect(defs.find((d) => d.key === "tiktok")!.editable).toBe(true);
+    expect(defs.find((d) => d.key === "indeed")!.editable).toBe(false);
     for (const d of defs) expect(JSON.stringify(d.guide)).not.toMatch(/\bssh\b/i);
   });
 

@@ -21,6 +21,9 @@ export const DEFAULT_ACCESS: Record<Capability, readonly string[]> = {
   "reviews.read": ["marketing-manager", "business-consultant", "online-shop-manager", "marketplace-manager", "shop-care-agent"],
   // Supplier orders and stock (Printful, Printify): counts only, for the online-shop team.
   "suppliers.read": ["dropshipping-agent", "online-shop-manager", "business-consultant"],
+  "social.read": ["marketing-manager", "business-consultant"],
+  "ads.read": ["marketing-manager", "business-consultant", "finance-manager"],
+  "documents.read": ["business-consultant", "compliance-manager"],
 };
 
 /** Employees that may never be given app data (the Admin manager runs setup, not the business). */
