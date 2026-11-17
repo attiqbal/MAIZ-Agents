@@ -418,7 +418,7 @@ $<HTMLFormElement>("ask").addEventListener("submit", async (e) => {
   const out = describeOutcome(emp.name, result.done);
   if (out.kind === "queued") { showQueued(emp.name, result.done.runsAt); return; }
   if (out.kind === "note") { showNote(emp.name, out.text); return; }
-  showAnswer(emp.name, out.text, result.done.checked === true, key);
+  showAnswer(emp.name, out.text, result.done.checked === true, key, result.done.hints);
   void loadOrg();
 });
 
@@ -454,10 +454,10 @@ function showQueued(who: string, runsAt?: string): void {
   });
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
-function showAnswer(who: string, text: string, checked: boolean, key: string): void {
+function showAnswer(who: string, text: string, checked: boolean, key: string, hints: { id: string; title: string; detail: string; action: { label: string; href: string } }[] = []): void {
   const box = answerBox();
   box.setAttribute("role", "status");
-  box.innerHTML = `<div class="panel-h"><h2>${esc(who)} says</h2><span class="r">${checked ? "Checked, for you to review" : "Draft for you to review"}</span></div><div class="preview" style="white-space:pre-wrap">${esc(text)}</div><p><a class="btn btn-sm btn-ghost" href="#chat/${esc(key)}">Follow up in conversation</a></p>`;
+  box.innerHTML = `<div class="panel-h"><h2>${esc(who)} says</h2><span class="r">${checked ? "Checked, for you to review" : "Draft for you to review"}</span></div><div class="preview" style="white-space:pre-wrap">${esc(text)}</div><p><a class="btn btn-sm btn-ghost" href="#chat/${esc(key)}">Follow up in conversation</a></p>${hints.map((h) => `<div class="need"><b>${esc(h.title)}</b><span class="d">${esc(h.detail)}</span><div class="acts"><a class="btn btn-sm btn-primary" href="${/^#[\w/-]{1,40}$/.test(h.action.href) ? esc(h.action.href) : "#apps"}">${esc(h.action.label)}</a></div></div>`).join("")}`;
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
 /** An answer panel that fills in word by word. Reading aloud waits for the finished answer (aria-busy), not every word. */

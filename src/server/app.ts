@@ -41,6 +41,7 @@ import { pushRoute } from "./push-routes.js";
 import { miningRoute } from "./mining-routes.js";
 import { backupHealthRoute, backupOwnerRoute } from "./backup-routes.js";
 import { billingRoute } from "./billing-routes.js";
+import { resourcesRoute } from "./resources-routes.js";
 import { MiningError } from "../modules/data-mining/index.js";
 import { PushError } from "../modules/push/index.js";
 import { agentOwnerRoute, agentPublicRoute } from "./agent-routes.js";
@@ -499,6 +500,8 @@ export function createApp(p: Platform) {
     { const r = (await metaOwnerRoute(req, userId, metaCtx)) ?? (await metaClientRoute(req, userId, metaCtx)); if (r) return r; }
     // ---- MAIZ quality review: the platform owner's queue across every client. Clients get 403. ----
     if (path === "/api/owner/reviews" || path.startsWith("/api/owner/reviews/")) return ownerReviewRoutes(req, userId, body);
+    // What the employees can use and what it costs (docs/RESOURCES.md).
+    { const r = resourcesRoute(req, userId, p, orgOf(userId)?.id); if (r) return r; }
     if (path === "/api/owner/ai" || path.startsWith("/api/owner/ai/")) return ownerAiRoutes(req, userId, body);
     if (path === "/api/owner/prices" || path.startsWith("/api/owner/prices/")) return ownerPriceRoutes(req, userId, body);
     if (method === "GET" && path === "/api/owner/team") {
@@ -1148,7 +1151,7 @@ export function createApp(p: Platform) {
         ? { text: queuedText, status: "queued", jobId: task.jobId, runsAt: task.runsAt }
         : { text: message ?? "No answer this time.", status: task.status === "no_energy" ? "no_energy" : "failed" };
     p.conversations.record(userId, orgId, a.emp.id, a.text, reply);
-    return { status: task.status, reason: task.reason, answer: task.deliverable, checked: task.checked === true, energyUsed: task.energyUsed, jobId: task.jobId, runsAt: task.runsAt, queueReason: task.queueReason, ...(message ? { message } : {}) };
+    return { status: task.status, reason: task.reason, answer: task.deliverable, checked: task.checked === true, energyUsed: task.energyUsed, jobId: task.jobId, runsAt: task.runsAt, queueReason: task.queueReason, ...(task.hints?.length ? { hints: task.hints } : {}), ...(message ? { message } : {}) };
   }
 
   return async function handle(req: Req): Promise<Res> {

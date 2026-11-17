@@ -9,6 +9,7 @@ import { getJobDescription, renderJobDescription } from "./job-descriptions.js";
 import { SHOP_EMPLOYEE_KEYS, shopCopyNote } from "../ecommerce/rules.js";
 import type { EnergyMeter } from "../energy/index.js";
 import { describePack, packFor } from "./finance/rules-pack.js";
+import type { ResourceSuggestion } from "../resources/types.js";
 
 /** Describes the business so every employee can tailor its work. */
 export interface BusinessProfile {
@@ -65,6 +66,10 @@ export interface TaskResult {
   at?: string;
   /** A second model checked this answer before it was shown. */
   checked?: boolean;
+  /** Keys of the resources the employee was given for this task (src/modules/resources). Recorded so the owner can see what is used. */
+  used?: string[];
+  /** Resources that would have helped but are not connected, for the web app to show as links. */
+  hints?: ResourceSuggestion[];
   jobId?: string;
   runsAt?: string;
   queueReason?: string;
@@ -105,6 +110,9 @@ export interface Intake {
 /** Most tasks one client may have waiting for a batch, whatever their energy, so one client cannot flood the pod. */
 export const MAX_QUEUED_PER_CLIENT = 200;
 
+/** What the resource registry gives an employee for one task. See src/server/platform.ts. */
+export type ResourceGuide = (userId: string, workspaceId: string, templateKey: string, brief: string, employeeName: string) => { text: string; used: string[]; hints: ResourceSuggestion[] } | undefined;
+
 interface RunContext {
   /** Routing policy. "live" for quick lookups, else the employee template. */
   taskType: string;
@@ -130,6 +138,14 @@ export class WorkforceService {
   }
 
   /** Extra facts per employee from other modules (for example connected apps). Kept out of this module's imports. */
+  private resourceGuide?: ResourceGuide;
+  /** Turns on the "what you can use" part of every employee's instructions, written from the resource registry. */
+  setResourceGuide(fn: ResourceGuide): void { this.resourceGuide = fn; }
+  /** The guide for one task. Never throws: a failing registry must not stop work, the job description's own tool list is used then. */
+  private guideFor(userId: string, workspaceId: string, templateKey: string, brief: string, employeeName: string): ReturnType<ResourceGuide> {
+    try { return this.resourceGuide?.(userId, workspaceId, templateKey, brief, employeeName); } catch { return undefined; }
+  }
+
   private contextSources: ((workspaceId: string, templateKey: string, taskType?: string) => string | undefined)[] = [];
   addContext(source: (workspaceId: string, templateKey: string, taskType?: string) => string | undefined): void {
     this.contextSources.push(source);
@@ -168,6 +184,11 @@ export class WorkforceService {
     if (!d) return false;
     if (d.liveDuringTrial && this.energy?.planOf(workspaceId).expiresAt) return true;
     return d.liveFirstTasks > 0 && (this.answered.get(workspaceId) ?? 0) < d.liveFirstTasks;
+  }
+
+  /** Platform-level (no user check): every finished task of every client since a time. For the owner's resource table only. */
+  allTasksSince(sinceIso: string): TaskResult[] {
+    return [...this.tasks.values()].filter((t) => t.at && t.at >= sinceIso);
   }
 
   /** Finished tasks for one client since a time, newest first. The board and the week's counts read this. */
@@ -378,11 +399,15 @@ export class WorkforceService {
 
     const profile = this.profiles.get(workspaceId);
     const jd = template.jobDescription ?? getJobDescription(template.key);
+    const guide = this.guideFor(userId, workspaceId, template.key, brief, employee.name);
     const parts = [
       template.instructions,
       // The full job description: responsibilities, skills, deliverables and authority limits.
-      ...(jd ? [renderJobDescription(jd)] : []),
-      profile ? `Business profile:\n${JSON.stringify(profile, null, 2)}` : "No business profile has been set yet.",
+      ...(jd ? [renderJobDescription(jd, { tools: !guide })] : []),
+      // What the employee can use, cheapest first (replaces the job description's own tool list).
+      ...(guide ? [guide.text] : []),
+      // Compact: every word of the instructions is paid for on every task.
+      profile ? `Business profile:\n${JSON.stringify(profile)}` : "No business profile has been set yet.",
     ];
     // The Finance manager keeps books to the owner's country rules (or a safe generic set).
     if (template.key === "finance-manager") parts.push(describePack(packFor(profile?.country)));
@@ -432,6 +457,7 @@ export class WorkforceService {
       task.costMicro = result.costMicro;
       task.baselineMicro = result.routing?.baselineMicro;
       if (result.routing?.reviewed && !result.routing.lowConfidence) task.checked = true;
+      if (guide) { task.used = guide.used; if (guide.hints.length) task.hints = guide.hints; }
       task.energyUsed = this.energy?.record(workspaceId, employeeId, result.provider, result.inputTokens, result.outputTokens, verdict.overtime, result.costMicro).energy;
     } catch (err) {
       task.status = "failed";

@@ -1,6 +1,7 @@
 import { ProviderError, type ChatMessage, type TextStream, type Completer, type CompletionRequest, type CompletionResult, type ModelAdapter, type RoutingInfo } from "../types.js";
 import { ResponseCache } from "./cache.js";
 import { SpendLedger, type CallRecord } from "./ledger.js";
+import { worthSampling } from "../../resources/rule.js";
 import { HARD_FAILURES, parseVerdict, reviewMessages, suspicion, type ReviewVerdict } from "./review.js";
 import { UNKNOWN_MODEL_PRICE, type AiRoutingSettings, type ModelPrice, type PolicySettings, type RoutingSettingsStore } from "./settings.js";
 
@@ -215,7 +216,8 @@ export class RoutingGateway implements Completer {
     const reasons = suspicion(answer, c.req);
     const hard = reasons.some((r) => HARD_FAILURES.has(r));
     let verdict: ReviewVerdict | undefined;
-    const sampled = this.random() < this.effectiveRate(c);
+    // A routine spot-check is skipped for a one-line answer with no figure (nothing to find). Suspicious answers are still checked below.
+    const sampled = this.random() < this.effectiveRate(c) && worthSampling(answer.text, c.req.tier);
     if (!hard && s.reviewer.enabled && !this.claudeBlocked(c) && (reasons.length > 0 || sampled)) verdict = await this.review(c, answer);
     c.notes.push(...reasons.map((r) => `suspicious_${r}`));
     const weak = hard || (verdict ? verdict.score < policy.minScore : c.rec.reviewError === true && reasons.length > 0) || (!c.rec.reviewed && reasons.length > 0);
