@@ -39,7 +39,8 @@ export interface Sink {
   integration(c: IntegrationConnection): void;
   /** Credentials for a connected app as JSON. The store must encrypt it. Empty string means removed. */
   integrationSecret(workspaceId: string, connectionId: string, secret: string): void;
-  integrationRecord(r: StoredRecord): void;
+  /** removed = the figure was deleted for good (the client disconnected the app it came from). */
+  integrationRecord(r: StoredRecord, removed?: boolean): void;
   /** A specialised task in MAIZ quality review, replaced on every change. */
   review(r: ReviewItem): void;
   /** A custom specialist waiting for (or past) the platform owner's review. */
