@@ -4,12 +4,13 @@
 import { api, getToken } from "./api";
 import { toast } from "./common";
 import { isBusy, keepFocus, setBusy } from "./keep-focus";
+import { answer, draftOf, planHtml, profileHtml, restart, startPlan, type Draft, type PlanState, type Profile } from "./agents-plan";
 
 interface Limits { dailyPercent: number; perJobPercent: number; jobsPerHour: number }
 interface Connection {
   id: string; name: string; tool: string; status: "active" | "paused" | "expired"; employees: { key: string; title: string }[]; needsApproval: boolean; limits: Limits;
   energy: { dailyCeiling: number; perJobCap: number; usedToday: number; leftToday: number }; jobsThisHour: number; waiting: number; webhookUrl: string | null;
-  keyPrefix: string; keyExpiresAt: string; lastUsedAt: string | null;
+  keyPrefix: string; keyExpiresAt: string; lastUsedAt: string | null; profile: Profile | null;
 }
 interface Job { id: string; status: string; reason: string | null; connectionName: string; employeeTitle: string; brief: string; estimate: number; energyUsed: number | null; createdAt: string; note: string | null }
 interface Overview { connections: Connection[]; jobs: Job[]; limits: { defaults: Limits; maximums: Limits; maxConnections: number }; allowedEmployees: { key: string; title: string; allowed: boolean; reason?: string }[]; canManage: boolean }
@@ -33,25 +34,31 @@ let view: Overview | undefined;
 let form: "" | "new" | string = "";
 let secrets: Secrets | undefined;
 let removing = "";
+/** The Admin manager's interview while it is open, and a proposal the owner chose to change by hand. */
+let planning: PlanState | undefined;
+let draft: Draft | undefined;
 let wired = false;
 const APPROVED_RECHECK_MS = 6_000;
 const body = (): HTMLElement => document.getElementById("agents-body")!;
 
-function formHtml(v: Overview, c?: Connection): string {
-  const lim = c?.limits ?? v.limits.defaults;
+function formHtml(v: Overview, c?: Connection, d?: Draft): string {
+  const lim = d?.limits ?? c?.limits ?? v.limits.defaults;
   const max = v.limits.maximums;
-  const picked = new Set(c?.employees.map((e) => e.key) ?? []);
+  const picked = new Set(d?.employees ?? c?.employees.map((e) => e.key) ?? []);
+  const name = d?.name ?? c?.name ?? "";
+  const tool = d?.tool ?? c?.tool ?? "claude";
+  const ask = d?.needsApproval ?? c?.needsApproval;
   const ticks = v.allowedEmployees.filter((e) => e.allowed).map((e) => `<label class="sf-check"><input type="checkbox" name="emp" value="${esc(e.key)}"${picked.has(e.key) ? " checked" : ""}> ${esc(e.title)}</label>`).join("");
   const never = v.allowedEmployees.filter((e) => !e.allowed).map((e) => e.title);
   return `<form class="ag-form" id="ag-form" data-id="${esc(c?.id ?? "")}" novalidate>
-    <h3>${c ? `Change ${esc(c.name)}` : "Connect a tool"}</h3>
+    <h3>${d ? "Check the suggestion, then save it" : c ? `Change ${esc(c.name)}` : "Connect a tool"}</h3>
     <div class="ag-two">
-      <div class="field"><label for="ag-name">Name, so you recognise it</label><input class="input" id="ag-name" maxlength="60" autocomplete="off" value="${esc(c?.name ?? "")}" placeholder="For example: Website chatbot"></div>
-      <div class="field"><label for="ag-tool">What is it?</label><select class="input" id="ag-tool">${TOOLS.map(([k, l]) => `<option value="${k}"${(c?.tool ?? "claude") === k ? " selected" : ""}>${l}</option>`).join("")}</select></div>
+      <div class="field"><label for="ag-name">Name, so you recognise it</label><input class="input" id="ag-name" maxlength="60" autocomplete="off" value="${esc(name)}" placeholder="For example: Website chatbot"></div>
+      <div class="field"><label for="ag-tool">What is it?</label><select class="input" id="ag-tool">${TOOLS.map(([k, l]) => `<option value="${k}"${tool === k ? " selected" : ""}>${l}</option>`).join("")}</select></div>
     </div>
     <fieldset class="ag-set"><legend class="label">Which employees may it give work to?</legend>${ticks || '<p class="small muted">Nobody on your team can take outside work yet.</p>'}
       ${never.length ? `<p class="small muted">Never available to outside tools: ${esc(never.join(", "))}.</p>` : ""}</fieldset>
-    <label class="sf-check"><input type="checkbox" id="ag-ask"${c?.needsApproval ? " checked" : ""}> Ask me before each job runs</label>
+    <label class="sf-check"><input type="checkbox" id="ag-ask"${ask ? " checked" : ""}> Ask me before each job runs</label>
     <fieldset class="ag-set"><legend class="label">Limits, as a share of your team's weekly energy</legend>
       <div class="ag-three">
         <div class="field"><label for="ag-day">Most in one day (%)</label><input class="input" id="ag-day" type="number" inputmode="numeric" min="1" max="${max.dailyPercent}" step="1" value="${lim.dailyPercent}"></div>
@@ -82,6 +89,7 @@ function connectionHtml(c: Connection, canManage: boolean): string {
   const words = c.status === "active" ? "On" : c.status === "expired" ? "Key expired" : "Paused";
   const acts = canManage ? `<div class="acts">
       <button class="btn btn-sm btn-ghost" type="button" data-ag="edit">Change</button>
+      <button class="btn btn-sm btn-ghost" type="button" data-ag="plan-existing">${c.profile ? "Plan again with the Admin manager" : "Plan with the Admin manager"}</button>
       <button class="btn btn-sm btn-ghost" type="button" data-ag="${c.status === "paused" ? "resume" : "pause"}">${c.status === "paused" ? "Switch on" : "Pause"}</button>
       <button class="btn btn-sm btn-ghost" type="button" data-ag="rotate">New key</button>
       ${c.webhookUrl ? '<button class="btn btn-sm btn-ghost" type="button" data-ag="test">Send a test</button>' : ""}
@@ -92,7 +100,8 @@ function connectionHtml(c: Connection, canManage: boolean): string {
     <p class="small">May give work to: ${esc(c.employees.map((e) => e.title).join(", ") || "nobody yet")}.${c.needsApproval ? " You approve each job first." : ""}</p>
     <p class="small muted ag-nums">Used ${num(c.energy.usedToday)} of ${num(c.energy.dailyCeiling)} energy today · up to ${num(c.energy.perJobCap)} a job · ${c.jobsThisHour} of ${c.limits.jobsPerHour} jobs this hour</p>
     <p class="small muted">Key starts <span class="mono">${esc(c.keyPrefix)}</span>, works until ${esc(day(c.keyExpiresAt))}. ${c.lastUsedAt ? `Last used ${esc(day(c.lastUsedAt))}.` : "Not used yet."}</p>
-    ${acts}${sure}${form === c.id && view ? formHtml(view, c) : ""}</li>`;
+    ${profileHtml(c.profile)}
+    ${acts}${sure}${form === c.id && view ? formHtml(view, c, draft) : ""}</li>`;
 }
 
 function jobHtml(j: Job, canManage: boolean): string {
@@ -122,7 +131,8 @@ function draw(el: HTMLElement): void {
   el.innerHTML = `${secrets ? secretsHtml(secrets) : ""}
     ${waiting.length ? `<h3 class="ag-h">Waiting for your OK</h3><ul class="ag-list">${waiting.map((j) => jobHtml(j, v.canManage)).join("")}</ul>` : ""}
     ${v.connections.length ? `<ul class="ag-list">${v.connections.map((c) => connectionHtml(c, v.canManage)).join("")}</ul>` : '<p class="small muted">No tools connected yet.</p>'}
-    ${form === "new" ? formHtml(v) : v.canManage ? `<div class="acts"><button class="btn btn-primary btn-sm" type="button" data-ag="new"${full ? " disabled" : ""}>Connect a tool</button>${full ? `<span class="small muted">You have the most connections allowed (${v.limits.maxConnections}).</span>` : ""}</div>` : '<p class="small muted">Only the account owner can connect or change a tool.</p>'}
+    ${planning ? planHtml(planning, location.origin) : ""}
+    ${form === "new" ? formHtml(v, undefined, draft) : planning ? "" : v.canManage ? `<div class="acts"><button class="btn btn-primary btn-sm" type="button" data-ag="plan-new"${full ? " disabled" : ""}>Connect a tool with the Admin manager</button><button class="btn btn-ghost btn-sm" type="button" data-ag="new"${full ? " disabled" : ""}>Set one up myself</button>${full ? `<span class="small muted">You have the most connections allowed (${v.limits.maxConnections}).</span>` : ""}</div>` : '<p class="small muted">Only the account owner can connect or change a tool.</p>'}
     ${recent.length ? `<h3 class="ag-h">Latest jobs from your tools</h3><ul class="ag-list">${recent.map((j) => jobHtml(j, false)).join("")}</ul>` : ""}`;
   // Secrets go in as text, never as markup, and are not kept anywhere else.
   if (secrets) {
@@ -149,18 +159,83 @@ async function act(path: string, payload: unknown, done: string): Promise<boolea
   return true;
 }
 
+/** Where keyboard focus goes after the interview moves on: the new question, the typed answer box, or the proposal. */
+function focusPlan(): void {
+  const el = document.querySelector<HTMLElement>("#agp-note, #agp-h, .agp .fd-opts .chip");
+  el?.focus({ preventScroll: false });
+}
+
+/** Makes (or, for a connection planned again, changes) a connection and shows the key once. Returns false with a reason on failure. */
+async function save(id: string, payload: object): Promise<{ ok: boolean; error?: string }> {
+  const r = await api<{ error?: string; key?: string; signingSecret?: string; connection?: Connection }>(id ? `/agents/${encodeURIComponent(id)}` : "/agents", { body: payload });
+  if (!r.ok || !r.data?.connection) return { ok: false, error: r.data?.error ?? "That could not be saved just now. Please try again." };
+  if (r.data.key) secrets = { name: r.data.connection.name, key: r.data.key, ...(r.data.signingSecret ? { signingSecret: r.data.signingSecret } : {}) };
+  form = "";
+  draft = undefined;
+  toast(id ? "Saved" : "Key created. Copy it now.");
+  await load();
+  if (secrets) document.querySelector(".ag-secrets")?.scrollIntoView({ block: "center", behavior: "smooth" });
+  return { ok: true };
+}
+
+/** Everything the interview's buttons do. Returns true when the press was one of its own. */
+async function onPlan(b: HTMLButtonElement, a: string): Promise<boolean> {
+  if (!a.startsWith("plan-")) return false;
+  if (a === "plan-new" || a === "plan-existing") {
+    setBusy(b, true);
+    const target = a === "plan-existing" ? b.closest<HTMLElement>("[data-id]")?.dataset.id ?? "" : "";
+    const started = await startPlan(target);
+    setBusy(b, false);
+    if (!started) { toast("The questions could not be loaded just now. Please try again."); return true; }
+    planning = started; form = ""; draft = undefined; removing = "";
+    paint(); focusPlan();
+    return true;
+  }
+  if (!planning) return true;
+  if (a === "plan-cancel") { planning = undefined; paint(); return true; }
+  if (a === "plan-skip") { planning = undefined; form = "new"; draft = undefined; paint(); document.getElementById("ag-name")?.focus(); return true; }
+  if (a === "plan-restart") { planning = restart(planning); paint(); focusPlan(); return true; }
+  if (a === "plan-back") { planning = { ...planning, typing: false }; paint(); focusPlan(); return true; }
+  if (a === "plan-pick") {
+    const last = Object.keys(planning.answers).length + 1 >= planning.questions.length;
+    const typed = planning.questions.find((q) => q.id === b.dataset.q)?.options.find((o) => o.value === b.dataset.v)?.typed;
+    if (last && !typed) { planning = { ...planning, working: true }; paint(); }
+    planning = await answer(planning, b.dataset.q ?? "", b.dataset.v ?? "");
+    paint(); focusPlan();
+    return true;
+  }
+  if (a === "plan-change") {
+    draft = draftOf(planning);
+    form = planning.target || "new";
+    planning = undefined;
+    paint(); document.getElementById("ag-name")?.focus();
+    return true;
+  }
+  if (a === "plan-accept") {
+    const d = draftOf(planning);
+    if (!d) return true;
+    setBusy(b, true);
+    const done = await save(planning.target, d);
+    setBusy(b, false);
+    if (done.ok) planning = undefined; else { planning = { ...planning, error: done.error ?? "" }; paint(); }
+    return true;
+  }
+  return true;
+}
+
 async function onClick(ev: Event): Promise<void> {
   const b = (ev.target as HTMLElement).closest<HTMLButtonElement>("[data-ag]");
   if (!b || b.disabled || isBusy(b)) return;
   const a = b.dataset.ag!;
+  if (await onPlan(b, a)) return;
   if (a === "copy") {
     const text = document.getElementById(b.dataset.from ?? "")?.textContent ?? "";
     try { await navigator.clipboard.writeText(text); toast("Copied"); } catch { toast("Select the text and copy it by hand."); }
     return;
   }
   if (a === "secrets-done") { secrets = undefined; paint(); return; }
-  if (a === "new") { form = "new"; removing = ""; paint(); document.getElementById("ag-name")?.focus(); return; }
-  if (a === "form-close") { form = ""; paint(); return; }
+  if (a === "new") { form = "new"; removing = ""; draft = undefined; paint(); document.getElementById("ag-name")?.focus(); return; }
+  if (a === "form-close") { form = ""; draft = undefined; paint(); return; }
   const jobId = b.closest<HTMLElement>("[data-job]")?.dataset.job;
   if (jobId) {
     setBusy(b, true);
@@ -185,6 +260,16 @@ async function onClick(ev: Event): Promise<void> {
 
 async function onSubmit(ev: Event): Promise<void> {
   const f = ev.target as HTMLFormElement;
+  if (f.dataset.planTyped && planning) {
+    ev.preventDefault();
+    const words = (document.getElementById("agp-note") as HTMLInputElement).value.trim();
+    if (!words) { planning = { ...planning, error: "Say what it does in a few words first." }; paint(); document.getElementById("agp-note")?.focus(); return; }
+    const last = Object.keys(planning.answers).length + 1 >= planning.questions.length;
+    if (last) { planning = { ...planning, working: true }; paint(); }
+    planning = await answer({ ...planning, error: "" }, f.dataset.planTyped, "custom", words);
+    paint(); focusPlan();
+    return;
+  }
   if (f.id !== "ag-form") return;
   ev.preventDefault();
   const val = (id: string) => (document.getElementById(id) as HTMLInputElement).value.trim();
@@ -199,14 +284,11 @@ async function onSubmit(ev: Event): Promise<void> {
     name: val("ag-name"), tool: val("ag-tool"), employees, needsApproval: (document.getElementById("ag-ask") as HTMLInputElement).checked,
     limits: { dailyPercent: Number(val("ag-day")), perJobPercent: Number(val("ag-job")), jobsPerHour: Number(val("ag-hour")) },
     ...(hook ? { webhookUrl: hook } : id ? { webhookUrl: null } : {}),
+    // A suggestion the owner changed keeps what the interview learned about the tool.
+    ...(draft ? { profile: draft.profile } : {}),
   };
-  const r = await api<{ error?: string; key?: string; signingSecret?: string; connection?: Connection }>(id ? `/agents/${encodeURIComponent(id)}` : "/agents", { body: payload });
-  if (!r.ok || !r.data?.connection) { fail(r.data?.error ?? "That could not be saved just now. Please try again."); return; }
-  if (r.data.key) secrets = { name: r.data.connection.name, key: r.data.key, ...(r.data.signingSecret ? { signingSecret: r.data.signingSecret } : {}) };
-  form = "";
-  toast(id ? "Saved" : "Key created. Copy it now.");
-  await load();
-  if (secrets) document.querySelector(".ag-secrets")?.scrollIntoView({ block: "center", behavior: "smooth" });
+  const saved = await save(id, payload);
+  if (!saved.ok) fail(saved.error ?? "That could not be saved just now. Please try again.");
 }
 
 /** Called each time the Apps screen is opened. */
@@ -218,6 +300,6 @@ export function showAgents(): void {
     body().addEventListener("submit", (e) => void onSubmit(e));
   }
   // An open form or a key that has not been copied yet is not thrown away by coming back to the screen.
-  if (form || secrets) return;
+  if (form || secrets || planning) return;
   void load();
 }
