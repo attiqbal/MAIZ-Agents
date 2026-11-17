@@ -39,6 +39,8 @@ export interface Order {
   /** Where the client finishes paying an addition their bank wants to check, and when that offer runs out. */
   payUrl?: string;
   payBy?: string;
+  /** Which employees each line hired, by line key. Absent on older orders, which fall back to the order the lines were hired in. */
+  hiredBy?: Record<string, string[]>;
   /** Monthly lines that have been stopped, by line key. */
   stops?: Record<string, LineStop>;
   /** Set when the provider could not be told to stop this order. Tried again until it goes through. */
@@ -110,8 +112,8 @@ export interface PaymentDeps {
   provider?: PaymentProvider;
   /** Prices a cart from the live price book, for this client's plan. The client never supplies a price. */
   quote: (lines: readonly unknown[], workspaceId: string) => Quote;
-  /** Hires what an order bought. Throws if it cannot. */
-  fulfil: (order: Order) => Promise<string[]>;
+  /** Hires what an order bought. Throws if it cannot. Says which line hired whom, since a line may be skipped (an employee the client already has). */
+  fulfil: (order: Order) => Promise<Hired>;
   /** Public address for return links. */
   appUrl: string;
   customerEmail: (userId: string) => string | undefined;
@@ -127,7 +129,7 @@ export interface PaymentDeps {
    * "provider" when the payment provider ended the subscription (the paid time is already over).
    */
   stopped?: (order: Order, by: "client" | "provider", also?: StoppedLine[]) => void;
-  /** True for an item a client can only hold once (the Team package). An older unpaid checkout holding it is closed when a new one opens. */
+  /** True for an item a client can only hold once (the Team package, an online-shop employee). An older unpaid checkout holding it is closed when a new one opens. */
   onceOnly?: (key: string) => boolean;
   /** True for the plan itself (the Team package). When it stops, every other monthly line of the client is stopped too. */
   plan?: (key: string) => boolean;
@@ -141,7 +143,11 @@ export interface PaymentDeps {
   released?: (workspaceId: string, lines: ReleasedLine[]) => void;
 }
 
+/** What fulfilment hired: everyone in order, and who came from which line (by line key). A bare list is the older shape. */
+export type Hired = string[] | { employeeIds: string[]; byLine: Record<string, string[]> };
+
 export const MAX_PENDING_ORDERS = 20;
+const BUSY = "Your last change is still going through. Give it a moment.";
 const MAX_SEEN_EVENTS = 5000;
 const pence = (gbp: number) => Math.round(gbp * 100);
 const DAY_MS = 86_400_000;
@@ -165,6 +171,12 @@ export class PaymentService {
   private sink?: Sink;
   /** Orders being fulfilled right now, so two webhooks racing cannot hire twice. */
   private fulfilling = new Set<string>();
+  /** Workspaces with a checkout running, so a double press cannot charge and hire twice. */
+  private checkingOut = new Set<string>();
+  /** Orders whose provider call has not come back yet. They have no provider reference to cancel, so nobody may close them. */
+  private inFlight = new Set<string>();
+  /** Lines (order and line key) being stopped at the provider right now, so a second press does not call it again. */
+  private stopping = new Set<string>();
   /** Recently handled provider event ids. Handlers are idempotent anyway; this just short-circuits replays. */
   private seenEvents = new Set<string>();
   /** The moment the last bill preview priced each client's cart at. Never taken from the browser. */
@@ -180,6 +192,17 @@ export class PaymentService {
 
   async checkout(userId: string, workspaceId: string, rawLines: unknown, opts: { addToBill?: boolean } = {}): Promise<CheckoutResult> {
     this.identity.require(userId, workspaceId, "workspace.manage"); // paying, the card and cancelling are the owner's alone
+    // One change at a time per client: a second press while the first is with the provider would charge and hire twice.
+    if (this.checkingOut.has(workspaceId)) throw new PaymentError(BUSY);
+    this.checkingOut.add(workspaceId);
+    try {
+      return await this.startCheckout(userId, workspaceId, rawLines, opts);
+    } finally {
+      this.checkingOut.delete(workspaceId);
+    }
+  }
+
+  private async startCheckout(userId: string, workspaceId: string, rawLines: unknown, opts: { addToBill?: boolean }): Promise<CheckoutResult> {
     const provider = this.d.provider;
     if (!provider) throw new PaymentError("payments are not switched on yet, so nothing can be bought");
     if (!Array.isArray(rawLines) || rawLines.length === 0 || rawLines.length > 100) throw new PaymentError("your cart is empty");
@@ -192,6 +215,9 @@ export class PaymentService {
     const lines: CheckoutLine[] = q.lines.map((l) => ({ key: l.key, title: l.title, qty: l.qty, unitMinor: pence(l.unitGbp), billing: l.billing }));
     const monthlyMinor = lines.filter((l) => l.billing === "monthly").reduce((n, l) => n + l.unitMinor * l.qty, 0);
     const onceMinor = lines.filter((l) => l.billing === "once").reduce((n, l) => n + l.unitMinor * l.qty, 0);
+    // A once-only item (the Team package, an online-shop employee): two open checkouts must never both be paid for it.
+    const onceOnly = new Set(lines.filter((l) => this.d.onceOnly?.(l.key)).map((l) => l.key));
+    if (onceOnly.size) await this.releasePending(workspaceId, (o) => o.lines.some((l) => onceOnly.has(l.key)));
     // One bill: only when the client asked for it on a page that told them their saved card is charged. If it cannot
     // be done before any money moves, the normal checkout below is used, so a client can always buy.
     const added = opts.addToBill ? await this.addToBill(userId, workspaceId, lines) : undefined;
@@ -199,9 +225,6 @@ export class PaymentService {
     const discount = this.d.discountFor?.(workspaceId, monthlyMinor);
     // One code discounts one subscription: an unpaid checkout that was holding it is closed before a new one opens.
     if (discount) await this.releasePending(workspaceId, (o) => o.discount?.id === discount.id);
-    // The same for a once-only item (the Team package): two open checkouts must never both be paid for it.
-    const onceOnly = new Set(lines.filter((l) => this.d.onceOnly?.(l.key)).map((l) => l.key));
-    if (onceOnly.size) await this.releasePending(workspaceId, (o) => o.lines.some((l) => onceOnly.has(l.key)));
     const order: Order = {
       id: newId("order"), workspaceId, userId, lines, monthlyMinor, dueTodayMinor: monthlyMinor + onceMinor - (discount?.amountOffMinor ?? 0), currency: "GBP",
       status: "pending", provider: provider.name, createdAt: this.d.now().toISOString(), employeeIds: [], ...(discount ? { discount } : {}),
@@ -209,20 +232,30 @@ export class PaymentService {
     this.save(order);
     this.audit.record({ workspaceId, actor: `user:${userId}`, action: "order.created", target: `order:${order.id}`, data: { dueTodayMinor: order.dueTodayMinor, monthlyMinor } });
     const base = this.d.appUrl.replace(/\/$/, "");
-    const session = await provider.createCheckout({
+    const session = await this.whileInFlight(order.id, () => provider.createCheckout({
       orderId: order.id, workspaceId, customerEmail: this.d.customerEmail(userId), currency: "GBP", lines,
       dueTodayMinor: order.dueTodayMinor, monthlyMinor, successUrl: `${base}/app.html?order=${order.id}#team`, cancelUrl: `${base}/app.html?cancelled=1#store`,
       ...(discount ? { discount: { amountOffMinor: discount.amountOffMinor }, discountMonths: discount.months } : {}),
-    }).catch((e) => { this.save({ ...order, status: "failed", problem: "the payment provider could not start the payment" }); throw e; });
+    })).catch((e) => { this.save({ ...order, status: "failed", problem: "the payment provider could not start the payment" }); throw e; });
     this.save({ ...this.orders.get(order.id)!, providerRef: session.providerRef, ...(session.subscriptionRef ? { subscriptionRef: session.subscriptionRef } : {}) });
     if (session.status === "paid") await this.markPaid(order.id);
     else if (session.status === "failed") this.markFailed(order.id, "the payment was declined");
     return { order: this.orders.get(order.id)!, ...(session.url ? { url: session.url } : {}) };
   }
 
-  /** Closes any unpaid checkout of this client that carries the discount, so it cannot be paid alongside a newer one. */
+  /** Runs a provider call that can move money, and marks the order as waiting on it until it comes back. */
+  private async whileInFlight<T>(orderId: string, call: () => Promise<T>): Promise<T> {
+    this.inFlight.add(orderId);
+    try {
+      return await call();
+    } finally {
+      this.inFlight.delete(orderId);
+    }
+  }
+
+  /** Closes any unpaid checkout of this client that holds the same discount or once-only item, so it cannot be paid alongside a newer one. */
   private async releasePending(workspaceId: string, holds: (o: Order) => boolean): Promise<void> {
-    const holding = [...this.orders.values()].filter((o) => o.workspaceId === workspaceId && o.status === "pending" && holds(o));
+    const holding = [...this.orders.values()].filter((o) => o.workspaceId === workspaceId && o.status === "pending" && !this.inFlight.has(o.id) && holds(o));
     for (const o of holding) {
       if (o.providerRef) await this.d.provider?.cancelSubscription(o.providerRef);
       this.markFailed(o.id, "replaced by a newer checkout");
@@ -246,7 +279,7 @@ export class PaymentService {
       return this.orders.get(o.id)!;
     }
     // An addition still waiting for payment: only its own invoice is closed, never the shared subscription.
-    const ref = o.addedTo ? o.providerRef : o.subscriptionRef ?? o.providerRef;
+    const ref = o.addedTo ? o.providerRef : await this.stopRef(o);
     if (ref && this.d.provider) await this.d.provider.cancelSubscription(ref);
     const next = o.status === "paid" ? this.withStops(o, this.periodOf(o).toISOString(), "client") : { ...o, status: "cancelled" as const };
     this.save(next);
@@ -266,14 +299,28 @@ export class PaymentService {
     const line = monthlyOf(o).find((l) => l.key === key);
     if (!line || o.status !== "paid" || o.stops?.[key]) throw new PaymentError("this cannot be stopped: it is not an active monthly line");
     if (this.d.plan?.(key)) return this.cancel(userId, workspaceId, orderId);
+    // A second press while the first is still with the provider: the answer is how things stand, and the provider is not asked twice.
+    const busyKey = `${orderId}:${key}`;
+    if (this.stopping.has(busyKey)) return o;
+    this.stopping.add(busyKey);
+    try {
+      return await this.stopLineNow(userId, workspaceId, o, line);
+    } finally {
+      this.stopping.delete(busyKey);
+    }
+  }
+
+  private async stopLineNow(userId: string, workspaceId: string, o: Order, line: CheckoutLine): Promise<Order> {
+    const key = line.key;
     const provider = this.d.provider;
     if (!provider) throw new PaymentError("payments are not switched on");
     const others = this.liveLines(workspaceId).filter((x) => !!o.subscriptionRef && x.order.subscriptionRef === o.subscriptionRef && !(x.order.id === o.id && x.line.key === key));
     let endsAt = this.periodOf(o).toISOString();
+    // Refused, with an alert, before anything is tried, when the provider's subscription was never learned.
+    const ref = others.length ? undefined : await this.stopRef(o);
     try {
       if (!others.length) {
         // The only line left on its subscription: the subscription ends with it.
-        const ref = o.subscriptionRef ?? o.providerRef;
         if (ref) await provider.cancelSubscription(ref);
       } else {
         if (!provider.removeFromSubscription) throw new Error("the provider cannot take one line off a subscription");
@@ -426,9 +473,10 @@ export class PaymentService {
 
   private async markPaid(orderId: string): Promise<void> {
     const o = this.orders.get(orderId);
-    if (o?.status === "cancelled" && !o.paidAt) {
-      this.audit.record({ workspaceId: o.workspaceId, actor: `payment:${o.provider}`, action: "order.paid_after_cancel", target: `order:${o.id}` });
-      await this.d.alert?.(`Paid a cancelled order: ${o.id}`, `A payment arrived for a cancelled order, so nothing was hired. Refund it in Stripe or restore the order. Workspace ${o.workspaceId}.`).catch(() => undefined);
+    // An order that was closed before any money arrived is never fulfilled, whatever the provider says later: a person decides.
+    if (o && (o.status === "cancelled" || o.status === "failed") && !o.paidAt) {
+      this.audit.record({ workspaceId: o.workspaceId, actor: `payment:${o.provider}`, action: o.status === "cancelled" ? "order.paid_after_cancel" : "order.paid_after_failed", target: `order:${o.id}` });
+      await this.d.alert?.(`Paid a ${o.status} order: ${o.id}`, `A payment arrived for a ${o.status} order, so nothing was hired. Refund it in Stripe or restore the order. Workspace ${o.workspaceId}.`).catch(() => undefined);
       return;
     }
     if (!o || o.fulfilledAt || this.fulfilling.has(orderId) || o.status === "cancelled") return;
@@ -439,9 +487,10 @@ export class PaymentService {
       this.audit.record({ workspaceId: o.workspaceId, actor: `payment:${o.provider}`, action: "order.paid", target: `order:${o.id}`, data: { dueTodayMinor: o.dueTodayMinor, ...(o.discount ? { discountCode: o.discount.code, discountMinor: o.discount.amountOffMinor } : {}) } });
       if (o.discount) this.d.discountUsed?.(o.workspaceId, o.discount.id, o.id);
       try {
-        const employeeIds = await this.d.fulfil(paid);
+        const hired = await this.d.fulfil(paid);
+        const { employeeIds, byLine } = Array.isArray(hired) ? { employeeIds: hired, byLine: undefined } : hired;
         // Onto the order as it is now: the call that started an addition may have saved its invoice meanwhile.
-        this.save({ ...paid, ...this.orders.get(orderId), status: "paid", employeeIds, fulfilledAt: this.d.now().toISOString() });
+        this.save({ ...paid, ...this.orders.get(orderId), status: "paid", employeeIds, ...(byLine ? { hiredBy: byLine } : {}), fulfilledAt: this.d.now().toISOString() });
       } catch (e) {
         const problem = e instanceof Error ? e.message : "fulfilment failed";
         this.save({ ...paid, ...this.orders.get(orderId), problem });
@@ -541,10 +590,10 @@ export class PaymentService {
     this.previews.delete(workspaceId);
     let r;
     try {
-      r = await provider.addToSubscription({
+      r = await this.whileInFlight(order.id, () => provider.addToSubscription!({
         orderId: order.id, workspaceId, planOrderId: plan.id, subscriptionRef, currency: "GBP", lines: monthly, ...(prorationDate ? { prorationDate } : {}),
         prepared: (itemRefs) => this.save({ ...this.orders.get(order.id)!, itemRefs }),
-      });
+      }));
     } catch (e) {
       if (e instanceof PaymentUncertainError) return this.addUnclear(order.id, e);
       this.markFailed(order.id, "it could not be added to the monthly bill, so a normal checkout was opened instead");
@@ -570,7 +619,8 @@ export class PaymentService {
 
   /** Closes additions to this subscription that are still waiting for payment, so a newer one can take their place. */
   private async releaseAdds(workspaceId: string, subscriptionRef: string): Promise<void> {
-    const waiting = [...this.orders.values()].filter((o) => o.workspaceId === workspaceId && o.status === "pending" && !!o.addedTo && o.subscriptionRef === subscriptionRef);
+    // One still with the provider has nothing to cancel yet and may be paid any moment: it is left alone.
+    const waiting = [...this.orders.values()].filter((o) => o.workspaceId === workspaceId && o.status === "pending" && !!o.addedTo && o.subscriptionRef === subscriptionRef && !this.inFlight.has(o.id));
     for (const o of waiting) {
       if (o.providerRef) await this.d.provider?.cancelSubscription(o.providerRef);
       this.markFailed(o.id, "replaced by a newer order");
@@ -638,8 +688,15 @@ export class PaymentService {
 
   /** Stops an order that has its own subscription, at the end of its own paid month. Undefined when the provider could not be told. */
   private async stopOwn(x: Order): Promise<Order | undefined> {
+    let ref: string | undefined;
     try {
-      const ref = x.subscriptionRef ?? x.providerRef;
+      ref = await this.stopRef(x, !x.stopWanted);
+    } catch {
+      // No subscription to stop from here. Left marked as wanted, so the client hears it is not stopped; the alert went out once.
+      this.save({ ...x, stopWanted: this.d.now().toISOString() });
+      return undefined;
+    }
+    try {
       if (ref && this.d.provider) await this.d.provider.cancelSubscription(ref);
     } catch (e) {
       this.save({ ...x, stopWanted: this.d.now().toISOString() });
@@ -653,8 +710,23 @@ export class PaymentService {
     return next;
   }
 
-  /** The employees a line of this order hired: fulfilment hires line by line, in order, skipping the plan. */
+  /**
+   * What to tell the provider to stop for a paid order: its subscription. A checkout session (`cs_`) is no
+   * subscription: once paid, "expiring" it does nothing while the provider keeps billing, so it is refused and a
+   * person is told. Unpaid orders still close their session.
+   */
+  private async stopRef(o: Order, tell = true): Promise<string | undefined> {
+    if (o.subscriptionRef || o.status !== "paid" || !o.providerRef?.startsWith("cs_")) return o.subscriptionRef ?? o.providerRef;
+    if (tell) await this.d.alert?.(`A monthly order cannot be stopped from here: ${o.id}`, `A stop was needed for a paid monthly order, but the payment provider's subscription for it was never learned (only the checkout session ${o.providerRef}). Nothing was stopped, so it may still be billed. Cancel the subscription in the provider's dashboard. Workspace ${o.workspaceId}.`).catch(() => undefined);
+    throw new PaymentError("We could not stop this from here, so nothing has changed. MAIZ has been told and will sort it out with you.");
+  }
+
+  /**
+   * The employees a line of this order hired. Newer orders record it per line. Older ones were hired line by line,
+   * in order, skipping the plan, so the position tells.
+   */
   private employeesOf(o: Order, key: string): string[] {
+    if (o.hiredBy) return o.hiredBy[key] ?? [];
     let from = 0;
     for (const l of o.lines) {
       if (this.d.plan?.(l.key)) continue;

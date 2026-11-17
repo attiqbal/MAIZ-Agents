@@ -477,7 +477,7 @@ export function createPlatform(cfg: PlatformConfig) {
   const payments = new PaymentService(identity, audit, {
     provider: cfg.payments ?? (cfg.allowDevAuth ? new MockPaymentProvider() : undefined),
     quote: (lines, ws) => quoteFor(ws, lines),
-    onceOnly: (key) => key === TEAM_PACKAGE_KEY,
+    onceOnly: (key) => key === TEAM_PACKAGE_KEY || ONE_PER_BUSINESS.has(key.split(":")[0]!),
     appUrl: base,
     customerEmail: (userId) => identity.workspacesFor(userId).map((w) => w.ownerEmail).find(Boolean),
     now,
@@ -487,6 +487,7 @@ export function createPlatform(cfg: PlatformConfig) {
     discountUsed: (ws, id, orderId) => coupons.markDiscountUsed(ws, id, orderId),
     fulfil: async (order) => {
       const ids: string[] = [];
+      const byLine: Record<string, string[]> = {};
       for (const line of order.lines) {
         // A consultant line is "consultant:pass"; the employee template is the part before the colon.
         const templateKey = line.key.split(":")[0]!;
@@ -494,7 +495,10 @@ export function createPlatform(cfg: PlatformConfig) {
         if (templateKey === TEAM_PACKAGE_KEY) continue;
         // An online-shop employee is hired once; a second paid checkout for it (or a replay) hires nobody new.
         if (ONE_PER_BUSINESS.has(templateKey) && workforce.templatesIn(order.workspaceId).includes(templateKey)) continue;
-        for (let i = 0; i < (ONE_PER_BUSINESS.has(templateKey) ? 1 : line.qty); i++) ids.push((await workforce.hire(order.userId, order.workspaceId, templateKey)).id);
+        const hired: string[] = [];
+        for (let i = 0; i < (ONE_PER_BUSINESS.has(templateKey) ? 1 : line.qty); i++) hired.push((await workforce.hire(order.userId, order.workspaceId, templateKey)).id);
+        ids.push(...hired);
+        byLine[line.key] = hired;
       }
       // A recurring line makes the client a paying one: they leave the free trial and start the paid plan with a full
       // pool (the trial's energy is not held against it). One-off consultant passes alone do not end the trial.
@@ -502,7 +506,7 @@ export function createPlatform(cfg: PlatformConfig) {
       // Only subscriptions count: one-off passes do not earn commission.
       if (order.lines.some((l) => l.billing === "monthly")) affiliates.recordPayment(order.workspaceId, order.dueTodayMinor / 100, order.id);
       if (order.lines.some((l) => l.billing === "monthly")) energy.switchToPaid(order.workspaceId, paidTeamPlan(prices.general()), `user:${order.userId}`);
-      return ids;
+      return { employeeIds: ids, byLine };
     },
     // The Team package stopping ends the plan: at the end of the month paid for when the client cancelled here,
     // at once when the payment provider ended the subscription (the paid time is over by then).
