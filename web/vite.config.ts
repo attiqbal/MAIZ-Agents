@@ -34,11 +34,13 @@ const EMPLOYEE_TITLE: Record<string, string> = {
   "business-consultant": "Business consultant", "hr-manager": "HR manager", "compliance-manager": "Compliance manager",
   "supply-chain-manager": "Supply chain manager (add-on)",
   "data-mining-agent": "Data mining agent (add-on)",
+  "online-shop-manager": "E-commerce manager (add-on)", "dropshipping-agent": "Dropshipping agent (add-on)",
+  "marketplace-manager": "Marketplace manager (add-on)", "shop-care-agent": "Shop customer care agent (add-on)",
 };
 const escHtml = (s: string) => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
 // How each sector reads in a heading ("AI employees for ...").
 const SECTOR_PHRASE: Record<string, string> = {
-  "food-drink": "cafés, restaurants and bars", shop: "shops and retailers", "online-store": "online stores",
+  "food-drink": "cafés, restaurants and bars", shop: "shops and retailers", "online-store": "online stores", dropshipping: "dropshipping and print-on-demand businesses", "marketplace-seller": "Amazon, Etsy and eBay sellers",
   services: "professional services firms", trades: "trades and construction", "health-beauty": "salons, clinics and gyms",
   tech: "software and tech companies", creative: "creative and media businesses", "education-care": "education and care providers",
   property: "property and hospitality", "making-moving": "manufacturers, wholesalers and couriers", charity: "charities and community groups",

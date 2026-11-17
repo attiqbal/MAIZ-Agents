@@ -126,6 +126,7 @@ export const DEPARTMENTS: readonly Department[] = [
     name: "Customer service and reception",
     mission: "Answers customers and callers quickly, greets visitors and keeps people coming back.",
     roles: [
+      r({ key: "shop-care-agent", jd: "shop-care-agent", title: "Shop customer care agent", purpose: "Answers shoppers about orders, delivery and returns, and prepares refunds for approval.", duties: [], skills: [], legal: [], records: [] }),
       r({
         key: "customer-service-reception", title: "Customer service and reception",
         purpose: "Answers calls, enquiries, chats and complaints, keeps bookings in order and greets visitors.",
@@ -212,6 +213,9 @@ export const DEPARTMENTS: readonly Department[] = [
     roles: [
       r({ key: "business-consultant", jd: "business-consultant", title: "Business consultant", purpose: "Finds waste and recommends the best-value decisions.", duties: [], skills: [], legal: [], records: [] }),
       r({ key: "supply-chain-manager", jd: "supply-chain-manager", title: "Supply chain and inventory manager", purpose: "Stock, suppliers and shipments.", duties: [], skills: [], legal: [], records: [] }),
+      r({ key: "online-shop-manager", jd: "online-shop-manager", title: "E-commerce manager", purpose: "Runs the day-to-day of an online shop: product pages, prices, stock, returns and promotions.", duties: [], skills: [], legal: [], records: [] }),
+      r({ key: "dropshipping-agent", jd: "dropshipping-agent", title: "Dropshipping agent", purpose: "Finds and checks products and suppliers, works out real margins and prepares supplier orders for approval.", duties: [], skills: [], legal: [], records: [] }),
+      r({ key: "marketplace-manager", jd: "marketplace-manager", title: "Marketplace manager", purpose: "Prepares Amazon, Etsy and eBay listings and works out what each sale earns after fees.", duties: [], skills: [], legal: [], records: [] }),
       r({
         key: "operations-logistics", title: "Operations and logistics", tier: "premium",
         purpose: "Runs projects, processes, quality and shifts, and manages suppliers, purchasing, stock and shipping.",

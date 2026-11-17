@@ -14,6 +14,7 @@
  */
 import { specialistJobDescription } from "./blueprints.js";
 import { consultantJobDescription } from "./consultants.js";
+import { ECOMMERCE_JOB_DESCRIPTIONS } from "./job-descriptions-ecommerce.js";
 
 export type Level = "Expert" | "Advanced" | "Working";
 
@@ -1049,6 +1050,7 @@ export const JOB_DESCRIPTIONS: readonly JobDescription[] = [
     escalate: ["Anything no employee's job covers: tell the owner and suggest a store employee, or draft a new specialist for MAIZ to review", "A requested role that needs a licensed professional: say so, and limit the specialist to preparing and organising"],
     handover: ["The setup form", "How you want to be contacted (dashboard or Slack)"],
   },
+  ...ECOMMERCE_JOB_DESCRIPTIONS,
 ];
 
 /** A ready-made employee's JD, one built from the org blueprint for a custom specialist, or a consultant's. */

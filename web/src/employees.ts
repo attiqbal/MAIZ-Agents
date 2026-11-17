@@ -32,6 +32,15 @@ if (bp) {
   }).join("");
 }
 
+// The online-shop employees: one tap puts the employee in the cart (each is hired once).
+document.querySelectorAll<HTMLButtonElement>("[data-add-shop]").forEach((btn) => btn.addEventListener("click", () => {
+  const key = btn.dataset.addShop;
+  if (!key) return;
+  void import("./store").then((m) => {
+    if (m.addToCart(key)) btn.textContent = "Added to cart";
+  });
+}));
+
 bp?.addEventListener("click", (e) => {
   const btn = (e.target as HTMLElement).closest<HTMLButtonElement>("[data-add]");
   if (!btn?.dataset.add) return;

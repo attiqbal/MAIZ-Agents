@@ -152,7 +152,6 @@ const ROWS: readonly Row[] = [
   ["thinkific", "Thinkific", "ecommerce", SALES, "Course sales and students from Thinkific.", "public"],
   ["kajabi", "Kajabi", "ecommerce", SALES, "Course and membership sales from Kajabi.", "check"],
   ["podia", "Podia", "ecommerce", SALES, "Course and download sales from Podia.", "check"],
-  ["printful", "Printful", "ecommerce", SALES, "Print-on-demand orders and their cost from Printful.", "public"],
   ["linnworks", "Linnworks", "ecommerce", SALES, "Orders and stock across your sales channels from Linnworks.", "public"],
   ["veeqo", "Veeqo", "ecommerce", SALES, "Orders, stock and shipping from Veeqo.", "public"],
   ["cin7", "Cin7", "ecommerce", SALES, "Stock levels and orders from Cin7.", "public"],

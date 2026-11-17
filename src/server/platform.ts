@@ -27,7 +27,7 @@ import { PriceBook, paidTeamPlan } from "../modules/pricing/index.js";
 import { SpecialistReviewService, type SpecialistRequest } from "../modules/review/specialists.js";
 import { templateFromRole } from "../modules/workforce/templates.js";
 import { MockPaymentProvider, PaymentService, type OrderDiscount, type PaymentProvider } from "../modules/payments/index.js";
-import { TEAM_PACKAGE_KEY, quoteForPlan } from "../modules/store/cart.js";
+import { ONE_PER_BUSINESS, TEAM_PACKAGE_KEY, quoteForPlan } from "../modules/store/cart.js";
 import { ReconciliationService } from "../modules/reconciliation/index.js";
 import { localParts } from "../modules/batch/schedule.js";
 import { RotaService, RotaError } from "../modules/rota/index.js";
@@ -410,7 +410,7 @@ export function createPlatform(cfg: PlatformConfig) {
   /** A client has the Team package once they are on a paid plan (clients who went paid before it was sold keep theirs). */
   const hasTeamPackage = (ws: string): boolean => !energy.onTrial(ws);
   /** Prices a cart for this client's plan: a first monthly order includes the Team package, and it is never sold twice. */
-  const quoteFor = (ws: string | undefined, lines: readonly unknown[]): ReturnType<typeof quoteForPlan> => quoteForPlan(lines, ws ? hasTeamPackage(ws) : false, prices.catalogue());
+  const quoteFor = (ws: string | undefined, lines: readonly unknown[]): ReturnType<typeof quoteForPlan> => quoteForPlan(lines, ws ? hasTeamPackage(ws) : false, prices.catalogue(), ws ? workforce.templatesIn(ws) : []);
   const payments = new PaymentService(identity, audit, {
     provider: cfg.payments ?? (cfg.allowDevAuth ? new MockPaymentProvider() : undefined),
     quote: (lines, ws) => quoteFor(ws, lines),
@@ -429,7 +429,9 @@ export function createPlatform(cfg: PlatformConfig) {
         const templateKey = line.key.split(":")[0]!;
         // The Team package is the plan itself: the core team was hired at signup, so there is nobody new to hire.
         if (templateKey === TEAM_PACKAGE_KEY) continue;
-        for (let i = 0; i < line.qty; i++) ids.push((await workforce.hire(order.userId, order.workspaceId, templateKey)).id);
+        // An online-shop employee is hired once; a second paid checkout for it (or a replay) hires nobody new.
+        if (ONE_PER_BUSINESS.has(templateKey) && workforce.templatesIn(order.workspaceId).includes(templateKey)) continue;
+        for (let i = 0; i < (ONE_PER_BUSINESS.has(templateKey) ? 1 : line.qty); i++) ids.push((await workforce.hire(order.userId, order.workspaceId, templateKey)).id);
       }
       // A recurring line makes the client a paying one: they leave the free trial and start the paid plan with a full
       // pool (the trial's energy is not held against it). One-off consultant passes alone do not end the trial.

@@ -80,7 +80,7 @@ Keep flat file names (no framework router). New pages are added to `vite.config.
 | Control centre | `control-centre.html` | **new** | Screenshots of the real app, link to the demo |
 | Pricing | `pricing.html` | upgrade | Add team builder (section 7); keep the hire-vs-MAIZ calculator |
 | Security | `security.html` | keep | Edit only to match reality |
-| Industries | `industries/<sector>.html` | **new, generated** | From `onboarding/sectors.ts` (13 sectors); Phase 4 |
+| Industries | `industries/<sector>.html` | **new, generated** | From `onboarding/sectors.ts` (15 sectors, including "Other"); Phase 4 |
 | Sign in / Sign up | `signin.html`, `onboarding.html` | unchanged | `noindex` |
 
 ### Navigation and sitemap (Atif, 2026-11-12: separate section for everything, secondary menus, properly planned)

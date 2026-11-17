@@ -10,7 +10,7 @@
 /** What a connection can be used for. Employees are granted capabilities, never raw app access. */
 export type Capability =
   | "sales.read" | "payroll.read" | "accounts.read" | "traffic.read" | "search.read"
-  | "crm.read" | "support.read" | "inbox.read" | "bookings.read" | "audience.read" | "tasks.read" | "reviews.read";
+  | "crm.read" | "support.read" | "inbox.read" | "bookings.read" | "audience.read" | "tasks.read" | "reviews.read" | "suppliers.read";
 
 export type Category = "till" | "payroll" | "accounting" | "payments" | "ecommerce" | "marketing" | "bridge" | "customers" | "messaging" | "teamwork";
 
@@ -38,7 +38,7 @@ export type AuthSpec =
       /** How the app wants our id and secret at its token address. Default: in the form body. */
       tokenAuth?: "basic" | "body";
     }
-  | { kind: "api_key"; fields: readonly { key: string; label: string; help?: string }[] }
+  | { kind: "api_key"; fields: readonly { key: string; label: string; help?: string; /** Longest value accepted. Default 500; some tokens (Printify) are longer. */ maxLength?: number }[] }
   | { kind: "file"; accepts: string; howToExport: readonly string[] }
   /** Zapier, Make or any tool that can POST JSON to a URL. */
   | { kind: "webhook" }
@@ -125,7 +125,7 @@ export interface SearchDay {
  * or a rating times 100); `areas.ts` says what each figure is called. Numbers only, so nothing a customer typed
  * can ever reach an employee's instructions.
  */
-export type ActivityArea = "crm" | "support" | "inbox" | "bookings" | "audience" | "tasks" | "reviews";
+export type ActivityArea = "crm" | "support" | "inbox" | "bookings" | "audience" | "tasks" | "reviews" | "supply";
 export interface ActivityDay {
   /** YYYY-MM-DD */
   date: string;
