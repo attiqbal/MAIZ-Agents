@@ -39,6 +39,24 @@ The owner is the finance department, the marketing team, HR and compliance, on t
 
 The compact story: **it is a team (1), it asks before it acts (2), it costs one known price (3), and it starts working today (4).** Points 5 to 8 are proof and reassurance, used when the viewer asks "but can I trust it" or "what if I grow".
 
+
+## 4b. More differentiators Atif listed (17 Nov, 13:09), with what we can honestly say today
+
+| Atif's point | Say it? | Wording and limits |
+|---|---|---|
+| Wide range of service integrations | Yes, carefully | "Connects to the apps you already use: Slack, Xero, Square, Stripe and 200+ more, read-only, by link or file." Connectors were tested against pretend servers only, so never film a live result as proof until checked after deploy. |
+| Easy sign up | Yes | Three minutes, conversation not forms, paste your website, Google or Microsoft login, no card for the 7-day trial. |
+| Good amount of work in the starter pack (energy) | Yes, as the allowance, not a task count | "8,000 energy a week, shared by the whole team, no per-task limit, cost shown before a task." Do not say how many tasks this equals; it varies. |
+| Wide variety of functions | Yes | Five employees in the package plus a free Admin manager, and a store of add-on employees, 12 specialist hires and consultants. |
+| Everything in one place | Yes | One control centre and one team, in Slack and the browser. Say "one place to approve, track and pay", not "replaces all your software". |
+| Data privacy and segregation | Yes, exactly as the security page says | Each business is kept apart at database level, tested on every change. No audit or certification claimed. Never say "fully secure". |
+| Valuing input from customers | Only as "you steer": approve, redo or edit every piece of work | There is no customer feedback or voting feature found in the code, and no proof the team learns from corrections. Do not claim "we build what you ask for" or "it learns from your edits" until that exists. |
+| Customization | Partly | True: the team is yours (add and remove employees, your voice learnt from your website, your country's rules, your apps). A new specialist designed by the Admin manager was only a draft flow in the last notes; verify before saying "we build a specialist for you". |
+| In-house video and content generation, plus specialised services | Content: yes, video: not yet | Marketing manager drafts posts and emails; a Content creator consultant is sold by the week or month. Video from templates (Creatomate, Shotstack) exists for the owner's promotion agent only; the client side is API-only with no screen and was tested against fake servers. Do not advertise "we make your videos" until a client screen exists and a real render has been checked. The "Creative studio" department is a plan, not a live employee. |
+| Learns the system and the flow of information, adapts to your needs | Partly | True today: the Marketing manager learns your voice from your site, signup reads your website, and the Admin manager asks only for what it still needs. Not proven: ongoing learning from your day-to-day corrections. Say "gets to know your business", never "keeps learning". |
+
+Owner decision flagged: to say "learns from your edits", "we build what you ask", or "we make your videos", those features must first exist and be checked. Until then they stay out of scripts (see the guardrails in section 7).
+
 ## 5. Why someone hires us (the reasons we stress, in priority order)
 
 1. **Get your evenings back.** The owner's late-night admin is done by morning.
