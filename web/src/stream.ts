@@ -12,6 +12,12 @@ export interface AskDone {
   message?: string;
   /** Things that would have helped this answer but are not connected: each is a link to the right screen. */
   hints?: { id: string; title: string; detail: string; action: { label: string; href: string } }[];
+  /** Set when the reply came from someone other than the employee the question was sent to (the Data mining agent). */
+  employee?: string;
+  /** A market data search that is quoted and waiting for "Confirm and start". Nothing has run. */
+  offer?: { kind: "mining"; topic: string; sources: string[]; total: number };
+  /** A page of this site the reply points to. */
+  link?: { href: string; label: string };
 }
 export interface SseEvent { event: string; data: any }
 
@@ -44,7 +50,7 @@ export function describeOutcome(who: string, d: AskDone): { kind: "answer" | "qu
 export interface StreamHandlers { onDelta(piece: string): void; onReset(): void }
 export type StreamResult = { ok: true; done: AskDone } | { ok: false; status: number; message?: string };
 
-export async function askStream(body: { text: string; employeeId: string; urgent?: boolean; when?: "now" | "tonight" }, h: StreamHandlers): Promise<StreamResult> {
+export async function askStream(body: { text: string; employeeId: string; urgent?: boolean; when?: "now" | "tonight"; bar?: boolean }, h: StreamHandlers): Promise<StreamResult> {
   try {
     const token = getToken();
     const res = await fetch("/api/ask/stream", {

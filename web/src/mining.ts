@@ -4,13 +4,14 @@
 import { api, getToken } from "./api";
 import { toast } from "./common";
 import { isBusy, keepFocus, setBusy } from "./keep-focus";
+import { changedHtml, watchBoxHtml, watchButtonHtml, watchLineHtml, type Check, type Watch, type WatchQuote } from "./mining-watch";
 
 interface MineSource { id: string; label: string; gives: string; energy: number; paid: boolean; available: boolean; reason?: string }
 type SourceStatus = "ok" | "empty" | "unavailable" | "failed";
-interface SetHeader { id: string; topic: string; createdAt: string; summary: string; energyUsed: number; sharedWith: string[]; sources: { id: string; label: string; status: SourceStatus; count: number; note?: string }[] }
+interface SetHeader { id: string; topic: string; createdAt: string; summary: string; energyUsed: number; sharedWith: string[]; sources: { id: string; label: string; status: SourceStatus; count: number; note?: string }[]; updatedAt?: string; watch?: Watch; lastCheck?: Pick<Check, "at" | "status" | "summary"> }
 interface SetItem { title: string; snippet: string; url: string; source: string; at?: string }
 interface SetFigure { label: string; value: string; date?: string; detail?: string; url?: string }
-interface Dataset extends Omit<SetHeader, "sources"> { sources: { id: string; label: string; status: SourceStatus; note?: string; items: SetItem[]; figures?: SetFigure[] }[] }
+interface Dataset extends Omit<SetHeader, "sources" | "lastCheck"> { sources: { id: string; label: string; status: SourceStatus; note?: string; items: SetItem[]; figures?: SetFigure[] }[]; checks?: Check[] }
 interface Overview { hired: boolean; sources: MineSource[]; datasets: SetHeader[]; employees: { key: string; title: string }[]; limits: { maxSources: number; runsPerHour: number; maxDatasets: number; minTopic: number; maxTopic: number } }
 interface Quote { topic: string; total: number; unavailable: string[] }
 
@@ -29,6 +30,9 @@ let busy = false;
 const opened = new Map<string, Dataset>();
 let sharing = "";
 let removing = "";
+/** The dataset whose weekly check box is open, and the weekly figure the server quoted for it. */
+let watching = "";
+let watchQuote: WatchQuote | undefined;
 let wired = false;
 
 const body = (): HTMLElement => document.getElementById("mine-body")!;
@@ -85,12 +89,13 @@ function setHtml(h: SetHeader, v: Overview): string {
     ? `<div class="acts mine-sure"><span class="small">Remove this dataset for good? Employees it was shared with stop seeing it.</span><button class="btn btn-sm btn-primary" type="button" data-mine="remove-yes">Yes, remove</button><button class="btn btn-sm btn-ghost" type="button" data-mine="remove-no">Keep it</button></div>`
     : "";
   return `<li class="mine-set" data-id="${esc(h.id)}">
-    <div class="mine-set-h"><h3>${esc(h.topic)}</h3><span class="small muted">${esc(day(h.createdAt))} · used ${esc(energy(h.energyUsed))}</span></div>
+    <div class="mine-set-h"><h3 tabindex="-1">${esc(h.topic)}</h3><span class="small muted">${esc(day(h.createdAt))}${h.updatedAt ? ` · updated ${esc(day(h.updatedAt))}` : ""} · first search used ${esc(energy(h.energyUsed))}</span></div>
+    ${watchLineHtml(h)}
     <p class="mine-sum">${esc(h.summary)}</p>
     <p class="small muted">Looked in: ${found}.</p>
     <p class="small muted">${shared}</p>
-    <div class="acts"><button class="btn btn-sm btn-ghost" type="button" data-mine="open" aria-expanded="${full ? "true" : "false"}">${full ? "Hide what was found" : "See what was found"}</button><button class="btn btn-sm btn-ghost" type="button" data-mine="share">Share with employees</button><button class="btn btn-sm btn-ghost" type="button" data-mine="remove">Remove</button></div>
-    ${shareBox}${removeBox}${full ? detailHtml(full) : ""}
+    <div class="acts"><button class="btn btn-sm btn-ghost" type="button" data-mine="open" aria-expanded="${full ? "true" : "false"}">${full ? "Hide what was found" : "See what was found"}</button><button class="btn btn-sm btn-ghost" type="button" data-mine="share">Share with employees</button>${watchButtonHtml(h, watching === h.id)}<button class="btn btn-sm btn-ghost" type="button" data-mine="remove">Remove</button></div>
+    ${shareBox}${watching === h.id && !h.watch ? watchBoxHtml(h, v.sources, watchQuote) : ""}${removeBox}${full ? detailHtml(full) : ""}
   </li>`;
 }
 
@@ -105,7 +110,7 @@ function detailHtml(d: Dataset): string {
     const empty = !items && !figures ? `<p class="small muted">${esc(s.note ?? (s.status === "ok" ? "Nothing to show." : `This source ${STATUS_WORDS[s.status]}.`))}</p>` : "";
     return `<section class="mine-found"><h4>${esc(s.label)}</h4>${figures}${items ? `<ul class="mine-items">${items}</ul>` : ""}${empty}</section>`;
   }).join("");
-  return `<div class="mine-detail">${sources}<p class="small muted">Gathered from public pages on ${esc(day(d.createdAt))}. Check anything important at the source before you rely on it.</p></div>`;
+  return `<div class="mine-detail">${changedHtml(d.checks, Boolean(d.watch))}${sources}<p class="small muted">Gathered from public pages on ${esc(day(d.updatedAt ?? d.createdAt))}. Check anything important at the source before you rely on it.</p></div>`;
 }
 
 function setsHtml(v: Overview): string {
@@ -191,9 +196,12 @@ async function onClick(ev: Event): Promise<void> {
       if (!r.ok || !r.data?.dataset) { setBusy(b, false); toast("That dataset could not be opened just now."); return; }
       opened.set(id, r.data.dataset);
     }
-  } else if (act === "share") { sharing = sharing === id ? "" : id; removing = ""; }
+  } else if (act === "share") { sharing = sharing === id ? "" : id; removing = ""; watching = ""; }
   else if (act === "share-close") sharing = "";
-  else if (act === "remove") { removing = removing === id ? "" : id; sharing = ""; }
+  else if (act === "watch") { watching = watching === id ? "" : id; watchQuote = undefined; sharing = ""; removing = ""; }
+  else if (act === "watch-close") { watching = ""; watchQuote = undefined; }
+  else if (act === "watch-yes" || act === "watch-stop") { await setWatch(b, id, act === "watch-yes"); return; }
+  else if (act === "remove") { removing = removing === id ? "" : id; sharing = ""; watching = ""; }
   else if (act === "remove-no") removing = "";
   else if (act === "remove-yes") {
     setBusy(b, true);
@@ -205,6 +213,42 @@ async function onClick(ev: Event): Promise<void> {
     toast("Dataset removed");
   }
   paintSets();
+}
+
+/** Puts a changed dataset back into the list and into the opened copy, without loading everything again. */
+function keepDataset(saved: Dataset): void {
+  if (!view) return;
+  if (opened.has(saved.id)) opened.set(saved.id, saved);
+  const last = saved.checks?.[0];
+  view = { ...view, datasets: view.datasets.map((h) => (h.id === saved.id ? { ...h, watch: saved.watch, updatedAt: saved.updatedAt, ...(last ? { lastCheck: last } : {}) } : h)) };
+}
+
+/** Switches the weekly check on (with the figure the client was just shown) or off. */
+async function setWatch(b: HTMLElement, id: string, on: boolean): Promise<void> {
+  const q = watchQuote?.id === id ? watchQuote : undefined;
+  if (on && !q) return;
+  setBusy(b, true);
+  const r = await api<{ dataset?: Dataset; quote?: Quote; error?: string }>(`/mining/datasets/${encodeURIComponent(id)}/watch`, { body: on ? { on: true, sources: q!.sources, confirm: true, confirmEnergy: q!.total } : { on: false } });
+  setBusy(b, false);
+  // The figure changed since it was shown: show the new one and ask again, never charge one nobody saw.
+  if (on && r.status === 409 && r.data?.quote) { watchQuote = { id, total: r.data.quote.total, message: r.data.error ?? "", sources: q!.sources }; paintSets(); return; }
+  if (!r.ok || !r.data?.dataset) { toast(r.data?.error ?? "That could not be changed just now. Please try again."); return; }
+  keepDataset(r.data.dataset);
+  watching = "";
+  watchQuote = undefined;
+  toast(on ? "Weekly check switched on. You will hear from us only when something changed." : "Weekly check stopped. The dataset is kept.");
+  paintSets();
+}
+
+/** "See what it uses each week": asks the server for the weekly figure. Nothing is switched on by this. */
+async function askWatch(form: HTMLFormElement, id: string): Promise<void> {
+  const sources = Array.from(form.querySelectorAll<HTMLInputElement>('input[name="wsrc"]:checked')).map((i) => i.value);
+  if (!sources.length) { toast("Tick at least one place to look."); return; }
+  const r = await api<{ quote?: Quote; error?: string }>(`/mining/datasets/${encodeURIComponent(id)}/watch`, { body: { on: true, sources } });
+  if (r.status !== 409 || !r.data?.quote) { toast(r.data?.error ?? "The weekly figure could not be worked out just now."); return; }
+  watchQuote = { id, total: r.data.quote.total, message: r.data.error ?? `A weekly check uses up to ${energy(r.data.quote.total)} each week.`, sources };
+  paintSets();
+  document.querySelector<HTMLButtonElement>('[data-mine="watch-yes"]')?.focus();
 }
 
 async function onSubmit(ev: Event): Promise<void> {
@@ -222,6 +266,7 @@ async function onSubmit(ev: Event): Promise<void> {
     await run(false);
     return;
   }
+  if (form.dataset.watch) { ev.preventDefault(); await askWatch(form, form.dataset.watch); return; }
   const id = form.dataset.share;
   if (!id || !view) return;
   ev.preventDefault();
@@ -242,13 +287,25 @@ async function load(): Promise<void> {
   paint();
 }
 
-/** Called each time the screen is opened. */
-export function showMining(): void {
+/** Opens one dataset and brings it into view: where an alert about a weekly check, or a search from chat, leads. */
+async function openDataset(id: string): Promise<void> {
+  if (!view?.datasets.some((h) => h.id === id)) return;
+  const r = await api<{ dataset?: Dataset }>(`/mining/datasets/${encodeURIComponent(id)}`);
+  if (!r.ok || !r.data?.dataset) return;
+  opened.set(id, r.data.dataset);
+  paintSets();
+  const row = document.querySelector<HTMLElement>(`.mine-set[data-id="${CSS.escape(id)}"]`);
+  row?.scrollIntoView({ block: "start" });
+  row?.querySelector<HTMLElement>("h3")?.focus({ preventScroll: true });
+}
+
+/** Called each time the screen is opened. `datasetId` comes from a link such as #mining/<id>. */
+export function showMining(datasetId = ""): void {
   if (!wired) {
     wired = true;
     body().addEventListener("click", (e) => void onClick(e));
     body().addEventListener("submit", (e) => void onSubmit(e));
     body().addEventListener("change", (e) => { if ((e.target as HTMLInputElement).name === "src") showTotal(); });
   }
-  void load();
+  void load().then(() => (datasetId ? openDataset(datasetId) : undefined));
 }

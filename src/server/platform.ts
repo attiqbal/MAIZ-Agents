@@ -44,7 +44,7 @@ import { PromoterService } from "../modules/promoter/index.js";
 import { DEFAULT_PAID_MULTIPLIER, PaidServices, paidService, type Payer } from "../modules/paid-services/index.js";
 import { GrowthService } from "../modules/growth/index.js";
 import { ResearchService } from "../modules/research/index.js";
-import { DataMiningService, miningSource } from "../modules/data-mining/index.js";
+import { DATA_MINING_AGENT, DataMiningService, miningSource } from "../modules/data-mining/index.js";
 import { ResourceRegistry, clientSummary, renderGuide, suggestionsForTask, usageTable, usedBy, type RecordsEntry } from "../modules/resources/index.js";
 import { MetaGraph, MetaRejected, type MetaConfig } from "../modules/meta/index.js";
 import { LiveProvider, MetaClientService, SandboxProvider } from "../modules/meta-clients/index.js";
@@ -327,6 +327,11 @@ export function createPlatform(cfg: PlatformConfig) {
   const mining = new DataMiningService({
     identity, meter: energy, audit, http: cfg.http, now, team: (userId, ws) => workforce.team(userId, ws), titleOf: (key, ws) => workforce.templateFor(key, ws)?.title, countryOf: (ws) => workforce.countryOf(ws),
     multiplier: () => prices.general().paidServiceMultiplier ?? DEFAULT_PAID_MULTIPLIER, keys: () => ({ reddit: connections.redditApp(), youtube: connections.youtubeKey(), x: connections.xToken(), ...connections.deskKeys() }),
+    // The weekly check on a dataset: runs with nobody signed in, at a quiet hour of the client's night, and tells them like a finished batch does.
+    agentIn: (ws) => workforce.employeeIn(ws, DATA_MINING_AGENT),
+    // "UTC" with no country in the profile is the fallback, not a known time zone: such a client is checked a plain week apart.
+    timezone: (ws) => { const tz = batch.scheduleOf(ws).timezone; return tz === "UTC" && !workforce.countryOf(ws) ? undefined : tz; },
+    notify: (ws, n) => { notices.add(ws, { kind: "info", ...n }); void admin.tell(ws, n.body, n.link).catch(() => undefined); },
   });
   workforce.addContext((ws, templateKey) => mining.contextFor(ws, templateKey));
   /** MAIZ quality review: every client's specialised tasks wait here for the platform owner's sign-off. */

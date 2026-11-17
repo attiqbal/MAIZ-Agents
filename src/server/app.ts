@@ -42,6 +42,7 @@ import { miningRoute } from "./mining-routes.js";
 import { backupHealthRoute, backupOwnerRoute } from "./backup-routes.js";
 import { billingRoute } from "./billing-routes.js";
 import { resourcesRoute } from "./resources-routes.js";
+import { miningAsk } from "./mining-chat.js";
 import { MiningError } from "../modules/data-mining/index.js";
 import { PushError } from "../modules/push/index.js";
 import { agentOwnerRoute, agentPublicRoute } from "./agent-routes.js";
@@ -688,6 +689,9 @@ export function createApp(p: Platform) {
 
     if (method === "POST" && path === "/api/ask") {
       const a = prepareAsk(userId, org.id, body());
+      // A request to look up market data is answered with its quote and nothing runs (docs/DATA-MINING.md).
+      const mined = miningAsk(p, userId, org.id, a);
+      if (mined) return json(200, mined);
       const task = await p.workforce.assign(userId, org.id, a.emp.id, a.text, { urgent: a.urgent, when: a.when, history: a.history });
       return json(200, answerBody(userId, org.id, a, task));
     }
@@ -696,10 +700,12 @@ export function createApp(p: Platform) {
     // "done" carries the whole answer and is the one to trust: a quality check may have changed what was streamed.
     if (method === "POST" && path === "/api/ask/stream") {
       const a = prepareAsk(userId, org.id, body());
+      const mined = miningAsk(p, userId, org.id, a);
       return {
         status: 200,
         headers: { "content-type": "text/event-stream; charset=utf-8", "cache-control": "no-store, no-transform", "x-accel-buffering": "no" },
         stream: async (send) => {
+          if (mined) { send("accepted", { employee: mined.employee }); send("done", mined); return; }
           send("accepted", { employee: a.emp.name });
           try {
             const task = await p.workforce.assign(userId, org.id, a.emp.id, a.text, {
@@ -1137,7 +1143,7 @@ export function createApp(p: Platform) {
     if (!emp) throw new BadRequest("pick one of your employees");
     p.identity.require(userId, orgId, "task.create");
     const when: "now" | "tonight" | undefined = b.when === "now" || b.when === "tonight" ? b.when : undefined;
-    return { text, emp, when, urgent: b.urgent === true, history: p.conversations.history(userId, orgId, emp.id) };
+    return { text, emp, when, urgent: b.urgent === true, bar: b.bar === true, history: p.conversations.history(userId, orgId, emp.id) };
   }
 
   /** What the client sees of a finished ask, and the same turn saved to the conversation. */

@@ -52,7 +52,7 @@ function route(): void {
   // The online-shop employees have no example dashboard either. Their working view is the conversation.
   if (valid === "desk" && SHOP_EMPLOYEE_KEYS.includes(sub)) { location.replace(`#chat/${sub}`); return; }
   if (valid === "desk") showDesk(sub);
-  if (valid === "mining") void import("./mining").then((m) => m.showMining());
+  if (valid === "mining") void import("./mining").then((m) => m.showMining(sub));
   if (valid === "chat") void showChat(sub);
   if (valid === "firstday") void import("./firstday").then((m) => m.showFirstDay());
   if (valid === "apps") void import("./apps").then((m) => m.setAppsView(sub));
@@ -402,19 +402,24 @@ $<HTMLFormElement>("ask").addEventListener("submit", async (e) => {
   const m = /^(finance|marketing|consultant|hr|compliance|supply|data|shop|dropship|marketplace|care)\s*[:,-]\s*(.+)$/is.exec(text);
   const key = m ? { finance: "finance-manager", marketing: "marketing-manager", consultant: "business-consultant", hr: "hr-manager", compliance: "compliance-manager", supply: "supply-chain-manager", data: "data-mining-agent", shop: "online-shop-manager", dropship: "dropshipping-agent", marketplace: "marketplace-manager", care: "shop-care-agent" }[m[1]!.toLowerCase() as "finance"] : "business-consultant";
   const emp = realOrg.team.find((x) => x.templateKey === key) ?? realOrg.team[0]!;
+  // "data:" with no Data mining agent on the team is sent as typed, so the reply can say so and point to the store.
+  const noDataAgent = key === "data-mining-agent" && emp.templateKey !== key;
   if (asking) { toast("Still working on your last question"); return; }
   asking = true;
   const stopWorking = startWorking(emp.name);
   const u = /^urgent\s*[:,-]\s*(.+)$/is.exec(m ? m[2]! : text);
   // The answer is written into the panel as it arrives. textContent only: streamed words are never parsed as HTML.
   const live = streamPanel(emp.name);
-  const sent = u ? u[1]! : m ? m[2]! : text;
-  const result = await askStream({ text: sent, employeeId: emp.id, urgent: !!u, ...(chosenWhen ? { when: chosenWhen } : {}) }, live);
+  const sent = noDataAgent ? text : u ? u[1]! : m ? m[2]! : text;
+  // `bar` says nobody was named: a clear request for public market data is then answered with its quote, and nothing runs.
+  const result = await askStream({ text: sent, employeeId: emp.id, urgent: !!u, ...(!m || noDataAgent ? { bar: true } : {}), ...(chosenWhen ? { when: chosenWhen } : {}) }, live);
   stopWorking();
   asking = false;
   if (!result.ok) { showNote(emp.name, result.message ?? "I could not reach your team. Your question is still in the box, so you can send it again.", true); return; }
   input.value = "";
   resetWhen();
+  // A market data search that waits for "Confirm and start", or a pointer to the store when the agent is not hired.
+  if (result.done.offer || result.done.link) { const offered = result.done; void import("./mining-chat").then((mc) => { mc.showAskOffer(answerBox(), offered); window.scrollTo({ top: 0, behavior: "smooth" }); }); return; }
   const out = describeOutcome(emp.name, result.done);
   if (out.kind === "queued") { showQueued(emp.name, result.done.runsAt); return; }
   if (out.kind === "note") { showNote(emp.name, out.text); return; }

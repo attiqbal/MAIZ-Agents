@@ -1,9 +1,10 @@
 import { DatasetNotFound, MiningError, viewOf } from "../modules/data-mining/index.js";
+import { miningChatRoute } from "./mining-chat.js";
 import type { Platform } from "./platform.js";
 import type { Req, Res } from "./app.js";
 
 const json = (status: number, body: unknown): Res => ({ status, body });
-const DATASET = /^\/api\/mining\/datasets\/([\w-]{1,64})(?:\/(share|remove))?$/;
+const DATASET = /^\/api\/mining\/datasets\/([\w-]{1,64})(?:\/(share|remove|watch))?$/;
 
 /**
  * The Data mining agent's page: what can be gathered and what it uses in energy, the client's saved datasets, running
@@ -26,6 +27,8 @@ export async function miningRoute(req: Req, userId: string, p: Platform, workspa
       throw e;
     }
   }
+  // A search offered in a conversation: "Confirm and start" and "Not now".
+  if (path.startsWith("/api/mining/chat/")) return miningChatRoute(req, userId, p, workspaceId);
   const one = DATASET.exec(path);
   if (!one) return json(404, { error: "not found" });
   const [, id, action] = one;
@@ -36,8 +39,11 @@ export async function miningRoute(req: Req, userId: string, p: Platform, workspa
       p.mining.remove(userId, workspaceId, id!);
       return json(200, { removed: true, datasets: p.mining.list(userId, workspaceId) });
     }
+    // The weekly check: switching it on is refused with what a week uses at most until that figure is confirmed.
+    if (method === "POST" && action === "watch") return json(200, { dataset: viewOf(p.mining.watch(userId, workspaceId, id!, body())) });
   } catch (e) {
     if (e instanceof DatasetNotFound) return json(404, { error: e.message });
+    if (e instanceof MiningError && e.quote) return json(409, { error: e.message, quote: e.quote });
     throw e;
   }
   return json(404, { error: "not found" });

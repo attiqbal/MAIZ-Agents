@@ -2160,3 +2160,29 @@ h1, .sec-head h2, .final h2, .stage-band h2, .article-head h1, .sec-title, .bent
 /* ---- What an employee can use (docs/RESOURCES.md) ---- */
 .res-d { display: block; }
 .res-h { margin: 14px 0 8px; font-weight: 500; }
+/* Market data: the weekly check and searches offered in a conversation. Outside AI tools: the Admin manager's planning interview. */
+.mine-watch-on { margin: 0; display: flex; gap: 4px 10px; flex-wrap: wrap; align-items: baseline; }
+.mine-last { max-width: 78ch; }
+.mine-watch { display: flex; flex-direction: column; gap: 10px; }
+.mine-watch .sf-check { display: flex; gap: 8px; align-items: flex-start; min-height: 40px; padding: 6px 0; }
+.mine-changed { border-bottom: 1px solid var(--line); padding-bottom: 14px; display: flex; flex-direction: column; gap: 8px; }
+.mine-changed p { margin: 0; }
+.mine-changed h5 { margin: 4px 0 0; font-size: 13px; font-weight: 600; color: var(--text-muted); }
+.mine-history { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.mine-history li { display: flex; gap: 4px 12px; flex-wrap: wrap; align-items: baseline; font-variant-numeric: tabular-nums; }
+.turn-offer { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+.turn-link { margin: 8px 0 0; }
+.turn-link a { min-height: 40px; display: inline-flex; align-items: center; }
+.agp { border: 1px solid var(--line); border-radius: 24px; padding: 16px 18px; display: flex; flex-direction: column; gap: 12px; background: var(--surface-fog-surface); }
+.agp > h3 { font-family: var(--font-polysans); font-size: 19px; font-weight: 400; letter-spacing: -0.01em; margin: 0; }
+.agp-log { display: flex; flex-direction: column; gap: 12px; }
+.agp-log .fd-msg { animation: none; }
+.agp-typed { display: flex; flex-direction: column; gap: 10px; max-width: 560px; }
+.agp-card { border: 1px solid var(--line); border-radius: 24px; padding: 16px 18px; background: var(--color-canvas-white); display: flex; flex-direction: column; gap: 10px; max-width: 760px; }
+.agp-card h3 { margin: 0; font-family: var(--font-polysans); font-size: 19px; font-weight: 400; letter-spacing: -0.01em; overflow-wrap: anywhere; }
+.agp-card h4 { margin: 4px 0 0; font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-muted); }
+.agp-card p { margin: 0; overflow-wrap: anywhere; }
+.agp-list { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 6px; font-size: 14.5px; overflow-wrap: anywhere; }
+.agp-notes { color: var(--text-2); }
+.agp .acts, .agp-card .acts { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.agp .chip { min-height: 40px; }

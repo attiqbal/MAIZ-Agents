@@ -30,6 +30,7 @@ export function connectionView(c: AgentConnection, roster: readonly RosterEntry[
     needsApproval: c.needsApproval, limits: c.limits, energy: now.energy, jobsThisHour: now.jobsThisHour, waiting: now.waiting,
     webhookUrl: c.webhookUrl ?? null, keyPrefix: c.keyPrefix, keyCreatedAt: c.keyCreatedAt, keyExpiresAt: c.keyExpiresAt,
     createdAt: c.createdAt, updatedAt: c.updatedAt, lastUsedAt: c.lastUsedAt ?? null,
+    profile: c.profile ? { ...c.profile, examples: c.profile.examples.map((e) => ({ ...e })) } : null,
   };
 }
 

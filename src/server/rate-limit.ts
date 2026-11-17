@@ -74,6 +74,8 @@ export function limitFor(method: string, path: string): Limit | undefined {
   // Invites are also limited per business and per invited address in the service.
   if (path === "/api/invites/open" || path === "/api/invites/accept") return { max: 20, windowMs: 10 * 60_000 };
   if (path === "/api/team/invites" || /^\/api\/team\/invites\/[\w-]{1,64}\/resend$/.test(path)) return { max: 20, windowMs: 10 * 60_000 };
+  // The planning interview for an outside tool: a proposal per try, and each one is written to the audit log.
+  if (path === "/api/agents/plan") return { max: 20, windowMs: 10 * 60_000 };
   // A webhook test makes the server call an address the owner typed: a few tries are plenty.
   if (/^\/api\/agents\/[\w-]{1,64}\/test$/.test(path)) return { max: 10, windowMs: 10 * 60_000 };
   // Tasks are limited by energy (the team pool, the daily ceiling and the monthly cost cap), not by a request count:
