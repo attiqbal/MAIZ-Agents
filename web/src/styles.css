@@ -1959,3 +1959,7 @@ h1, .sec-head h2, .final h2, .stage-band h2, .article-head h1, .sec-title, .bent
 .ag-pre { background: var(--color-canvas-white); border: 1px solid var(--line); border-radius: 14px; padding: 10px 12px; font-size: 12.5px; white-space: pre-wrap; overflow-wrap: anywhere; margin: 6px 0; }
 @media (max-width: 640px) { .ag-two, .ag-three { grid-template-columns: 1fr; } .ag-conn-h .status { margin-left: 0; } }
 .btn[aria-disabled="true"] { opacity: .45; cursor: progress; }
+
+/* ---- What an employee can use (docs/RESOURCES.md) ---- */
+.res-d { display: block; }
+.res-h { margin: 14px 0 8px; font-weight: 500; }

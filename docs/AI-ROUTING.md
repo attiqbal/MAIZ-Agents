@@ -16,6 +16,10 @@ covers RunPod when it is down or cold, and keeps regulated work.
 5. **Redo.** A score below `minScore` (standard 7, premium 8) redoes the work on Claude Sonnet, passing the reviewer's issues as a hint. If Claude is over budget the RunPod answer is kept and counted as *low confidence*.
 6. **Claude only.** Policies with `primary: "claude"` (default: `compliance-manager`) never touch RunPod, unless a Claude cap is hit and `whenClaudeCapped` is `degrade`.
 
+**Routine checks are skipped when there is nothing to find** (`resources/rule.ts`, `worthSampling`): a one-line answer with no figure in it is not sampled. Suspicious answers, the `premium` lane and the Claude-only policies are unchanged. See `docs/RESOURCES.md`.
+
+**What the employee is told it can use** is written from the resource registry on every task, cheapest first (known, then free, then energy, then double energy with the quote shown), instead of a hand-written list. See `docs/RESOURCES.md`.
+
 The reviewer treats the answer as data (delimited, told to ignore instructions inside it) and its reply is parsed strictly; an unreadable reply is *never* a pass, it is counted as a review error.
 
 ## Budgets

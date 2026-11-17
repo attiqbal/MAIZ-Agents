@@ -300,6 +300,14 @@ $("ai-run-all").addEventListener("click", async () => {
   toast(r.data.started ? "Batch finished." : "Nothing was waiting.");
 });
 
+interface ResUse { month: string; rows: { key: string; name: string; how: "given" | "charged"; uses: number; energy: number; costMicro: number }[] }
+/** What the employees were given and what paid things took. Empty until the system has seen a task, never invented. */
+function renderResources(u: ResUse | null): void {
+  $("ai-res-month").textContent = u?.month ?? "";
+  const rows = (u?.rows ?? []).map((r) => `<tr><td>${esc(r.name)}</td><td>${r.how === "charged" ? "Paid, taken from clients" : "Given with tasks"}</td><td class="num">${r.uses.toLocaleString("en-GB")}</td><td class="num">${r.energy.toLocaleString("en-GB")}</td><td class="num">${r.how === "charged" ? usd(r.costMicro) : "n/a"}</td></tr>`).join("");
+  $("ai-res").innerHTML = `<thead><tr><th scope="col">Resource</th><th scope="col">How it was used</th><th scope="col" class="num">Uses</th><th scope="col" class="num">Energy</th><th scope="col" class="num">Real cost</th></tr></thead><tbody>${rows || '<tr><td colspan="5" class="muted">Nothing recorded yet this month. It fills in as employees finish tasks.</td></tr>'}</tbody>`;
+}
+
 void (async () => {
   const r = await ownerLoad<Overview>("/owner/ai");
   if (!r) return;
@@ -307,6 +315,9 @@ void (async () => {
     view = r; live = true;
     const b = await api<BatchView>("/owner/batch");
     batchView = b.ok && b.data ? b.data : null;
+    const ru = await api<ResUse>("/owner/resources");
+    renderResources(ru.ok && ru.data ? ru.data : null);
   }
+  if (r === "demo") renderResources(null);
   renderAll();
 })();

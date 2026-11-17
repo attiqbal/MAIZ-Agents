@@ -10,6 +10,8 @@ export interface AskDone {
   checked?: boolean;
   runsAt?: string;
   message?: string;
+  /** Things that would have helped this answer but are not connected: each is a link to the right screen. */
+  hints?: { id: string; title: string; detail: string; action: { label: string; href: string } }[];
 }
 export interface SseEvent { event: string; data: any }
 
