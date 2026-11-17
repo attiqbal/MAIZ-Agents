@@ -152,7 +152,8 @@ function renderStore(): void {
   $("apps-grid").innerHTML = shown.map((c) => {
     // A live connector whose app keys are not set up yet is not "direct" for this owner today.
     const [tone, label] = c.availability === "live" && (c.connect === "bridge" || c.connect === "file") ? BADGE.planned : BADGE[c.availability];
-    const cta = c.connect === "oauth" ? `<button class="btn btn-primary btn-sm" data-connect="${esc(c.key)}">Connect</button>`
+    const cta = c.connect === "oauth" && c.fields?.length ? `<button class="btn btn-primary btn-sm" data-key="${esc(c.key)}">Connect</button>`
+      : c.connect === "oauth" ? `<button class="btn btn-primary btn-sm" data-connect="${esc(c.key)}">Connect</button>`
       : c.connect === "webhook" ? `<button class="btn btn-primary btn-sm" data-connect="${esc(c.key)}">Get a private link</button>`
       : c.connect === "bridge" ? `<button class="btn btn-ghost btn-sm" data-connect="webhook">Use Zapier or Make</button>`
       : c.connect === "api_key" ? `<button class="btn btn-primary btn-sm" data-key="${esc(c.key)}">Connect</button>`
@@ -288,8 +289,10 @@ export function initApps(): void {
     e.preventDefault();
     if (!keying) return;
     const values = Object.fromEntries(new FormData(e.target as HTMLFormElement).entries());
-    const r = await api(`/integrations/apps/${keying.key}/connect`, { body: { values } });
+    const r = await api<{ url?: string }>(`/integrations/apps/${keying.key}/connect`, { body: { values } });
     if (!r.ok) { $("apps-key-result").textContent = (r.data as { error?: string } | undefined)?.error ?? "Could not connect"; return; }
+    // An app that asks for one detail first (the Shopify shop address) then sends the owner to approve it on its own page.
+    if (r.data?.url) { location.href = r.data.url; return; }
     $<HTMLDialogElement>("apps-key").close();
     toast(`${keying.name} connected`);
     void loadApps();

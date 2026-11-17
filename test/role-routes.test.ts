@@ -112,6 +112,13 @@ const CHANGES: readonly Row[] = [
   ["POST", "/api/queue/run-now", "member"],
   ["POST", "/api/queue/:id/cancel", "member"],
   ["POST", "/api/paid-services/nope/render", "member", {}],
+  ["POST", "/api/tools/voice", "member", {}],
+  ["POST", "/api/tools/voice/quote", "member", {}],
+  ["POST", "/api/tools/search", "member", {}],
+  ["POST", "/api/tools/read", "member", {}],
+  ["POST", "/api/tools/stock", "member", {}],
+  ["POST", "/api/tools/stock/keep", "member", {}],
+  ["POST", "/api/tools/files/:id/remove", "member"],
   ["POST", "/api/mining/run", "member", {}],
   ["POST", "/api/mining/datasets/:id/share", "member", { employees: [] }],
   ["POST", "/api/mining/datasets/:id/remove", "member"],
@@ -137,7 +144,7 @@ const CHANGES: readonly Row[] = [
 /** Reads open to everyone in the business, view-only included. */
 const READS: readonly string[] = [
   "/api/team", "/api/org", "/api/dashboard", "/api/energy", "/api/setup", "/api/notifications", "/api/suggestions", "/api/queue", "/api/batch/schedule",
-  "/api/finance/summary", "/api/rota/week", "/api/specialists", "/api/reviews", "/api/conversations/:emp", "/api/paid-services", "/api/paid-services/uses/:id",
+  "/api/finance/summary", "/api/rota/week", "/api/specialists", "/api/reviews", "/api/conversations/:emp", "/api/paid-services", "/api/paid-services/uses/:id", "/api/tools", "/api/tools/voices", "/api/tools/files/:id",
   "/api/push", "/api/mining", "/api/mining/datasets/:id", "/api/agents", "/api/integrations", "/api/integrations/activity", "/api/integrations/growth",
   "/api/overview", "/api/resources/employee/:emp", "/api/overview/approvals", "/api/overview/books", "/api/overview/calendar", "/api/meta", "/api/meta/posts", "/api/meta/insights", "/api/meta/sandbox/outbox",
 ];

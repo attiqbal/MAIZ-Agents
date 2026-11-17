@@ -486,6 +486,9 @@ export function createApp(p: Platform) {
         // Some apps return an account id beside the code (QuickBooks realmId). Short plain values only.
         const extra: Record<string, string> = {};
         for (const k of ["realmId", "selling_partner_id"]) { const v = req.query.get(k); if (v && /^[\w.-]{1,64}$/.test(v)) extra[k] = v; }
+        // What the client typed before the sign-in comes back from the signed state. The whole query is kept for apps that sign it (Shopify).
+        if (state.v && typeof state.v === "object") for (const [k, v] of Object.entries(state.v)) if (typeof v === "string") extra[k] = v;
+        if (p.integrations.registry.get(state.a)?.connectFields) extra.query = req.query.toString();
         // Apps that use PKCE: the proof is worked out from the secret and this browser's nonce, so it is never stored or sent to the browser.
         if (p.integrations.registry.get(state.a)?.auth.kind === "oauth2" && (p.integrations.registry.get(state.a)!.auth as { pkce?: boolean }).pkce) extra.code_verifier = pkceVerifier(secret, state.n);
         await p.integrations.completeOAuth(state.u, org.id, state.a, code, extra);
@@ -1125,9 +1128,15 @@ export function createApp(p: Platform) {
       if (c.auth.kind === "oauth2") {
         // The nonce is also set as a cookie, so only the browser that started the connection can finish it.
         const nonce = randomBytes(16).toString("hex");
-        const back = body().returnTo === "firstday" ? { r: "firstday" } : {};
-        const state = makeToken(secret, { k: "int-oauth", u: userId, a: key, n: nonce, ...back }, OAUTH_STATE_SECONDS, p.now().getTime());
-        return { status: 200, body: { url: ig.authorizeUrl(userId, orgId, key, state, pkceChallenge(pkceVerifier(secret, nonce))) }, headers: { "set-cookie": oauthCookie(nonce, OAUTH_STATE_SECONDS, p.cfg.appUrl) } };
+        const b = body();
+        const back = b.returnTo === "firstday" ? { r: "firstday" } : {};
+        // Boxes typed before the sign-in (the shop address) are checked now and travel in the signed state, never in the browser's hands.
+        const typed: Record<string, string> = {};
+        for (const f of c.connectFields ?? []) { const v = b.values?.[f.key]; if (typeof v === "string" && v.length <= 200) typed[f.key] = v.trim(); }
+        const bad = c.connectFields ? c.validate?.(typed) : undefined;
+        if (bad) throw new BadRequest(bad);
+        const state = makeToken(secret, { k: "int-oauth", u: userId, a: key, n: nonce, ...back, ...(c.connectFields ? { v: typed } : {}) }, OAUTH_STATE_SECONDS, p.now().getTime());
+        return { status: 200, body: { url: ig.authorizeUrl(userId, orgId, key, state, pkceChallenge(pkceVerifier(secret, nonce)), typed) }, headers: { "set-cookie": oauthCookie(nonce, OAUTH_STATE_SECONDS, p.cfg.appUrl) } };
       }
       if (c.auth.kind === "api_key") return json(201, { connection: ig.connectWithKey(userId, orgId, key, body().values ?? {}) });
       if (c.auth.kind === "webhook") {

@@ -99,6 +99,9 @@ export const CLIENT_RULES: readonly RouteRule[] = [
   rule("POST", "/api/queue/run-now", "task.create"),
   rule("POST", `/api/queue/${ID}/cancel`, "task.create"),
   rule("POST", `/api/paid-services/${ID}/render`, "task.create"),
+  // Outside services (voice, web search, page reading, stock pictures): work that can spend energy, so not for view-only people.
+  rule("POST", "/api/tools/(voice|voice/quote|search|read|stock|stock/keep)", "task.create"),
+  rule("POST", `/api/tools/files/${ID}/remove`, "task.create"),
   rule("POST", "/api/mining/run", "task.create"),
   rule("POST", `/api/mining/datasets/${ID}/(share|remove|watch)`, "task.create"),
   rule("POST", "/api/mining/chat/(confirm|decline)", "task.create"),

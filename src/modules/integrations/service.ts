@@ -107,7 +107,7 @@ export class IntegrationService {
       key: c.key, name: c.name, category: c.category, summary: c.summary, availability: c.availability, note: c.note, regions: c.regions,
       capabilities: c.capabilities,
       connect: connectMode(c, !!this.opts.oauthApps?.[c.key]),
-      fields: c.auth.kind === "api_key" ? c.auth.fields : undefined,
+      fields: c.auth.kind === "api_key" ? c.auth.fields : c.connectFields,
       howToExport: c.auth.kind === "file" ? c.auth.howToExport : undefined,
       acceptsFiles: !!c.parseFile,
       defaultAccess: defaultAccessFor(c.capabilities),
@@ -145,12 +145,12 @@ export class IntegrationService {
   // ---------- connecting ----------
 
   /** Where to send the owner to approve an OAuth app. `state` is signed by the caller and comes back to the callback. */
-  authorizeUrl(userId: string, workspaceId: string, key: string, state: string, challenge?: string): string {
+  authorizeUrl(userId: string, workspaceId: string, key: string, state: string, challenge?: string, values?: Record<string, string>): string {
     this.identity.require(userId, workspaceId, "workspace.manage");
     const c = this.registry.require(key);
     const app = this.opts.oauthApps?.[key];
     if (c.auth.kind !== "oauth2" || !app) throw new IntegrationError(`${c.name} cannot be connected directly yet. Upload a file instead.`);
-    if (c.authorizeUrl) return c.authorizeUrl(app, state, c.auth.pkce ? challenge : undefined);
+    if (c.authorizeUrl) return c.authorizeUrl(app, state, c.auth.pkce ? challenge : undefined, values);
     const url = new URL(c.auth.authorizeUrl);
     if (c.auth.pkce && challenge) { url.searchParams.set("code_challenge", challenge); url.searchParams.set("code_challenge_method", "S256"); }
     url.searchParams.set("client_id", app.clientId);

@@ -222,7 +222,12 @@ export interface Connector {
   /** Extra boxes the owner fills in once. Their values reach the connector as `app.extra`. */
   ownerFields?: readonly OwnerField[];
   /** Builds the sign-in address when the provider does not follow the usual shape (Amazon, eBay, TikTok). */
-  authorizeUrl?(app: OAuthApp, state: string, challenge?: string): string;
+  authorizeUrl?(app: OAuthApp, state: string, challenge?: string, values?: Record<string, string>): string;
+  /**
+   * Boxes the client fills in before the sign-in (Shopify's shop address). Checked with `validate`, kept in the signed
+   * state, and handed back to `exchangeCode` as params beside the code.
+   */
+  connectFields?: readonly { key: string; label: string; help?: string }[];
   /** "none": the provider has no harmless way to check the owner's details, so the card's test says so. */
   ownerTest?: "none" | "salesforce";
   /** Swap a refresh token for a fresh access token. Called before `read` when the token has expired. */

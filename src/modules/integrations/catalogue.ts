@@ -9,6 +9,8 @@ import { xero } from "./connectors/xero.js";
 import { hubspot, pipedrive } from "./connectors/crm.js";
 import { zendesk, freshdesk } from "./connectors/support.js";
 import { shopify, woocommerce } from "./connectors/shops.js";
+import { shopifyApp } from "./connectors/shopify-app.js";
+import { freeagent } from "./connectors/freeagent.js";
 import { quickbooks } from "./connectors/quickbooks.js";
 import { outlook, calendly, calcom, mailchimp, brevo } from "./connectors/people.js";
 import { trello, asana } from "./connectors/work.js";
@@ -82,7 +84,6 @@ const viaBridge = (key: string, name: string, category: Category, capabilities: 
 export const COMMON_APPS: readonly Connector[] = [
   // Accounting
   viaBridge("sage", "Sage Accounting", "accounting", ["accounts.read"], "planned", "Your books in Sage Accounting (Sage Business Cloud).", "Sage Accounting has a public OAuth API. Direct connection is planned.", ["GB", "IE", "US", "CA", "ES", "FR", "DE"]),
-  viaBridge("freeagent", "FreeAgent", "accounting", ["accounts.read"], "planned", "Your books in FreeAgent.", "FreeAgent has a public OAuth API. Direct connection is planned.", ["GB"]),
   viaBridge("zoho-books", "Zoho Books", "accounting", ["accounts.read"], "planned", "Your books in Zoho Books.", "Zoho Books has a public OAuth API. Direct connection is planned."),
   viaBridge("myob", "MYOB", "accounting", ["accounts.read"], "planned", "Your books in MYOB.", "MYOB has a public API that now uses granular scopes. Direct connection is planned.", ["AU", "NZ"]),
   viaBridge("freshbooks", "FreshBooks", "accounting", ["accounts.read"], "planned", "Invoices and expenses in FreshBooks.", "FreshBooks has a public OAuth API. Direct connection is planned."),
@@ -98,7 +99,7 @@ export const COMMON_APPS: readonly Connector[] = [
 /** The registry the platform uses, with every connector we ship. */
 export function defaultRegistry(): ConnectorRegistry {
   const r = new ConnectorRegistry();
-  const live = [hubspot, pipedrive, zendesk, freshdesk, shopify, woocommerce, quickbooks, outlook, calendly, calcom, mailchimp, brevo, trello, asana, salesforce, intercom, helpscout, bigcommerce, squarespace, clickup, constantContact, twilio, gmail, googleBusinessProfile, googleAds, linkedinPages, tiktok, pinterest, trustpilot, metaAds, amazonSeller, etsy, ebay, docusign, canva];
+  const live = [hubspot, pipedrive, zendesk, freshdesk, shopify, shopifyApp, freeagent, woocommerce, quickbooks, outlook, calendly, calcom, mailchimp, brevo, trello, asana, salesforce, intercom, helpscout, bigcommerce, squarespace, clickup, constantContact, twilio, gmail, googleBusinessProfile, googleAds, linkedinPages, tiktok, pinterest, trustpilot, metaAds, amazonSeller, etsy, ebay, docusign, canva];
   for (const c of [xero, square, stripe, ga4, searchConsole, brightpay, tillFile, webhookBridge, ...live, ...PLANNED, ...COMMON_APPS, ...APPROVAL_APPS, ...PLANNED_CUSTOMER_APPS, ...BUSINESS_APPS, ...DROPSHIP_SUPPLIERS]) r.register(c);
   return r;
 }

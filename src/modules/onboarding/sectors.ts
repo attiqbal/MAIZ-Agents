@@ -78,7 +78,7 @@ export const APPS: readonly AppChoice[] = [
   { key: "xero", name: "Xero", gives: "Profit and loss, month by month", how: "direct", for: "finance-manager" },
   { key: "quickbooks", name: "QuickBooks", gives: "Profit and loss, month by month", how: "direct", for: "finance-manager" },
   { key: "sage", name: "Sage", gives: "Your books in Sage", how: "bridge", for: "finance-manager" },
-  { key: "freeagent", name: "FreeAgent", gives: "Your books in FreeAgent", how: "bridge", for: "finance-manager", regions: ["GB"] },
+  { key: "freeagent", name: "FreeAgent", gives: "Your books in FreeAgent", how: "direct", for: "finance-manager", regions: ["GB"] },
   { key: "stripe", name: "Stripe", gives: "Card payments, refunds and fees", how: "direct", for: "finance-manager" },
   { key: "paypal", name: "PayPal", gives: "Payments, refunds and fees", how: "bridge", for: "finance-manager" },
   { key: "gocardless", name: "GoCardless", gives: "Direct Debit payments", how: "bridge", for: "finance-manager", regions: ["GB", "IE", "FR", "DE", "AU", "US"] },
