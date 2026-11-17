@@ -113,6 +113,13 @@ All original and mute or minimal, so they can be reused without voice casting.
 - **The Sticky Note:** the Boss's handwritten notes appear as sticky notes on screen (comedy: all say the same three things).
 - **The Clock:** a wall clock that is always 9:00 on Monday and 3:00 in the "3am shift" episodes. It is a prop, not a character.
 
+## 4b. Ollie, the intern (human, used in pillar L)
+
+- A nervous, kind human intern. Not an AI. The joke is that the MAIZ team makes Ollie's day easier, never that they replace Ollie.
+- Voice: young, quick, unsure, always says thank you. Look: oversized lanyard, a tote bag, sneakers. Colour: mint.
+- Catchphrase: "Sorry, quick question."
+- Uses: vs the Shoebox, asking Maya for help, first reports. Never the butt of a cruel joke.
+
 ## 5. The set (one set, always the same)
 
 - A small, cosy open-plan office in warm cream paper tones (matches the site: cream paper canvas, white cards, ink text, grass-green accent).
