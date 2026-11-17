@@ -25,12 +25,12 @@ const TASK_WORDS: Record<string, RegExp> = {
   books: /\b(profit|loss|p&l|books|accounts|expenses|margin|spend(ing)?|costs?)\b/i,
   payroll: /\b(payroll|wages?|salar\w+)\b/i,
   "website-visits": /\b(website|web ?site|traffic|visitors?|visits|analytics)\b/i,
-  search: /\b(seo|search|google|keywords?|ranking)\b/i,
+  search: /\b(seo|search (traffic|clicks|rankings?|results)|google (search|ranking)|keywords?)\b/i,
   leads: /\b(leads?|deals?|pipeline|crm)\b/i,
   support: /\b(support|tickets?|complaints?)\b/i,
   bookings: /\b(bookings?|appointments?)\b/i,
   audience: /\b(newsletter|subscribers?|email list|mailing list|open rate)\b/i,
-  reviews: /\b(reviews?|ratings?)\b/i,
+  reviews: /\b(average rating|star rating|review (score|count|figures)|customer reviews)\b/i,
   "public-opinion": /\b(people (are )?saying|reddit|forums?|competitors?|market research|trends?|sentiment|opinions?)\b/i,
   news: /\b(news|press coverage|headlines)\b/i,
   economy: /\b(inflation|economy|gdp|unemployment)\b/i,
@@ -115,7 +115,7 @@ export function renderGuide(resources: readonly Resource[], task?: string, max =
   if (model) add(line("- Energy: ", [`your own writing and analysis${model.cost.energy ? ` (about ${model.cost.energy} a task)` : ""}`], ". Keep answers as short as the task allows.", room));
   if (energy.length) add(line("- Energy, the owner confirms the figure first: ", energy, ".", room));
   if (paid.length) add(line("- Double energy, only when the task truly needs it and the owner has seen the cost: ", paid, ".", room));
-  if (missing.length) add(line("- Not connected, would help: ", missing, '. Tell the owner "connect X and I can do this" instead of guessing.', room));
+  if (missing.length) add(line("- Not connected, would help: ", missing, '. Say "connect X and I can do this", never guess.', room));
   out.push(CLOSING);
   return out.join("\n");
 }

@@ -182,7 +182,8 @@ export class ResourceRegistry {
     const mayHaveAppData = allowedTemplate(templateKey);
     const conns = new Map(this.s.connections(userId, workspaceId).map((c) => [c.connectorKey, c]));
     const now = this.s.now();
-    return this.s.apps().filter((a) => a.capabilities.length > 0).map((a): Resource => {
+    // The Zapier and Make link is a way of connecting any app, not an app that has figures of its own.
+    return this.s.apps().filter((a) => a.capabilities.length > 0 && a.connect !== "webhook").map((a): Resource => {
       const caps = a.capabilities.map(capabilityOf);
       const conn = conns.get(a.key);
       const base = { key: `app:${a.key}`, kind: "app" as const, name: a.name, goodFor: `Your ${caps.map((c) => c.words).join(", ")}, read from ${a.name}.`, gives: caps.map((c) => c.tag), cost: KNOWN, needsApproval: false };
