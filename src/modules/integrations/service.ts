@@ -13,6 +13,9 @@ import { toPayrollEntry, toSalesEntry, PAYROLL_ACCOUNTS } from "./posting.js";
 import { cleanFigures, summariseArea } from "./areas.js";
 import { IntegrationError, type ActivityDay, type Connector, type ConnectorContext, type Credentials, type DateRange, type OAuthApp, type AccountsMonth, type ParsedFile, type PayrollRun, type SalesDay, type SearchDay, type TrafficDay } from "./types.js";
 
+/** Connections that hold a Google permission: disconnecting one deletes what Google sent and cancels the permission. */
+const GOOGLE_CONNECTORS: ReadonlySet<string> = new Set(["ga4", "search-console", "gmail"]);
+
 export interface IntegrationConnection {
   id: string;
   workspaceId: string;
@@ -195,9 +198,20 @@ export class IntegrationService {
     return updated;
   }
 
-  /** Removes the saved website and search figures of one connection. */
-  private forgetFigures(connectionId: string): void {
-    for (const [id, r] of this.records) if (r.connectionId === connectionId && (r.kind === "traffic" || r.kind === "search")) this.records.delete(id);
+  /** Removes the saved website and search figures of one connection (or, with `all`, everything it sent), here and in the store. */
+  private forgetFigures(connectionId: string, all = false): void {
+    for (const [id, r] of this.records) {
+      if (r.connectionId !== connectionId || !(all || r.kind === "traffic" || r.kind === "search")) continue;
+      this.records.delete(id);
+      this.sink?.integrationRecord(r, true);
+    }
+  }
+
+  /** True when another live connection of the same client was approved through the same Google app. */
+  private sharesGoogleApp(conn: IntegrationConnection): boolean {
+    const clientId = this.opts.oauthApps?.[conn.connectorKey]?.clientId;
+    if (!clientId) return false;
+    return [...this.connections.values()].some((c) => c.id !== conn.id && c.workspaceId === conn.workspaceId && c.status !== "disconnected" && GOOGLE_CONNECTORS.has(c.connectorKey) && this.opts.oauthApps?.[c.connectorKey]?.clientId === clientId);
   }
 
   private contextFor_(userId: string, workspaceId: string, credentials: Credentials): ConnectorContext {
@@ -232,7 +246,13 @@ export class IntegrationService {
     const conn = this.own(workspaceId, connectionId);
     this.update({ ...conn, status: "disconnected" });
     const old = this.secrets.get(conn.id);
-    if (old && (conn.connectorKey === "ga4" || conn.connectorKey === "search-console")) void googleRevoke(this.http, old);
+    if (GOOGLE_CONNECTORS.has(conn.connectorKey)) {
+      // Everything Google sent through this connection goes with it (Google API Services User Data Policy).
+      this.forgetFigures(conn.id, true);
+      // Google cancels the whole permission when any one token is revoked, so it is kept while another
+      // connection of this client that uses the same Google app still needs it.
+      if (old && !this.sharesGoogleApp(conn)) void googleRevoke(this.http, old);
+    }
     this.secrets.delete(conn.id);
     this.sink?.integrationSecret(workspaceId, conn.id, "");
     this.audit.record({ workspaceId, actor: `user:${userId}`, action: "integration.disconnected", target: conn.id, data: { app: conn.connectorKey } });

@@ -73,7 +73,7 @@ export const ga4: Connector = {
   summary: "Who visits your website, where they come from and what they do. Your Marketing manager writes you a weekly report and warns you when something changes.",
   availability: "live",
   capabilities: ["traffic.read"],
-  note: "Read-only. We never change your Analytics. Google asks you to tick the box for viewing your Analytics data.",
+  note: "Read-only. We never change your Analytics. Google asks you to tick the box for viewing your Analytics data. Your AI team is given weekly totals to answer your questions, and they are never used to train AI. Disconnect deletes them.",
   auth: { kind: "oauth2", authorizeUrl: GOOGLE_AUTHORIZE, tokenUrl: GOOGLE_TOKEN, scopes: [SCOPE], envPrefix: "GOOGLE_DATA", authorizeParams: GOOGLE_PARAMS },
   read: readGa4,
   choices: ga4Choices,
