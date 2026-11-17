@@ -72,6 +72,36 @@ export const AREAS: Record<ActivityArea, AreaDef> = {
       { key: "totalReviews", label: "reviews in total", kind: "count", level: true },
     ],
   },
+  social: {
+    area: "social", title: "Social media", capability: "social.read", employees: ["marketing-manager", "business-consultant"],
+    figures: [
+      { key: "followers", label: "followers", kind: "count", level: true },
+      { key: "newFollowers", label: "new followers", kind: "count" },
+      { key: "impressions", label: "times your posts were seen", kind: "count" },
+      { key: "clicks", label: "clicks", kind: "count" },
+      { key: "engagements", label: "likes, comments, shares and saves", kind: "count" },
+      { key: "posts", label: "posts in total", kind: "count", level: true },
+    ],
+  },
+  ads: {
+    area: "ads", title: "Advertising", capability: "ads.read", employees: ["marketing-manager", "business-consultant", "finance-manager"],
+    figures: [
+      { key: "spend", label: "spent on adverts", kind: "money" },
+      { key: "impressions", label: "times your adverts were shown", kind: "count" },
+      { key: "clicks", label: "clicks on adverts", kind: "count" },
+      { key: "conversions", label: "results the adverts brought (leads or sales)", kind: "count" },
+    ],
+  },
+  documents: {
+    area: "documents", title: "Documents and designs", capability: "documents.read", employees: ["business-consultant", "compliance-manager", "marketing-manager"],
+    figures: [
+      { key: "sent", label: "documents sent for signing", kind: "count" },
+      { key: "completed", label: "documents signed", kind: "count" },
+      { key: "waiting", label: "documents waiting for a signature", kind: "count", level: true },
+      { key: "designs", label: "designs in your account", kind: "count", level: true },
+      { key: "designsUpdated", label: "designs made or changed", kind: "count" },
+    ],
+  },
 };
 
 export const isArea = (v: unknown): v is ActivityArea => typeof v === "string" && Object.prototype.hasOwnProperty.call(AREAS, v);

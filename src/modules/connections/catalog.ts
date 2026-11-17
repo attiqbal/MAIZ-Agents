@@ -27,6 +27,8 @@ export interface ConnDef {
   summary: string;
   /** social/messaging: asked for by the owner's own team. clients: what clients sign in with or connect. platform: runs the site. */
   group: "social" | "messaging" | "clients" | "platform";
+  /** How much the site depends on it: critical (the site cannot work properly without it), must (needed for a main feature), optional. */
+  tier?: "critical" | "must" | "optional";
   /** True when the owner can enter the details in the browser. False: set on the server, shown here as status + test. */
   editable: boolean;
   fields: FieldDef[];

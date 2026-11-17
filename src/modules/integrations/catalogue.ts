@@ -16,6 +16,10 @@ import { salesforce, intercom, helpscout } from "./connectors/more-crm.js";
 import { bigcommerce, squarespace } from "./connectors/more-shops.js";
 import { clickup, constantContact, twilio } from "./connectors/more-work.js";
 import { gmail } from "./connectors/gmail.js";
+import { googleAds, googleBusinessProfile } from "./connectors/listed-google.js";
+import { linkedinPages, pinterest, tiktok, trustpilot } from "./connectors/listed-social.js";
+import { amazonSeller, ebay, etsy, metaAds } from "./connectors/listed-shops.js";
+import { canva, docusign } from "./connectors/listed-docs.js";
 import { APPROVAL_APPS, PLANNED_CUSTOMER_APPS } from "./more-apps.js";
 import { BUSINESS_APPS } from "./business-apps.js";
 import { IntegrationError, type Availability, type Capability, type Category, type Connector } from "./types.js";
@@ -93,7 +97,7 @@ export const COMMON_APPS: readonly Connector[] = [
 /** The registry the platform uses, with every connector we ship. */
 export function defaultRegistry(): ConnectorRegistry {
   const r = new ConnectorRegistry();
-  const live = [hubspot, pipedrive, zendesk, freshdesk, shopify, woocommerce, quickbooks, outlook, calendly, calcom, mailchimp, brevo, trello, asana, salesforce, intercom, helpscout, bigcommerce, squarespace, clickup, constantContact, twilio, gmail];
+  const live = [hubspot, pipedrive, zendesk, freshdesk, shopify, woocommerce, quickbooks, outlook, calendly, calcom, mailchimp, brevo, trello, asana, salesforce, intercom, helpscout, bigcommerce, squarespace, clickup, constantContact, twilio, gmail, googleBusinessProfile, googleAds, linkedinPages, tiktok, pinterest, trustpilot, metaAds, amazonSeller, etsy, ebay, docusign, canva];
   for (const c of [xero, square, stripe, ga4, searchConsole, brightpay, tillFile, webhookBridge, ...live, ...PLANNED, ...COMMON_APPS, ...APPROVAL_APPS, ...PLANNED_CUSTOMER_APPS, ...BUSINESS_APPS]) r.register(c);
   return r;
 }

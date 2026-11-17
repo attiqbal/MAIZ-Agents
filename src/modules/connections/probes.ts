@@ -133,8 +133,9 @@ export async function probeApp(kind: ProbeKind, app: ProbeApp, http: typeof fetc
 const KEYS_BAD = /^(invalid_client|unauthorized_client|invalid_client_id|bad_client_id|bad_client_secret|client_not_found|access_denied)$/i;
 const CODE_BAD = /^(invalid_grant|invalid_request|bad_auth_code|bad_verification_code|invalid_code|redirect_uri_mismatch|invalid_redirect_uri|bad_redirect_uri|unsupported_grant_type)$/i;
 
-export async function probeGeneric(name: string, tokenUrl: string, basic: boolean, app: ProbeApp, http: typeof fetch): Promise<ProbeResult> {
-  const common = { grant_type: "authorization_code", code: MADE_UP_CODE, redirect_uri: app.redirectUri };
+export async function probeGeneric(name: string, tokenUrl: string, basic: boolean, app: ProbeApp, http: typeof fetch, pkce = false): Promise<ProbeResult> {
+  // An app that insists on PKCE answers about the missing proof before it looks at the code, so the test sends one.
+  const common = { grant_type: "authorization_code", code: MADE_UP_CODE, redirect_uri: app.redirectUri, ...(pkce ? { code_verifier: `${MADE_UP_CODE}-${MADE_UP_CODE}-0123456789` } : {}) };
   const headers: Record<string, string> = { ...FORM };
   const body = basic ? form(common) : form({ ...common, client_id: app.clientId, client_secret: app.clientSecret });
   if (basic) headers.authorization = `Basic ${Buffer.from(`${app.clientId}:${app.clientSecret}`).toString("base64")}`;

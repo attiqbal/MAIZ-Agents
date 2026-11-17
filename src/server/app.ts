@@ -62,6 +62,15 @@ const loginFailed = (code: "cancelled" | "failed" | "unverified" | "owner", appU
   status: 302,
   headers: { location: `/signin.html?error=${code}`, "set-cookie": loginCookie("", 0, appUrl), "cache-control": "no-store" },
 });
+/** The PKCE proof for one connect attempt: derived, so nothing needs storing and the browser never sees it. */
+const pkceVerifier = (secret: string, nonce: string): string => createHmac("sha256", secret).update(`pkce:${nonce}`).digest("base64url");
+const pkceChallenge = (verifier: string): string => createHash("sha256").update(verifier).digest("base64url");
+/** What a provider said when it refused, cut to short plain words (never raw markup) so it can be shown to the person. */
+const refusalText = (error: string | null, description: string | null): string => {
+  if (!error || error === "access_denied" || !/^[\w.:-]{1,60}$/.test(error)) return "";
+  const d = (description ?? "").replace(/[^\w .,'()/:+-]/g, " ").replace(/\s+/g, " ").trim().slice(0, 160);
+  return `${error}${d ? `: ${d}` : ""}`;
+};
 const oauthCookie = (nonce: string, maxAge: number, appUrl?: string): string =>
   `${OAUTH_COOKIE}=${nonce}; Path=/api/integrations; HttpOnly; SameSite=Lax; Max-Age=${maxAge}${appUrl?.startsWith("https://") ? "; Secure" : ""}`;
 function readCookie(header: string | undefined, name: string): string | undefined {
@@ -446,21 +455,29 @@ export function createApp(p: Platform) {
     // ---- business apps: OAuth return and webhooks are public; state or the secret link proves who they are for ----
     if (method === "GET" && path === "/api/integrations/callback") {
       const state = readToken(secret, req.query.get("state") ?? undefined, p.now().getTime());
-      const code = req.query.get("code");
+      const code = req.query.get("code") ?? req.query.get("spapi_oauth_code");
       if (!state?.u || state.k !== "int-oauth" || typeof state.a !== "string" || typeof state.n !== "string") return json(400, { error: "invalid or expired connect link" });
       // Bound to the browser that started it (cookie) and usable once, so a link sent to someone else cannot attach their account.
       if (readCookie(req.headers["cookie"], OAUTH_COOKIE) !== state.n || p.usedLinks.has(state.n)) return json(400, { error: "invalid or expired connect link" });
       p.usedLinks.add(state.n, state.exp * 1000);
       const org = orgOf(state.u);
       const home = state.r === "firstday" ? "#firstday" : "#apps";
+      if (!code && org) {
+        // The provider refused before sending a code (a missing permission, a wrong address). Keep its own words to show once.
+        const said = refusalText(req.query.get("error"), req.query.get("error_description"));
+        if (said) { p.integrations.noteProblem(state.u, org.id, `${p.integrations.registry.get(state.a)?.name ?? "The app"} said no: ${said}`); return { status: 302, headers: { location: `/app.html?connect=failed${home}` } }; }
+      }
       if (!code || !org) return { status: 302, headers: { location: `/app.html${home}` } }; // owner pressed Cancel in the app
       try {
         // Some apps return an account id beside the code (QuickBooks realmId). Short plain values only.
         const extra: Record<string, string> = {};
-        for (const k of ["realmId"]) { const v = req.query.get(k); if (v && /^[\w.-]{1,64}$/.test(v)) extra[k] = v; }
+        for (const k of ["realmId", "selling_partner_id"]) { const v = req.query.get(k); if (v && /^[\w.-]{1,64}$/.test(v)) extra[k] = v; }
+        // Apps that use PKCE: the proof is worked out from the secret and this browser's nonce, so it is never stored or sent to the browser.
+        if (p.integrations.registry.get(state.a)?.auth.kind === "oauth2" && (p.integrations.registry.get(state.a)!.auth as { pkce?: boolean }).pkce) extra.code_verifier = pkceVerifier(secret, state.n);
         await p.integrations.completeOAuth(state.u, org.id, state.a, code, extra);
       } catch (e) {
         if (!(e instanceof IntegrationError)) throw e;
+        p.integrations.noteProblem(state.u, org.id, e.message);
         return { status: 302, headers: { location: `/app.html?connect=failed${home}` } };
       }
       return { status: 302, headers: { location: `/app.html${home}` } };
@@ -1057,7 +1074,7 @@ export function createApp(p: Platform) {
     const { method, path } = req;
     const ig = p.integrations;
     if (method === "GET" && path === "/api/integrations") {
-      return json(200, { catalogue: ig.catalogue(), connections: ig.list(userId, orgId), pending: ig.pending(userId, orgId) });
+      return json(200, { catalogue: ig.catalogue(), connections: ig.list(userId, orgId), pending: ig.pending(userId, orgId), problem: ig.takeProblem(userId, orgId) });
     }
     if (method === "GET" && path === "/api/integrations/activity") return json(200, { activity: ig.activitySummary(userId, orgId) });
     if (method === "POST" && path === "/api/integrations/post") return json(200, ig.post(userId, orgId));
@@ -1076,7 +1093,7 @@ export function createApp(p: Platform) {
         const nonce = randomBytes(16).toString("hex");
         const back = body().returnTo === "firstday" ? { r: "firstday" } : {};
         const state = makeToken(secret, { k: "int-oauth", u: userId, a: key, n: nonce, ...back }, OAUTH_STATE_SECONDS, p.now().getTime());
-        return { status: 200, body: { url: ig.authorizeUrl(userId, orgId, key, state) }, headers: { "set-cookie": oauthCookie(nonce, OAUTH_STATE_SECONDS, p.cfg.appUrl) } };
+        return { status: 200, body: { url: ig.authorizeUrl(userId, orgId, key, state, pkceChallenge(pkceVerifier(secret, nonce))) }, headers: { "set-cookie": oauthCookie(nonce, OAUTH_STATE_SECONDS, p.cfg.appUrl) } };
       }
       if (c.auth.kind === "api_key") return json(201, { connection: ig.connectWithKey(userId, orgId, key, body().values ?? {}) });
       if (c.auth.kind === "webhook") {
