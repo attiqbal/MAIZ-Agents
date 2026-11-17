@@ -72,6 +72,15 @@ export const AREAS: Record<ActivityArea, AreaDef> = {
       { key: "totalReviews", label: "reviews in total", kind: "count", level: true },
     ],
   },
+  supply: {
+    area: "supply", title: "Supplier orders and stock", capability: "suppliers.read", employees: ["dropshipping-agent", "online-shop-manager", "business-consultant"],
+    figures: [
+      { key: "ordersOpen", label: "supplier orders still being made or sent", kind: "count", level: true },
+      { key: "ordersProblem", label: "supplier orders with a problem or on hold", kind: "count", level: true },
+      { key: "ordersFulfilled", label: "supplier orders fulfilled", kind: "count" },
+      { key: "outOfStock", label: "products out of stock or unavailable", kind: "count", level: true },
+    ],
+  },
 };
 
 export const isArea = (v: unknown): v is ActivityArea => typeof v === "string" && Object.prototype.hasOwnProperty.call(AREAS, v);

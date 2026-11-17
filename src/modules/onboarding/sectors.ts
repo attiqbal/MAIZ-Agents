@@ -19,6 +19,10 @@ export type NeedKey =
   | "staff"
   | "stock"
   | "know-my-market"
+  | "run-my-shop"
+  | "find-products"
+  | "sell-marketplaces"
+  | "shop-customers"
   | "raise-money"
   | "online-presence"
   | "less-admin";
@@ -44,6 +48,10 @@ export const NEEDS: readonly Need[] = [
   { key: "staff", label: "Hire and look after staff", lead: "hr-manager", firstJob: "A people basics checklist: contracts, holiday, policies", goal: "hire and look after staff" },
   { key: "stock", label: "Keep stock and suppliers in order", lead: "supply-chain-manager", firstJob: "A stock and supplier health check", goal: "keep stock and suppliers in order" },
   { key: "know-my-market", label: "Know my market", lead: "data-mining-agent", firstJob: "A market snapshot on a topic you choose: what people say, the news and the figures, with sources", goal: "understand the market and competitors" },
+  { key: "run-my-shop", label: "Run my online shop day to day", lead: "online-shop-manager", firstJob: "A health check of your shop: product pages, prices, stock and trust", goal: "run the online shop well" },
+  { key: "find-products", label: "Find products and suppliers to sell", lead: "dropshipping-agent", firstJob: "A margin and supplier check on a product you are thinking of selling", goal: "find products and suppliers that make a profit" },
+  { key: "sell-marketplaces", label: "Sell on Amazon, Etsy or eBay", lead: "marketplace-manager", firstJob: "Draft listings for one product, with what you keep after fees", goal: "sell on online marketplaces" },
+  { key: "shop-customers", label: "Answer shoppers about orders and returns", lead: "shop-care-agent", firstJob: "A returns and delivery reply pack in your shop's voice", goal: "answer shoppers about orders, delivery and returns" },
   { key: "raise-money", label: "Raise money or get a loan", lead: "finance-manager", firstJob: "A funding readiness check: what a lender or investor will ask for", goal: "raise money" },
   { key: "online-presence", label: "Look better online", lead: "marketing-manager", firstJob: "A review of your website and social pages with quick fixes", goal: "improve the website and social pages" },
   { key: "less-admin", label: "Spend less time on admin", lead: "admin-manager", firstJob: "A list of the admin your team can take over this week", goal: "spend less time on admin" },
@@ -81,6 +89,11 @@ export const APPS: readonly AppChoice[] = [
   { key: "till-file", name: "Another till", gives: "Daily takings from any till's sales export", how: "file", for: "finance-manager" },
   { key: "shopify", name: "Shopify", gives: "Online orders, refunds and payouts", how: "direct", for: "finance-manager" },
   { key: "woocommerce", name: "WooCommerce", gives: "Orders from your online shop", how: "direct", for: "finance-manager" },
+  { key: "printful", name: "Printful", gives: "Print-on-demand orders and out-of-stock products", how: "direct", for: "dropshipping-agent" },
+  { key: "printify", name: "Printify", gives: "Print-on-demand orders and unavailable products", how: "direct", for: "dropshipping-agent" },
+  { key: "etsy", name: "Etsy", gives: "Orders and sales from your Etsy shop", how: "bridge", for: "marketplace-manager" },
+  { key: "amazon-seller", name: "Amazon Seller Central", gives: "Orders and sales from your Amazon seller account", how: "bridge", for: "marketplace-manager" },
+  { key: "ebay", name: "eBay", gives: "Orders and sales from your eBay account", how: "bridge", for: "marketplace-manager" },
   { key: "brightpay", name: "BrightPay", gives: "Payroll totals for the books", how: "file", for: "hr-manager", regions: ["GB", "IE"] },
   { key: "gusto", name: "Gusto", gives: "Payroll totals for the books", how: "bridge", for: "hr-manager", regions: ["US"] },
   { key: "deel", name: "Deel", gives: "International payroll and contractors", how: "bridge", for: "hr-manager" },
@@ -120,10 +133,22 @@ export const SECTORS: readonly Sector[] = [
     industry: "Retail (consumer rights, product safety)", customers: "Local shoppers", holdsStock: true,
   },
   {
-    key: "online-store", label: "Online store", examples: "Sell products on your own site or a marketplace",
-    words: ["online store", "online shop", "ecommerce", "e-commerce", "shopify", "etsy", "amazon", "dropship", "subscription box", "webshop"],
-    needs: ["more-customers", "know-my-numbers", "stock"], apps: ["shopify", "woocommerce", "stripe", "paypal", "xero", "slack"],
+    key: "online-store", label: "Online store", examples: "Sell products on your own website",
+    words: ["online store", "online shop", "ecommerce", "e-commerce", "shopify", "woocommerce", "subscription box", "webshop"],
+    needs: ["run-my-shop", "more-customers", "shop-customers"], apps: ["shopify", "woocommerce", "stripe", "paypal", "xero", "slack"],
     industry: "Online retail (distance selling, returns, product safety)", customers: "Online shoppers", holdsStock: true,
+  },
+  {
+    key: "dropshipping", label: "Dropshipping or print on demand", examples: "A supplier makes and posts your products",
+    words: ["dropship", "drop ship", "drop-ship", "print on demand", "print-on-demand", "printful", "printify", "cj dropshipping"],
+    needs: ["find-products", "run-my-shop", "shop-customers"], apps: ["shopify", "woocommerce", "printful", "printify", "stripe", "xero"],
+    industry: "Online retail by dropshipping (distance selling, who is the seller, delivery times, product safety, customs on imports)", customers: "Online shoppers",
+  },
+  {
+    key: "marketplace-seller", label: "Marketplace seller", examples: "Sell on Amazon, Etsy or eBay",
+    words: ["amazon", "etsy", "ebay", "marketplace", "vinted", "depop", "fba"],
+    needs: ["sell-marketplaces", "run-my-shop", "stock"], apps: ["etsy", "amazon-seller", "ebay", "shopify", "stripe", "xero"],
+    industry: "Selling on online marketplaces (marketplace rules, distance selling, returns, product safety)", customers: "Marketplace shoppers", holdsStock: true,
   },
   {
     key: "services", label: "Professional services", examples: "Agency, consultancy, accountant, law firm, architect",

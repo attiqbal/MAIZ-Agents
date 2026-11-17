@@ -40,6 +40,11 @@ export const SETUP_FORM: readonly FormField[] = [
   { key: "personalData", label: "What personal data do you keep?", type: "multi", options: ["Customer contact details", "Payment details", "Staff records", "Health or other sensitive data", "None"], for: "compliance-manager" },
   { key: "stockItems", label: "Roughly how many products or stock items do you keep?", type: "number", for: "supply-chain-manager" },
   { key: "tradeCountries", label: "Which countries do you buy from or ship to?", type: "text", for: "supply-chain-manager", help: "So your team knows which customs and product rules apply." },
+  { key: "shopPlatform", label: "Where do you sell online?", type: "multi", options: ["My own website (Shopify, WooCommerce or similar)", "Amazon", "Etsy", "eBay", "Another marketplace", "Not selling yet"], for: "online-shop-manager" },
+  { key: "deliveryTerms", label: "What are your delivery times, delivery prices and returns terms today?", type: "longtext", for: "online-shop-manager", help: "In your own words. If a supplier posts your goods, say how long it really takes." },
+  { key: "marketplaces", label: "Which marketplaces do you sell on or want to sell on?", type: "multi", options: ["Amazon", "Etsy", "eBay", "Another"], for: "marketplace-manager" },
+  { key: "supplierCountries", label: "Where do your suppliers ship from, and which countries do you sell to?", type: "text", for: "dropshipping-agent", help: "So delivery times and import rules are right. \"Not decided yet\" is fine." },
+  { key: "returnsPolicy", label: "What is your returns and refund policy, in your own words?", type: "longtext", for: "shop-care-agent", help: "Who pays for return postage, how many days shoppers have, and any goods you do not take back." },
   { key: "licences", label: "Which licences, registrations or certificates do you hold?", type: "longtext", for: "compliance-manager", help: "With renewal dates if you know them." },
 ];
 

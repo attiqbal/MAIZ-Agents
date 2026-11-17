@@ -89,6 +89,10 @@ const TEAM: readonly { key: string; title: string; standbyJob: string }[] = [
 const ADD_ON_FOR_NEED: Partial<Record<NeedKey, PlanOffer>> = {
   stock: { key: "supply-chain-manager", title: "Supply chain and inventory manager", reason: "You asked for help with stock and suppliers. This employee watches stock levels, reorders and supplier prices." },
   "know-my-market": { key: "data-mining-agent", title: "Data mining agent", reason: "You asked to know your market. This employee gathers public data on a topic (what people say, news, figures, company records) and shares it with your team." },
+  "run-my-shop": { key: "online-shop-manager", title: "E-commerce manager", reason: "You asked for help running your online shop. This employee writes honest product pages, plans prices and promotions from your real numbers, watches returns and tells you how the shop is doing." },
+  "find-products": { key: "dropshipping-agent", title: "Dropshipping agent", reason: "You asked for help finding products and suppliers. This employee checks products and suppliers, works out your real margin after every cost, and prepares supplier orders for you to approve." },
+  "sell-marketplaces": { key: "marketplace-manager", title: "Marketplace manager", reason: "You asked to sell on marketplaces. This employee prepares Amazon, Etsy and eBay listings as drafts and shows what each sale earns after fees." },
+  "shop-customers": { key: "shop-care-agent", title: "Shop customer care agent", reason: "You asked for help answering shoppers. This employee drafts replies about orders, delivery and returns, and prepares refunds for you to approve." },
 };
 
 const CONSULTANT_FOR_NEED: Partial<Record<NeedKey, PlanOffer>> = {

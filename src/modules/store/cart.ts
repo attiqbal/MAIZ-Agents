@@ -12,6 +12,7 @@ import { EMPLOYEE_TEMPLATES } from "../workforce/templates.js";
 import { DEPARTMENTS, LEGACY_SPECIALIST_KEYS } from "../workforce/blueprints.js";
 import { CONSULTANTS } from "../workforce/consultants.js";
 import { STANDARD_TEAM } from "../onboarding/index.js";
+import { SHOP_EMPLOYEE_KEYS } from "../ecommerce/rules.js";
 
 export type Billing = "monthly" | "once";
 export type ItemKind = "package" | "employee" | "specialist" | "consultant";
@@ -65,6 +66,9 @@ export interface CatalogueItem {
 /** Draft monthly prices. A ready-made add-on matches the Standard price on the pricing page. */
 export const MONTHLY_PRICE_GBP = { employee: 25, specialistStandard: 35, specialistPremium: 35 } as const;
 export const MAX_QTY = 10;
+
+/** Online-shop add-on employees a business hires once: a second copy would only repeat the first, so it is never sold twice. */
+export const ONE_PER_BUSINESS: ReadonlySet<string> = new Set(SHOP_EMPLOYEE_KEYS);
 
 /** Ready-made employees that come with every package, so they are not sold in the store. */
 const IN_PACKAGE: ReadonlySet<string> = new Set(STANDARD_TEAM);
@@ -141,7 +145,7 @@ export function quote(lines: readonly unknown[], catalogue: readonly CatalogueIt
     if (!getItem(key)) { rejected.push({ key, reason: "not in the store" }); continue; }
     if (!Number.isInteger(n) || n < 1) { rejected.push({ key, reason: "quantity must be a whole number of 1 or more" }); continue; }
     // One business has one Team package, however many times it was added.
-    qty.set(key, key === TEAM_PACKAGE_KEY ? 1 : Math.min(MAX_QTY, (qty.get(key) ?? 0) + n));
+    qty.set(key, key === TEAM_PACKAGE_KEY || ONE_PER_BUSINESS.has(key) ? 1 : Math.min(MAX_QTY, (qty.get(key) ?? 0) + n));
   }
   const priced: PricedLine[] = [...qty].map(([key, n]) => {
     const item = getItem(key)!;
@@ -159,7 +163,16 @@ export function quote(lines: readonly unknown[], catalogue: readonly CatalogueIt
  *    (a consultant pass alone needs no plan);
  *  - already on the Team package: it cannot be bought a second time.
  */
-export function quoteForPlan(lines: readonly unknown[], hasTeamPackage: boolean, catalogue: readonly CatalogueItem[] = CATALOGUE): Quote {
+export function quoteForPlan(lines: readonly unknown[], hasTeamPackage: boolean, catalogue: readonly CatalogueItem[] = CATALOGUE, owned: readonly string[] = []): Quote {
+  // An online-shop employee the client already has is left out of the cart, and the client is told why.
+  const keyOf = (raw: unknown): string => (typeof (raw as { key?: unknown } | null)?.key === "string" ? (raw as { key: string }).key : "");
+  const hasAlready = (raw: unknown): boolean => ONE_PER_BUSINESS.has(keyOf(raw)) && owned.includes(keyOf(raw));
+  const q = quoteForTeam(lines.filter((l) => !hasAlready(l)), hasTeamPackage, catalogue);
+  const dupes = [...new Set(lines.filter(hasAlready).map(keyOf))].map((key) => ({ key, reason: "you already have this employee" }));
+  return dupes.length ? { ...q, rejected: [...q.rejected, ...dupes] } : q;
+}
+
+function quoteForTeam(lines: readonly unknown[], hasTeamPackage: boolean, catalogue: readonly CatalogueItem[]): Quote {
   const plain = quote(lines, catalogue);
   const asked = plain.lines.some((l) => l.key === TEAM_PACKAGE_KEY);
   if (hasTeamPackage) {

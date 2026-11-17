@@ -6,6 +6,7 @@ import type { IdentityService } from "../identity/index.js";
 import type { ChatMessage, Completer, TextStream } from "../model-gateway/types.js";
 import { getTemplate, type EmployeeTemplate } from "./templates.js";
 import { getJobDescription, renderJobDescription } from "./job-descriptions.js";
+import { SHOP_EMPLOYEE_KEYS, shopCopyNote } from "../ecommerce/rules.js";
 import type { EnergyMeter } from "../energy/index.js";
 import { describePack, packFor } from "./finance/rules-pack.js";
 
@@ -375,6 +376,9 @@ export class WorkforceService {
         ],
       });
       task.deliverable = result.text;
+      // An online-shop draft that slips in false urgency, invented reviews or a refusal of the 14 day right gets a plain warning under it.
+      const shopNote = SHOP_EMPLOYEE_KEYS.includes(template.key) ? shopCopyNote(result.text) : undefined;
+      if (shopNote) task.deliverable = `${result.text}\n\n${shopNote}`;
       task.provider = result.provider;
       task.inputTokens = result.inputTokens;
       task.outputTokens = result.outputTokens;

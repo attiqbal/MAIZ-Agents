@@ -211,7 +211,7 @@ export class IntegrationService {
     const clean: Record<string, string> = {};
     for (const f of c.auth.fields) {
       const v = typeof values[f.key] === "string" ? (values[f.key] as string).trim() : "";
-      if (!v || v.length > 500) throw new IntegrationError(`${f.label} is required`);
+      if (!v || v.length > (f.maxLength ?? 500)) throw new IntegrationError(`${f.label} is required`);
       clean[f.key] = v;
     }
     const problem = c.validate?.(clean);
