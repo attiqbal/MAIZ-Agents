@@ -37,6 +37,11 @@ export interface GeneralPrices {
    * energy of its plain cost. One setting for every paid service. 1 makes them cost their plain price in energy.
    */
   paidServiceMultiplier: number;
+  /**
+   * A switch, 1 for on and 0 for off: a client who already pays the Team package gets later monthly extras added to
+   * that same monthly bill, instead of a second subscription (docs/ONE-BILL.md). Off at launch.
+   */
+  oneMonthlyBill: number;
 }
 
 export interface ItemSetting {
@@ -104,6 +109,7 @@ export const DEFAULT_GENERAL: GeneralPrices = {
   specialistStandardWeeklyEnergy: 2_000,
   specialistPremiumWeeklyEnergy: 2_000,
   paidServiceMultiplier: 2,
+  oneMonthlyBill: 0,
 };
 
 const GENERAL_LIMITS: Record<keyof GeneralPrices, [number, number, boolean]> = {
@@ -121,6 +127,7 @@ const GENERAL_LIMITS: Record<keyof GeneralPrices, [number, number, boolean]> = {
   specialistStandardWeeklyEnergy: [0, 1_000_000, true],
   specialistPremiumWeeklyEnergy: [0, 1_000_000, true],
   paidServiceMultiplier: [1, 10, false],
+  oneMonthlyBill: [0, 1, true],
 };
 const MAX_PRICE = 100_000;
 const MAX_ENERGY = 10_000_000;

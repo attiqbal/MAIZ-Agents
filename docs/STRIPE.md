@@ -17,9 +17,9 @@ Payments are behind one flag. `PAYMENTS_PROVIDER` empty = checkout refused, noth
 - A client still on the trial who buys any monthly item gets the Team package added to that first order (`quoteForPlan`), shown in the cart and on Stripe's page before they pay. A consultant pass on its own needs no plan. A client already on a paid plan cannot buy the package twice; clients who went paid before this change keep their plan as it is.
 - Cancelling the Team package order (from the client's billing page, or when Stripe ends the subscription) ends the plan: the team works to the end of the month paid for when the client cancelled in MAIZ, or stops at once when Stripe ended the subscription, then pauses exactly like an ended trial. Buying the package again restarts it (`EnergyMeter.endPaidPlan`).
 - Two open checkouts never both hold the Team package: starting a new one closes the older unpaid one, the same way a discount code is released.
-- Extras bought after the package are separate monthly orders. Cancelling the package does not cancel them: the client is told so in the notice and can cancel each one on Stripe's page from Settings, Plan and billing. Stopping them automatically waits for the item below, because today a cancelled extra leaves its employee on the team.
+- Extras bought after the package: cancelling the package now stops every other monthly order of the client too, each at the end of its own paid month (`cancelSubscription` on each, or on the shared subscription once), and the notice names what was stopped. If Stripe cannot be reached for one of them it is retried every 15 minutes and the owner is emailed. See docs/ONE-BILL.md.
 - Top-up energy a client bought is kept when a cancelled plan is started again.
-- Not built yet: removing an add-on employee when its own monthly order is cancelled. The order is marked cancelled and Stripe stops charging, but the employee stays on the team until this is added.
+- An extra whose monthly order ends (the client stopped it, the package was cancelled, or Stripe deleted the subscription) is removed from the team when its paid month is over, and its weekly energy goes with it (the pool is worked out from who is on the team). The six core employees are never removed. The work it did is kept and still labelled with its name.
 - Discount codes come off the first monthly order (docs/PROMOTIONS.md).
 
 ## Settings (server secrets, never chat or git)
@@ -33,7 +33,7 @@ Payments are behind one flag. `PAYMENTS_PROVIDER` empty = checkout refused, noth
 | `STRIPE_ALLOW_LIVE=1` | required for live keys; leave unset until go-live |
 | `STRIPE_ALLOW_TEST_IN_PRODUCTION=1` | required to use test keys on the production server (anyone could then "pay" with a test card) |
 
-Restricted key permissions: Checkout Sessions (write), Customers (write), Subscriptions (write), Coupons (write), Customer portal (write).
+Restricted key permissions: Checkout Sessions (write), Customers (write), Subscriptions (write), Coupons (write), Customer portal (write). For the one-bill switch (docs/ONE-BILL.md) also: Prices (write), Products (write), Invoices (write, to read the part-month invoice and void an unpaid one). Without them the switch can be turned on, every add attempt is refused by Stripe before money moves, and the client gets today's separate checkout.
 
 ## Test it locally
 1. `stripe login` (or `stripe sandbox create`), set the three variables in `.env`.
@@ -42,7 +42,7 @@ Restricted key permissions: Checkout Sessions (write), Customers (write), Subscr
 
 ## Stripe Dashboard steps only the account owner can do
 1. Activate the account with MAIZ AI Ltd details and bank account.
-2. Add the webhook endpoint `https://maizagents.com/api/payments/webhook` with events: `checkout.session.completed`, `checkout.session.async_payment_succeeded`, `checkout.session.async_payment_failed`, `checkout.session.expired`, `customer.subscription.deleted`, `invoice.payment_failed`, `charge.dispute.created`, `charge.refunded`, `radar.early_fraud_warning.created`.
+2. Add the webhook endpoint `https://maizagents.com/api/payments/webhook` with events: `checkout.session.completed`, `checkout.session.async_payment_succeeded`, `checkout.session.async_payment_failed`, `checkout.session.expired`, `customer.subscription.deleted`, `invoice.payment_failed`, `invoice.paid`, `invoice.voided`, `customer.subscription.pending_update_expired`, `charge.dispute.created`, `charge.refunded`, `radar.early_fraud_warning.created`.
 3. Settings > Billing > Customer portal: save a configuration (cancellation, payment method, invoices).
 4. Tax: add the UK VAT registration, then set `STRIPE_AUTOMATIC_TAX=1`. Decide whether £150 is VAT-inclusive; prices are currently sent as tax-exclusive-by-default in the account setting.
 5. Business details on invoices (legal name, address, VAT number) under Settings > Invoice template.

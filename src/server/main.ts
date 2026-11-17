@@ -151,6 +151,9 @@ const calendarTimer = setInterval(() => {
   try { platform.overview.dates.tick(); } catch (e) { console.error("calendar reminders failed:", e instanceof Error ? e.message : "error"); }
 }, BATCH_TICK_MS);
 calendarTimer.unref();
+// Once a minute: monthly lines whose paid month is over leave the team, unpaid additions to a bill are closed, stops the payment provider missed are tried again.
+const billingTimer = setInterval(() => { void platform.payments.sweep().catch((e) => console.error("billing sweep failed:", e instanceof Error ? e.message : e)); }, BATCH_TICK_MS);
+billingTimer.unref();
 
 // Hosts send SIGTERM before replacing the instance: stop taking requests and write pending changes to Postgres.
 let stopping = false;
@@ -162,6 +165,7 @@ async function shutdown(signal: string) {
   force.unref();
   clearInterval(batchTimer);
   clearInterval(backupTimer);
+  clearInterval(billingTimer);
   server.close();
   try { await store?.close(); } catch (err) { console.error("flush on shutdown failed:", err); }
   // Give waiting emails (sign-in links, owner alerts) a few seconds to go out.

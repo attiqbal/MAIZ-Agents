@@ -2026,3 +2026,19 @@ h1, .sec-head h2, .final h2, .stage-band h2, .article-head h1, .sec-title, .bent
 .ovl-done .ubar { font-size: 14px; }
 .ovl-done .acts { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
 @media (max-width: 640px) { .ovl-item { padding: 16px; } .ovl-done .ubar { grid-template-columns: 1fr; } .ovl-done .acts { justify-content: flex-start; } }
+/* One bill: the monthly lines in Plan and billing (docs/ONE-BILL.md). */
+.bl-h { font-family: var(--font-polysans); font-size: 19px; font-weight: 400; letter-spacing: -0.01em; margin: 18px 0 8px; }
+.bl-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.bl-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px 14px; align-items: center; border: 1px solid var(--line); border-radius: 24px; padding: 14px 18px; background: var(--color-canvas-white); }
+.bl-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; overflow-wrap: anywhere; }
+.bl-price { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.bl-act { grid-column: 1 / -1; }
+.bl-sure { display: flex; flex-direction: column; gap: 8px; border-top: 1px solid var(--line); padding-top: 10px; }
+.bl-sure .acts { display: flex; gap: 8px; flex-wrap: wrap; }
+.bl-total { margin: 10px 0 0; max-width: 70ch; }
+@media (max-width: 640px) { .bl-row { grid-template-columns: 1fr; } .bl-price { white-space: normal; } }
+.ow-bill { grid-column: 1 / -1; }
+.ow-bill .hint { max-width: 72ch; }
+
+.cart-bill { display: flex; flex-direction: column; gap: 6px; margin: 12px 0; }
+.cart-bill p { margin: 0; max-width: 60ch; }

@@ -1,6 +1,7 @@
 import { randomBytes } from "node:crypto";
 import Stripe from "stripe";
-import { WebhookSignatureError, type CheckoutRequest, type CheckoutSession, type PaymentProvider, type ProviderEvent } from "./types.js";
+import { StripeBill, priceIdsOfInvoice } from "./stripe-bill.js";
+import { WebhookSignatureError, type AddPreview, type AddToSubscriptionRequest, type AddToSubscriptionResult, type CheckoutRequest, type CheckoutSession, type PaymentProvider, type ProviderEvent, type RemoveFromSubscriptionRequest } from "./types.js";
 
 /** The Stripe API version this integration was written and tested against. */
 export const STRIPE_API_VERSION = "2026-10-28.endive";
@@ -29,12 +30,18 @@ const idOf = (x: unknown): string | undefined => (typeof x === "string" ? x : ty
 export class StripePaymentProvider implements PaymentProvider {
   readonly name = "stripe";
   private stripe: Stripe;
+  private bill: StripeBill;
   /** Tags our Checkout Sessions in the Stripe dashboard (the suffix is random, per Stripe's guidance). */
   private integrationId = `maiz-checkout-${letters(8)}`;
 
   constructor(private opts: StripeOptions) {
     this.stripe = opts.client ?? new Stripe(opts.secretKey, { apiVersion: STRIPE_API_VERSION as Stripe.LatestApiVersion, maxNetworkRetries: 2 });
+    this.bill = new StripeBill(this.stripe);
   }
+
+  addToSubscription(req: AddToSubscriptionRequest): Promise<AddToSubscriptionResult> { return this.bill.add(req); }
+  previewAddToSubscription(req: Omit<AddToSubscriptionRequest, "orderId" | "prepared">): Promise<AddPreview> { return this.bill.preview(req); }
+  removeFromSubscription(req: RemoveFromSubscriptionRequest): Promise<{ endsAt?: string }> { return this.bill.remove(req); }
 
   async createCheckout(req: CheckoutRequest): Promise<CheckoutSession> {
     const recurring = req.lines.some((l) => l.billing === "monthly");
@@ -90,6 +97,8 @@ export class StripePaymentProvider implements PaymentProvider {
     try {
       if (ref.startsWith("sub_")) await this.stripe.subscriptions.update(ref, { cancel_at_period_end: true });
       else if (ref.startsWith("cs_")) await this.stripe.checkout.sessions.expire(ref);
+      // A part-month invoice nobody paid: voiding it also drops the change that was waiting on it (Stripe pending updates).
+      else if (ref.startsWith("in_")) await this.stripe.invoices.voidInvoice(ref);
     } catch (e) {
       // Already cancelled, already expired or completed: nothing left to stop.
       if (e instanceof Stripe.errors.StripeInvalidRequestError) return;
@@ -136,6 +145,22 @@ export class StripePaymentProvider implements PaymentProvider {
       case "customer.subscription.deleted": {
         const sub = event.data.object;
         return { ...base, type: "subscription.cancelled", providerRef: sub.id, subscriptionRef: sub.id, ...custom(sub.customer) };
+      }
+      case "invoice.paid":
+      case "invoice.voided": {
+        const inv = event.data.object;
+        const subscriptionRef = subscriptionOfInvoice(inv);
+        if (!inv.id || !subscriptionRef) return undefined;
+        const workspaceRef = inv.parent?.subscription_details?.metadata?.workspaceId;
+        return event.type === "invoice.voided"
+          ? { ...base, type: "invoice.voided", providerRef: inv.id, subscriptionRef }
+          : { ...base, type: "invoice.paid", providerRef: inv.id, subscriptionRef, itemRefs: priceIdsOfInvoice(inv), amountMinor: inv.amount_paid, currency: inv.currency, ...(workspaceRef ? { workspaceRef } : {}), ...custom(inv.customer) };
+      }
+      case "customer.subscription.pending_update_expired": {
+        // The change that was waiting is gone: what the subscription (and any change still waiting) carries is listed, so only orders for other lines are closed.
+        const sub = event.data.object;
+        const itemRefs = [...sub.items.data, ...(sub.pending_update?.subscription_items ?? [])].map((i) => i.price.id);
+        return { ...base, type: "subscription.update_expired", providerRef: sub.id, subscriptionRef: sub.id, itemRefs };
       }
       case "invoice.payment_failed": {
         const inv = event.data.object;
