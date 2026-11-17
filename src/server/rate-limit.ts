@@ -58,6 +58,8 @@ export function limitFor(method: string, path: string): Limit | undefined {
     if (method === "PUT") return { max: 20, windowMs: 10 * 60_000 };
     if (/\/(run|restore-test|recovery-key)$/.test(path)) return { max: 10, windowMs: 10 * 60_000 };
   }
+  // The Approvals, Books and Calendar screens gather many records in one read: plenty for opening and refreshing, not for hammering.
+  if (path.startsWith("/api/overview/")) return method === "GET" ? { max: 120, windowMs: 60_000 } : { max: 30, windowMs: 60_000 };
   if (method !== "POST") return undefined;
   // Coupon codes can be guessed, so tries are few per address. Wrong tries are also counted per person.
   if (path === "/api/coupons/check" || path === "/api/coupons/redeem") return { max: 12, windowMs: 10 * 60_000 };

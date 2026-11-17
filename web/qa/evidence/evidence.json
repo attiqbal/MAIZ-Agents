@@ -529,6 +529,21 @@
       "viewport": "375x812",
       "artifact": "audit-signup-reads-website-375.png",
       "observation": "Signup step 1 at 375 after pressing 'Read my website' (the reading is answered by a pretend page in this run): the panel shows the name, kind of business, what it does, the apps the site uses and its social pages, and the sector tile and business name are filled in."
+    },
+    {
+      "viewport": "1440x900",
+      "artifact": "approvals-live-1440.png",
+      "observation": "Signed-in client with a leave request, an unfinished first day and figures waiting: one list, newest or most urgent first, Approve and Decline on the leave request, links for the two decided elsewhere. Sidebar badge, top bar and Overview tile all read 3 and fell to 2 and 1 after each decision; focus stayed on the list. Checked by driving the page in Playwright, no example rows or Example tag visible."
+    },
+    {
+      "viewport": "375x812",
+      "artifact": "compliance-live-375.png",
+      "observation": "Calendar with a staff review date, the plan date and two dates the client added: cards stack, form fields are full width with labels, no sideways scroll. A brand new client sees only the honest empty states on Approvals, Books and cash and the calendar. Checked by driving the page in Playwright and looking at the screenshots."
+    },
+    {
+      "viewport": "1440x900",
+      "artifact": "finance-live-1440.png",
+      "observation": "Books and cash with three days of takings from one connected app: every figure says which app and which days it came from, tables by app and by day, nothing summed across currencies, no bank balance. Signed out, the three screens still show their example rows as before."
     }
   ]
 }

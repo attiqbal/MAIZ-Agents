@@ -56,6 +56,7 @@ import { CredentialStore } from "../modules/credentials/index.js";
 import { PushService, VAPID_STORE_KEY } from "../modules/push/index.js";
 import { AGENT_SECRET_PREFIX, AgentService } from "../modules/agents/index.js";
 import { BACKUP_SECRET_PREFIX, BackupService, pgAdmin, spawnRunner, type DbAdmin, type ProgramRunner } from "../modules/backup/index.js";
+import { createOverview } from "../modules/overview/index.js";
 
 export interface PlatformConfig {
   /**
@@ -466,6 +467,18 @@ export function createPlatform(cfg: PlatformConfig) {
   });
 
   /**
+   * The client's Approvals, Books and cash and Compliance calendar screens, and the dates a client adds to their own
+   * calendar (with a reminder through the bell). Reads the other modules as the signed-in person. docs/OVERVIEW-DATA.md.
+   */
+  const overview = createOverview({
+    identity, now, agents, metaClients, people, reviews, specialists, integrations, ledger, reconciliation, payments, energy, admin, paidThrough,
+    timezone: (ws) => batch.scheduleOf(ws).timezone,
+    team: (ws) => [...new Set(workforce.templatesIn(ws))].map((key) => ({ key, title: workforce.templateFor(key, ws)?.title ?? key })),
+    notify: (ws, n) => { notices.add(ws, { kind: "info", title: n.title, body: n.body, link: "/app.html#compliance" }); },
+  });
+  workforce.addContext((ws, templateKey) => overview.dates.contextFor(ws, templateKey));
+
+  /**
    * The client's control center, from real records: each employee's energy, the task board and the week's totals.
    * Everything is read through the services, so permissions and workspace walls apply.
    */
@@ -653,6 +666,7 @@ export function createPlatform(cfg: PlatformConfig) {
       else if (x.kind === "agent_conn" || x.kind === "agent_job" || x.kind === "agent_delivery") agents.restore(x.kind, x.data);
       else if (x.kind === "dataset") mining.restore(x.data);
     }
+    for (const x of s.records ?? []) if (x.kind === "cal_date") overview.dates.restore(x.data);
     for (const r of specialists.approved()) workforce.registerCustomTemplate(r.workspaceId, customTemplateOf(r));
     if (s.aiSettings) aiSettings.restore(s.aiSettings);
     for (const d of s.aiDays ?? []) spend.restore(d);
@@ -680,6 +694,7 @@ export function createPlatform(cfg: PlatformConfig) {
     sink = store;
     for (const part of [audit, identity, energy, workforce, ledger, router, admin, integrations, reviews, prices, specialists, aiSettings, spend, batch, payments, rota, reconciliation, people, conversations, notices, credentials, coupons, affiliates, promoter, growth, connections, metaClients, push, mining, agents]) part.useSink(store);
     backup.useSink(store);
+    overview.dates.useSink(store);
     live.sink = store;
     live.wa?.useSink(store);
   }
@@ -724,6 +739,6 @@ export function createPlatform(cfg: PlatformConfig) {
     slack: { enumerable: true, get: () => cfg.slack ?? connections.slackApp() },
     loginApps: { enumerable: true, get: (): LoginApps => ({ ...connections.loginApps(), ...cfg.loginApps }) },
   });
-  return { backup, agents, mining, orderDiscountFor, quoteFor, hasTeamPackage, push, conversations, notices, warm, ownerDecisions, decisionDigest, dashboard, reconciliation, rota, people, payments, batch, email, usedLinks, sends, loginFails, resets, credentials, formHits, codeFails, coupons, affiliates, promoter, paid, growth, research, connections, growthTick, metaClients, metaSettings, get ownerWhatsApp() { return live.wa; }, admin, reviews, prices, specialists, ai, clients, isPlatformOwner, healthy, hasStore, cfg: liveCfg, now, audit, bus, identity, energy, workforce, ledger, onboarding, router, integrations, slackTokens, saveSlackToken, attachStore };
+  return { backup, overview, agents, mining, orderDiscountFor, quoteFor, hasTeamPackage, push, conversations, notices, warm, ownerDecisions, decisionDigest, dashboard, reconciliation, rota, people, payments, batch, email, usedLinks, sends, loginFails, resets, credentials, formHits, codeFails, coupons, affiliates, promoter, paid, growth, research, connections, growthTick, metaClients, metaSettings, get ownerWhatsApp() { return live.wa; }, admin, reviews, prices, specialists, ai, clients, isPlatformOwner, healthy, hasStore, cfg: liveCfg, now, audit, bus, identity, energy, workforce, ledger, onboarding, router, integrations, slackTokens, saveSlackToken, attachStore };
 }
 export type Platform = ReturnType<typeof createPlatform>;

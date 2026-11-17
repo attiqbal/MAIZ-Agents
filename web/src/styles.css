@@ -1995,3 +1995,34 @@ h1, .sec-head h2, .final h2, .stage-band h2, .article-head h1, .sec-title, .bent
 .bk-detail summary { cursor: pointer; min-height: 40px; display: inline-flex; align-items: center; font-size: 13px; color: var(--accent-text); }
 .bk-detail code { display: block; font-family: var(--font-mono); font-size: 12.5px; background: var(--surface-ash-surface); border-radius: 12px; padding: 10px 12px; white-space: pre-wrap; overflow-wrap: anywhere; }
 @media (max-width: 560px) { .bk-wide { grid-column: auto; } .bk-facts > div { grid-template-columns: 1fr; } .bk-keybox { padding: 16px; } }
+/* ===== Real figures: Approvals, Books and cash and the Compliance calendar (signed-in clients) ===== */
+/* A signed-in client never sees the example rows, not even while their own records load. */
+.signed-in [data-eg-body], .signed-in [data-need] { display: none; }
+.signed-in [data-screen="approvals"] .eg, .signed-in [data-screen="finance"] .eg, .signed-in [data-screen="compliance"] .eg { display: none; }
+.ovl, .ovl-stack { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
+.ovl[hidden] { display: none; }
+.ovl p { margin: 0; }
+.ovl-status { font-size: 14px; font-weight: 500; color: var(--color-graphite); background: var(--surface-ivory-surface); border: 1px solid var(--line); border-radius: 18px; padding: 10px 16px; align-self: flex-start; max-width: 78ch; }
+.ovl-status:empty { display: none; }
+.ovl-empty { background: var(--surface-page-canvas); border-radius: var(--radius-2xl); padding: 24px; display: flex; flex-direction: column; gap: 10px; }
+.ovl-empty p { max-width: 62ch; }
+.panel .ovl-empty { padding: 0; }
+.ovl-empty .all-clear { text-align: left; padding: 0; font-family: var(--font-polysans); font-size: 22px; letter-spacing: -0.01em; color: var(--color-graphite); }
+.ovl-item { padding: 18px 20px; gap: 8px; }
+.ovl-item .preview { white-space: pre-wrap; overflow-wrap: anywhere; }
+.ovl-item .acts, .ovl .cal .acts { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 6px; }
+.ovl-cost { font-weight: 500; color: var(--color-graphite); }
+.ovl .panel .tile-kpi { background: var(--surface-ash-surface); }
+.ovl .tile-kpi .v { white-space: normal; overflow-wrap: anywhere; }
+.ovl .ag-h { margin: 6px 0 0; }
+.ovl-tbl { min-width: 620px; }
+.ovl-tbl td b { font-weight: 500; color: var(--color-graphite); }
+.ovl-tbl th.num { text-align: right; }
+.ovl-note { max-width: 78ch; }
+.ovl-year { font-size: 11px; }
+.ovl-form .ovl-note-in { border-radius: 18px; resize: vertical; min-height: 64px; font: inherit; }
+.ovl-form .ag-two { grid-template-columns: 1fr; }
+.ovl-done { list-style: none; margin: 0; padding: 0; }
+.ovl-done .ubar { font-size: 14px; }
+.ovl-done .acts { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+@media (max-width: 640px) { .ovl-item { padding: 16px; } .ovl-done .ubar { grid-template-columns: 1fr; } .ovl-done .acts { justify-content: flex-start; } }

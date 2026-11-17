@@ -1,8 +1,10 @@
 // The control centre's real numbers. dash.ts draws an example business first; when the client is signed in and the
 // API answers, this replaces the overview, team, tasks and energy screens with their own records (GET /api/dashboard).
-// Compliance, approvals and finance stay examples until their data exists, and keep their "Example data" tag.
+// Approvals, Books and cash and the calendar have their own real screens (approvals-live.ts, books-live.ts,
+// calendar-live.ts). What needs the client is counted once, in needs.ts, so the tile here agrees with the list.
 import { api, getToken } from "./api";
 import { energyBar, status, tile } from "./dash";
+import { needsNow, onNeeds } from "./needs";
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
@@ -34,12 +36,18 @@ function hideExampleTag(screen: string): void {
   document.querySelector(`[data-screen="${screen}"] .eg`)?.remove();
 }
 
-function overview(d: Live): void {
+/** The "Needs you" tile: the same count as the Approvals list and the sidebar badge. */
+function needsTile(): string {
+  const n = needsNow()?.summary.total;
+  if (n === undefined) return tile("Needs you", "…", "Checking what is waiting for you", "#approvals");
+  return tile("Needs you", String(n), n ? "Open Approvals to see what is waiting" : "Nothing is waiting on you", "#approvals", n ? "warn" : "");
+}
+
+function kpis(d: Live): void {
   const t = d.totals;
   const inProgress = d.tasks.filter((x) => x.column === "in_progress").length;
-  $("need-count").textContent = t.waitingOnYou ? `${t.waitingOnYou} need${t.waitingOnYou === 1 ? "s" : ""} you` : "All clear";
   $("ov-kpis").innerHTML = [
-    tile("Needs you", String(t.waitingOnYou), t.waitingOnYou ? "Questions from specialised tasks" : "Nothing is waiting on you", "#work", t.waitingOnYou ? "warn" : ""),
+    needsTile(),
     tile("In quality review", String(t.inReview), "Specialised work MAIZ checks before it starts", "#work"),
     tile("Tasks in progress", String(inProgress), `${t.queued} waiting for the next batch, ${t.doneWeek} done this week`, "#work"),
     d.teamEnergy
@@ -48,6 +56,10 @@ function overview(d: Live): void {
     tile("Energy this month", t.energyMonth.toLocaleString(), "Across your whole team", "#usage"),
     tile("Next batch", t.nextRunLabel, `${t.queued} task${t.queued === 1 ? "" : "s"} waiting`, "#work"),
   ].join("");
+}
+
+function overview(d: Live): void {
+  kpis(d);
   const planned = d.tasks.filter((x) => x.column === "planned").slice(0, 4);
   $("ov-next").innerHTML = planned.length
     ? planned.map((x) => `<li>${esc(x.employeeName ?? "")} · ${esc(x.title)}</li>`).join("")
@@ -169,7 +181,8 @@ export async function loadLive(): Promise<void> {
   if (!getToken()) return;
   const r = await api<Live>("/dashboard");
   if (!r.ok || !r.data) return;
-  // The top bar counts what needs the client. Approvals (below) is still an example screen, so only real questions count here.
-  document.getElementById("need-count")!.textContent = `${r.data.totals.waitingOnYou} need${r.data.totals.waitingOnYou === 1 ? "s" : ""} you`;
-  overview(r.data); team(r.data); tasks(r.data); usage(r.data);
+  const live = r.data;
+  overview(live); team(live); tasks(live); usage(live);
+  // When the list of what needs the client is read again, only the tiles are drawn again.
+  onNeeds(() => { const hadFocus = $("ov-kpis").contains(document.activeElement); kpis(live); if (hadFocus) $("ov-kpis").querySelector<HTMLElement>("a")?.focus(); });
 }

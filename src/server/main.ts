@@ -146,6 +146,11 @@ batchTimer.unref();
 // one is due, and alerts the owner when something is wrong. tick() never throws. See docs/BACKUPS.md.
 const backupTimer = setInterval(() => { void platform.backup.tick(); }, BATCH_TICK_MS);
 backupTimer.unref();
+// Once a minute: reminders for the dates clients put on their own Compliance calendar (each goes once, in their daytime).
+const calendarTimer = setInterval(() => {
+  try { platform.overview.dates.tick(); } catch (e) { console.error("calendar reminders failed:", e instanceof Error ? e.message : "error"); }
+}, BATCH_TICK_MS);
+calendarTimer.unref();
 
 // Hosts send SIGTERM before replacing the instance: stop taking requests and write pending changes to Postgres.
 let stopping = false;

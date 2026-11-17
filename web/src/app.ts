@@ -13,10 +13,16 @@ import { initPeople, setPeopleBusiness } from "./people";
 import { initDesk, showDesk } from "./desk";
 import { renderDeptBar } from "./dept";
 import { api, getToken, clearSession, type Org } from "./api";
+import { startNeeds, loadNeeds } from "./needs";
 import { JOB_DESCRIPTIONS, getJobDescription, jdHtml } from "./jd";
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const app = $("app");
+// A signed-in client never sees the example rows of Approvals, Books and cash or the calendar, not even while
+// their own records load: the examples are hidden at once and the real screens draw in their place (needs.ts,
+// approvals-live.ts, books-live.ts, calendar-live.ts).
+const signedIn = !!getToken();
+app.classList.toggle("signed-in", signedIn);
 
 // Profile from onboarding (falls back to the example business).
 let profile: { biz?: string; email?: string; slack?: boolean; contact?: string } = {};
@@ -49,6 +55,9 @@ function route(): void {
   if (valid === "apps") void import("./apps").then((m) => m.setAppsView(sub));
   if (valid === "apps") void import("./agents").then((m) => m.showAgents());
   if (valid === "slack") void import("./apps").then((m) => m.initSlackTab(Boolean(profile.slack)));
+  if (signedIn && valid === "approvals") void import("./approvals-live").then((m) => m.showApprovals());
+  if (signedIn && valid === "finance") void import("./books-live").then((m) => m.showBooks());
+  if (signedIn && valid === "compliance") void import("./calendar-live").then((m) => m.showCalendar());
   screens.forEach((s) => s.toggleAttribute("hidden", s.dataset.screen !== valid));
   // Slack lives inside Apps and connections, so the rail marks that entry for it.
   const here = valid === "desk" ? `desk/${sub}` : valid === "slack" ? "apps" : valid;
@@ -110,6 +119,8 @@ const details: Record<string, { title: string; cost: string; leaves: string; pre
 let selected = "posts";
 
 function refresh(): void {
+  // A signed-in client's counts and "Needs you" list come from their real records, never from the example items.
+  if (signedIn) { startNeeds(); void loadNeeds(); return; }
   document.querySelectorAll<HTMLElement>("[data-need]").forEach((el) => el.toggleAttribute("hidden", !pending.has(el.dataset.need!)));
   document.querySelectorAll<HTMLElement>("#alist [data-a]").forEach((el) => el.toggleAttribute("hidden", !pending.has(el.dataset.a!)));
   const n = pending.size;
