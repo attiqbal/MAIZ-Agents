@@ -131,7 +131,7 @@
     <!-- APPROVALS -->
     <div class="content" data-screen="approvals" hidden>
       <div class="page-h"><div><h1>Approvals</h1><p>Anything that would leave your company waits here until you say yes.</p></div><span class="badge badge-dark eg">Example data</span></div>
-      <div class="appr">
+      <div class="appr" data-eg-body>
         <div class="alist" id="alist">
           <button class="aitem" aria-pressed="true" data-a="posts"><span class="xs">Marketing manager · 11:58</span><b>Schedule 3 Instagram posts</b><span class="badge badge-dark" style="align-self:flex-start">Leaves the company</span></button>
           <button class="aitem" aria-pressed="false" data-a="vat"><span class="xs">Finance manager · 13:15</span><b>Answer: VAT registration</b><span class="badge badge-dark" style="align-self:flex-start">Question</span></button>
@@ -147,6 +147,7 @@
         </div>
       </div>
       <p class="all-clear" id="appr-empty" hidden>Nothing needs you right now.</p>
+      <div class="ovl" id="appr-live" hidden></div>
     </div>
 
     <!-- WORK -->
@@ -238,12 +239,13 @@
     <!-- FINANCE -->
     <div class="content" data-screen="finance" hidden>
       <div class="page-h"><div><h1>Books and cash</h1><p>Your cash, profit and bills. The figures come from tested accounting code, not from AI guesses.</p></div><span class="badge badge-dark eg">Example data</span></div>
-      <div class="grid3">
+      <div class="grid3" data-eg-body>
         <div class="panel kpi"><span class="l">Cash position</span><span class="v">£18,420</span><span class="dl">3 accounts · updated 09:30</span></div>
         <div class="panel kpi"><span class="l">Runway</span><span class="v">7.5 months</span><span class="dl down">−0.4 since last month</span></div>
         <div class="panel kpi"><span class="l">Spend vs budget</span><span class="v">94%</span><span class="dl">of planned spend used</span></div>
       </div>
-      <div class="grid2">
+      <div class="ovl" id="books-live" hidden></div>
+      <div class="grid2" data-eg-body>
         <section class="panel"><div class="panel-h"><h2>Profit and loss · October</h2><span class="status warn"><span class="dot"></span>Not closed</span><span class="r">GBP · UK rules pack</span></div>
           <table class="fin-table"><thead><tr><th>Line</th><th>£</th></tr></thead><tbody>
             <tr><td>Subscription revenue</td><td>5,690</td></tr><tr><td>Cost of coffee and roasting</td><td>−1,930</td></tr><tr><td>Packaging and postage</td><td>−1,120</td></tr><tr><td>Marketing</td><td>−640</td></tr><tr><td>Software and subscriptions</td><td>−212</td></tr><tr><td>Operating profit</td><td>1,788</td></tr></tbody></table>
@@ -258,8 +260,9 @@
     <!-- COMPLIANCE -->
     <div class="content" data-screen="compliance" hidden>
       <div class="page-h"><div><h1>Deadline calendar</h1><p>Filing, payment and renewal dates your Compliance manager is tracking, with who is preparing each one.</p></div><span class="badge badge-dark eg">Example data</span></div>
-      <div class="kpis kpis-4" id="cal-kpis"></div>
-      <div class="grid2">
+      <div class="ovl" id="cal-live" hidden></div>
+      <div class="kpis kpis-4" id="cal-kpis" data-eg-body></div>
+      <div class="grid2" data-eg-body>
         <section class="panel" aria-labelledby="cal-h"><div class="panel-h"><h2 id="cal-h">Upcoming deadlines</h2><div class="chips r" id="cal-filter" role="group" aria-label="Show deadlines by type"></div></div>
           <ul class="cal" id="cal-list"></ul>
           <p class="xs muted">Example for a UK limited company. Your Compliance manager builds your own calendar from your country and business type, and every date links to its official source. It prepares and reminds; it never files or pays for you, and it is not legal advice.</p></section>

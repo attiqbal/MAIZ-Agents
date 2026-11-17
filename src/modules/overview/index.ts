@@ -110,10 +110,13 @@ export function createOverview(d: OverviewDeps) {
       .filter((s) => s.approvedAt >= earliest);
   };
 
-  /** True while the client has not yet told their team about the business. */
+  /**
+   * True until the team has been set up from the client's answers. The same rule as the setup card on the
+   * Overview, so the card and the count never disagree.
+   */
   const setupWaiting = (userId: string, ws: string): boolean => {
     try {
-      return d.admin.status(userId, ws).state === "awaiting_form";
+      return d.admin.status(userId, ws).state !== "ready";
     } catch (e) {
       // A business that was never welcomed has no setup to wait for. Anything else is a real fault.
       if (e instanceof SetupError) return false;
