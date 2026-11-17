@@ -41,10 +41,11 @@ import { userIdFor } from "./identity.js";
 import { ExpiringSet, SendLog } from "./expiring.js";
 import { AffiliateService, CouponService, billDiscount } from "../modules/promotions/index.js";
 import { PromoterService } from "../modules/promoter/index.js";
-import { DEFAULT_PAID_MULTIPLIER, PaidServices, type Payer } from "../modules/paid-services/index.js";
+import { DEFAULT_PAID_MULTIPLIER, PaidServices, paidService, type Payer } from "../modules/paid-services/index.js";
 import { GrowthService } from "../modules/growth/index.js";
 import { ResearchService } from "../modules/research/index.js";
-import { DataMiningService } from "../modules/data-mining/index.js";
+import { DataMiningService, miningSource } from "../modules/data-mining/index.js";
+import { ResourceRegistry, clientSummary, renderGuide, suggestionsForTask, usageTable, usedBy, type RecordsEntry } from "../modules/resources/index.js";
 import { MetaGraph, MetaRejected, type MetaConfig } from "../modules/meta/index.js";
 import { LiveProvider, MetaClientService, SandboxProvider } from "../modules/meta-clients/index.js";
 import type { MetaClientSettings } from "./config.js";
@@ -394,6 +395,54 @@ export function createPlatform(cfg: PlatformConfig) {
     businessName: (ws) => identity.workspaceById(ws)?.name,
   });
   workforce.addContext((ws, templateKey) => people.contextFor(ws, templateKey));
+  /**
+   * What every employee may use, ready or not, with its cost and what to ask first. Built on each question from the
+   * modules above through their own public functions, so a service added to one of them appears here by itself.
+   * The same answer writes the "what you can use" part of every employee's instructions, the client's list on the
+   * desk and the owner's usage table (docs/RESOURCES.md).
+   */
+  const records = (u: string, ws: string, key: string): RecordsEntry[] => {
+    const out: RecordsEntry[] = [];
+    const today = now().toISOString().slice(0, 10);
+    const count = (read: () => number): number => { try { return read(); } catch { return 0; } };
+    if (key === "rota-coordinator" || key === "hr-manager") out.push({ key: "rota", name: "The rota", goodFor: "Staff, shifts, hours and the limits each person gave.", gives: ["rota"], state: count(() => rota.week(u, ws, today).staff.length) > 0 ? "ready" : "empty", fix: { label: "Add your staff", href: "#people" } });
+    if (key === "hr-manager" || key === "compliance-manager") out.push({ key: "staff", name: "Staff records", goodFor: "Who works for you, their documents and what is due.", gives: ["staff"], state: count(() => people.overview(u, ws).summary.headcount) > 0 ? "ready" : "empty", fix: { label: "Add your staff", href: "#people" } });
+    if (key === "finance-manager") out.push({ key: "books", name: "The MAIZ books", goodFor: "Double-entry books, with every total worked out by tested code.", gives: ["ledger"], state: "ready", fix: { label: "Open Books", href: "#books" } });
+    return out;
+  };
+  const resources = new ResourceRegistry({
+    team: (u, ws) => workforce.team(u, ws),
+    hasProfile: (u, ws) => !!workforce.profileOf(u, ws),
+    apps: () => integrations.catalogue(),
+    connections: (u, ws) => integrations.list(u, ws),
+    mining: (u, ws) => mining.overview(u, ws),
+    paid: () => paid.list(),
+    records,
+    outsideTools: (u, ws) => agents.overview(u, ws).connections.map((c) => ({ name: c.name, status: c.status, employees: c.employees.map((e) => e.key) })),
+    taskEnergy: (ws) => energy.estimateFor(ws),
+    now,
+  });
+  workforce.setResourceGuide((u, ws, key, brief, name) => {
+    const r = resources.forEmployee(u, ws, key);
+    return { text: renderGuide(r, brief), used: usedBy(r), hints: suggestionsForTask(r, brief, name) };
+  });
+  /** The client's "What this employee can use" list. The employee must be on this client's team. */
+  const resourcesFor = (u: string, ws: string, templateKey: string) => clientSummary(resources.forEmployee(u, ws, templateKey));
+  const RESOURCE_NAMES: Record<string, string> = { "known:profile": "Business profile", "known:datasets": "Saved datasets", "known:rota": "The rota", "known:staff": "Staff records", "known:books": "The MAIZ books", "model:open": "Writing and analysis (open models)" };
+  const resourceName = (key: string): string => {
+    const [kind, id = ""] = [key.slice(0, key.indexOf(":")), key.slice(key.indexOf(":") + 1)];
+    if (kind === "app") return integrations.registry.get(id)?.name ?? id;
+    if (kind === "paid") return paidService(id)?.name ?? id;
+    if (kind === "source") return miningSource(id)?.label ?? id;
+    return RESOURCE_NAMES[key] ?? key;
+  };
+  /** The owner's table: what the employees were given and what paid things took this month, from records already kept. */
+  const resourceUsage = (userId: string) => {
+    if (!isPlatformOwner(userId)) throw new PermissionError("only the platform owner sees what the employees use");
+    const month = now().toISOString().slice(0, 7);
+    const rows = usageTable({ tasks: workforce.allTasksSince(`${month}-01`).map((t) => ({ used: t.used, energy: t.energyUsed, costMicro: t.costMicro })), providers: energy.usageByProvider(month) });
+    return { month, rows: rows.map((r) => ({ ...r, name: resourceName(r.key) })) };
+  };
   /** Checkout and orders. What a paid order buys is hired here, from the same templates the store sells. */
   /** A client has the Team package once they are on a paid plan (clients who went paid before it was sold keep theirs). */
   const hasTeamPackage = (ws: string): boolean => !energy.onTrial(ws);
@@ -693,6 +742,6 @@ export function createPlatform(cfg: PlatformConfig) {
     slack: { enumerable: true, get: () => cfg.slack ?? connections.slackApp() },
     loginApps: { enumerable: true, get: (): LoginApps => ({ ...connections.loginApps(), ...cfg.loginApps }) },
   });
-  return { agents, mining, orderDiscountFor, quoteFor, hasTeamPackage, push, conversations, notices, warm, ownerDecisions, decisionDigest, dashboard, reconciliation, rota, people, payments, batch, email, usedLinks, sends, loginFails, resets, credentials, formHits, codeFails, coupons, affiliates, promoter, paid, growth, research, connections, growthTick, metaClients, metaSettings, get ownerWhatsApp() { return live.wa; }, admin, reviews, prices, specialists, ai, clients, isPlatformOwner, healthy, hasStore, cfg: liveCfg, now, audit, bus, identity, energy, workforce, ledger, onboarding, router, integrations, slackTokens, saveSlackToken, attachStore };
+  return { resources, resourcesFor, resourceUsage, agents, mining, orderDiscountFor, quoteFor, hasTeamPackage, push, conversations, notices, warm, ownerDecisions, decisionDigest, dashboard, reconciliation, rota, people, payments, batch, email, usedLinks, sends, loginFails, resets, credentials, formHits, codeFails, coupons, affiliates, promoter, paid, growth, research, connections, growthTick, metaClients, metaSettings, get ownerWhatsApp() { return live.wa; }, admin, reviews, prices, specialists, ai, clients, isPlatformOwner, healthy, hasStore, cfg: liveCfg, now, audit, bus, identity, energy, workforce, ledger, onboarding, router, integrations, slackTokens, saveSlackToken, attachStore };
 }
 export type Platform = ReturnType<typeof createPlatform>;

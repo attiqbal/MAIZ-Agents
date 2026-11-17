@@ -1065,7 +1065,7 @@ export function energyText(d: Deliverable): string {
  * The job description as the employee reads it on every task. Kept compact:
  * it is sent with every request, so every line costs energy.
  */
-export function renderJobDescription(jd: JobDescription): string {
+export function renderJobDescription(jd: JobDescription, opts: { tools?: boolean } = {}): string {
   const list = (xs: readonly string[]) => xs.map((x) => `- ${x}`).join("\n");
   return [
     `Your job description: ${jd.jobTitle} (${jd.department}, reports to the ${jd.reportsTo.toLowerCase()}).`,
@@ -1075,7 +1075,8 @@ export function renderJobDescription(jd: JobDescription): string {
     `Laws and legal requirements you must know and apply (say when a rule must be confirmed for the owner's country):\n${list(jd.legal)}`,
     `Documents and records you keep complete and up to date:\n${list(jd.records)}`,
     `Standards you work to:\n${list(jd.knowledge)}`,
-    `Tools you can use today: ${jd.tools.filter((t) => t.status === "available").map((t) => t.name).join("; ")}. Do not claim to use any other tool.`,
+    // The resource guide (src/modules/resources) replaces this line when it is present, so the list is written once.
+    ...(opts.tools === false ? [] : [`Tools you can use today: ${jd.tools.filter((t) => t.status === "available").map((t) => t.name).join("; ")}. Do not claim to use any other tool.`]),
     `Standard deliverables: ${jd.deliverables.map((d) => `${d.name} (${d.cadence.toLowerCase()})`).join("; ")}.`,
     `You are measured on:\n${list(jd.kpis)}`,
     `You may do on your own (as drafts): ${jd.authority.autonomous.join("; ")}.`,
