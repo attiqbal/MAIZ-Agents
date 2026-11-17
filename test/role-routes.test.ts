@@ -136,7 +136,7 @@ const READS: readonly string[] = [
   "/api/team", "/api/org", "/api/dashboard", "/api/energy", "/api/setup", "/api/notifications", "/api/suggestions", "/api/queue", "/api/batch/schedule",
   "/api/finance/summary", "/api/rota/week", "/api/specialists", "/api/reviews", "/api/conversations/:emp", "/api/paid-services", "/api/paid-services/uses/:id",
   "/api/push", "/api/mining", "/api/mining/datasets/:id", "/api/agents", "/api/integrations", "/api/integrations/activity", "/api/integrations/growth",
-  "/api/overview", "/api/overview/approvals", "/api/overview/books", "/api/overview/calendar", "/api/meta", "/api/meta/posts", "/api/meta/insights", "/api/meta/sandbox/outbox",
+  "/api/overview", "/api/resources/employee/:emp", "/api/overview/approvals", "/api/overview/books", "/api/overview/calendar", "/api/meta", "/api/meta/posts", "/api/meta/insights", "/api/meta/sandbox/outbox",
 ];
 
 /** Routes with no business behind them: public pages and calls proved by a signature, a key or a one-time link, the person's own account, and MAIZ's own owner pages. */
