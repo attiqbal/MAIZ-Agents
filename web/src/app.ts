@@ -45,6 +45,8 @@ function route(): void {
   if (valid === "desk") showDesk(sub);
   if (valid === "mining") void import("./mining").then((m) => m.showMining());
   if (valid === "chat") void showChat(sub);
+  if (valid === "learning") void import("./learning").then((m) => m.showLearning());
+  if (valid === "video") void import("./video").then((m) => m.showVideo());
   if (valid === "firstday") void import("./firstday").then((m) => m.showFirstDay());
   if (valid === "apps") void import("./apps").then((m) => m.setAppsView(sub));
   if (valid === "apps") void import("./agents").then((m) => m.showAgents());
@@ -479,6 +481,8 @@ document.addEventListener("keydown", (e) => {
 
 initDash();
 initChat();
+void import("./learning").then((m) => m.initLearning());
+void import("./video").then((m) => m.initVideo());
 initBell();
 // A suggestion's question goes into the ask bar for the person to read and send, never sent for them.
 void initSuggestions((employee, text) => {

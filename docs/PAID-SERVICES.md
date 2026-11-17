@@ -35,7 +35,8 @@ Both built connectors were tested against fake servers only. Nothing has been re
 ## Who can use it today
 
 - **The promotion agent (owner).** On an approved draft, open "Make a video from this draft", choose the service, paste the template id, see the cost, confirm. The draft's words fill the template's text slot. Nothing is published: the video link sits on the draft. Routes: `POST /api/owner/promoter/drafts/:id/video`, `.../video-status`, `GET /api/owner/promoter/video-services`.
-- **Clients' agents (API only, no screen yet).** `GET /api/paid-services`, `POST /api/paid-services/:service/render` with `employeeId`, `templateId`, `fields` and `confirmEnergy`, `GET /api/paid-services/uses/:id`. These use the platform's key, which is why the multiplier applies.
+- **Clients (the Videos screen, `/app.html#video`).** See `docs/CLIENT-VIDEO.md`. The routes below are what it calls.
+- **Clients' agents (API).** `GET /api/paid-services`, `POST /api/paid-services/:service/render` with `employeeId`, `templateId`, `fields` and `confirmEnergy`, `GET /api/paid-services/uses/:id`. These use the platform's key, which is why the multiplier applies.
 
 ## Safety notes
 

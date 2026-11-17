@@ -26,6 +26,8 @@
     <a class="ni" href="#work" data-nav="work"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="5" height="16" rx="1.5"/><rect x="10" y="4" width="5" height="10" rx="1.5"/></svg>Tasks</a>
     <a class="ni" href="#chat" data-nav="chat"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h16v11H9l-5 4z"/><path d="M8 9.5h8M8 12.5h5"/></svg>Conversations</a>
     <div class="group" id="g-team">Your team</div>
+    <a class="ni" href="#learning" data-nav="learning"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3a6 6 0 00-3.5 10.900V17h7v-3.100A6 6 0 0012 3zM9.500 20h5"/></svg>What your team knows</a>
+    <a class="ni" href="#video" data-nav="video"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="6" width="13" height="12" rx="2.500"/><path d="M16 10l5-3v10l-5-3"/></svg>Videos</a>
     <a class="ni" href="#desk/admin-manager" data-nav="desk/admin-manager" data-dept="admin"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="3.2"/><path d="M5 20c0-3.3 3.1-5.500 7-5.500s7 2.200 7 5.500"/></svg>Admin manager</a>
     <a class="ni" href="#desk/finance-manager" data-nav="desk/finance-manager" data-dept="finance"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19V9M10 19V5M16 19v-7M22 19H2"/></svg>Finance</a>
     <a class="ni" href="#desk/marketing-manager" data-nav="desk/marketing-manager" data-dept="marketing"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="3.2"/><path d="M5 20c0-3.3 3.1-5.500 7-5.500s7 2.200 7 5.500"/></svg>Marketing</a>
@@ -399,6 +401,63 @@
             <button class="btn btn-primary" id="chat-send" type="submit">Send</button>
           </form>
           <p><button type="button" class="btn btn-sm btn-ghost" id="chat-clear" hidden>Clear this conversation</button></p>
+        </section>
+      </div>
+    </div>
+
+    <!-- WHAT YOUR TEAM KNOWS -->
+    <div class="content" data-screen="learning" hidden>
+      <div class="page-h"><div><h1>What your team knows</h1><p>Your team picks up how you like things from your thumbs up, your notes and the changes you make to answers, and builds a short picture of your business. Everything here is yours to change or delete.</p></div></div>
+      <p id="learn-empty" class="small muted" hidden>Log in to see what your team has learned.</p>
+      <div id="learn-body" hidden>
+        <section class="panel" aria-labelledby="learn-pref-h"><div class="panel-h"><h2 id="learn-pref-h">How you like things done</h2><span class="r" id="learn-totals"></span></div>
+          <p class="small muted">Each line is added to your team's instructions, so you do not have to repeat yourself. It is a short list: the lines you repeat most stay. Nothing is learned from a thumbs up on its own; say what you liked in a note to teach it.</p>
+          <ul class="know-list" id="learn-lessons" aria-live="polite"></ul>
+          <form class="know-form" id="learn-add-lesson"><label class="sr-only" for="learn-lesson-in">Add a preference</label><input class="input" id="learn-lesson-in" maxlength="200" placeholder="For example: always use British spelling"><button class="btn btn-sm btn-primary" type="submit">Add</button></form>
+        </section>
+        <section class="panel" aria-labelledby="learn-prof-h"><div class="panel-h"><h2 id="learn-prof-h">Your business, as your team understands it</h2><span class="r">From signup, your website, your apps and your work</span></div>
+          <p class="small muted">Each line says where it came from. Change a line and your words replace it. Delete a line and it is not learned again.</p>
+          <ul class="know-list" id="learn-facts" aria-live="polite"></ul>
+          <form class="know-form" id="learn-add-fact"><label class="sr-only" for="learn-fact-kind">Kind of line</label><select class="input" id="learn-fact-kind" style="flex:0 1 190px"><option value="about">About the business</option><option value="how">How we work</option><option value="tool">Tools we use</option><option value="recurring">Regular jobs</option><option value="tone">Tone of voice</option></select><label class="sr-only" for="learn-fact-in">Add a line</label><input class="input" id="learn-fact-in" maxlength="240" placeholder="Add something your team should know"><button class="btn btn-sm btn-primary" type="submit">Add</button></form>
+        </section>
+        <section class="panel"><div class="panel-h"><h2>Start again</h2></div><p class="small muted">Deletes every preference, profile line and count above for your business. Your conversations are not touched.</p><p><button type="button" class="btn btn-sm btn-ghost" id="learn-forget">Forget everything</button></p></section>
+      </div>
+    </div>
+
+    <!-- VIDEOS -->
+    <div class="content" data-screen="video" hidden>
+      <div class="page-h"><div><h1>Videos</h1><p>Make a short video from a template you designed at Creatomate or Shotstack, with your own brand filled in. You see the cost first, and nothing is used until you approve it.</p></div></div>
+      <p id="video-empty" class="small muted" hidden>Log in to make videos.</p>
+      <div id="video-body" hidden>
+        <section class="panel" aria-labelledby="video-brand-h"><div class="panel-h"><h2 id="video-brand-h">Your brand</h2><span class="r">Used to fill your templates</span></div>
+          <form id="video-brand" class="know-form">
+            <label class="small block">Business name<input class="input" name="name" maxlength="80"></label>
+            <label class="small block">Brand colour<input class="input" name="colour" maxlength="7" placeholder="#1f7a3d" pattern="#[0-9a-fA-F]{6}"></label>
+            <label class="small block">Logo address (public https)<input class="input" name="logoUrl" maxlength="300" placeholder="https://yoursite.com/logo.png"></label>
+            <label class="small block">Tagline<input class="input" name="tagline" maxlength="120"></label>
+            <button class="btn btn-sm btn-primary" type="submit">Save brand</button>
+          </form>
+        </section>
+        <section class="panel" aria-labelledby="video-new-h"><div class="panel-h"><h2 id="video-new-h">Make a video</h2><span class="r" id="video-energy"></span></div>
+          <form id="video-form">
+            <div class="know-form">
+              <label class="small block">Who makes it<select class="input" id="video-emp"></select></label>
+              <label class="small block">Service<select class="input" id="video-service"></select></label>
+              <label class="small block">Template id (copy it from the service)<input class="input" id="video-template" maxlength="64" required></label>
+              <label class="small block">Name for this video<input class="input" id="video-title" maxlength="80" placeholder="Autumn blend"></label>
+            </div>
+            <fieldset class="block"><legend class="small">What goes in each slot of the template</legend>
+              <div id="video-slots"></div>
+              <button type="button" class="btn btn-sm btn-ghost" id="video-add-slot">Add a slot</button>
+            </fieldset>
+            <p class="small" id="video-cost" aria-live="polite"></p>
+            <p><button class="btn btn-primary" type="submit" id="video-go">See the cost</button> <span class="small muted" id="video-msg" aria-live="polite"></span></p>
+          </form>
+          <div id="video-listed" class="small muted"></div>
+          <p class="small muted">Want help with the idea or the words? The Brand and content creator in the store, and its Video scriptwriter role, can plan the video and write the script for you to put into a template. <a href="#store">Browse the store</a>.</p>
+        </section>
+        <section class="panel" aria-labelledby="video-list-h"><div class="panel-h"><h2 id="video-list-h">Your videos</h2><span class="r">Approve a video before you use it. Nothing is posted for you.</span></div>
+          <div class="video-grid" id="video-list"></div>
         </section>
       </div>
     </div>

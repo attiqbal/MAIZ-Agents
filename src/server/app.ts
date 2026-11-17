@@ -10,6 +10,9 @@ import { ReviewError } from "../modules/review/index.js";
 import { PricingError } from "../modules/pricing/index.js";
 import { OWNER_SPECIALISTS, PromoterError } from "../modules/promoter/index.js";
 import { PaidServiceError, RenderError } from "../modules/paid-services/index.js";
+import { LearningError } from "../modules/learning/index.js";
+import { factsFromSignup, factsFromWebsite } from "../modules/learning/sources.js";
+import { VideoError } from "../modules/video/index.js";
 import { GROWTH_ROLE, GrowthError, discoveryQueries } from "../modules/growth/index.js";
 import { ResearchError } from "../modules/research/index.js";
 import { DEFAULT_COMMISSION, DEFAULT_HOLD_DAYS, PromoError, describeCommission } from "../modules/promotions/index.js";
@@ -369,7 +372,10 @@ export function createApp(p: Platform) {
       const coupon = typeof b.coupon === "string" && b.coupon.trim() ? redeemAtSignup(userId, org.workspaceId, email, b.coupon) : undefined;
       await p.admin.welcome(userId, org);
       const token = issueSession(email);
-      return json(201, { token, workspaceId: org.workspaceId, blueprint: org.blueprint, trialEndsAt: p.energy.planOf(org.workspaceId).expiresAt ?? org.trialEndsAt, ...(coupon ? { coupon } : {}) });
+      // The business profile starts from what was just typed. The home page is read after the reply, so signup never waits on it.
+      p.learning.learnFacts(org.workspaceId, factsFromSignup({ sells: answers.sells, website: answers.website, sectorLabel, country: answers.country ?? answers.countryName, size: answers.size, needs: answers.needs, apps: answers.apps }));
+      const res = json(201, { token, workspaceId: org.workspaceId, blueprint: org.blueprint, trialEndsAt: p.energy.planOf(org.workspaceId).expiresAt ?? org.trialEndsAt, ...(coupon ? { coupon } : {}) });
+      return answers.website ? { ...res, after: async () => { try { p.learning.learnFacts(org.workspaceId, factsFromWebsite(await readSite(answers.website!, { http: p.cfg.http }))); } catch { /* an unreadable site just adds nothing */ } } } : res;
     }
 
     // ---- payment provider webhooks: public, authenticated by the provider's signature over the exact bytes ----
@@ -723,6 +729,58 @@ export function createApp(p: Platform) {
       p.identity.require(userId, org.id, "task.read");
       const use = await p.paid.status({ kind: "client", workspaceId: org.id, employeeId: "" }, paidStatus[1]!);
       return json(200, { use: { ...use, payer: undefined } });
+    }
+
+    // ---- feedback on answers, and what the team has learned about this business ----
+    // Thumbs up or down, redo, or an edit to the answer's words. Small preferences are kept; see docs/LEARNING.md.
+    if (method === "POST" && path === "/api/feedback") {
+      const b = body();
+      const emp = p.workforce.team(userId, org.id).find((e) => e.id === b.employeeId);
+      if (!emp) throw new BadRequest("pick one of your employees");
+      const kind = b.kind;
+      if (kind !== "up" && kind !== "down" && kind !== "redo" && kind !== "edit") throw new BadRequest("say whether it was good, not good, to redo, or edited");
+      const turnId = String(b.turnId ?? "");
+      let before: string | undefined;
+      let after: string | undefined;
+      try {
+        if (kind === "edit") ({ before, after } = p.conversations.editAnswer(userId, org.id, emp.id, turnId, String(b.text ?? "")));
+        else p.conversations.rateAnswer(userId, org.id, emp.id, turnId, kind);
+      } catch (e) {
+        if (e instanceof PermissionError) throw e;
+        throw new BadRequest(e instanceof Error ? e.message : "that answer was not found");
+      }
+      const r = p.learning.feedback(userId, org.id, { employeeId: emp.id, templateKey: emp.templateKey, kind, turnId, note: b.note, before, after });
+      return json(200, { ...r, turns: p.conversations.thread(userId, org.id, emp.id) });
+    }
+    if (method === "GET" && path === "/api/learning") {
+      p.identity.require(userId, org.id, "task.read");
+      p.syncLearning(userId, org.id);
+      return json(200, p.learning.view(userId, org.id));
+    }
+    if (method === "POST" && path === "/api/learning/lessons") { p.learning.addLesson(userId, org.id, body().text); return json(201, p.learning.view(userId, org.id)); }
+    const lesson = /^\/api\/learning\/lessons\/([\w-]{1,64})$/.exec(path);
+    if (method === "DELETE" && lesson) { p.learning.deleteLesson(userId, org.id, lesson[1]!); return json(200, p.learning.view(userId, org.id)); }
+    if (method === "POST" && path === "/api/learning/facts") { p.learning.setFact(userId, org.id, body()); return json(200, p.learning.view(userId, org.id)); }
+    const fact = /^\/api\/learning\/facts\/([\w-]{1,64})$/.exec(path);
+    if (method === "DELETE" && fact) { p.learning.deleteFact(userId, org.id, fact[1]!); return json(200, p.learning.view(userId, org.id)); }
+    if (method === "POST" && path === "/api/learning/forget") { p.learning.forgetAll(userId, org.id); return json(200, p.learning.view(userId, org.id)); }
+
+    // ---- client video: templates plus the business's brand. Cost shown first, charged by paid services, approved before use ----
+    const videoView = (extra: object = {}) => ({
+      ...p.video.view(userId, org.id),
+      services: p.paid.list().filter((s) => s.kind === "api").map((s) => ({ key: s.key, name: s.name, summary: s.summary, note: s.note, link: s.link, connected: s.connected, quote: s.quote })),
+      listed: p.paid.list().filter((s) => s.kind !== "api").map((s) => ({ key: s.key, name: s.name, note: s.note, kind: s.kind, link: s.link })),
+      team: p.energy.teamEnergyOf(org.id),
+      ...extra,
+    });
+    if (method === "GET" && path === "/api/video") return json(200, videoView());
+    if (method === "POST" && path === "/api/video/brand") { p.video.setBrand(userId, org.id, body()); return json(200, videoView()); }
+    if (method === "POST" && path === "/api/video") { const draft = await p.video.create(userId, org.id, body()); return json(201, videoView({ draft })); }
+    const vid = /^\/api\/video\/([\w-]{1,64})(?:\/(refresh|decide))?$/.exec(path);
+    if (vid) {
+      if (method === "POST" && vid[2] === "refresh") { const draft = await p.video.refresh(userId, org.id, vid[1]!); return json(200, videoView({ draft })); }
+      if (method === "POST" && vid[2] === "decide") { const b = body(); const draft = p.video.decide(userId, org.id, vid[1]!, b.approve === true, b.note); return json(200, videoView({ draft })); }
+      if (method === "DELETE" && !vid[2]) { p.video.remove(userId, org.id, vid[1]!); return json(200, videoView()); }
     }
 
     // The app calls this when it opens or the ask box is focused, so a sleeping GPU is awake by the time the question is sent.
@@ -1133,7 +1191,7 @@ export function createApp(p: Platform) {
     try {
       return renewed(req, await route(req));
     } catch (err) {
-      if (err instanceof BadRequest || err instanceof SetupError || err instanceof SignupError || err instanceof LedgerError || err instanceof ChannelError || err instanceof IntegrationError || err instanceof ReviewError || err instanceof PeopleError || err instanceof PricingError || err instanceof PromoError || err instanceof PromoterError || err instanceof GrowthError || err instanceof ResearchError || err instanceof PushError || err instanceof AgentError || err instanceof MiningError || err instanceof EnergyError || err instanceof SettingsError || err instanceof BatchError || err instanceof PaymentError || err instanceof RotaError || err instanceof MetaClientError) return json(400, { error: err.message });
+      if (err instanceof BadRequest || err instanceof SetupError || err instanceof SignupError || err instanceof LedgerError || err instanceof ChannelError || err instanceof IntegrationError || err instanceof ReviewError || err instanceof PeopleError || err instanceof PricingError || err instanceof PromoError || err instanceof PromoterError || err instanceof GrowthError || err instanceof ResearchError || err instanceof PushError || err instanceof AgentError || err instanceof MiningError || err instanceof EnergyError || err instanceof SettingsError || err instanceof BatchError || err instanceof PaymentError || err instanceof RotaError || err instanceof MetaClientError || err instanceof LearningError || err instanceof VideoError) return json(400, { error: err.message });
       // A paid service that has not been confirmed answers 409 with the quote, so the screen can show the cost and ask.
       if (err instanceof PaidServiceError) return json(err.quote ? 409 : 400, { error: err.message, quote: err.quote });
       if (err instanceof RenderError) return json(400, { error: err.message });

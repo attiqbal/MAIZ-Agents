@@ -33,6 +33,9 @@ import { localParts } from "../modules/batch/schedule.js";
 import { RotaService, RotaError } from "../modules/rota/index.js";
 import { PeopleService } from "../modules/people/index.js";
 import { ConversationService } from "../modules/conversations/index.js";
+import { LearningService } from "../modules/learning/index.js";
+import { factsFromAsks, factsFromConnections, factsFromProfile } from "../modules/learning/sources.js";
+import { VideoStudio } from "../modules/video/index.js";
 import { NotificationService } from "../modules/notifications/index.js";
 
 import { ConsoleEmailSender, QueuedEmailSender, ResendEmailSender, type EmailSender } from "./email.js";
@@ -272,6 +275,27 @@ export function createPlatform(cfg: PlatformConfig) {
     meter: energy, multiplier: () => prices.general().paidServiceMultiplier ?? DEFAULT_PAID_MULTIPLIER, keys: () => connections.videoKeys(), http: cfg.http ?? fetch, now,
     onUse: (u) => { if (u.payer.kind === "client") audit.record({ workspaceId: u.payer.workspaceId, actor: `employee:${u.payer.employeeId}`, action: "paid_service.used", data: { service: u.service, energy: u.energy, simulated: u.simulated } }); },
   });
+  /** What each business has taught its team (feedback, edits, profile). Added to every employee's instructions in a short block. */
+  const learning = new LearningService(identity, now);
+  workforce.addContext((ws, templateKey) => learning.contextFor(ws, templateKey));
+  /** Client video from templates and the client's brand. Priced and charged by `paid`; approval is a separate step. */
+  const video = new VideoStudio(identity, {
+    paid,
+    employeeOk: (userId, ws, employeeId) => workforce.team(userId, ws).some((e) => e.id === employeeId),
+    onDecision: (ws, d, approved, userId) => {
+      const templateKey = workforce.templateOf(d.employeeId) ?? "all";
+      learning.feedback(userId, ws, { employeeId: d.employeeId, templateKey, kind: approved ? "up" : "down", note: approved ? undefined : d.note });
+    },
+  }, now);
+  /** Fills the business profile from what is already known: setup answers, connected apps and repeated asks. Cheap, so it runs when the profile is opened. */
+  const syncLearning = (userId: string, ws: string): void => {
+    const names = new Map(integrations.catalogue().map((c) => [c.key, c.name]));
+    learning.learnFacts(ws, [
+      ...factsFromProfile(workforce.profileOf(userId, ws)),
+      ...factsFromConnections(integrations.list(userId, ws).filter((c) => c.status === "connected").map((c) => names.get(c.connectorKey) ?? c.connectorKey)),
+      ...factsFromAsks(conversations.askedOf(ws)),
+    ]);
+  };
   const OWNER_PROMOTER: Payer = { kind: "owner", agent: "promotion-agent" };
   const promoter = new PromoterService((userId) => ownerIdSet.has(userId), {
     now, completer: gateway, send: (mail) => email.send(mail),
@@ -615,6 +639,8 @@ export function createPlatform(cfg: PlatformConfig) {
     for (const x of s.records ?? []) {
       if (x.kind === "meta_conn" || x.kind === "meta_post" || x.kind === "meta_limits") metaClients.restore(x.kind, x.data);
       else if (x.kind === "conversation") conversations.restore(x.data);
+      else if (x.kind === "learning") learning.restore(x.data);
+      else if (x.kind === "video") video.restore(x.data);
       else if (x.kind === "notices") notices.restore(x.data);
       else if (x.kind === "order") payments.restore(x.data);
       else if (x.kind === "recon") reconciliation.restore(x.data);
@@ -648,7 +674,7 @@ export function createPlatform(cfg: PlatformConfig) {
       else affiliates.restore(x.kind, x.data);
     }
     sink = store;
-    for (const part of [audit, identity, energy, workforce, ledger, router, admin, integrations, reviews, prices, specialists, aiSettings, spend, batch, payments, rota, reconciliation, people, conversations, notices, credentials, coupons, affiliates, promoter, growth, connections, metaClients, push, mining, agents]) part.useSink(store);
+    for (const part of [audit, identity, energy, workforce, ledger, router, admin, integrations, reviews, prices, specialists, aiSettings, spend, batch, payments, rota, reconciliation, people, conversations, learning, video, notices, credentials, coupons, affiliates, promoter, growth, connections, metaClients, push, mining, agents]) part.useSink(store);
     live.sink = store;
     live.wa?.useSink(store);
   }
@@ -693,6 +719,6 @@ export function createPlatform(cfg: PlatformConfig) {
     slack: { enumerable: true, get: () => cfg.slack ?? connections.slackApp() },
     loginApps: { enumerable: true, get: (): LoginApps => ({ ...connections.loginApps(), ...cfg.loginApps }) },
   });
-  return { agents, mining, orderDiscountFor, quoteFor, hasTeamPackage, push, conversations, notices, warm, ownerDecisions, decisionDigest, dashboard, reconciliation, rota, people, payments, batch, email, usedLinks, sends, loginFails, resets, credentials, formHits, codeFails, coupons, affiliates, promoter, paid, growth, research, connections, growthTick, metaClients, metaSettings, get ownerWhatsApp() { return live.wa; }, admin, reviews, prices, specialists, ai, clients, isPlatformOwner, healthy, hasStore, cfg: liveCfg, now, audit, bus, identity, energy, workforce, ledger, onboarding, router, integrations, slackTokens, saveSlackToken, attachStore };
+  return { agents, mining, orderDiscountFor, quoteFor, hasTeamPackage, push, conversations, learning, video, syncLearning, notices, warm, ownerDecisions, decisionDigest, dashboard, reconciliation, rota, people, payments, batch, email, usedLinks, sends, loginFails, resets, credentials, formHits, codeFails, coupons, affiliates, promoter, paid, growth, research, connections, growthTick, metaClients, metaSettings, get ownerWhatsApp() { return live.wa; }, admin, reviews, prices, specialists, ai, clients, isPlatformOwner, healthy, hasStore, cfg: liveCfg, now, audit, bus, identity, energy, workforce, ledger, onboarding, router, integrations, slackTokens, saveSlackToken, attachStore };
 }
 export type Platform = ReturnType<typeof createPlatform>;

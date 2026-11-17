@@ -1959,3 +1959,18 @@ h1, .sec-head h2, .final h2, .stage-band h2, .article-head h1, .sec-title, .bent
 .ag-pre { background: var(--color-canvas-white); border: 1px solid var(--line); border-radius: 14px; padding: 10px 12px; font-size: 12.5px; white-space: pre-wrap; overflow-wrap: anywhere; margin: 6px 0; }
 @media (max-width: 640px) { .ag-two, .ag-three { grid-template-columns: 1fr; } .ag-conn-h .status { margin-left: 0; } }
 .btn[aria-disabled="true"] { opacity: .45; cursor: progress; }
+
+/* Feedback under an answer, and the "what your team knows" and "videos" screens */
+.fb-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 4px; }
+.fb-form { display: flex; flex-direction: column; gap: 8px; margin-top: 6px; }
+.fb-form .input { width: 100%; margin-top: 4px; }
+.know-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.know-list li { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; justify-content: space-between; padding: 10px 14px; border-radius: 16px; background: var(--surface-fog-surface); }
+.know-list .k-text { flex: 1 1 260px; overflow-wrap: anywhere; }
+.know-form { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.know-form .input { flex: 1 1 240px; }
+.video-grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
+.video-card { display: flex; flex-direction: column; gap: 6px; padding: 14px; border-radius: 24px; background: var(--surface-fog-surface); }
+.video-card video { width: 100%; border-radius: 16px; background: #000; }
+.slot-row { display: grid; gap: 8px; grid-template-columns: minmax(100px, 1fr) minmax(100px, 2fr) auto; align-items: center; margin-bottom: 8px; }
+@media (max-width: 560px) { .slot-row { grid-template-columns: 1fr; } }
