@@ -56,7 +56,7 @@ describe("connection tiers", () => {
   });
 
   it("leaves the owner's own channels, market research sources and extra client apps as Optional", () => {
-    for (const key of ["facebook", "instagram", "whatsapp", "square", "reddit", "youtube", "x", "fred", "alphavantage", "companieshouse", "creatomate", "hubspot", "tiktok", "canva", "envato"]) expect(tierOf(defOf(key)!).tier, key).toBe("optional");
+    for (const key of ["facebook", "instagram", "whatsapp", "square", "reddit", "youtube", "x", "fred", "alphavantage", "companieshouse", "creatomate", "tiktok", "canva", "envato"]) expect(tierOf(defOf(key)!).tier, key).toBe("optional");
   });
 
   it("gives every service a tier and a reason in plain words", () => {
@@ -83,8 +83,8 @@ describe("connection tiers", () => {
   it("says how each service is connected", () => {
     expect(modeOf(defOf("facebook")!)).toBe("editable");
     expect(modeOf(defOf("stripe")!)).toBe("server");
-    expect(modeOf(defOf("tiktok")!)).toBe("approval");
-    expect(modeOf(defOf("canva")!)).toBe("manual");
+    expect(modeOf(defOf("tiktok")!)).toBe("editable");
+    expect(modeOf(defOf("indeed")!)).toBe("approval");
     expect(modeOf(defOf("envato")!)).toBe("manual");
     const base: ConnDef = { key: "newthing", title: "New thing (needs approval)", summary: "s", group: "platform", editable: false, fields: [], guide: [], usedBy: [] };
     expect(modeOf(base)).toBe("approval");
@@ -101,8 +101,9 @@ describe("Connections page: managing a saved service", () => {
     const by = (k: string) => all.find((c) => c.key === k);
     expect(by("stripe")).toMatchObject({ tier: "critical", mode: "server", status: "not_connected" });
     expect(by("anthropic")).toMatchObject({ tier: "critical", mode: "server", status: "connected" });
-    expect(by("tiktok")).toMatchObject({ mode: "approval", editable: false });
-    expect(by("canva")).toMatchObject({ mode: "manual", editable: false });
+    expect(by("tiktok")).toMatchObject({ mode: "editable", editable: true });
+    expect(by("indeed")).toMatchObject({ mode: "approval", editable: false });
+    expect(by("hubspot")).toMatchObject({ tier: "must" });
     expect(by("google")).toMatchObject({ tier: "must", mode: "editable" });
   });
 
@@ -157,7 +158,7 @@ describe("Connections page: managing a saved service", () => {
     const { call, stranger } = setup({ env: { ANTHROPIC_API_KEY: "sk-ant-secret-123456" } });
     expect((await call("POST", "/api/owner/connections/facebook/disconnect", undefined, stranger)).status).toBe(403);
     expect((await call("POST", "/api/owner/connections/anthropic/disconnect")).status).toBe(400);
-    expect((await call("POST", "/api/owner/connections/tiktok/disconnect")).status).toBe(400);
+    expect((await call("POST", "/api/owner/connections/indeed/disconnect")).status).toBe(400);
     expect((await call("POST", "/api/owner/connections/nothing/disconnect")).status).toBe(400);
   });
 
