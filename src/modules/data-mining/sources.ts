@@ -1,6 +1,6 @@
 import * as desk from "../research/desk.js";
 import type { DeskItem } from "../research/desk.js";
-import { clean, searchHackerNews, searchReddit, searchX, searchYouTube, type Mention, type RedditApp, type SearchOptions } from "../research/sources.js";
+import { clean, searchGitHub, searchHackerNews, searchReddit, searchX, searchYouTube, type Mention, type RedditApp, type SearchOptions } from "../research/sources.js";
 
 /**
  * The places the Data mining agent may read, and what each run of one costs in energy.
@@ -10,7 +10,7 @@ import { clean, searchHackerNews, searchReddit, searchX, searchYouTube, type Men
  * already public through each source's official interface. What comes back was written by strangers, so it is kept
  * as short snippets and links and treated as data, never as instructions.
  */
-export type MiningSourceId = "hackernews" | "reddit" | "youtube" | "x" | "news" | "economy" | "prices" | "companies";
+export type MiningSourceId = "hackernews" | "github" | "reddit" | "youtube" | "x" | "news" | "economy" | "prices" | "companies";
 
 export interface MiningSource {
   id: MiningSourceId;
@@ -41,6 +41,8 @@ export const YOUTUBE_RUNS_PER_DAY = 40;
 export const X_RUNS_PER_DAY = 50;
 /** Alpha Vantage's free key answers 25 times a day; some are left for the owner's desk. */
 export const PRICE_RUNS_PER_DAY = 15;
+/** GitHub allows about 10 keyless searches a minute across the whole platform; this keeps a day well inside that. */
+export const GITHUB_RUNS_PER_DAY = 500;
 /** Most items (or figures) kept from one source in one dataset. */
 export const MAX_ITEMS_PER_SOURCE = 10;
 export const MAX_SNIPPET = 300;
@@ -61,6 +63,7 @@ const COUNTRY_CODE = /^[A-Za-z]{2,3}$/;
 
 export const MINING_SOURCES: readonly MiningSource[] = [
   { id: "hackernews", label: "Hacker News discussions", gives: "What founders and tech people are saying about the topic.", baseEnergy: FREE_SOURCE_ENERGY, paid: false, estCostMicro: 0 },
+  { id: "github", label: "GitHub issues and requests", gives: "What builders ask for and complain about in public GitHub issues, with the project each came from.", baseEnergy: FREE_SOURCE_ENERGY, paid: false, estCostMicro: 0, dailyBudget: GITHUB_RUNS_PER_DAY },
   { id: "reddit", label: "Reddit conversations", gives: "What customers and communities are saying, with the community each post came from.", baseEnergy: FREE_SOURCE_ENERGY, paid: false, estCostMicro: 0 },
   { id: "youtube", label: "YouTube videos", gives: "Recent videos about the topic, with the channel and a short description.", baseEnergy: FREE_SOURCE_ENERGY, paid: false, estCostMicro: 0, dailyBudget: YOUTUBE_RUNS_PER_DAY },
   { id: "x", label: "Posts on X", gives: "Public posts from the last seven days. X charges for each search, so this uses more energy.", baseEnergy: X_BASE_ENERGY, paid: true, estCostMicro: X_EST_COST_MICRO, dailyBudget: X_RUNS_PER_DAY },
@@ -160,6 +163,7 @@ export async function gather(id: MiningSourceId, ctx: GatherContext): Promise<Ga
   const items = (found: (MiningItem | undefined)[]): Gathered => ({ items: found.filter(present).slice(0, MAX_ITEMS_PER_SOURCE), figures: [] });
   switch (id) {
     case "hackernews": return items((await searchHackerNews(http, search)).map(fromMention));
+    case "github": return items((await searchGitHub(http, search)).map(fromMention));
     case "reddit": return items((await searchReddit(http, keys.reddit!, search)).map(fromMention));
     case "youtube": return items((await searchYouTube(http, keys.youtube!, search)).map(fromMention));
     case "x": return items((await searchX(http, keys.x!, search)).map(fromMention));

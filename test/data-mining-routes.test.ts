@@ -84,7 +84,7 @@ describe("data mining routes: the page", () => {
     const b = r.body as any;
     expect(b.hired).toBe(true);
     expect(b.datasets).toEqual([]);
-    expect(b.sources.map((x: any) => x.id)).toEqual(["hackernews", "reddit", "youtube", "x", "news", "economy", "prices", "companies"]);
+    expect(b.sources.map((x: any) => x.id)).toEqual(["hackernews", "github", "reddit", "youtube", "x", "news", "economy", "prices", "companies"]);
     expect(b.sources.find((x: any) => x.id === "news")).toEqual({ id: "news", label: "News coverage", gives: expect.any(String), paid: false, energy: FREE_SOURCE_ENERGY, available: true });
     // No keys are set on this server: the sources that need one say so instead of failing.
     expect(b.sources.find((x: any) => x.id === "x")).toMatchObject({ paid: true, energy: 100, available: false, reason: expect.stringMatching(/not available yet/) });

@@ -1,6 +1,6 @@
 import * as desk from "./desk.js";
 import { DESK_KINDS, type DeskItem, type DeskKeys, type DeskKind } from "./desk.js";
-import { ResearchError, SOURCES, searchHackerNews, searchReddit, searchX, searchYouTube, type Mention, type RedditApp, type SearchOptions, type SourceKey } from "./sources.js";
+import { ResearchError, SOURCES, searchGitHub, searchHackerNews, searchReddit, searchX, searchYouTube, type Mention, type RedditApp, type SearchOptions, type SourceKey } from "./sources.js";
 
 export interface ResearchOptions {
   isOwner: (userId: string) => boolean;
@@ -41,6 +41,7 @@ export class ResearchService {
     return [
       { source: "reddit", ready: !!this.opts.reddit(), needs: this.opts.reddit() ? undefined : "Add the Reddit app on the Connections page" },
       { source: "hackernews", ready: true },
+      { source: "github", ready: true },
       { source: "youtube", ready: !!this.opts.youtubeKey(), needs: this.opts.youtubeKey() ? undefined : "Add the YouTube key on the Connections page" },
       { source: "x", ready: !!this.opts.xToken(), needs: this.opts.xToken() ? undefined : "Add the X token on the Connections page" },
     ];
@@ -78,7 +79,7 @@ export class ResearchService {
         this.youtubeRuns.push(this.now());
       }
       searched.push(s);
-      const run = s === "reddit" ? searchReddit(this.http, reddit!, o) : s === "youtube" ? searchYouTube(this.http, yt!, o) : s === "x" ? searchX(this.http, xt!, o) : searchHackerNews(this.http, o);
+      const run = s === "reddit" ? searchReddit(this.http, reddit!, o) : s === "youtube" ? searchYouTube(this.http, yt!, o) : s === "x" ? searchX(this.http, xt!, o) : s === "github" ? searchGitHub(this.http, o) : searchHackerNews(this.http, o);
       tasks.push(run.catch((e: unknown) => { skipped.push({ source: s, reason: e instanceof ResearchError ? e.message : "Something went wrong reading it." }); return []; }));
     }
     const mentions = (await Promise.all(tasks)).flat().filter((m) => m.title).sort((a, b) => b.score + b.comments * 2 - (a.score + a.comments * 2));

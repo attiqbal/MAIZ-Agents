@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { createApp, makeToken, type Req } from "../src/server/app.js";
 import { userIdFor } from "../src/server/identity.js";
 import { createPlatform } from "../src/server/platform.js";
-import { clean, parseHackerNews, parseReddit, parseX, parseYouTube } from "../src/modules/research/index.js";
+import { clean, parseGitHub, parseHackerNews, parseReddit, parseX, parseYouTube } from "../src/modules/research/index.js";
 
 const OWNER = "atif@maiz.test";
 const now = new Date("2026-11-20T09:00:00Z");
@@ -39,6 +39,7 @@ const redditAnswer = (c: Call) => {
     { data: { title: "off-site link", permalink: "https://evil.test/x", subreddit: "x" } },
   ] } } };
   if (c.url.includes("hn.algolia.com")) return { json: { hits: [{ objectID: "123", title: "Ask HN: how do you test?", points: 80, num_comments: 30, author: "pg", created_at_i: 1_790_000_000, story_text: "<p>hello</p>" }, { objectID: "bad id", title: "x" }] } };
+  if (c.url.includes("api.github.com/search/issues")) return { json: { items: [{ html_url: "https://github.com/acme/widgets/issues/7", title: "Need a <b>mock test</b> exporter", body: "please", comments: 3, reactions: { total_count: 4 }, created_at: "2026-11-10T00:00:00Z" }, { html_url: "https://evil.test/acme/widgets/issues/8", title: "off-site" }] } };
   if (c.url.includes("youtube/v3/search")) return { json: { items: [{ id: { videoId: "abcdefghijk" }, snippet: { title: "Mock tests", channelTitle: "Chan", publishedAt: "2026-11-01T00:00:00Z", description: "d" } }] } };
   if (c.url.includes("api.x.com/2/tweets/search")) return { json: { data: [{ id: "1700000000000000001", author_id: "9", text: "Anyone know a good mock test room?", public_metrics: { like_count: 5, retweet_count: 2, reply_count: 3 }, created_at: "2026-11-18T10:00:00.000Z" }, { id: "../x", author_id: "9", text: "bad" }], includes: { users: [{ id: "9", username: "jane_doe" }] } } };
   if (c.url.includes("api.x.com/2/users/by")) return { json: { data: { id: "1", username: "X" } } };
@@ -56,6 +57,10 @@ describe("reading what people write", () => {
     expect(clean("a\u0000b‮  c\n\nd", 10)).toBe("a b c d");
     const m = parseReddit({ data: { children: [{ data: { title: "t", permalink: "/r/a/comments/1/x/", subreddit: "a", score: 1 } }, { data: { title: "n", permalink: "/r/a/comments/2/x/", over_18: true } }, { data: { title: "e", permalink: "https://evil.test" } }] } });
     expect(m.map((x) => x.url)).toEqual(["https://www.reddit.com/r/a/comments/1/x/"]);
+    const gh = parseGitHub({ items: [{ html_url: "https://github.com/a/b/issues/1", title: "t <b>", comments: 2 }, { html_url: "https://github.com/a/b/issues/x", title: "bad number" }, { html_url: "https://evil.test/a/b/issues/1", title: "off-site" }] });
+    expect(gh).toHaveLength(1);
+    expect(gh[0]).toMatchObject({ source: "github", community: "a/b", comments: 2 });
+    expect(gh[0]!.title).not.toMatch(/[<>]/);
     expect(parseHackerNews({ hits: [{ objectID: "9", title: "ok" }, { objectID: "../x", title: "bad" }] })).toHaveLength(1);
     expect(parseYouTube({ items: [{ id: { videoId: "bad id" }, snippet: {} }] }, {})).toEqual([]);
     const x = parseX({ data: [{ id: "12", author_id: "1", text: "hi <b>there</b>", public_metrics: { like_count: 1, retweet_count: 1 } }, { id: "13", author_id: "2", text: "no author" }], includes: { users: [{ id: "1", username: "bob" }] } });
@@ -159,14 +164,14 @@ describe("Reddit and YouTube cards, and market research", () => {
     const first = await call("POST", "/api/owner/research/search", { query: "mock test room" });
     expect(first.status).toBe(200);
     const body = first.body as any;
-    expect(body.searched).toEqual(["hackernews"]);
+    expect(body.searched).toEqual(["hackernews", "github"]);
     expect(body.skipped.map((s: any) => s.source).sort()).toEqual(["reddit", "x", "youtube"]);
     await call("PUT", "/api/owner/connections/reddit", { fields: REDDIT });
     await call("PUT", "/api/owner/connections/youtube", { fields: { apiKey: YT } });
     expect((await call("PUT", "/api/owner/connections/x", { fields: { bearerToken: "short" } })).status).toBe(400);
     await call("PUT", "/api/owner/connections/x", { fields: { bearerToken: X } });
     const all = (await call("POST", "/api/owner/research/search", { query: "mock test room", subreddits: ["r/uk"] })).body as any;
-    expect(all.searched.sort()).toEqual(["hackernews", "reddit", "x", "youtube"]);
+    expect(all.searched.sort()).toEqual(["github", "hackernews", "reddit", "x", "youtube"]);
     expect(all.mentions.find((m: any) => m.source === "x")).toMatchObject({ community: "@jane_doe" });
     const top = all.mentions[0];
     expect(top).toMatchObject({ source: "youtube", score: 1000 });
