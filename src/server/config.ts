@@ -154,3 +154,18 @@ export function metaClientsFromEnv(env: Record<string, string | undefined>): Met
     version: env.META_GRAPH_VERSION || undefined,
   };
 }
+
+/**
+ * Things worth knowing when signup is open in production. Not errors: the server still starts. They are printed at start-up
+ * (and by deploy/signup-mode.sh) so opening signup never happens by surprise with payments or sign-in unfinished.
+ */
+export function openModeWarnings(env: Record<string, string | undefined>): string[] {
+  if (env.SIGNUP_MODE !== "open" || env.NODE_ENV !== "production") return [];
+  const out: string[] = [];
+  if (env.PAYMENTS_PROVIDER !== "stripe") out.push("PAYMENTS_PROVIDER is not stripe: new customers can sign up but checkout is refused, so nobody can pay.");
+  else if (!/^(sk|rk)_live_/.test(env.STRIPE_SECRET_KEY ?? "")) out.push("STRIPE_SECRET_KEY is a test key: payments will not be real.");
+  if (!env.GOOGLE_CLIENT_ID && !env.MICROSOFT_CLIENT_ID) out.push("No Google or Microsoft sign-in is set: customers can only use the emailed sign-in link.");
+  if (!env.CONTACT_EMAIL) out.push("CONTACT_EMAIL is empty: the Terms and Privacy pages have no contact address (set it and rebuild).");
+  if (!env.RUNPOD_API_KEY) out.push("RUNPOD_API_KEY is not set: the open-model workers are off, so more work goes to Claude.");
+  return out;
+}

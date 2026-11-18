@@ -3,7 +3,7 @@ import { createServer } from "node:http";
 import { join } from "node:path";
 import { createApp } from "./app.js";
 import { clientAppEnv } from "../modules/connections/client-apps.js";
-import { checkEnv, integrationAppsFromEnv, metaClientsFromEnv, metaFromEnv, platformOwnersFromEnv, whatsappFromEnv } from "./config.js";
+import { checkEnv, openModeWarnings, integrationAppsFromEnv, metaClientsFromEnv, metaFromEnv, platformOwnersFromEnv, whatsappFromEnv } from "./config.js";
 import { loginAppsFromEnv } from "./social-login.js";
 import { QueuedEmailSender, ResendEmailSender } from "./email.js";
 import { MockPaymentProvider, StripePaymentProvider } from "../modules/payments/index.js";
@@ -18,6 +18,7 @@ if (problems.length) {
   for (const p of problems) console.error(`config: ${p}`);
   process.exit(1);
 }
+for (const w of openModeWarnings(env)) console.warn(`signup is open, but: ${w}`);
 
 // Queued: sent at Resend's pace with retries, so a burst of sign-ins does not lose emails to its rate limit.
 const mailer = env.RESEND_API_KEY && env.EMAIL_FROM ? new QueuedEmailSender(new ResendEmailSender(env.RESEND_API_KEY, env.EMAIL_FROM)) : undefined;
