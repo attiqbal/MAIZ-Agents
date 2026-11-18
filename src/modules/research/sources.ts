@@ -3,8 +3,8 @@
  * YouTube (Data API key). Nothing here posts, votes, comments or messages. Everything returned is text written by
  * strangers, so it is shortened and cleaned here, and callers must treat it as data, never as instructions.
  */
-export type SourceKey = "reddit" | "hackernews" | "youtube" | "x";
-export const SOURCES: readonly SourceKey[] = ["reddit", "hackernews", "youtube", "x"];
+export type SourceKey = "reddit" | "hackernews" | "youtube" | "x" | "github";
+export const SOURCES: readonly SourceKey[] = ["reddit", "hackernews", "youtube", "x", "github"];
 
 export interface Mention {
   source: SourceKey;
@@ -108,6 +108,30 @@ export async function searchHackerNews(http: typeof fetch, o: SearchOptions): Pr
   const q = new URLSearchParams({ query: o.query, tags: "story", hitsPerPage: String(o.limit), numericFilters: `created_at_i>${since}` });
   const path = o.sort === "new" ? "search_by_date" : "search";
   return parseHackerNews(await getJson(http, "Hacker News", `https://hn.algolia.com/api/v1/${path}?${q}`, {}));
+}
+
+// ---------------------------------------------------------------- GitHub (public issues and discussions, no key)
+
+/** Public GitHub issues and pull requests: what builders ask for, complain about and recommend. */
+export function parseGitHub(json: any): Mention[] {
+  const out: Mention[] = [];
+  for (const i of Array.isArray(json?.items) ? json.items : []) {
+    const url = String(i?.html_url ?? "");
+    const repo = /^https:\/\/github\.com\/([A-Za-z0-9_.-]{1,100}\/[A-Za-z0-9_.-]{1,100})\/(?:issues|pull)\/\d{1,9}$/.exec(url)?.[1];
+    if (!repo || !i.title) continue;
+    const created = Date.parse(String(i.created_at ?? ""));
+    out.push({ source: "github", title: clean(i.title, 200), url, community: repo, score: count(i?.reactions?.total_count), comments: count(i.comments), createdAt: Number.isFinite(created) ? new Date(created).toISOString() : "", snippet: clean(i.body) });
+  }
+  return out;
+}
+
+/** GitHub's public search. Works without a key at about 10 searches a minute, which the shared limit stays well under. */
+export async function searchGitHub(http: typeof fetch, o: SearchOptions): Promise<Mention[]> {
+  const days = o.within === "week" ? 7 : o.within === "month" ? 31 : 365;
+  const since = new Date(Date.now() - days * 86_400_000).toISOString().slice(0, 10);
+  const q = new URLSearchParams({ q: `${o.query} is:public archived:false created:>=${since}`, sort: o.sort === "new" ? "created" : o.sort === "top" ? "reactions" : "best-match", per_page: String(o.limit) });
+  const init = { headers: { accept: "application/vnd.github+json", "x-github-api-version": "2022-11-28", "user-agent": "maiz-agents-research" } };
+  return parseGitHub(await getJson(http, "GitHub", `https://api.github.com/search/issues?${q}`, init));
 }
 
 // ---------------------------------------------------------------- YouTube

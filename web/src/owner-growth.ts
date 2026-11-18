@@ -190,7 +190,7 @@ $("dk-form").addEventListener("submit", async (e) => {
 // ---- Find conversations (read-only research on Reddit, Hacker News and YouTube)
 interface Found { source: string; title: string; url: string; community: string; score: number; comments: number; createdAt: string; snippet: string }
 interface Found_ { mentions: Found[]; searched: string[]; skipped: { source: string; reason: string }[]; cached: boolean }
-const SOURCE: Record<string, string> = { reddit: "Reddit", hackernews: "Hacker News", youtube: "YouTube", x: "X" };
+const SOURCE: Record<string, string> = { reddit: "Reddit", hackernews: "Hacker News", github: "GitHub", youtube: "YouTube", x: "X" };
 let found: Found[] = [];
 const safeUrl = (u: string): string => (/^https:\/\/(www\.)?(reddit\.com|news\.ycombinator\.com|youtube\.com|x\.com)\//.test(u) ? u : "#");
 function renderFound(): void {
@@ -198,7 +198,7 @@ function renderFound(): void {
   $("rs-table").innerHTML = found.length ? `<thead><tr><th scope="col">Post</th><th scope="col">Where</th><th scope="col">Numbers</th><th scope="col"><span class="sr-only">Actions</span></th></tr></thead><tbody>${found.map((m, i) => `<tr><td class="ow-title"><b><a href="${esc(safeUrl(m.url))}" rel="noopener noreferrer" target="_blank">${esc(m.title)}</a></b><span>${esc(m.snippet)}</span></td>
     <td>${esc(SOURCE[m.source] ?? m.source)}<br><span class="muted small">${esc(m.community)}</span></td>
     <td class="num">${m.score.toLocaleString("en-GB")} ${m.source === "youtube" ? "views" : m.source === "x" ? "likes and reposts" : "points"}<br><span class="muted small">${m.comments.toLocaleString("en-GB")} comments · ${esc(date(m.createdAt))}</span></td>
-    <td><div class="acts"><button type="button" class="btn btn-quiet btn-sm" data-place="${i}">Use as a place</button>${m.source === "reddit" || m.source === "hackernews" ? `<button type="button" class="btn btn-quiet btn-sm" data-reply="${i}">Reply to this</button>` : ""}</div></td></tr>`).join("")}</tbody>` : "";
+    <td><div class="acts"><button type="button" class="btn btn-quiet btn-sm" data-place="${i}">Use as a place</button>${m.source === "reddit" || m.source === "hackernews" || m.source === "github" ? `<button type="button" class="btn btn-quiet btn-sm" data-reply="${i}">Reply to this</button>` : ""}</div></td></tr>`).join("")}</tbody>` : "";
 }
 $("rs-form").addEventListener("submit", async (e) => {
   e.preventDefault();

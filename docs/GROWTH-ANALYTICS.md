@@ -33,6 +33,7 @@ On `/owner-growth.html`, **Find conversations** searches public posts, read-only
 |---|---|---|
 | Reddit | Official API, app-only token (`client_credentials`), a descriptive User-Agent | Reddit card: Client ID, secret, your username |
 | Hacker News | Algolia's public search | none |
+| GitHub | Public issue search (`api.github.com/search/issues`), no key, about 10 searches a minute | none |
 | YouTube | Data API v3, key sent in a header | YouTube card: API key |
 | X (Twitter) | API v2 recent search (last 7 days only), bearer token in a header | X card: bearer token. X's plan with post search is paid (check current price; we have not verified it) |
 
@@ -61,3 +62,12 @@ LinkedIn has no public API for searching or reading other people's posts, and sc
 - Tested only against fake servers. Real Reddit, Google and YouTube answers have not been seen.
 - Reddit's Data API terms: as we understand them, commercial use needs Reddit's approval and free use is rate limited. Read their terms before using results for clients' businesses. We only read, and stay far below the limit.
 - Not built: client-side market listening (a weekly Reddit digest per client), Meta Ads / Google Ads read-only, image generation, brand voice from the website.
+
+
+### Agent-Reach review (2026-11-18)
+
+[Panniantong/agent-reach](https://github.com/Panniantong/agent-reach) (MIT) is a Python CLI that lets a coding agent read Twitter/X, Reddit, YouTube, GitHub, LinkedIn, Bilibili, Xiaohongshu and others. We reviewed it and took the part that fits:
+
+- **Adopted:** its GitHub channel, rebuilt natively as the keyless `github` source (`searchGitHub`) in Find conversations and the Data mining agent. No code was copied.
+- **Already covered by official APIs here:** Reddit, YouTube, X, Hacker News and web/news.
+- **Not adopted, on purpose:** running its CLI on the server (a Python and browser dependency with other people's logged-in sessions), and its login-cookie or anti-bot channels (LinkedIn, Facebook, Instagram, Xiaohongshu, Bilibili, X by scraping). They break those platforms' terms and the growth manager's rule never to bypass access restrictions. Chinese-language channels are out of scope for an English-only product.

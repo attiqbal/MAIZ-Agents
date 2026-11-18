@@ -69,7 +69,7 @@ async function confirmed(d: Awaited<ReturnType<typeof desk>>, sources: string[],
 
 describe("data mining: sources and their energy", () => {
   it("lists every source with a plain label, and only X is paid per use", () => {
-    expect(MINING_SOURCES.map((s) => s.id)).toEqual(["hackernews", "reddit", "youtube", "x", "news", "economy", "prices", "companies"]);
+    expect(MINING_SOURCES.map((s) => s.id)).toEqual(["hackernews", "github", "reddit", "youtube", "x", "news", "economy", "prices", "companies"]);
     for (const s of MINING_SOURCES) expect(s.label.length && s.gives.length).toBeGreaterThan(0);
     expect(MINING_SOURCES.filter((s) => s.paid).map((s) => s.id)).toEqual(["x"]);
   });
