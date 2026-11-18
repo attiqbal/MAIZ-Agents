@@ -341,8 +341,9 @@ export class PgStore implements Sink {
     // Same AES-256-GCM as chat bot tokens. A removed secret is stored as an empty value.
     this.state(workspaceId, "int_secret", connectionId, { enc: secret ? this.encrypt(secret) : "" });
   }
-  integrationRecord(r: StoredRecord): void {
-    this.state(r.workspaceId, "int_record", r.id, r);
+  integrationRecord(r: StoredRecord, removed = false): void {
+    // A deleted figure keeps only a marker, so nothing of it is left to restore.
+    this.state(r.workspaceId, "int_record", r.id, removed ? { removed: true } : r);
   }
   review(r: ReviewItem): void {
     // Stored under the client's workspace, so row-level security keeps one client's tasks from another.
@@ -490,7 +491,7 @@ export class PgStore implements Sink {
       slackTokens: of("slack_token").map((s) => ({ team: s.id, token: this.decrypt(s.data.enc) })),
       integrations: of("integration").map((s) => s.data),
       integrationSecrets: of("int_secret").filter((s) => s.data.enc).map((s) => ({ connectionId: s.id, secret: this.decrypt(s.data.enc) })),
-      integrationRecords: of("int_record").map((s) => s.data),
+      integrationRecords: of("int_record").filter((s) => !s.data.removed).map((s) => s.data),
       reviews: of("review").map((s) => s.data),
       specialistRequests: of("specialist_req").map((s) => s.data),
       records: states.filter((s) => (GENERIC_KINDS as readonly string[]).includes(s.kind)).map((s) => ({ workspaceId: s.workspace_id, kind: s.kind, id: s.id, data: s.data })),

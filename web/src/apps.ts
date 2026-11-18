@@ -242,8 +242,11 @@ export function initApps(): void {
     }
     const dis = t.closest<HTMLElement>("[data-disconnect]");
     if (dis) {
-      await api(`/integrations/connections/${dis.dataset.disconnect}`, { method: "DELETE" });
-      toast("Disconnected. Your books keep what was already added.");
+      const key = data.connections.find((c) => c.id === dis.dataset.disconnect)?.connectorKey ?? "";
+      const r = await api(`/integrations/connections/${dis.dataset.disconnect}`, { method: "DELETE" });
+      if (!r.ok) { toast("Could not disconnect. Please try again."); return; }
+      // Google's rules: what Google sent is deleted with the connection, and the client is told so.
+      toast(["ga4", "search-console", "gmail"].includes(key) ? "Disconnected. The figures Google sent us have been deleted." : "Disconnected. Your books keep what was already added.");
       void loadApps();
       return;
     }
