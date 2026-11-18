@@ -7,7 +7,9 @@ Until MAIZ Agents opens, the website collects a mailing list instead of signups.
 | `interest` (default) | Every "Start free trial / Sign up" button says **Register your interest** and goes to `/register-interest.html`. No 7-day-trial or "no card" promise. `/onboarding.html` redirects there. | `POST /api/signup` is refused (403) for everyone except the platform owner. Logging in, Stripe and the existing signup code are untouched. |
 | `open` | The normal site (free trial, signup flow). | Normal signup. |
 
-**Turn signup back on:** set `SIGNUP_MODE=open` in `deploy/.env` (or Render), then rebuild: `docker compose up -d --build`. The website copy is built in, so a restart alone is not enough.
+**Go live (Hetzner):** on the server run `cd /opt/maiz && git pull && deploy/signup-mode.sh open`. It sets `SIGNUP_MODE=open` in `deploy/.env`, rebuilds (the website copy is built in, so a restart alone is not enough), prints any start-up warnings (test Stripe key, no Google/Microsoft sign-in, empty `CONTACT_EMAIL`) and checks `/api/signup/mode` says `open`. **Back to waitlist:** `deploy/signup-mode.sh interest`. On Render, set `SIGNUP_MODE=open` and redeploy.
+
+In `open` mode the register-interest page and list still work (the page just stops being linked, and the owner list keeps its entries), so you can keep collecting a waitlist from a link you share yourself.
 
 **Test signup while pre-launch:** log in as a platform owner and open `/onboarding.html?preview=1`.
 

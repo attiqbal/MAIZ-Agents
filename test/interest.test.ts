@@ -3,7 +3,7 @@ import { createApp, makeToken, type Req } from "../src/server/app.js";
 import { userIdFor } from "../src/server/identity.js";
 import { createPlatform } from "../src/server/platform.js";
 import { MemoryEmailSender } from "../src/server/email.js";
-import { checkEnv } from "../src/server/config.js";
+import { checkEnv, openModeWarnings } from "../src/server/config.js";
 
 const OWNER = "atif@maiz.test";
 
@@ -92,5 +92,20 @@ describe("signup switch", () => {
   it("rejects a mistyped SIGNUP_MODE at start-up", () => {
     expect(checkEnv({ SIGNUP_MODE: "soon" }).join(" ")).toMatch(/SIGNUP_MODE/);
     expect(checkEnv({ SIGNUP_MODE: "open" }).join(" ")).not.toMatch(/SIGNUP_MODE/);
+  });
+});
+
+describe("opening signup", () => {
+  const live = { NODE_ENV: "production", SIGNUP_MODE: "open", PAYMENTS_PROVIDER: "stripe", STRIPE_SECRET_KEY: "sk_live_abc", GOOGLE_CLIENT_ID: "g", CONTACT_EMAIL: "hi@maiz.test", RUNPOD_API_KEY: "r" };
+  it("has nothing to say when everything is set, or while still pre-launch", () => {
+    expect(openModeWarnings(live)).toEqual([]);
+    expect(openModeWarnings({ ...live, SIGNUP_MODE: "interest", PAYMENTS_PROVIDER: "" })).toEqual([]);
+  });
+  it("warns about payments, sign-in and contact address without blocking start-up", () => {
+    const w = openModeWarnings({ NODE_ENV: "production", SIGNUP_MODE: "open" }).join("\n");
+    expect(w).toMatch(/PAYMENTS_PROVIDER/);
+    expect(w).toMatch(/Google or Microsoft/);
+    expect(w).toMatch(/CONTACT_EMAIL/);
+    expect(openModeWarnings({ ...live, STRIPE_SECRET_KEY: "sk_test_x" }).join()).toMatch(/test key/);
   });
 });
