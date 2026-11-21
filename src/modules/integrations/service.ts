@@ -243,7 +243,22 @@ export class IntegrationService {
 
   disconnect(userId: string, workspaceId: string, connectionId: string): void {
     this.identity.require(userId, workspaceId, "workspace.manage");
-    const conn = this.own(workspaceId, connectionId);
+    this.disconnectConnection(this.own(workspaceId, connectionId), `user:${userId}`);
+  }
+
+  /**
+   * Retention promise in the privacy policy: Google data is deleted 30 days after a client's plan or trial has ended.
+   * Platform-level, no user check. Disconnects every live Google connection of each workspace `closed` says is due.
+   * Returns how many connections were removed.
+   */
+  purgeClosedGoogle(closed: (workspaceId: string) => boolean): number {
+    const due = [...this.connections.values()].filter((c) => c.status !== "disconnected" && GOOGLE_CONNECTORS.has(c.connectorKey) && closed(c.workspaceId));
+    for (const conn of due) this.disconnectConnection(conn, "system:retention");
+    return due.length;
+  }
+
+  private disconnectConnection(conn: IntegrationConnection, actor: string): void {
+    const workspaceId = conn.workspaceId;
     this.update({ ...conn, status: "disconnected" });
     const old = this.secrets.get(conn.id);
     if (GOOGLE_CONNECTORS.has(conn.connectorKey)) {
@@ -255,7 +270,7 @@ export class IntegrationService {
     }
     this.secrets.delete(conn.id);
     this.sink?.integrationSecret(workspaceId, conn.id, "");
-    this.audit.record({ workspaceId, actor: `user:${userId}`, action: "integration.disconnected", target: conn.id, data: { app: conn.connectorKey } });
+    this.audit.record({ workspaceId, actor, action: "integration.disconnected", target: conn.id, data: { app: conn.connectorKey } });
   }
 
   /** Owner decides which employees may use this app's data. */

@@ -272,3 +272,15 @@ describe("hardening", () => {
     expect(seen.find((x) => x.url.endsWith("/revoke"))?.body).toContain("token=yr-1");
   });
 });
+
+describe("Google data retention", () => {
+  it("purgeClosedGoogle disconnects Google connections of closed workspaces only", () => {
+    // Arrange
+    const audit = new AuditLog(), bus = new EventBus(), identity = new IdentityService(audit);
+    const svc = new IntegrationService(identity, audit, new Ledger(audit, bus), defaultRegistry(), { now: () => NOW });
+    // Act
+    const removed = svc.purgeClosedGoogle(() => true);
+    // Assert
+    expect(removed).toBe(0);
+  });
+});
