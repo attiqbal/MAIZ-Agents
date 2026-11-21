@@ -274,13 +274,19 @@ describe("hardening", () => {
 });
 
 describe("Google data retention", () => {
-  it("purgeClosedGoogle disconnects Google connections of closed workspaces only", () => {
+  it("purgeClosedGoogle deletes the figures and token of closed workspaces and leaves others", async () => {
     // Arrange
-    const audit = new AuditLog(), bus = new EventBus(), identity = new IdentityService(audit);
-    const svc = new IntegrationService(identity, audit, new Ledger(audit, bus), defaultRegistry(), { now: () => NOW });
+    const { http } = fakeGoogle();
+    const { ig, ws } = await setup(http);
+    const conn = await ig.completeOAuth("owner", ws, "ga4", "code");
+    await ig.sync("owner", ws, conn.id);
     // Act
-    const removed = svc.purgeClosedGoogle(() => true);
+    const kept = ig.purgeClosedGoogle(() => false);
+    const removed = ig.purgeClosedGoogle((id) => id === ws);
     // Assert
-    expect(removed).toBe(0);
+    expect(kept).toBe(0);
+    expect(removed).toBe(1);
+    expect(ig.recordsOf(ws)).toHaveLength(0);
+    expect(ig.list("owner", ws)).toHaveLength(0);
   });
 });
