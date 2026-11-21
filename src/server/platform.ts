@@ -689,7 +689,13 @@ export function createPlatform(cfg: PlatformConfig) {
   }
 
   /** Daily analytics refresh, the weekly growth report and growth alerts, in each client's own time. */
-  const growthTick = () => integrations.growthTick(
+  const RETENTION_DAYS = 30;
+  /** A client whose plan or trial ended more than 30 days ago has their Google data deleted (privacy policy, "How long we keep it"). */
+  const purgeExpiredGoogle = () => integrations.purgeClosedGoogle((ws) => {
+    const ends = energy.planOf(ws).expiresAt;
+    return ends !== undefined && now().getTime() - new Date(ends).getTime() > RETENTION_DAYS * 86_400_000;
+  });
+  const growthTick = () => { purgeExpiredGoogle(); return integrations.growthTick(
     (ws, n) => { notices.add(ws, { kind: "info", title: n.title, body: n.body, link: "/app.html#apps" }); },
     (ws) => {
       const l = localParts(now(), batch.scheduleOf(ws).timezone);
@@ -697,7 +703,7 @@ export function createPlatform(cfg: PlatformConfig) {
       const weekday = ((new Date(Date.UTC(l.y, l.m - 1, l.d)).getUTCDay() + 6) % 7) + 1;
       return { weekday, hour: l.hh, isoWeek: isoWeek(date), date };
     },
-  );
+  ); };
 
   /** True when changes are written to the database (false: memory only, lost on restart). */
   const hasStore = () => !!live.sink;

@@ -73,7 +73,7 @@ const COMPANY = {
   incorporated: BASE_COMPANY.incorporated,
   incorporatedIso: BASE_COMPANY.incorporatedIso,
   office: BASE_COMPANY.registeredOffice,
-  email: (process.env.CONTACT_EMAIL ?? "").trim() || "[contact email to be added]",
+  email: (process.env.CONTACT_EMAIL ?? "").trim() || "support@maizagents.com",
 };
 const companyTokens = (html: string): string =>
   html

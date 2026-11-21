@@ -272,3 +272,21 @@ describe("hardening", () => {
     expect(seen.find((x) => x.url.endsWith("/revoke"))?.body).toContain("token=yr-1");
   });
 });
+
+describe("Google data retention", () => {
+  it("purgeClosedGoogle deletes the figures and token of closed workspaces and leaves others", async () => {
+    // Arrange
+    const { http } = fakeGoogle();
+    const { ig, ws } = await setup(http);
+    const conn = await ig.completeOAuth("owner", ws, "ga4", "code");
+    await ig.sync("owner", ws, conn.id);
+    // Act
+    const kept = ig.purgeClosedGoogle(() => false);
+    const removed = ig.purgeClosedGoogle((id) => id === ws);
+    // Assert
+    expect(kept).toBe(0);
+    expect(removed).toBe(1);
+    expect(ig.recordsOf(ws)).toHaveLength(0);
+    expect(ig.list("owner", ws)).toHaveLength(0);
+  });
+});
